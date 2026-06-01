@@ -7,11 +7,14 @@ This follows the browser chunking behavior: float32 PCM at 16 kHz, with
 
 import argparse
 import asyncio
+import json
 import math
+import re
 import sys
 import time
 import urllib.parse
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import List, Optional
 
 import numpy as np
@@ -40,6 +43,7 @@ class SessionStats:
     max_tbt_s: float = 0.0
     disconnected: bool = False
     result_times_s: List[float] = field(default_factory=list)
+    texts: List[str] = field(default_factory=list)
 
     def observe_message(self, elapsed_s: float, message: str) -> None:
         if message.startswith("ERROR"):
@@ -48,6 +52,7 @@ class SessionStats:
         if message.startswith("READY") or message.startswith("PROCESSING_COMPLETE"):
             return
         self.messages += 1
+        self.texts.append(message)
         self.result_times_s.append(elapsed_s)
         if self.first_result_s is None:
             self.first_result_s = elapsed_s
@@ -71,6 +76,180 @@ class SessionStats:
             for idx, emit_s in enumerate(self.result_times_s)
         ]
         return float(sum(lags) / len(lags))
+
+
+def join_hypothesis(texts: List[str], language_pair: str) -> str:
+    cleaned = [clean_text_for_bleu(text) for text in texts if clean_text_for_bleu(text)]
+    lower_pair = language_pair.lower()
+    if "chinese" in lower_pair or "japanese" in lower_pair:
+        return "".join(cleaned)
+    return " ".join(cleaned)
+
+
+def clean_text_for_bleu(text: str) -> str:
+    text = re.sub(r"</?t>", "", text)
+    text = re.sub(r"<[^>]+>", "", text)
+    return text.strip()
+
+
+def _parse_audio_yaml(path: Path) -> List[dict]:
+    try:
+        import yaml
+
+        loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+        if isinstance(loaded, list):
+            return [item for item in loaded if isinstance(item, dict)]
+    except Exception:
+        pass
+
+    items: List[dict] = []
+    current = {}
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        if raw_line.startswith("- "):
+            if current:
+                items.append(current)
+            current = {}
+            line = raw_line[2:]
+        else:
+            line = raw_line.strip()
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        current[key.strip()] = value.strip()
+    if current:
+        items.append(current)
+    return items
+
+
+def load_reference_text(args) -> Optional[str]:
+    if args.reference_text_file:
+        return "".join(
+            clean_text_for_bleu(line)
+            for line in Path(args.reference_text_file).read_text(encoding="utf-8").splitlines()
+        )
+    if not args.reference_audio_yaml or not args.reference_ref_file:
+        return None
+
+    items = _parse_audio_yaml(Path(args.reference_audio_yaml))
+    refs = Path(args.reference_ref_file).read_text(encoding="utf-8").splitlines()
+    target_wav = Path(args.reference_wav or args.audio_file).name
+    selected_lines = []
+    for idx, item in enumerate(items):
+        wav = str(item.get("wav", ""))
+        if Path(wav).name == target_wav and idx < len(refs):
+            selected_lines.append(clean_text_for_bleu(refs[idx]))
+    if not selected_lines:
+        raise RuntimeError(
+            f"no reference segments matched wav={target_wav} in {args.reference_audio_yaml}"
+        )
+    return "".join(selected_lines)
+
+
+def compute_sentence_bleu(hypothesis: str, reference: str, tokenize: str) -> float:
+    import sacrebleu
+
+    try:
+        return float(
+            sacrebleu.sentence_bleu(
+                hypothesis,
+                [reference],
+                tokenize=tokenize,
+                use_effective_order=True,
+            ).score
+        )
+    except TypeError:
+        return float(sacrebleu.sentence_bleu(hypothesis, [reference], tokenize=tokenize).score)
+
+
+def compute_corpus_bleu(hypotheses: List[str], reference: str, tokenize: str) -> float:
+    import sacrebleu
+
+    references = [[reference for _ in hypotheses]]
+    try:
+        return float(
+            sacrebleu.corpus_bleu(
+                hypotheses,
+                references,
+                tokenize=tokenize,
+                use_effective_order=True,
+            ).score
+        )
+    except TypeError:
+        return float(sacrebleu.corpus_bleu(hypotheses, references, tokenize=tokenize).score)
+
+
+def write_bleu_artifacts(args, stats_list: List[SessionStats], reference_text: str) -> List[float]:
+    hypotheses = [join_hypothesis(item.texts, args.language_pair) for item in stats_list]
+    scores = [
+        compute_sentence_bleu(hypothesis, reference_text, args.bleu_tokenize)
+        for hypothesis in hypotheses
+    ]
+    corpus_score = compute_corpus_bleu(hypotheses, reference_text, args.bleu_tokenize) if hypotheses else 0.0
+    print(
+        "sentence_bleu="
+        f"avg={float(np.mean(scores)):.3f} p50={np.percentile(scores, 50):.3f} "
+        f"min={min(scores):.3f} max={max(scores):.3f} corpus={corpus_score:.3f} "
+        f"tokenize={args.bleu_tokenize}"
+    )
+    for item, hypothesis, score in list(zip(stats_list, hypotheses, scores))[:5]:
+        print(
+            f"bleu_sample idx={item.idx} score={score:.3f} "
+            f"hyp_chars={len(hypothesis)} ref_chars={len(reference_text)} "
+            f"hyp_preview={hypothesis[:120]}"
+        )
+
+    if args.save_dir:
+        output_dir = Path(args.save_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        jsonl_path = output_dir / "session_predictions.jsonl"
+        with jsonl_path.open("w", encoding="utf-8") as handle:
+            for item, hypothesis, score in zip(stats_list, hypotheses, scores):
+                handle.write(
+                    json.dumps(
+                        {
+                            "idx": item.idx,
+                            "session_id": item.session_id,
+                            "sentence_bleu": score,
+                            "hypothesis": hypothesis,
+                            "reference": reference_text,
+                            "messages": item.texts,
+                            "result_times_s": item.result_times_s,
+                            "stream_laal_s": item.stream_laal_s(args.duration_sec),
+                            "max_tbt_s": item.max_tbt_s,
+                            "first_result_s": item.first_result_s,
+                            "last_result_s": item.last_result_s,
+                            "send_done_s": item.send_done_s,
+                            "session_done_s": item.session_done_s,
+                            "errors": item.errors,
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
+        summary_path = output_dir / "summary.json"
+        summary_path.write_text(
+            json.dumps(
+                {
+                    "sessions": args.sessions,
+                    "audio_file": args.audio_file,
+                    "duration_sec": args.duration_sec,
+                    "language_pair": args.language_pair,
+                    "glossary_preset": args.glossary_preset,
+                    "bleu_tokenize": args.bleu_tokenize,
+                    "sentence_bleu_avg": float(np.mean(scores)) if scores else None,
+                    "sentence_bleu_p50": float(np.percentile(scores, 50)) if scores else None,
+                    "sentence_bleu_min": min(scores) if scores else None,
+                    "sentence_bleu_max": max(scores) if scores else None,
+                    "corpus_bleu": corpus_score,
+                    "reference_chars": len(reference_text),
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        print(f"bleu_artifacts={output_dir}")
+    return scores
 
 
 def load_audio(path: str, duration_sec: float) -> np.ndarray:
@@ -193,6 +372,14 @@ async def run_all(args) -> int:
         raise RuntimeError("server is in mock_mode; refusing real stress test")
 
     audio = load_audio(args.audio_file, args.duration_sec)
+    reference_text = load_reference_text(args)
+    if reference_text is not None:
+        print(
+            "reference_config="
+            f"chars={len(reference_text)} "
+            f"audio_yaml={args.reference_audio_yaml} ref_file={args.reference_ref_file} "
+            f"reference_wav={args.reference_wav or args.audio_file}"
+        )
     chunk_samples = args.chunk_samples or BASE_CHUNK_SAMPLES * args.latency_multiplier
     expected_chunks = math.ceil(len(audio) / chunk_samples)
     print(
@@ -331,6 +518,9 @@ async def run_all(args) -> int:
     for failure in failures[:10]:
         print(f"failure={failure}")
 
+    if reference_text is not None and stats_list:
+        write_bleu_artifacts(args, stats_list, reference_text)
+
     return 1 if failures else 0
 
 
@@ -356,6 +546,12 @@ def parse_args():
     parser.add_argument("--no-cleanup", action="store_false", dest="cleanup")
     parser.add_argument("--allow-mock", action="store_false", dest="fail_on_mock")
     parser.add_argument("--allow-traditional", action="store_false", dest="require_scheduler")
+    parser.add_argument("--reference-text-file", default=None)
+    parser.add_argument("--reference-audio-yaml", default=None)
+    parser.add_argument("--reference-ref-file", default=None)
+    parser.add_argument("--reference-wav", default=None)
+    parser.add_argument("--bleu-tokenize", default="zh")
+    parser.add_argument("--save-dir", default=None)
     parser.set_defaults(
         realtime=True,
         require_realtime_wallclock=True,

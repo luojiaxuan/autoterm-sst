@@ -156,6 +156,19 @@ def _split_csv(value: str) -> List[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def _split_worker_gpu_groups(value: str, tp_size: int) -> List[str]:
+    if ";" in value:
+        return [item.strip() for item in value.split(";") if item.strip()]
+    tokens = _split_csv(value)
+    if tp_size <= 1:
+        return tokens
+    if len(tokens) % tp_size != 0:
+        raise RuntimeError(
+            f"worker GPU count ({len(tokens)}) must be divisible by vLLM TP size ({tp_size})"
+        )
+    return [",".join(tokens[idx : idx + tp_size]) for idx in range(0, len(tokens), tp_size)]
+
+
 def _format_term_map(references: Sequence[Dict[str, Any]], mode: str) -> str:
     lines: List[str] = []
     for ref in references:
@@ -314,13 +327,14 @@ def _worker_main(worker_idx: int, gpu_token: str, command_queue: mp.Queue, resul
             "model": lang_cfg["model_path"],
             "trust_remote_code": True,
             "gpu_memory_utilization": float(config["gpu_memory_utilization"]),
-            "tensor_parallel_size": 1,
-            "limit_mm_per_prompt": {"audio": int(config["vllm_limit_audio"])},
+            "tensor_parallel_size": int(config["vllm_tp_size"]),
             "max_num_seqs": int(config["max_num_seqs"]),
             "max_model_len": int(config["max_model_len"]),
             "enable_prefix_caching": bool(config["enable_prefix_caching"]),
             "enforce_eager": bool(config["vllm_enforce_eager"]),
         }
+        if int(config["vllm_limit_audio"]) > 0:
+            llm_kwargs["limit_mm_per_prompt"] = {"audio": int(config["vllm_limit_audio"])}
         if config["disable_custom_all_reduce"]:
             llm_kwargs["disable_custom_all_reduce"] = True
         result_queue.put({"type": "worker_loading_model", **worker_info, "llm_kwargs": llm_kwargs})
@@ -339,7 +353,7 @@ def _worker_main(worker_idx: int, gpu_token: str, command_queue: mp.Queue, resul
             retriever = StreamingMaxSimRetriever(
                 model_path=config["rag_model_path"],
                 index_path=lang_cfg["index_path"],
-                device="cuda:0",
+                device=config["rag_device"],
                 top_k=int(config["rag_top_k"]),
                 lora_rank=int(config["rag_lora_r"]),
                 text_lora_rank=int(config["rag_text_lora_r"]),
@@ -547,6 +561,7 @@ class RasstRuntime:
         return {
             "language_pair": self.args.language_pair,
             "gpu_memory_utilization": self.args.gpu_memory_utilization,
+            "vllm_tp_size": self.args.vllm_tp_size,
             "max_num_seqs": self.args.max_num_seqs,
             "max_model_len": self.args.max_model_len,
             "vllm_limit_audio": self.args.vllm_limit_audio,
@@ -561,6 +576,7 @@ class RasstRuntime:
             "seed": self.args.seed,
             "rag_enabled": self.args.rag_enabled,
             "rag_model_path": self.args.rag_model_path,
+            "rag_device": self.args.rag_device,
             "rag_top_k": self.args.rag_top_k,
             "rag_lora_r": self.args.rag_lora_r,
             "rag_text_lora_r": self.args.rag_text_lora_r,
@@ -576,7 +592,7 @@ class RasstRuntime:
         }
 
     async def start(self) -> None:
-        gpu_tokens = _split_csv(self.args.worker_gpus)
+        gpu_tokens = _split_worker_gpu_groups(self.args.worker_gpus, int(self.args.vllm_tp_size))
         if not gpu_tokens:
             raise RuntimeError("No RASST worker GPUs configured")
         for idx, gpu_token in enumerate(gpu_tokens):
@@ -684,8 +700,8 @@ class RasstRuntime:
             "workers": self.worker_status,
             "active_sessions": len(self.active_sessions),
             "mock_mode": False,
-            "tp_size_per_worker": 1,
-            "rag_device_per_worker": "cuda:0",
+            "tp_size_per_worker": self.args.vllm_tp_size,
+            "rag_device_per_worker": self.args.rag_device,
         }
 
 
@@ -820,12 +836,14 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", "8000")))
     parser.add_argument("--worker-gpus", default=os.environ.get("RASST_WORKER_GPUS", visible or "0,1"))
+    parser.add_argument("--vllm-tp-size", type=int, default=int(os.environ.get("RASST_VLLM_TP_SIZE", "1")))
     parser.add_argument("--language-pair", default=os.environ.get("RASST_DEMO_LANGUAGE_PAIR", "English -> Chinese"))
     parser.add_argument(
         "--rag-model-path",
         default=os.environ.get("RASST_HN1024_RETRIEVER", str(PROJECT_ROOT / "checkpoints/retriever/rasst-hn1024.pt")),
     )
     parser.add_argument("--rag-enabled", type=int, default=int(os.environ.get("RASST_RAG_ENABLED", "1")))
+    parser.add_argument("--rag-device", default=os.environ.get("RASST_RAG_DEVICE", "cuda:0"))
     parser.add_argument("--rag-top-k", type=int, default=int(os.environ.get("RASST_RAG_TOP_K", "10")))
     parser.add_argument("--rag-score-threshold", type=float, default=float(os.environ.get("RASST_RAG_SCORE_THRESHOLD", "0.78")))
     parser.add_argument("--rag-lora-r", type=int, default=128)

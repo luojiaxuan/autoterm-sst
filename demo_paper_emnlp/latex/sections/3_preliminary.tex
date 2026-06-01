@@ -1,0 +1,15 @@
+\section{Preliminary}
+
+\paragraph{Simultaneous Speech Translation (SST)} 
+Given a partial speech input sequence \( S = (s_1, s_2, \cdots, s_i) \in \mathbb{R}^n \) and a previously generated translation \( T = (t_1, t_2, \cdots, t_j) \), an SST system must decide whether to \emph{read}—by consuming the next speech frame \( s_{i+1} \)—or \emph{write}—by generating the next target token \( t_{j+1} \). The objective is to generate accurate translations while minimizing both algorithmic latency, which depends solely on the read/write decisions, and computational overhead, which becomes critical when scaling to long-form or multi-user scenarios.
+
+\paragraph{InfiniSST}
+InfiniSST is a LLM-based SST system that comprises three main components: a streaming speech encoder, an adapter module, and a multi-turn LLM decoder. It reformulates SST as a multi-turn dialogue between the speech input and the decoder to enable efficient inference without recomputing previously processed input.
+
+The input speech is segmented into fixed-size chunks (e.g., 960 ms) and processed by a streaming speech encoder equipped with chunkwise causal attention and a sliding window mechanism. Chunkwise causal attention allows bidirectional attention within each chunk and causal attention across chunks, while the sliding window ensures that only a limited number of key-value (KV) pairs are cached, enabling scalable inference.
+
+The adapter compresses the encoder output by a factor of four using two convolutional layers, followed by a linear projection to match the LLM’s embedding dimension.
+
+The multi-turn LLM decoder treats the shrinked speech features as user inputs in a dialogue and generates corresponding translations as assistant responses, continuing until a special end-of-turn (EOT) token is produced. This EOT token signals that additional speech input is required, prompting the system to process the next chunk.
+
+To enable streaming inference over arbitrarily long input, InfiniSST incorporates the attention sink mechanism~\cite{}. Attention sink maintains two segments of the key-value (KV) cache before applying Rotary Positional Embedding (RoPE)~\cite{}: a fixed set of tokens from the beginning of the sequence and a sliding window of the most recent tokens. The KV cache corresponding to intermediate tokens is discarded to reduce memory consumption. RoPE is then recomputed over the concatenation of the preserved initial tokens and the current sliding window. This mechanism allows InfiniSST to perform inference seamlessly on hours-long speech input.

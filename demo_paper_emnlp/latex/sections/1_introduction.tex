@@ -1,0 +1,7 @@
+\section{Introduction}
+
+Simultaneous speech translation (SST) is a key technology for real-time cross-lingual communication in conferences, education, and business. Large language models (LLMs) have recently improved SST translation quality, but at the cost of increased computation \cite{}. To address this, InfiniSST~\cite{} reformulates SST as a multi-turn dialogue task, eliminating redundant feature recomputation and enabling full reuse of KV cache—making it a strong candidate for high translation quality with low computational overhead.
+
+However, scaling simultaneous translation systems like InfiniSST to support multiple concurrent users while maintaining low latency remains challenging. First, read/write decisions differ across users, hindering efficient batching. Second, existing LLM serving frameworks such as SGLang and vLLM do not support prefix caching for speech input, requiring repeated KV recomputation. They also lack support for streaming LLM inference methods like StreamingLLM~\cite{}, which are essential for long-form, multi-turn inference in SST.
+
+In this work, we develop an efficient serving system that supports up to 32 concurrent users per GPU for a 7B InfiniSST model with minimal computational overhead. 

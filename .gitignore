@@ -1,0 +1,50 @@
+# Runtime outputs
+logs/
+serve/logs/
+*.log
+*.err
+*.out
+
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# Node/Electron build artifacts
+node_modules/
+dist/
+build/
+coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local checkpoints, model weights, and generated data
+checkpoints/
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.ckpt
+*.onnx
+
+# Demo/runtime media and temporary files
+*.wav
+*.mp3
+*.mp4
+*.webm
+*.tmp
+*.part
+
+# Local editor and OS metadata
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo

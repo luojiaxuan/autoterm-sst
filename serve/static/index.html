@@ -1,0 +1,4327 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RASST Translation Demo</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* 窗口拖拽区域 - 扩大到整个顶部区域 */
+        .drag-area {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 120px;
+            -webkit-app-region: drag;
+            z-index: 1000;
+            background: transparent;
+            pointer-events: auto;
+        }
+
+        /* 确保所有交互元素不可拖拽 */
+        button, input, select, textarea, .btn, .upload-btn, .record-btn {
+            -webkit-app-region: no-drag !important;
+        }
+
+        .header {
+            text-align: center;
+            margin-top: 40px;
+            margin-bottom: 40px;
+            position: relative;
+            z-index: 1001;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+            -webkit-app-region: no-drag; /* 标题文字不可拖拽，避免选择冲突 */
+            pointer-events: none; /* 文字不阻止拖拽 */
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            color: #a0a0a0;
+            font-weight: 300;
+            -webkit-app-region: no-drag; /* 副标题不可拖拽 */
+            pointer-events: none; /* 文字不阻止拖拽 */
+        }
+
+        .main-panel {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 40px;
+            margin-bottom: 30px;
+            margin-top: 20px; /* 为拖拽区域留出空间 */
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            -webkit-app-region: no-drag; /* 主面板内容不可拖拽 */
+            position: relative;
+            z-index: 999; /* 确保在拖拽区域下方 */
+        }
+
+        .controls-section {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 30px;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 2fr;
+            gap: 20px;
+            align-items: end;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .control-group.buttons-group {
+            /* JavaScript会在Electron中动态调整位置 */
+        }
+
+        .button-row {
+            display: flex;
+            gap: 12px;
+            align-items: stretch;
+        }
+
+        .button-row .btn {
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .control-group label {
+            font-size: 0.9rem;
+            color: #a0a0a0;
+            font-weight: 500;
+        }
+
+        .control-group select, .control-group input {
+            height: 48px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: white;
+            padding: 0 12px;
+            font-size: 0.9rem;
+        }
+
+        .control-group select:focus, .control-group input:focus {
+            outline: none;
+            border-color: #00d4ff;
+            box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.2);
+        }
+
+        .glossary-section {
+            background: rgba(0, 0, 0, 0.16);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 18px 20px;
+            margin-bottom: 30px;
+        }
+
+        .glossary-header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 14px;
+        }
+
+        .glossary-header h2 {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .glossary-meta {
+            color: #a0a0a0;
+            font-size: 0.85rem;
+            text-align: right;
+        }
+
+        .glossary-grid {
+            display: grid;
+            grid-template-columns: minmax(220px, 1fr) minmax(320px, 2fr) minmax(160px, 0.8fr);
+            gap: 16px;
+            align-items: stretch;
+        }
+
+        .glossary-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .glossary-textarea {
+            min-height: 116px;
+            resize: vertical;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 8px;
+            color: white;
+            padding: 12px;
+            font-size: 0.9rem;
+            line-height: 1.45;
+        }
+
+        .glossary-textarea:focus {
+            outline: none;
+            border-color: #00d4ff;
+            box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.2);
+        }
+
+        .glossary-textarea::placeholder {
+            color: #777;
+        }
+
+        .btn {
+            height: 48px;
+            background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            padding: 12px 16px;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(79, 172, 254, 0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: rgba(255, 255, 255, 0.1) !important;
+            color: rgba(255, 255, 255, 0.5) !important;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* 强制确保按钮样式应用 */
+        .buttons-group .btn {
+            background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%) !important;
+            color: white !important;
+            border: none !important;
+        }
+
+        .buttons-group .btn:disabled {
+            background: linear-gradient(45deg, rgba(79, 172, 254, 0.5) 0%, rgba(0, 242, 254, 0.4) 100%) !important;
+            color: rgba(255, 255, 255, 0.8) !important;
+        }
+
+        .input-section {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 16px;
+        }
+
+        .input-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .input-item.youtube-section {
+            flex-direction: row;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .upload-btn, .record-btn {
+            padding: 16px 24px;
+            border: none;
+            border-radius: 16px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-height: 56px;
+            white-space: nowrap;
+            width: 100%;
+        }
+
+        .upload-btn {
+            background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .record-btn {
+            background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        .record-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(245, 87, 108, 0.4);
+        }
+
+        .record-btn.recording {
+            background: linear-gradient(45deg, #ff6b6b 0%, #ee5a24 100%);
+            animation: pulse 2s infinite;
+        }
+
+        .system-audio-btn {
+            background: linear-gradient(45deg, #6a11cb 0%, #2575fc 100%);
+            color: white;
+            padding: 16px 24px;
+            border: none;
+            border-radius: 16px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-height: 56px;
+            white-space: nowrap;
+            width: 100%;
+        }
+
+        .system-audio-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(106, 17, 203, 0.4);
+        }
+
+        .system-audio-btn.capturing {
+            background: linear-gradient(45deg, #ff6b6b 0%, #ee5a24 100%);
+            animation: pulse 2s infinite;
+        }
+
+        .blackhole-btn {
+            background: linear-gradient(45deg, #ffa726 0%, #fb8c00 100%);
+            color: white;
+            padding: 16px 24px;
+            border: none;
+            border-radius: 16px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-height: 56px;
+            white-space: nowrap;
+            width: 100%;
+        }
+
+        .blackhole-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(255, 167, 38, 0.4);
+        }
+
+        .blackhole-btn:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .blackhole-btn.installing {
+            background: linear-gradient(45deg, #4caf50 0%, #2e7d32 100%);
+            animation: pulse 2s infinite;
+        }
+
+        .blackhole-btn.installed {
+            background: linear-gradient(45deg, #4caf50 0%, #388e3c 100%);
+            cursor: default;
+            transform: none;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+
+        .blackhole-btn.installed:hover {
+            transform: none;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 107, 107, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 107, 107, 0); }
+        }
+
+        .play-btn {
+            width: 60px;
+            height: 60px;
+            border: none;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .play-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 10px 25px rgba(79, 172, 254, 0.4);
+        }
+
+        .url-input {
+            flex: 1;
+            padding: 16px 20px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.05);
+            color: white;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            min-height: 56px;
+        }
+
+        .url-input:focus {
+            outline: none;
+            border-color: #4facfe;
+            box-shadow: 0 0 0 3px rgba(79, 172, 254, 0.2);
+        }
+
+        .url-input::placeholder {
+            color: #888;
+        }
+
+        .video-section {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 30px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            height: 200px;
+            background: #000;
+            border-radius: 16px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .video-placeholder {
+            color: #666;
+            font-size: 1.2rem;
+            text-align: center;
+        }
+
+        audio, video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Electron模式下的紧凑布局样式 */
+        .electron-mode .video-section {
+            display: none !important;
+            height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        .electron-mode .container {
+            padding-bottom: 5px !important;
+        }
+
+        .electron-mode .main-panel {
+            margin-bottom: 5px !important;
+            padding-bottom: 5px !important;
+        }
+
+        .electron-mode .input-section {
+            margin-bottom: 5px !important;
+            padding-bottom: 0 !important;
+        }
+
+        .electron-mode .upload-btn, 
+        .electron-mode .record-btn, 
+        .electron-mode .system-audio-btn {
+            margin-bottom: 0 !important;
+        }
+
+        .electron-mode .button-group {
+            margin-bottom: 0 !important;
+            gap: 10px !important;
+        }
+
+        /* Floating Translation Panel */
+        .translation-panel {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: calc(100% - 60px);
+            max-width: 1160px;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            transition: all 0.3s ease;
+            cursor: move;
+            user-select: none;
+        }
+
+        .translation-panel.minimized {
+            height: 60px;
+            overflow: hidden;
+        }
+
+        .translation-panel.dragging {
+            transition: none;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.7);
+        }
+
+        .translation-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            cursor: move;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .translation-header h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #ffffff;
+            margin: 0;
+        }
+
+        .panel-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .status-indicator {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-indicator.ready {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
+
+        .status-indicator.processing {
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+            border: 1px solid rgba(255, 193, 7, 0.3);
+        }
+
+        .status-indicator.error {
+            background: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+            border: 1px solid rgba(244, 67, 54, 0.3);
+        }
+
+        .panel-btn {
+            width: 24px;
+            height: 24px;
+            border: none;
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .panel-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .panel-btn svg {
+            width: 12px;
+            height: 12px;
+        }
+
+        .panel-btn.reset-btn {
+            background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            width: auto;
+            height: auto;
+        }
+
+        .panel-btn.reset-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 10px rgba(79, 172, 254, 0.3);
+        }
+
+        .panel-btn.reset-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .translation-content {
+            padding: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .translation-output {
+            min-height: 120px;
+            max-height: 260px; /* 添加最大高度限制 */
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 1rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            color: #ffffff;
+            overflow-y: auto; /* 当内容超出时显示滚动条 */
+            overflow-x: hidden; /* 隐藏横向滚动条 */
+            /* 自定义滚动条样式 */
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.1);
+        }
+
+        /* Webkit浏览器的滚动条样式 */
+        .translation-output::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .translation-output::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        .translation-output::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+        }
+
+        .translation-output::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .volume-indicator {
+            margin-top: 15px;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .volume-level {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #4caf50 0%, #8bc34a 50%, #ffeb3b 75%, #ff9800 90%, #f44336 100%);
+            transition: width 0.1s ease;
+            border-radius: 4px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-input-label {
+            display: inline-block;
+            cursor: pointer;
+        }
+
+        .mic-status {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #a0a0a0;
+            text-align: center;
+        }
+
+        @media (max-width: 1024px) {
+            .input-section {
+                grid-template-columns: 1fr;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            .controls-section {
+                grid-template-columns: 1fr;
+            }
+
+            .glossary-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .glossary-header {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .glossary-meta {
+                text-align: left;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .main-panel {
+                padding: 20px;
+            }
+
+            .translation-panel {
+                left: 15px;
+                right: 15px;
+                bottom: 15px;
+                width: auto;
+                max-width: none;
+                transform: none;
+            }
+        }
+
+        /* Icon styles */
+        .icon {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
+
+        /* Loading animation */
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #4facfe;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Resize handle */
+        .resize-handle {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 20px;
+            height: 20px;
+            cursor: nw-resize;
+            background: linear-gradient(-45deg, transparent 0%, transparent 40%, rgba(255,255,255,0.1) 40%, rgba(255,255,255,0.1) 60%, transparent 60%);
+        }
+
+        /* Toast通知系统已移除 */
+
+        /* 状态栏在Electron环境中的样式调整 */
+        .electron-status-bar {
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 16px;
+            font-size: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .electron-status-bar.ready {
+            border-left: 4px solid #4caf50;
+        }
+
+        .electron-status-bar.processing {
+            border-left: 4px solid #ff9800;
+        }
+
+        .electron-status-bar.error {
+            border-left: 4px solid #f44336;
+        }
+
+        .electron-status-icon {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .electron-status-icon.ready {
+            background: #4caf50;
+        }
+
+        .electron-status-icon.processing {
+            background: #ff9800;
+            animation: pulse 2s infinite;
+        }
+
+        .electron-status-icon.error {
+            background: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <!-- 窗口拖拽区域 -->
+    <div class="drag-area"></div>
+    
+    <!-- Electron专用音频处理器 -->
+    <script src="/static/electron-audio-fix.js"></script>
+    
+    <!-- Toast通知容器已移除 -->
+    
+    <div class="container">
+        <div class="header">
+            <h1>RASST Translation Demo</h1>
+            <p>Terminology-aware simultaneous speech translation powered by Speech LLM + RAG</p>
+        </div>
+
+        <div class="main-panel">
+            <!-- Model Configuration -->
+            <div class="controls-section">
+                <div class="control-group">
+                    <label>Model</label>
+                    <select id="agentType">
+                        <option value="RASST" selected>RASST</option>
+                        <option value="InfiniSST">InfiniSST Legacy</option>
+                    </select>
+                </div>
+                
+                <div class="control-group">
+                    <label>Language Pair</label>
+                    <select id="languagePair">
+                        <option value="English -> Chinese">English → Chinese</option>
+                        <option value="English -> Japanese">English → Japanese</option>
+                        <option value="English -> German">English → German</option>
+                    </select>
+                </div>
+                
+                <div class="control-group">
+                    <label>Latency</label>
+                    <select id="latencyMultiplier">
+                        <option value="1">1x (Fastest)</option>
+                        <option value="2" selected>2x (Default)</option>
+                        <option value="3">3x (More Accurate)</option>
+                        <option value="4">4x (Most Accurate)</option>
+                    </select>
+                </div>
+                
+                <div class="control-group buttons-group">
+                    <div class="button-row">
+                        <button id="loadModel" class="btn">Load Model</button>
+                        <button id="updateLatency" class="btn" disabled>Update Latency</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Imported Glossary -->
+            <div class="glossary-section">
+                <div class="glossary-header">
+                    <h2>Imported Glossary</h2>
+                    <div id="glossaryMeta" class="glossary-meta">Preset: ACL tagged glossary raw · Manual: 0 · Pending</div>
+                </div>
+                <div class="glossary-grid">
+                    <div class="control-group">
+                        <label>Preset</label>
+                        <select id="glossaryPreset">
+                            <option value="acl_tagged_raw" selected>ACL tagged glossary raw</option>
+                            <option value="acl_tagged_1k">ACL tagged glossary 1k</option>
+                            <option value="acl_tagged_10k">ACL tagged glossary 10k</option>
+                            <option value="medicine_raw">Medicine raw glossary</option>
+                            <option value="medicine_1k">Medicine glossary 1k</option>
+                            <option value="medicine_10k">Medicine glossary 10k</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Manual Terms</label>
+                        <textarea id="glossaryText" class="glossary-textarea" spellcheck="false" placeholder="term=translation&#10;large language model=大语言模型"></textarea>
+                    </div>
+                    <div class="glossary-actions">
+                        <button id="buildGlossary" class="btn" type="button">Confirm / Build</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Audio Input Section -->
+            <div class="input-section" id="audioInputSection">
+                <!-- Web Mode Buttons -->
+                <div class="input-item" id="webUploadItem">
+                    <button class="upload-btn" type="button" id="uploadBtn">
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+                        </svg>
+                        Upload Video/Audio
+                    </button>
+                    <input type="file" id="audioFile" class="file-input" accept="audio/*,video/*" />
+                </div>
+                
+                <div class="input-item youtube-section" id="webYoutubeItem">
+                    <input type="url" id="youtubeUrl" class="url-input" placeholder="https://www.youtube.com/watch?v=..." />
+                    <button id="playBtn" class="play-btn">
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <path d="M8,5.14V19.14L19,12.14L8,5.14Z"/>
+                        </svg>
+                    </button>
+                </div>
+                
+                <!-- Electron Mode System Audio Capture Button -->
+                <div class="input-item" id="electronSystemAudioItem" style="display: none;">
+                    <button class="system-audio-btn" type="button" id="systemAudioBtn">
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <path d="M3,9V15H7L12,20V4L7,9H3M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.71V20.77C18.01,19.86 21,16.28 21,12C21,7.72 18.01,4.14 14,3.23Z"/>
+                        </svg>
+                        Capture System Audio
+                    </button>
+                </div>
+                
+
+                
+                <div class="input-item">
+                    <button id="toggleMic" class="record-btn">
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <path d="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z"/>
+                        </svg>
+                        Record Audio
+                    </button>
+                </div>
+            </div>
+
+            <!-- Microphone Status -->
+            <div id="micStatus" class="mic-status"></div>
+            <div class="volume-indicator hidden" id="volumeIndicator">
+                <div id="volumeLevel" class="volume-level"></div>
+            </div>
+
+            <!-- Video/Audio Player (hidden in Electron mode) -->
+            <div class="video-section" id="videoSection">
+                <div class="video-container" id="mediaContainer">
+                    <div class="video-placeholder" id="videoPlaceholder">
+                        <p>Upload a video/audio file or enter a YouTube URL to begin</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Translation Panel -->
+    <div id="translationPanel" class="translation-panel">
+        <div class="translation-header" id="panelHeader">
+            <div class="header-left">
+                <h3>Ready to translate</h3>
+                <div id="statusIndicator" class="status-indicator ready">
+                    <div class="loading hidden" id="loadingSpinner"></div>
+                    <span id="statusText">Ready</span>
+                </div>
+            </div>
+            <div class="panel-controls">
+                <button id="resetTranslation" class="panel-btn reset-btn" disabled>Reset</button>
+                <button id="minimizeBtn" class="panel-btn" title="Minimize">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M19,13H5V11H19V13Z"/>
+                    </svg>
+                </button>
+                <button id="closeBtn" class="panel-btn" title="Close">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <div class="translation-content" id="translationContent">
+            <div id="translationOutput" class="translation-output">
+                Translation will appear here...
+            </div>
+        </div>
+        <div class="resize-handle" id="resizeHandle"></div>
+    </div>
+
+    <script>
+        let ws = null;
+        let sessionId = null;
+        let audioContext = null;
+        let audioSource = null;
+        let processor = null;
+        const segmentSize = 4096;
+        const targetSampleRate = 16000;
+        const baseChunkSize = 960 * 16;
+        let currentLatencyMultiplier = 2;
+        let audioBuffer = new Float32Array();
+        let resampledBuffer = new Float32Array();
+        let firstChunkSent = false;
+        let translationPaused = true;
+        
+        const PRE_BUFFER_DELAY_MS = 300;
+        let idleTimer = null;
+        const IDLE_TIMEOUT = 5 * 60 * 1000;
+        let pingInterval = null;
+        const PING_INTERVAL = 5000;
+        let deleteRetryInterval = null;
+        const SESSION_DELETE_RETRY_INTERVAL = 10000;
+        const QUEUE_CHECK_INTERVAL = 2000;
+        let queueCheckInterval = null;
+        let isQueued = false;
+        let clientId = null;
+        
+        let translationInitialized = false;
+        let micStream = null;
+        let micRecorder = null;
+        let isMicRecording = false;
+        let isSystemAudioCapturing = false;
+        let systemAudioStream = null;
+        let audioElementConnected = false;
+        let currentMediaElement = null;
+        let audioProcessingActive = false; // 全局音频处理状态标志
+
+        // Panel dragging variables
+        let isDragging = false;
+        let isResizing = false;
+        let dragOffset = { x: 0, y: 0 };
+        let isMinimized = false;
+
+        // UI Elements
+        const agentType = document.getElementById('agentType');
+        const languagePair = document.getElementById('languagePair');
+        const latencyMultiplier = document.getElementById('latencyMultiplier');
+        const glossaryPreset = document.getElementById('glossaryPreset');
+        const glossaryText = document.getElementById('glossaryText');
+        const glossaryMeta = document.getElementById('glossaryMeta');
+        const buildGlossary = document.getElementById('buildGlossary');
+        const loadModel = document.getElementById('loadModel');
+        const updateLatency = document.getElementById('updateLatency');
+        const audioFile = document.getElementById('audioFile');
+        const youtubeUrl = document.getElementById('youtubeUrl');
+        const playBtn = document.getElementById('playBtn');
+        const resetTranslation = document.getElementById('resetTranslation');
+        const translationOutput = document.getElementById('translationOutput');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const toggleMic = document.getElementById('toggleMic');
+        const micStatus = document.getElementById('micStatus');
+        const volumeLevel = document.getElementById('volumeLevel');
+        const volumeIndicator = document.getElementById('volumeIndicator');
+        const mediaContainer = document.getElementById('mediaContainer');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const systemAudioBtn = document.getElementById('systemAudioBtn');
+        
+        // Panel elements
+        const translationPanel = document.getElementById('translationPanel');
+        const panelHeader = document.getElementById('panelHeader');
+        const translationContent = document.getElementById('translationContent');
+        const minimizeBtn = document.getElementById('minimizeBtn');
+        const closeBtn = document.getElementById('closeBtn');
+        const resizeHandle = document.getElementById('resizeHandle');
+
+        function countManualGlossaryTerms(text) {
+            if (!text) return 0;
+            return text
+                .split('\n')
+                .map(line => line.trim())
+                .filter(line => line && !line.startsWith('#') && (line.includes('=') || line.includes('=>') || line.includes('\t')))
+                .length;
+        }
+
+        let serverDefaultGlossaryPreset = 'acl_tagged_raw';
+        let confirmedGlossary = {
+            preset: 'acl_tagged_raw',
+            text: '',
+            manualTerms: 0,
+            presetTerms: 0,
+            indexReady: false,
+            indexPath: '',
+            confirmedAt: 0
+        };
+
+        function isGlossaryConfirmed() {
+            const preset = glossaryPreset ? glossaryPreset.value : serverDefaultGlossaryPreset;
+            const text = glossaryText ? glossaryText.value : '';
+            return confirmedGlossary.preset === preset && confirmedGlossary.text === text && confirmedGlossary.confirmedAt > 0;
+        }
+
+        function updateGlossaryMeta() {
+            if (!glossaryMeta) return;
+            const selected = glossaryPreset ? glossaryPreset.options[glossaryPreset.selectedIndex] : null;
+            const presetLabel = selected ? selected.textContent : 'ACL tagged glossary raw';
+            const manualCount = countManualGlossaryTerms(glossaryText ? glossaryText.value : '');
+            const state = isGlossaryConfirmed() ? 'Ready' : 'Pending';
+            glossaryMeta.textContent = `Preset: ${presetLabel} · Manual: ${manualCount} · ${state}`;
+        }
+
+        function populateGlossaryPresets(presets) {
+            if (!glossaryPreset || !Array.isArray(presets) || presets.length === 0) return;
+            const currentValue = glossaryPreset.value || serverDefaultGlossaryPreset;
+            glossaryPreset.innerHTML = '';
+            presets.forEach(preset => {
+                const option = document.createElement('option');
+                option.value = preset.id;
+                option.textContent = preset.label || preset.id;
+                option.disabled = preset.available === false;
+                option.selected = preset.id === currentValue;
+                glossaryPreset.appendChild(option);
+            });
+            if (!Array.from(glossaryPreset.options).some(option => option.selected)) {
+                const fallback = Array.from(glossaryPreset.options).find(option => option.value === serverDefaultGlossaryPreset) || glossaryPreset.options[0];
+                if (fallback) fallback.selected = true;
+            }
+            updateGlossaryMeta();
+        }
+
+        async function confirmGlossarySelection() {
+            if (!glossaryPreset || !glossaryText) return null;
+            const payload = {
+                session_id: sessionId || null,
+                language_pair: languagePair.value,
+                glossary_preset: glossaryPreset.value || serverDefaultGlossaryPreset,
+                glossary_text: glossaryText.value || ''
+            };
+            if (buildGlossary) {
+                buildGlossary.disabled = true;
+                buildGlossary.textContent = 'Building...';
+            }
+            try {
+                const response = await fetch('/glossary/build', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (!response.ok || data.success === false) {
+                    throw new Error(data.detail || data.error || `HTTP ${response.status}`);
+                }
+                confirmedGlossary = {
+                    preset: payload.glossary_preset,
+                    text: payload.glossary_text,
+                    manualTerms: data.manual_terms || 0,
+                    presetTerms: data.preset_terms || 0,
+                    indexReady: data.index_ready === true,
+                    indexPath: data.index_path || '',
+                    confirmedAt: Date.now()
+                };
+                updateGlossaryMeta();
+                updateStatus(`Glossary ready: ${data.preset_terms || 0} preset terms, ${data.manual_terms || 0} manual terms.`, 'ready');
+                return data;
+            } catch (error) {
+                updateStatus('Glossary build failed: ' + error, 'error');
+                console.error('Glossary build failed:', error);
+                throw error;
+            } finally {
+                if (buildGlossary) {
+                    buildGlossary.disabled = false;
+                    buildGlossary.textContent = 'Confirm / Build';
+                }
+            }
+        }
+
+        async function loadServerConfig() {
+            try {
+                const response = await fetch('/config', { cache: 'no-store' });
+                if (!response.ok) return;
+                const config = await response.json();
+                if (Array.isArray(config.models) && config.models.length > 0) {
+                    agentType.innerHTML = '';
+                    config.models.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model.id;
+                        option.textContent = model.label || model.id;
+                        option.selected = model.default === true;
+                        agentType.appendChild(option);
+                    });
+                }
+                if (Array.isArray(config.language_pairs) && config.language_pairs.length > 0) {
+                    languagePair.innerHTML = '';
+                    config.language_pairs.forEach(pair => {
+                        const option = document.createElement('option');
+                        option.value = pair.id;
+                        option.textContent = pair.label || pair.id;
+                        option.disabled = pair.available === false;
+                        option.selected = pair.id === config.loaded_language_pair;
+                        languagePair.appendChild(option);
+                    });
+                }
+                if (Array.isArray(config.glossary_presets) && config.glossary_presets.length > 0) {
+                    serverDefaultGlossaryPreset = config.default_glossary_preset || serverDefaultGlossaryPreset;
+                    populateGlossaryPresets(config.glossary_presets);
+                }
+            } catch (error) {
+                console.warn('Server config endpoint unavailable; using built-in UI options.', error);
+                updateGlossaryMeta();
+            }
+        }
+
+        // Electron 集成检测和初始化
+        let isElectron = false;
+        let serverConfig = null; // 添加服务器配置
+        let translationWindowShown = false; // 跟踪翻译窗口状态
+        let electronAudioProcessor = null; // Electron专用音频处理器
+        const MIC_SEND_RMS_THRESHOLD = 0.003;
+        const MIC_SEND_AVG_ABS_THRESHOLD = 0.002;
+        const MIC_SEND_ACTIVE_RATIO_THRESHOLD = 0.015;
+        const MIC_SEND_ACTIVE_SAMPLE_THRESHOLD = 0.01;
+        let droppedMicChunkCount = 0;
+
+        function getAudioStats(samples) {
+            if (!samples || samples.length === 0) {
+                return { avgAbs: 0, rms: 0, peak: 0, activeRatio: 0 };
+            }
+            let absSum = 0;
+            let squareSum = 0;
+            let peak = 0;
+            let activeSamples = 0;
+            for (let i = 0; i < samples.length; i++) {
+                const value = Math.abs(samples[i]);
+                absSum += value;
+                squareSum += value * value;
+                if (value > peak) peak = value;
+                if (value > MIC_SEND_ACTIVE_SAMPLE_THRESHOLD) activeSamples++;
+            }
+            return {
+                avgAbs: absSum / samples.length,
+                rms: Math.sqrt(squareSum / samples.length),
+                peak: peak,
+                activeRatio: activeSamples / samples.length
+            };
+        }
+
+        function shouldSendMicrophoneChunk(chunk) {
+            const stats = getAudioStats(chunk);
+            const hasSpeechLikeEnergy =
+                stats.rms >= MIC_SEND_RMS_THRESHOLD ||
+                (stats.avgAbs >= MIC_SEND_AVG_ABS_THRESHOLD && stats.activeRatio >= MIC_SEND_ACTIVE_RATIO_THRESHOLD);
+            if (!hasSpeechLikeEnergy) {
+                droppedMicChunkCount++;
+                if (droppedMicChunkCount === 1 || droppedMicChunkCount % 10 === 0) {
+                    console.debug('Dropped low-energy microphone chunk', {
+                        droppedMicChunkCount,
+                        avgAbs: Number(stats.avgAbs.toFixed(5)),
+                        rms: Number(stats.rms.toFixed(5)),
+                        peak: Number(stats.peak.toFixed(5)),
+                        activeRatio: Number(stats.activeRatio.toFixed(5))
+                    });
+                }
+                return false;
+            }
+            droppedMicChunkCount = 0;
+            return true;
+        }
+
+        function sendAudioChunk(chunk, sourceType = 'media') {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                return false;
+            }
+            if (sourceType === 'microphone' && !shouldSendMicrophoneChunk(chunk)) {
+                return false;
+            }
+            ws.send(chunk.buffer);
+            return true;
+        }
+
+        function renderTranslationMessage(message) {
+            const text = String(message || '').trim();
+            if (!text) {
+                console.debug('Ignored empty translation message');
+                return;
+            }
+            if (isElectron) {
+                updateElectronTranslation(text);
+            } else {
+                const currentText = translationOutput.textContent.trim();
+                if (!currentText || currentText === 'Translation will appear here...') {
+                    translationOutput.textContent = text;
+                } else {
+                    translationOutput.textContent = `${translationOutput.textContent.trimEnd()}\n${text}`;
+                }
+                setTimeout(() => {
+                    scrollTranslationToBottom();
+                }, 10);
+            }
+        }
+        window.shouldSendMicrophoneChunk = shouldSendMicrophoneChunk;
+        window.sendAudioChunk = sendAudioChunk;
+
+        // Electron专用控制面板变量声明
+        let electronControlPanel = null;
+        let translationStyleSettings = {
+            fontSize: 14,
+            backgroundOpacity: 95,
+            textColor: '#ffffff'
+        };
+
+        // Electron专用控制面板函数
+        function createElectronControlPanel() {
+            if (electronControlPanel) return;
+
+            // 创建控制面板
+            electronControlPanel = document.createElement('div');
+            electronControlPanel.id = 'electronControlPanel';
+            electronControlPanel.innerHTML = `
+                <div class="electron-panel-header">
+                    <h3>Translation Window Control</h3>
+                    <button class="panel-toggle-btn" id="panelToggleBtn">−</button>
+                </div>
+                <div class="electron-panel-content" id="electronPanelContent">
+                    <!-- Electron状态栏 -->
+                    <div class="electron-status-bar ready" id="electronStatusBar">
+                        <div class="electron-status-icon ready" id="electronStatusIcon"></div>
+                        <div class="electron-status-text" id="electronStatusText">Ready - Load model</div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label>Font Size</label>
+                        <div class="font-controls">
+                            <button class="control-btn" id="electronFontDecrease">A−</button>
+                            <span class="font-size-display" id="electronFontSize">14px</span>
+                            <button class="control-btn" id="electronFontIncrease">A+</button>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label>Background Opacity</label>
+                        <div class="opacity-controls">
+                            <input type="range" id="opacitySlider" min="0" max="100" value="95" class="opacity-slider">
+                            <span class="opacity-display" id="opacityDisplay">95%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label>Text Color</label>
+                        <div class="text-color-controls">
+                            <button class="color-btn active" id="whiteTextBtn" data-color="#ffffff">White</button>
+                            <button class="color-btn" id="blackTextBtn" data-color="#000000">Black</button>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label>Window Control</label>
+                        <div class="window-controls">
+                            <button class="control-btn" id="electronShowWindow">Show Window</button>
+                            <button class="control-btn" id="electronHideWindow">Hide Window</button>
+                            <button class="control-btn reset-btn" id="electronResetTranslation">Reset Translation</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 添加样式
+            const style = document.createElement('style');
+            style.textContent = `
+                #electronControlPanel {
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    width: 280px;
+                    background: rgba(0, 0, 0, 0.9);
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    border-radius: 16px;
+                    padding: 0;
+                    z-index: 2000;
+                    backdrop-filter: blur(20px);
+                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+                    transition: all 0.3s ease;
+                    -webkit-app-region: no-drag; /* 控制面板不可拖拽 */
+                }
+
+                .electron-panel-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 16px 20px;
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                    background: rgba(255, 255, 255, 0.05);
+                    border-radius: 16px 16px 0 0;
+                }
+
+                .electron-panel-header h3 {
+                    color: #ffffff;
+                    font-size: 1rem;
+                    font-weight: 600;
+                    margin: 0;
+                }
+
+                .panel-toggle-btn {
+                    width: 24px;
+                    height: 24px;
+                    border: none;
+                    background: rgba(255, 255, 255, 0.1);
+                    color: #ffffff;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.2s ease;
+                }
+
+                .panel-toggle-btn:hover {
+                    background: rgba(255, 255, 255, 0.2);
+                }
+
+                .electron-panel-content {
+                    padding: 20px;
+                    transition: all 0.3s ease;
+                    overflow: hidden;
+                }
+
+                #electronControlPanel.collapsed .electron-panel-content {
+                    max-height: 0;
+                    padding: 0 20px;
+                }
+
+                .control-group {
+                    margin-bottom: 20px;
+                }
+
+                .control-group:last-child {
+                    margin-bottom: 0;
+                }
+
+                .control-group label {
+                    display: block;
+                    color: #a0a0a0;
+                    font-size: 0.9rem;
+                    font-weight: 500;
+                    margin-bottom: 8px;
+                }
+
+                .font-controls {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+
+                .font-controls .control-btn {
+                    width: 32px;
+                    height: 28px;
+                    border: none;
+                    background: rgba(255, 255, 255, 0.1);
+                    color: #ffffff;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 0.8rem;
+                    font-weight: bold;
+                    transition: all 0.2s ease;
+                }
+
+                .font-controls .control-btn:hover {
+                    background: rgba(255, 255, 255, 0.2);
+                    transform: translateY(-1px);
+                }
+
+                .font-size-display {
+                    color: #ffffff;
+                    font-size: 0.9rem;
+                    font-weight: 600;
+                    min-width: 40px;
+                    text-align: center;
+                }
+
+                .opacity-controls {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    width: 100%;
+                    position: relative;
+                    z-index: 1;
+                }
+
+                .opacity-slider {
+                    flex: 1;
+                    height: 6px;
+                    -webkit-appearance: none;
+                    appearance: none;
+                    background: rgba(255, 255, 255, 0.2);
+                    border-radius: 3px;
+                    outline: none;
+                    border: none;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    min-width: 100px;
+                    position: relative;
+                    overflow: hidden;
+                }
+
+                .opacity-slider::before {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    height: 100%;
+                    background: linear-gradient(to right, #4facfe 0%, #00f2fe 100%);
+                    border-radius: 3px;
+                    width: var(--progress, 95%);
+                    transition: width 0.1s ease;
+                }
+
+                .opacity-slider:hover {
+                    background: rgba(255, 255, 255, 0.3);
+                }
+
+                .opacity-slider::-webkit-slider-thumb {
+                    -webkit-appearance: none;
+                    appearance: none;
+                    width: 18px;
+                    height: 18px;
+                    background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
+                    border-radius: 50%;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    border: 2px solid rgba(255, 255, 255, 0.8);
+                    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+                }
+
+                .opacity-slider::-webkit-slider-thumb:hover {
+                    transform: scale(1.15);
+                    box-shadow: 0 4px 12px rgba(79, 172, 254, 0.4);
+                }
+
+                /* Firefox 滑块样式 */
+                .opacity-slider::-moz-range-thumb {
+                    width: 18px;
+                    height: 18px;
+                    background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
+                    border-radius: 50%;
+                    cursor: pointer;
+                    border: 2px solid rgba(255, 255, 255, 0.8);
+                    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+                }
+
+                .opacity-slider::-moz-range-track {
+                    height: 6px;
+                    background: rgba(255, 255, 255, 0.3);
+                    border-radius: 3px;
+                    border: none;
+                }
+
+                .opacity-display {
+                    color: #ffffff;
+                    font-size: 0.85rem;
+                    font-weight: 600;
+                    min-width: 35px;
+                    text-align: center;
+                }
+
+                .text-color-controls {
+                    display: flex;
+                    gap: 8px;
+                }
+
+                .color-btn {
+                    flex: 1;
+                    padding: 8px 12px;
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    background: rgba(255, 255, 255, 0.1);
+                    color: #ffffff;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 0.8rem;
+                    font-weight: 600;
+                    transition: all 0.2s ease;
+                }
+
+                .color-btn:hover {
+                    background: rgba(255, 255, 255, 0.2);
+                    transform: translateY(-1px);
+                }
+
+                .color-btn.active {
+                    background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
+                    border-color: #4facfe;
+                }
+
+                .window-controls {
+                    display: flex;
+                    gap: 8px;
+                    flex-wrap: wrap;
+                }
+
+                .window-controls .control-btn {
+                    flex: 1;
+                    min-width: 70px;
+                    padding: 8px 12px;
+                    border: none;
+                    background: rgba(255, 255, 255, 0.1);
+                    color: #ffffff;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 0.8rem;
+                    font-weight: 600;
+                    transition: all 0.2s ease;
+                }
+
+                .window-controls .control-btn:hover {
+                    background: rgba(255, 255, 255, 0.2);
+                    transform: translateY(-1px);
+                }
+
+                .window-controls .reset-btn {
+                    background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
+                    flex: 1;
+                    min-width: 90px;
+                    font-size: 0.75rem;
+                }
+
+                .window-controls .reset-btn:hover {
+                    background: linear-gradient(45deg, #369ef7 0%, #00d4fe 100%);
+                }
+            `;
+            document.head.appendChild(style);
+            document.body.appendChild(electronControlPanel);
+
+            // 绑定事件
+            setupElectronControlEvents();
+        }
+
+        function setupElectronControlEvents() {
+            // 面板收缩/展开
+            const panelToggleBtn = document.getElementById('panelToggleBtn');
+            panelToggleBtn.addEventListener('click', () => {
+                electronControlPanel.classList.toggle('collapsed');
+                panelToggleBtn.textContent = electronControlPanel.classList.contains('collapsed') ? '+' : '−';
+            });
+
+            // 字体大小控制
+            const fontDecreaseBtn = document.getElementById('electronFontDecrease');
+            const fontIncreaseBtn = document.getElementById('electronFontIncrease');
+            const fontSizeDisplay = document.getElementById('electronFontSize');
+
+            fontDecreaseBtn.addEventListener('click', () => {
+                translationStyleSettings.fontSize = Math.max(10, translationStyleSettings.fontSize - 2);
+                updateTranslationStyle();
+                fontSizeDisplay.textContent = translationStyleSettings.fontSize + 'px';
+            });
+
+            fontIncreaseBtn.addEventListener('click', () => {
+                translationStyleSettings.fontSize = Math.min(24, translationStyleSettings.fontSize + 2);
+                updateTranslationStyle();
+                fontSizeDisplay.textContent = translationStyleSettings.fontSize + 'px';
+            });
+
+            // 透明度控制
+            const opacitySlider = document.getElementById('opacitySlider');
+            const opacityDisplay = document.getElementById('opacityDisplay');
+
+            opacitySlider.addEventListener('input', (e) => {
+                translationStyleSettings.backgroundOpacity = parseInt(e.target.value);
+                updateTranslationStyle();
+                opacityDisplay.textContent = translationStyleSettings.backgroundOpacity + '%';
+                // 更新进度条
+                e.target.style.setProperty('--progress', translationStyleSettings.backgroundOpacity + '%');
+            });
+
+            // 文字颜色控制
+            const colorBtns = document.querySelectorAll('.color-btn');
+            colorBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    colorBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    translationStyleSettings.textColor = btn.dataset.color;
+                    updateTranslationStyle();
+                });
+            });
+
+            // 窗口控制
+            const showWindowBtn = document.getElementById('electronShowWindow');
+            const hideWindowBtn = document.getElementById('electronHideWindow');
+            const resetTranslationBtn = document.getElementById('electronResetTranslation');
+
+            showWindowBtn.addEventListener('click', () => {
+                showElectronTranslationWindow();
+            });
+
+            hideWindowBtn.addEventListener('click', () => {
+                if (window.electronAPI && window.electronAPI.hideTranslationWindow) {
+                    window.electronAPI.hideTranslationWindow();
+                }
+            });
+
+            resetTranslationBtn.addEventListener('click', async () => {
+                if (typeof resetTranslationFromElectron === 'function') {
+                    await resetTranslationFromElectron();
+                }
+            });
+        }
+
+        function updateTranslationStyle() {
+            if (window.electronAPI && window.electronAPI.updateTranslationStyle) {
+                window.electronAPI.updateTranslationStyle(translationStyleSettings);
+            }
+        }
+
+        // 检测是否在 Electron 环境中运行
+        console.log('🔍 Environment detection:', {
+            hasWindow: typeof window !== 'undefined',
+            hasElectronAPI: typeof window !== 'undefined' && !!window.electronAPI,
+            hasElectronAudioProcessor: typeof window !== 'undefined' && !!window.ElectronAudioProcessor
+        });
+        
+        if (typeof window !== 'undefined' && window.electronAPI) {
+            isElectron = true;
+            console.log('✅ Electron environment confirmed');
+            
+            // 防止dragEvent引用错误 - 修复JavaScript错误
+            if (typeof dragEvent === 'undefined') {
+                window.dragEvent = null;
+                console.log('🔧 Defined dragEvent to prevent ReferenceError');
+            }
+            
+            // 在Electron环境中隐藏主窗口的翻译面板
+            const mainTranslationPanel = document.getElementById('translationPanel');
+            if (mainTranslationPanel) {
+                mainTranslationPanel.style.display = 'none';
+            }
+            
+            // 立即强制切换UI显示
+            console.log('🔄 Immediate Electron UI switch...');
+            
+            // 更直接的UI切换方法，不依赖函数
+            try {
+                console.log('🚀 Direct UI switch execution...');
+                
+                // 等待DOM就绪后执行
+                setTimeout(() => {
+                    const webUpload = document.getElementById('webUploadItem');
+                    const webYoutube = document.getElementById('webYoutubeItem');
+                    const systemAudio = document.getElementById('electronSystemAudioItem');
+                    const videoSec = document.getElementById('videoSection');
+                    
+                    console.log('📍 Direct UI switch - elements found:', {
+                        webUpload: !!webUpload,
+                        webYoutube: !!webYoutube,
+                        systemAudio: !!systemAudio,
+                        videoSec: !!videoSec
+                    });
+                    
+                    if (webUpload) {
+                        webUpload.style.display = 'none';
+                        webUpload.style.visibility = 'hidden';
+                        console.log('🔥 HIDDEN webUploadItem DIRECTLY');
+                    }
+                    
+                    if (webYoutube) {
+                        webYoutube.style.display = 'none';
+                        webYoutube.style.visibility = 'hidden';
+                        console.log('🔥 HIDDEN webYoutubeItem DIRECTLY');
+                    }
+                    
+                    if (videoSec) {
+                        videoSec.style.display = 'none';
+                        console.log('🔥 HIDDEN videoSection DIRECTLY');
+                    }
+                    
+                    if (systemAudio) {
+                        systemAudio.style.display = 'block';
+                        systemAudio.style.visibility = 'visible';
+                        console.log('🔥 SHOWN electronSystemAudioItem DIRECTLY');
+                    }
+                    
+                    console.log('🎯 Direct UI switch completed!');
+                }, 100);
+                
+                // 设置监控，确保系统音频按钮始终可见
+                setInterval(() => {
+                    const systemAudio = document.getElementById('electronSystemAudioItem');
+                    
+                    // 如果系统音频按钮被隐藏了，重新显示
+                    if (systemAudio && systemAudio.style.display !== 'block') {
+                        systemAudio.style.setProperty('display', 'block', 'important');
+                        systemAudio.style.setProperty('visibility', 'visible', 'important');
+                        console.log('🔄 Re-enforced electronSystemAudioItem visibility');
+                    }
+                    
+                    // 移除任何可能重新出现的Web模式元素
+                    const webUpload = document.getElementById('webUploadItem');
+                    const webYoutube = document.getElementById('webYoutubeItem');
+                    
+                    if (webUpload) {
+                        webUpload.remove();
+                        console.log('🔄 Removed re-appeared webUploadItem');
+                    }
+                    
+                    if (webYoutube) {
+                        webYoutube.remove();
+                        console.log('🔄 Removed re-appeared webYoutubeItem');
+                    }
+                }, 2000); // 每2秒检查一次
+                
+            } catch (directError) {
+                console.error('❌ Direct UI switch failed:', directError);
+                // 如果直接方法失败，尝试调用函数
+                try {
+                    forceElectronModeUI();
+                } catch (funcError) {
+                    console.error('❌ Function UI switch also failed:', funcError);
+                }
+            }
+            
+            // 从当前URL获取服务器配置
+            const currentUrl = new URL(window.location.href);
+            serverConfig = {
+                protocol: currentUrl.protocol.replace(':', ''),
+                host: currentUrl.hostname,
+                port: currentUrl.port || (currentUrl.protocol === 'https:' ? '443' : '80')
+            };
+            
+            console.log('Electron environment detected, server config:', serverConfig);
+            
+            // 等待ElectronAudioProcessor加载完成
+            const checkElectronAudioProcessor = () => {
+                if (window.ElectronAudioProcessor) {
+                    console.log('✅ ElectronAudioProcessor is now available');
+                } else {
+                    console.log('⏳ Waiting for ElectronAudioProcessor to load...');
+                    setTimeout(checkElectronAudioProcessor, 100);
+                }
+            };
+            checkElectronAudioProcessor();
+            
+            // 立即显示独立翻译窗口
+            setTimeout(() => {
+                showElectronTranslationWindow();
+                updateElectronStatus('Ready - Load model', 'ready');
+            }, 500);
+            
+            // 创建Electron专用控制面板
+            createElectronControlPanel();
+            
+            // 显示版本信息
+            const versionInfo = document.getElementById('versionInfo');
+            if (versionInfo && window.electronAPI.versions) {
+                versionInfo.innerHTML = `
+                    Electron: ${window.electronAPI.versions.electron}<br>
+                    Node: ${window.electronAPI.versions.node}<br>
+                    Chrome: ${window.electronAPI.versions.chrome}
+                `;
+                versionInfo.classList.remove('hidden');
+            }
+            
+            // 监听菜单文件打开事件
+            window.electronAPI.onMenuOpenFile(() => {
+                // 触发文件选择器
+                if (audioFile) {
+                    audioFile.click();
+                }
+            });
+        }
+
+        // 强制切换到Electron模式的UI
+        function forceElectronModeUI() {
+            console.log('🚀 FORCE Electron mode UI switch - immediate execution');
+            
+            // 立即查找并操作元素
+            const webUploadItem = document.getElementById('webUploadItem');
+            const webYoutubeItem = document.getElementById('webYoutubeItem');
+            const videoSection = document.getElementById('videoSection');
+            const electronSystemAudioItem = document.getElementById('electronSystemAudioItem');
+            const audioInputSection = document.getElementById('audioInputSection');
+            
+            console.log('🔍 UI Elements found:', {
+                webUploadItem: !!webUploadItem,
+                webYoutubeItem: !!webYoutubeItem,
+                videoSection: !!videoSection,
+                electronSystemAudioItem: !!electronSystemAudioItem,
+                audioInputSection: !!audioInputSection
+            });
+            
+            // 使用最强制的方法：直接从DOM移除Web模式元素
+            if (webUploadItem) {
+                webUploadItem.remove();
+                console.log('💥 REMOVED webUploadItem from DOM');
+            } else {
+                console.log('ℹ️ webUploadItem already removed or not found');
+            }
+            
+            if (webYoutubeItem) {
+                webYoutubeItem.remove();
+                console.log('💥 REMOVED webYoutubeItem from DOM');
+            } else {
+                console.log('ℹ️ webYoutubeItem already removed or not found');
+            }
+            
+            if (videoSection) {
+                videoSection.remove();
+                console.log('💥 REMOVED videoSection from DOM completely');
+            } else {
+                console.error('❌ videoSection not found!');
+            }
+            
+            // 强制显示Electron模式的系统音频按钮
+            if (electronSystemAudioItem) {
+                electronSystemAudioItem.style.setProperty('display', 'block', 'important');
+                electronSystemAudioItem.style.setProperty('visibility', 'visible', 'important');
+                electronSystemAudioItem.style.setProperty('opacity', '1', 'important');
+                console.log('✅ Shown electronSystemAudioItem with !important');
+            } else {
+                console.error('❌ electronSystemAudioItem not found!');
+            }
+            
+            // 调整input-section的grid布局为2列（系统音频 + 录音）
+            if (audioInputSection) {
+                audioInputSection.style.setProperty('grid-template-columns', '1fr 1fr', 'important');
+                console.log('✅ Adjusted audioInputSection grid to 2 columns with !important');
+            } else {
+                console.error('❌ audioInputSection not found!');
+            }
+            
+            // videoSection 已经在上面被移除，这里不需要重复处理
+            console.log('ℹ️ videoSection already removed from DOM above');
+            
+            // 调整主面板的下边距，减少空白空间
+            const mainPanel = document.querySelector('.main-panel');
+            if (mainPanel) {
+                mainPanel.style.setProperty('margin-bottom', '10px', 'important');
+                mainPanel.style.setProperty('padding-bottom', '10px', 'important');
+                console.log('✅ Reduced main panel margin and padding in Electron mode');
+            }
+            
+            // 进一步缩短按钮区域与底部的距离
+            if (audioInputSection) {
+                audioInputSection.style.setProperty('margin-bottom', '10px', 'important');
+                audioInputSection.style.setProperty('padding-bottom', '0px', 'important');
+                console.log('✅ Reduced audioInputSection margins in Electron mode');
+            }
+            
+            // 缩短容器之间的间距
+            const container = document.querySelector('.container');
+            if (container) {
+                container.style.setProperty('padding-bottom', '10px', 'important');
+                console.log('✅ Reduced container padding in Electron mode');
+            }
+            
+            // videoSection 已经被完全移除，不需要再调整样式
+            console.log('ℹ️ videoSection completely removed, no style adjustments needed');
+            
+            // 添加Electron模式的CSS类到body元素，用于进一步样式调整
+            document.body.classList.add('electron-mode');
+            
+            console.log('🎉 FORCE Electron mode UI switch completed');
+            
+            // 添加一个延迟再次检查，确保UI正确显示
+            setTimeout(() => {
+                const remainingWebUpload = document.getElementById('webUploadItem');
+                const remainingWebYoutube = document.getElementById('webYoutubeItem');
+                const finalSystemAudio = document.getElementById('electronSystemAudioItem');
+                const removedVideoSectionElement = document.getElementById('videoSection');
+                
+                const finalCheck = {
+                    webUploadRemoved: !remainingWebUpload,
+                    webYoutubeRemoved: !remainingWebYoutube,
+                    electronSystemAudioVisible: finalSystemAudio ? finalSystemAudio.style.display === 'block' : false,
+                    videoSectionCompletelyRemoved: !removedVideoSectionElement
+                };
+                console.log('🔍 Final UI state check (500ms later):', finalCheck);
+            }, 500);
+        }
+
+        // 切换到Electron模式的UI（兼容性函数）
+        function switchToElectronMode() {
+            console.log('🔄 switchToElectronMode called, delegating to forceElectronModeUI...');
+            forceElectronModeUI();
+        }
+
+        // Electron翻译窗口辅助函数
+        function showElectronTranslationWindow() {
+            if (isElectron) {
+                try {
+                    window.electronAPI.showTranslationWindow();
+                    translationWindowShown = true;
+                    console.log('Electron translation window shown');
+                } catch (error) {
+                    console.error('Error showing translation window:', error);
+                }
+            }
+        }
+
+        function updateElectronTranslation(text) {
+            if (isElectron) {
+                // 确保翻译窗口已显示
+                if (!translationWindowShown) {
+                    showElectronTranslationWindow();
+                }
+                // 发送翻译更新
+                try {
+                    window.electronAPI.updateTranslation({ text: text });
+                    console.log('Translation updated to Electron window:', text.substring(0, 50) + '...');
+                } catch (error) {
+                    console.error('Error updating Electron translation:', error);
+                }
+            }
+        }
+
+        function updateElectronStatus(text, type = 'ready') {
+            if (isElectron) {
+                // 更新Electron控制面板中的状态栏
+                updateElectronStatusBar(text, type);
+                
+                // 发送到独立翻译窗口（但窗口不再显示状态）
+                try {
+                    window.electronAPI.updateTranslationStatus({ text: text, type: type });
+                    console.log('Status updated to Electron window:', text, type);
+                } catch (error) {
+                    console.error('Error updating Electron status:', error);
+                }
+            }
+        }
+
+        // 获取WebSocket URL的辅助函数
+        function getWebSocketUrl(sessionId) {
+            if (isElectron && serverConfig) {
+                // 在Electron环境中，使用服务器配置构造WebSocket URL
+                const wsProtocol = serverConfig.protocol === 'https' ? 'wss' : 'ws';
+                const port = serverConfig.port ? `:${serverConfig.port}` : '';
+                return `${wsProtocol}://${serverConfig.host}${port}/wss/${sessionId}`;
+            } else {
+                // 在浏览器环境中，使用当前页面的协议和主机
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                return `${protocol}//${window.location.host}/wss/${sessionId}`;
+            }
+        }
+
+        // Panel drag functionality
+        function initializePanelDragging() {
+            // 检查元素是否存在，防止在Electron环境下出错
+            if (panelHeader) {
+                panelHeader.addEventListener('mousedown', startDragging);
+            }
+            if (resizeHandle) {
+                resizeHandle.addEventListener('mousedown', startResizing);
+            }
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', stopDragging);
+
+            if (minimizeBtn) {
+                minimizeBtn.addEventListener('click', toggleMinimize);
+            }
+            if (closeBtn) {
+                closeBtn.addEventListener('click', closePanel);
+            }
+        }
+
+        function startDragging(e) {
+            if (e.target === minimizeBtn || e.target === closeBtn || e.target.closest('.panel-btn')) {
+                return;
+            }
+            
+            if (!translationPanel) return;
+            
+            isDragging = true;
+            translationPanel.classList.add('dragging');
+            
+            const rect = translationPanel.getBoundingClientRect();
+            dragOffset.x = e.clientX - rect.left;
+            dragOffset.y = e.clientY - rect.top;
+            
+            e.preventDefault();
+        }
+
+        function startResizing(e) {
+            isResizing = true;
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function handleMouseMove(e) {
+            if (isDragging && translationPanel) {
+                const x = e.clientX - dragOffset.x;
+                const y = e.clientY - dragOffset.y;
+                
+                // Keep panel within viewport bounds
+                const maxX = window.innerWidth - translationPanel.offsetWidth;
+                const maxY = window.innerHeight - translationPanel.offsetHeight;
+                
+                const boundedX = Math.max(0, Math.min(x, maxX));
+                const boundedY = Math.max(0, Math.min(y, maxY));
+                
+                translationPanel.style.left = boundedX + 'px';
+                translationPanel.style.top = boundedY + 'px';
+                translationPanel.style.bottom = 'auto';
+                translationPanel.style.transform = 'none';
+            } else if (isResizing && translationPanel) {
+                const rect = translationPanel.getBoundingClientRect();
+                const newWidth = Math.max(300, e.clientX - rect.left);
+                const newHeight = Math.max(200, e.clientY - rect.top);
+                
+                translationPanel.style.width = newWidth + 'px';
+                translationPanel.style.height = newHeight + 'px';
+            }
+        }
+
+        function stopDragging() {
+            if (isDragging) {
+                isDragging = false;
+                if (translationPanel) {
+                    translationPanel.classList.remove('dragging');
+                }
+            }
+            if (isResizing) {
+                isResizing = false;
+            }
+        }
+
+        function toggleMinimize() {
+            if (!translationPanel || !minimizeBtn) return;
+            
+            isMinimized = !isMinimized;
+            translationPanel.classList.toggle('minimized', isMinimized);
+            
+            minimizeBtn.innerHTML = isMinimized ? 
+                '<svg viewBox="0 0 24 24"><path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z"/></svg>' :
+                '<svg viewBox="0 0 24 24"><path d="M19,13H5V11H19V13Z"/></svg>';
+            
+            minimizeBtn.title = isMinimized ? 'Restore' : 'Minimize';
+        }
+
+        function closePanel() {
+            if (translationPanel) {
+                translationPanel.style.display = 'none';
+            }
+        }
+
+        function showPanel() {
+            if (isElectron) {
+                // 在Electron环境中只显示独立翻译窗口，不显示主窗口面板
+                showElectronTranslationWindow();
+            } else {
+                // 在浏览器环境中显示主窗口面板
+                translationPanel.style.display = 'block';
+            }
+        }
+
+        // Generate unique client ID
+        function generateClientId() {
+            return 'client_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        }
+        
+        function ensureClientId() {
+            if (!clientId) {
+                clientId = generateClientId();
+                console.log(`Generated new client ID: ${clientId} for this browser tab`);
+            }
+            return clientId;
+        }
+
+
+        
+
+
+        // Update status display
+        function updateStatus(text, type = 'ready') {
+            if (isElectron) {
+                // 在Electron环境中只更新独立翻译窗口的状态
+                updateElectronStatus(text, type);
+            } else {
+                // 在浏览器环境中更新主窗口面板的状态
+                if (statusText) {
+                    statusText.textContent = text;
+                }
+                if (statusIndicator) {
+                    statusIndicator.className = `status-indicator ${type}`;
+                }
+                
+                // Update panel header title
+                if (panelHeader) {
+                    const headerTitle = panelHeader.querySelector('h3');
+                    if (headerTitle) {
+                        if (type === 'processing') {
+                            headerTitle.textContent = 'Processing...';
+                            if (loadingSpinner) loadingSpinner.classList.remove('hidden');
+                        } else if (type === 'error') {
+                            headerTitle.textContent = 'Error';
+                            if (loadingSpinner) loadingSpinner.classList.add('hidden');
+                        } else {
+                            headerTitle.textContent = 'Ready to translate';
+                            if (loadingSpinner) loadingSpinner.classList.add('hidden');
+                        }
+                    }
+                }
+            }
+        }
+
+        // Scroll translation to bottom
+        function scrollTranslationToBottom() {
+            // 在浏览器环境下滚动翻译输出
+            if (!isElectron && translationOutput) {
+                // 使用requestAnimationFrame确保DOM更新后再滚动
+                requestAnimationFrame(() => {
+                    // 现在直接滚动translationOutput元素（它现在有自己的滚动条）
+                    translationOutput.scrollTop = translationOutput.scrollHeight;
+                    
+                    // 如果以上不工作，也尝试滚动translationContent容器
+                    const translationContent = document.getElementById('translationContent');
+                    if (translationContent) {
+                        translationContent.scrollTop = translationContent.scrollHeight;
+                    }
+                    
+                    console.log(`Scrolled to bottom: scrollTop=${translationOutput.scrollTop}, scrollHeight=${translationOutput.scrollHeight}`);
+                });
+            }
+            resetIdleTimer();
+        }
+
+        // Create media element (audio or video)
+        function createMediaElement(file) {
+            // Remove existing media
+            const existingMedia = mediaContainer.querySelector('audio, video');
+            if (existingMedia) {
+                existingMedia.remove();
+            }
+
+            // Determine if it's video or audio
+            const isVideo = file.type.startsWith('video/');
+            const mediaElement = document.createElement(isVideo ? 'video' : 'audio');
+            
+            mediaElement.controls = true;
+            mediaElement.style.width = '100%';
+            mediaElement.style.height = '100%';
+            mediaElement.src = URL.createObjectURL(file);
+            
+            // Hide placeholder
+            const placeholder = mediaContainer.querySelector('.video-placeholder');
+            if (placeholder) {
+                placeholder.style.display = 'none';
+            }
+            
+            mediaContainer.appendChild(mediaElement);
+            currentMediaElement = mediaElement;
+            
+            // Add event listeners
+            addMediaEventListeners(mediaElement);
+            
+            // Show translation panel
+            showPanel();
+            
+            return mediaElement;
+        }
+
+        // Add event listeners to media element
+        function addMediaEventListeners(mediaElement) {
+            mediaElement.addEventListener('play', async () => {
+                if (!translationInitialized && sessionId) {
+                    try {
+                        const currentTime = mediaElement.currentTime;
+                        mediaElement.pause();
+                        updateStatus('Initializing translation system...', 'processing');
+                        
+                        await initializeTranslation(mediaElement);
+                        mediaElement.currentTime = currentTime;
+                        translationPaused = false;
+                        
+                        if (audioContext && audioContext.state === 'suspended') {
+                            await audioContext.resume();
+                        }
+                        
+                        setTimeout(() => {
+                            mediaElement.play().then(() => {
+                                updateStatus('Playing and translating...', 'processing');
+                                resetIdleTimer();
+                            }).catch(e => {
+                                console.error('Error playing media after initialization:', e);
+                                updateStatus('Error playing media: ' + e, 'error');
+                            });
+                        }, 50);
+                        
+                        resetIdleTimer();
+                    } catch (error) {
+                        console.error('Error initializing translation:', error);
+                        updateStatus('Error initializing translation: ' + error, 'error');
+                    }
+                } else if (translationInitialized) {
+                    translationPaused = false;
+                    updateStatus('Playing and translating...', 'processing');
+                    
+                    if (audioContext && audioContext.state === 'suspended') {
+                        audioContext.resume().catch(e => {
+                            console.error('Error resuming audio context:', e);
+                        });
+                    }
+                    
+                    resetIdleTimer();
+                }
+            });
+            
+            mediaElement.addEventListener('pause', () => {
+                if (translationInitialized) {
+                    translationPaused = true;
+                    updateStatus('Translation paused', 'ready');
+                    
+                    if (audioContext && audioContext.state === 'running') {
+                        audioContext.suspend().catch(e => {
+                            console.error('Error suspending audio context:', e);
+                        });
+                    }
+                }
+            });
+
+            mediaElement.addEventListener('ended', () => {
+                console.log('Media playback ended, cleaning up...');
+                
+                // 在Electron环境中停止专用音频处理器
+                if (isElectron && electronAudioProcessor) {
+                    console.log('🛑 Stopping Electron audio processor on media end...');
+                    try {
+                        electronAudioProcessor.stop();
+                        electronAudioProcessor = null;
+                        console.log('✅ Electron audio processor stopped on media end');
+                    } catch (error) {
+                        console.error('❌ Error stopping Electron audio processor on media end:', error);
+                    }
+                } else {
+                    // 传统浏览器处理方式
+                    if (resampledBuffer.length > 0) {
+                        const targetChunkSize = baseChunkSize * currentLatencyMultiplier;
+                        const finalChunk = new Float32Array(targetChunkSize);
+                        finalChunk.set(resampledBuffer);
+                        if (ws) ws.send(finalChunk.buffer);
+                    }
+                    
+                    if (processor) processor.disconnect();
+                    if (audioContext) audioContext.suspend();
+                }
+                
+                if (ws) ws.close();
+                updateStatus('Translation completed', 'ready');
+                translationInitialized = false;
+            });
+        }
+
+        // Initialize translation system
+        async function initializeTranslation(mediaElement = currentMediaElement) {
+            if (!sessionId || translationInitialized) return;
+            
+            try {
+                translationPaused = false;
+                
+                const wsUrl = getWebSocketUrl(sessionId);
+                console.log(`Connecting to WebSocket at: ${wsUrl}`);
+                ws = new WebSocket(wsUrl);
+                
+                ws.onmessage = (event) => {
+                    const message = event.data;
+                    console.log(`websocket message: ${message}`);
+                    
+                    if (typeof message === 'string' && message.startsWith('INITIALIZING:')) {
+                        updateStatus(message.substring('INITIALIZING:'.length).trim(), 'processing');
+                        return;
+                    } else if (typeof message === 'string' && message.startsWith('READY:')) {
+                        updateStatus('Model is ready. Processing audio...', 'processing');
+                        return;
+                    } else if (typeof message === 'string' && message.startsWith('ERROR:')) {
+                        updateStatus(message, 'error');
+                        return;
+                    }
+                    
+                    if (!translationPaused) {
+                        renderTranslationMessage(message);
+                    }
+                };
+                
+                ws.onerror = (error) => {
+                    updateStatus('WebSocket error: ' + error, 'error');
+                };
+                
+                return new Promise((resolve, reject) => {
+                    ws.onopen = async () => {
+                        try {
+                            // 在Electron环境中使用专用音频处理器处理媒体文件
+                            console.log('🔍 Checking Electron conditions:', {
+                                isElectron: isElectron,
+                                hasElectronAudioProcessor: !!window.ElectronAudioProcessor,
+                                hasMediaElement: !!mediaElement,
+                                mediaElementType: mediaElement ? mediaElement.tagName : 'null'
+                            });
+                            
+                            // 在Electron环境中等待ElectronAudioProcessor加载（如果需要）
+                            if (isElectron && !window.ElectronAudioProcessor) {
+                                console.log('⏳ ElectronAudioProcessor not yet loaded, waiting...');
+                                await new Promise((resolve) => {
+                                    const checkProcessor = () => {
+                                        if (window.ElectronAudioProcessor) {
+                                            console.log('✅ ElectronAudioProcessor loaded during wait');
+                                            resolve();
+                                        } else {
+                                            setTimeout(checkProcessor, 50);
+                                        }
+                                    };
+                                    checkProcessor();
+                                });
+                            }
+                            
+                            if (isElectron && window.ElectronAudioProcessor && mediaElement) {
+                                console.log('🎵 Using Electron-specific audio processor for media file...');
+                                
+                                try {
+                                    // 确保没有其他音频处理在运行
+                                    if (audioContext) {
+                                        try {
+                                            await audioContext.close();
+                                            audioContext = null;
+                                            console.log('🧹 Closed existing AudioContext for media file processing');
+                                        } catch (e) {
+                                            console.warn('⚠️ Error closing existing AudioContext:', e);
+                                        }
+                                    }
+                                    
+                                    // 禁用全局音频处理标志
+                                    audioProcessingActive = false;
+                                    
+                                    electronAudioProcessor = new window.ElectronAudioProcessor();
+                                    await electronAudioProcessor.initializeAudio(mediaElement, ws, 'media');
+                                    
+                                    // 设置状态
+                                    translationPaused = false;
+                                    translationInitialized = true;
+                                    
+                                    console.log('🎯 Media file status set:', {
+                                        translationPaused: translationPaused,
+                                        translationInitialized: translationInitialized,
+                                        electronAudioProcessor: !!electronAudioProcessor,
+                                        mediaElement: !!mediaElement
+                                    });
+                                    
+                                    updateStatus('Playing and translating...', 'processing');
+                                    resetIdleTimer();
+                                    
+                                    console.log('✅ Electron audio processor initialized for media file, skipping traditional processing');
+                                    resolve();
+                                    return; // 重要：直接返回，不执行后面的ScriptProcessor代码
+                                } catch (electronError) {
+                                    console.error('❌ Electron audio processor failed for media file:', electronError);
+                                    updateStatus('Electron audio processor failed, using fallback...', 'processing');
+                                    
+                                    // 清理失败的Electron处理器
+                                    if (electronAudioProcessor) {
+                                        try {
+                                            electronAudioProcessor.stop();
+                                            electronAudioProcessor = null;
+                                        } catch (cleanupError) {
+                                            console.error('Error cleaning up failed Electron processor:', cleanupError);
+                                        }
+                                    }
+                                    
+                                    // 继续使用传统浏览器处理方式作为备用方案
+                                    console.log('🔄 Falling back to traditional browser audio processing for media file...');
+                                }
+                            }
+                            
+                            // 传统浏览器处理方式（仅在非Electron环境或Electron备选方案失败时执行）
+                            console.log('Using traditional browser audio processing...');
+                            
+                            if (audioElementConnected && mediaElement) {
+                                console.log('Audio element already connected, recreating it');
+                                
+                                if (audioContext) {
+                                    try {
+                                        await audioContext.close();
+                                        console.log('Previous AudioContext closed');
+                                    } catch (e) {
+                                        console.error('Error closing previous AudioContext:', e);
+                                    }
+                                    audioContext = null;
+                                }
+                                
+                                audioElementConnected = false;
+                            }
+                            
+                            audioContext = new AudioContext();
+                            console.log('New AudioContext created with sample rate:', audioContext.sampleRate);
+                            
+                            if (mediaElement) {
+                                audioSource = audioContext.createMediaElementSource(mediaElement);
+                                console.log('New MediaElementSource created');
+                                audioElementConnected = true;
+                            }
+                            
+                            const originalSampleRate = audioContext.sampleRate;
+                            const resampleRatio = targetSampleRate / originalSampleRate;
+                            
+                            processor = audioContext.createScriptProcessor(segmentSize, 1, 1);
+                            
+                            processor.onaudioprocess = (e) => {
+                                if (ws && ws.readyState === WebSocket.OPEN && !translationPaused) {
+                                    const inputData = e.inputBuffer.getChannelData(0);
+                                    
+                                    const resampledLength = Math.floor(inputData.length * resampleRatio);
+                                    const resampledChunk = new Float32Array(resampledLength);
+                                    
+                                    for (let i = 0; i < resampledLength; i++) {
+                                        const originalIndex = Math.floor(i / resampleRatio);
+                                        resampledChunk[i] = inputData[originalIndex];
+                                    }
+                                    
+                                    const newBuffer = new Float32Array(resampledBuffer.length + resampledChunk.length);
+                                    newBuffer.set(resampledBuffer);
+                                    newBuffer.set(resampledChunk, resampledBuffer.length);
+                                    resampledBuffer = newBuffer;
+                                    
+                                    const targetChunkSize = baseChunkSize * currentLatencyMultiplier;
+                                    
+                                    while (resampledBuffer.length >= targetChunkSize) {
+                                        const chunk = resampledBuffer.slice(0, targetChunkSize);
+                                        ws.send(chunk.buffer);
+                                        resampledBuffer = resampledBuffer.slice(targetChunkSize);
+                                    }
+                                }
+                            };
+                            
+                            if (audioSource) {
+                                audioSource.connect(processor);
+                                processor.connect(audioContext.destination);
+                                audioSource.connect(audioContext.destination);
+                            }
+                            
+                            translationInitialized = true;
+                            updateStatus('Playing and translating...', 'processing');
+                            resetIdleTimer();
+                            
+                            resolve();
+                        } catch (error) {
+                            console.error('Error:', error);
+                            updateStatus('Error initializing audio: ' + error, 'error');
+                            if (ws) ws.close();
+                            translationInitialized = false;
+                            reject(error);
+                        }
+                    };
+                });
+            } catch (error) {
+                updateStatus('Error: ' + error, 'error');
+                translationInitialized = false;
+                throw error;
+            }
+        }
+
+        // Clean up audio resources
+        function cleanupAudioResources() {
+            // 停止Electron音频处理器（如果存在）
+            if (electronAudioProcessor) {
+                console.log('🧹 Stopping Electron audio processor...');
+                try {
+                    electronAudioProcessor.stop();
+                    electronAudioProcessor = null;
+                    console.log('✅ Electron audio processor stopped');
+                } catch (error) {
+                    console.error('❌ Error stopping Electron audio processor:', error);
+                }
+            }
+            
+            if (ws) {
+                try {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        ws.close();
+                    }
+                } catch (e) {
+                    console.error('Error closing WebSocket:', e);
+                }
+                ws = null;
+            }
+            
+            if (micStream) {
+                micStream.getTracks().forEach(track => {
+                    track.stop();
+                    console.log('Microphone track stopped');
+                });
+                micStream = null;
+            }
+            
+            if (processor) {
+                try {
+                    processor.disconnect();
+                } catch (e) {
+                    console.error('Error disconnecting processor:', e);
+                }
+                processor = null;
+            }
+            
+            if (audioSource) {
+                try {
+                    audioSource.disconnect();
+                    console.log('Audio source disconnected');
+                } catch (e) {
+                    console.error('Error disconnecting audio source:', e);
+                }
+                audioSource = null;
+            }
+            
+            if (audioContext) {
+                try {
+                    audioContext.close().then(() => {
+                        console.log('AudioContext closed successfully');
+                        audioContext = null;
+                    }).catch(e => {
+                        console.error('Error closing audio context:', e);
+                    });
+                } catch (e) {
+                    console.error('Error in audio context cleanup:', e);
+                }
+            }
+            
+            resampledBuffer = new Float32Array();
+            audioBuffer = new Float32Array();
+            firstChunkSent = false;
+            
+            if (isMicRecording) {
+                isMicRecording = false;
+                toggleMic.innerHTML = `
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path d="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z"/>
+                    </svg>
+                    Record Audio
+                `;
+                toggleMic.classList.remove('recording');
+                micStatus.textContent = '';
+                volumeIndicator.classList.add('hidden');
+            }
+            
+            audioElementConnected = false;
+        }
+
+        // Session management functions (keeping existing logic)
+        function resetIdleTimer() {
+            if (idleTimer) {
+                clearTimeout(idleTimer);
+                console.log('Idle timer reset due to user activity');
+            }
+            
+            if (sessionId) {
+                idleTimer = setTimeout(async () => {
+                    console.log('🔍 Idle timer triggered - checking translation status:', {
+                        translationInitialized: translationInitialized,
+                        translationPaused: translationPaused,
+                        sessionId: sessionId,
+                        condition: translationInitialized && !translationPaused
+                    });
+                    
+                    if (translationInitialized && !translationPaused) {
+                        console.log('Translation is active, not closing session due to inactivity');
+                        resetIdleTimer();
+                        return;
+                    }
+                    
+                    console.log('Application idle for 1 minutes, releasing resources...');
+                    await cleanupSession();
+                    updateStatus('Session closed due to inactivity', 'error');
+                }, IDLE_TIMEOUT);
+            }
+        }
+
+        // handle youtube player
+        playBtn.addEventListener("click", async () => {
+            if (!youtubeUrl || !youtubeUrl.value || !sessionId) {
+                alert("Please enter a YouTube URL and ensure a session is active.");
+                updateStatus("Please enter a YouTube URL and ensure a session is active",'error')
+                return;
+            }
+
+            // Show loading state before requesting backend
+            updateStatus("downloading audio first due to Youtube sandbox protection", "processing");
+
+            try {
+                const response = await fetch('/download_youtube?' + new URLSearchParams({
+                    url: youtubeUrl.value,
+                    session_id: sessionId
+                }), {
+                    method: 'POST'
+                });
+
+                const responseType = response.headers.get('content-type') || '';
+                if (!response.ok || responseType.includes('application/json')) {
+                    let errorMessage = `${response.status} ${response.statusText}`.trim();
+                    try {
+                        const data = await response.json();
+                        errorMessage = data.error || data.detail || data.message || errorMessage;
+                    } catch (parseError) {
+                        errorMessage = await response.text();
+                    }
+                    throw new Error(errorMessage);
+                }
+
+                const blob = await response.blob();
+                const fileType = blob.type || responseType || 'video/mp4';
+
+                if (!fileType.startsWith('video/') && !fileType.startsWith('audio/')) {
+                    throw new Error('Expected audio/video file, got: ' + fileType);
+                }
+
+                // Reuse upload logic
+                const file = new File([blob], fileType.startsWith('video/') ? 'youtube_video.mp4' : 'youtube_audio.mp4', { type: fileType });
+                createMediaElement(file);
+                translationInitialized = false;
+                updateStatus('Audio loaded from YouTube. Press play to start translation.', 'ready');
+                resetIdleTimer();
+
+                // Show translation panel
+                showPanel();
+                resetIdleTimer();
+            } catch (error) {
+                console.error('Error downloading or playing YouTube video:', error);
+                updateStatus('Failed to load YouTube video: ' + error, 'error');
+            }
+        });
+
+        async function cleanupSession() {
+            try {
+                stopPinging();
+                stopQueueCheck();
+                
+                if (isMicRecording) {
+                    stopMicrophone(false);
+                } else {
+                    volumeLevel.style.width = '0%';
+                    volumeIndicator.classList.add('hidden');
+                }
+                
+                micStatus.textContent = '';
+                
+                if (currentMediaElement) {
+                    currentMediaElement.pause();
+                    currentMediaElement.currentTime = 0;
+                }
+                
+                cleanupAudioResources();
+                
+                if (audioContext) {
+                    try {
+                        if (audioContext.state !== 'closed') {
+                            await audioContext.close();
+                        }
+                        audioContext = null;
+                    } catch (e) {
+                        console.error('Error closing AudioContext:', e);
+                    }
+                }
+                
+                if (sessionId) {
+                    console.log(`Deleting session ${sessionId} from client side`);
+                    try {
+                        const response = await fetch('/delete_session?' + new URLSearchParams({
+                            session_id: sessionId
+                        }), {
+                            method: 'POST'
+                        });
+                        
+                        const data = await response.json();
+                        if (!data.success) {
+                            console.error('Failed to delete session:', data.error);
+                        } else {
+                            console.log('Session successfully deleted from server');
+                        }
+                    } catch (e) {
+                        console.error('Error deleting session:', e);
+                    }
+                    
+                    localStorage.removeItem('translationSessionId_' + clientId);
+                    sessionId = null;
+                    isQueued = false;
+                }
+                
+                updateLatency.disabled = true;
+                resetTranslation.disabled = true;
+                
+            } catch (error) {
+                console.error('Error cleaning up session:', error);
+            }
+        }
+
+        // Ping and queue management (keeping existing logic)
+        function startPinging() {
+            if (pingInterval) {
+                clearInterval(pingInterval);
+            }
+            
+            if (!sessionId) {
+                return;
+            }
+            
+            sendPing();
+            pingInterval = setInterval(sendPing, PING_INTERVAL);
+            console.log(`Started ping interval (${PING_INTERVAL}ms)`);
+        }
+        
+        function stopPinging() {
+            if (pingInterval) {
+                clearInterval(pingInterval);
+                pingInterval = null;
+                console.log('Stopped ping interval');
+            }
+        }
+        
+        async function sendPing() {
+            if (!sessionId) {
+                console.log('No sessionId available, stopping ping');
+                stopPinging();
+                return;
+            }
+            
+            // 额外验证sessionId格式
+            if (typeof sessionId !== 'string' || sessionId.trim() === '') {
+                console.warn('Invalid sessionId format, stopping ping:', sessionId);
+                stopPinging();
+                sessionId = null;
+                localStorage.removeItem('translationSessionId_' + clientId);
+                return;
+            }
+            
+            try {
+                const response = await fetch('/ping?' + new URLSearchParams({
+                    session_id: sessionId
+                }), {
+                    method: 'POST',
+                    timeout: 10000  // 10秒超时
+                });
+                
+                // 检查响应状态
+                if (!response.ok) {
+                    console.warn(`Ping failed with status ${response.status}: ${response.statusText}`);
+                    if (response.status === 503) {
+                        console.warn('Service unavailable, will retry next ping');
+                    }
+                    return;
+                }
+
+                // 检查响应类型
+                const contentType = response.headers.get("content-type");
+                if (!contentType || !contentType.includes("application/json")) {
+                    console.warn('Ping response is not JSON, got:', contentType);
+                    return;
+                }
+                
+                const data = await response.json();
+                if (!data.success) {
+                    console.warn('Failed to send ping:', data.error, 'for sessionId:', sessionId);
+                    if (data.error === 'Invalid session ID') {
+                        console.log('Session invalidated by server, cleaning up');
+                        stopPinging();
+                        sessionId = null;
+                        localStorage.removeItem('translationSessionId_' + clientId);
+                        // 更新UI状态
+                        updateStatus('Session expired. Please load a model again.', 'error');
+                        if (updateLatency) updateLatency.disabled = true;
+                        if (resetTranslation) resetTranslation.disabled = true;
+                    }
+                } else {
+                    // Ping成功，可以在debug模式下记录
+                    if (window.location.search.includes('debug=true')) {
+                        console.log('Ping successful for session:', sessionId);
+                    }
+                }
+            } catch (error) {
+                // 区分不同类型的错误
+                if (error.name === 'TypeError' && error.message.includes('JSON')) {
+                    console.warn('Error parsing ping response as JSON:', error.message);
+                } else if (error.name === 'AbortError') {
+                    console.warn('Ping request timed out');
+                } else {
+                    console.error('Error sending ping:', error);
+                }
+            }
+        }
+
+        async function checkQueueStatus(sessionId) {
+            if (!sessionId || !isQueued) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/queue_status/${sessionId}`);
+                
+                // 检查响应状态
+                if (!response.ok) {
+                    console.warn(`Queue status check failed with status ${response.status}: ${response.statusText}`);
+                    if (response.status === 503) {
+                        console.warn('Service unavailable, will retry queue status check');
+                    }
+                    return;
+                }
+
+                // 检查响应类型
+                const contentType = response.headers.get("content-type");
+                if (!contentType || !contentType.includes("application/json")) {
+                    console.warn('Queue status response is not JSON, got:', contentType);
+                    return;
+                }
+                
+                const data = await response.json();
+                
+                if (data.status === 'active') {
+                    isQueued = false;
+                    if (queueCheckInterval) {
+                        clearInterval(queueCheckInterval);
+                        queueCheckInterval = null;
+                    }
+                    
+                    updateStatus('Model loaded successfully. Upload audio and press play to start translation.', 'ready');
+                    updateElectronStatus('Model loaded successfully. Use video or microphone to start', 'ready');
+                    updateLatency.disabled = false;
+                    resetTranslation.disabled = false;
+                    console.log('Model loaded successfully:', {
+                        model: agentType.value,
+                        languagePair: languagePair.value,
+                        latency: latencyMultiplier.value + 'x'
+                    });
+                    startPinging();
+                    resetIdleTimer();
+                } else if (data.status === 'initializing') {
+                    updateStatus('Model is initializing, please wait...', 'processing');
+                    updateElectronStatus('Loading model...', 'processing');
+                } else if (data.status === 'queued') {
+                    updateStatus(`Waiting in queue... Position: ${data.queue_position}`, 'processing');
+                    updateElectronStatus(`Queue: ${data.queue_position}`, 'processing');
+                } else {
+                    updateStatus('Error: Session not found in queue or active sessions', 'error');
+                    updateElectronStatus('Session error', 'error');
+                    isQueued = false;
+                    if (queueCheckInterval) {
+                        clearInterval(queueCheckInterval);
+                        queueCheckInterval = null;
+                    }
+                }
+            } catch (error) {
+                // 区分不同类型的错误
+                if (error.name === 'TypeError' && error.message.includes('JSON')) {
+                    console.warn('Error parsing queue status response as JSON:', error.message);
+                } else {
+                    console.error('Error checking queue status:', error);
+                    updateStatus('Error checking queue status: ' + error, 'error');
+                }
+            }
+        }
+        
+        function startQueueCheck(sessionId) {
+            if (queueCheckInterval) {
+                clearInterval(queueCheckInterval);
+            }
+            
+            checkQueueStatus(sessionId);
+            queueCheckInterval = setInterval(() => checkQueueStatus(sessionId), QUEUE_CHECK_INTERVAL);
+            console.log(`Started queue status check interval (${QUEUE_CHECK_INTERVAL}ms)`);
+        }
+        
+        function stopQueueCheck() {
+            if (queueCheckInterval) {
+                clearInterval(queueCheckInterval);
+                queueCheckInterval = null;
+                console.log('Stopped queue status check interval');
+            }
+        }
+
+        // Event Listeners
+        if (glossaryPreset) {
+            glossaryPreset.addEventListener('change', updateGlossaryMeta);
+        }
+        if (glossaryText) {
+            glossaryText.addEventListener('input', updateGlossaryMeta);
+        }
+        if (buildGlossary) {
+            buildGlossary.addEventListener('click', async () => {
+                try {
+                    await confirmGlossarySelection();
+                } catch (error) {
+                    // Status is already updated by confirmGlossarySelection.
+                }
+            });
+        }
+        updateGlossaryMeta();
+
+        loadModel.addEventListener('click', async () => {
+            try {
+                await cleanupSession();
+                updateStatus('Loading model...', 'processing');
+                
+                // 在Electron环境中，立即显示翻译窗口以提供反馈
+                if (isElectron) {
+                    showElectronTranslationWindow();
+                    // 更新翻译窗口的状态
+                    updateElectronStatus('Loading model...', 'processing');
+                }
+                
+                currentLatencyMultiplier = parseInt(latencyMultiplier.value);
+                const initPayload = {
+                    agent_type: agentType.value,
+                    language_pair: languagePair.value,
+                    latency_multiplier: currentLatencyMultiplier,
+                    client_id: clientId,
+                    glossary_preset: glossaryPreset ? glossaryPreset.value : serverDefaultGlossaryPreset,
+                    glossary_text: isGlossaryConfirmed() && glossaryText ? glossaryText.value : ''
+                };
+                const response = await fetch('/init', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(initPayload)
+                });
+                
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.detail || data.error || `HTTP ${response.status}`);
+                }
+                sessionId = data.session_id;
+                localStorage.setItem('translationSessionId_' + clientId, sessionId);
+                startPinging();
+                const currentManualText = glossaryText ? glossaryText.value : '';
+                if (initPayload.glossary_text === currentManualText) {
+                    confirmedGlossary = {
+                        preset: data.glossary_preset || initPayload.glossary_preset,
+                        text: initPayload.glossary_text,
+                        manualTerms: data.manual_terms || 0,
+                        presetTerms: data.preset_terms || 0,
+                        indexReady: data.index_ready === true,
+                        indexPath: data.index_path || '',
+                        confirmedAt: Date.now()
+                    };
+                    updateGlossaryMeta();
+                }
+                
+                // Log settings to console
+                console.log('Model configuration:', {
+                    model: agentType.value,
+                    languagePair: languagePair.value,
+                    latency: latencyMultiplier.value + 'x',
+                    glossaryPreset: data.glossary_preset || initPayload.glossary_preset,
+                    presetTerms: data.preset_terms,
+                    manualTerms: data.manual_terms,
+                    sessionId: sessionId
+                });
+                
+                if (data.queued) {
+                    isQueued = true;
+                    updateStatus(`Waiting in queue... Position: ${data.queue_position}`, 'processing');
+                    updateElectronStatus(`Waiting in queue... Position: ${data.queue_position}`, 'processing');
+                    startQueueCheck(sessionId);
+                    updateLatency.disabled = true;
+                    resetTranslation.disabled = true;
+                } else if (data.initializing) {
+                    updateStatus('Model is initializing, please wait...', 'processing');
+                    updateElectronStatus('Loading model...', 'processing');
+                    updateLatency.disabled = true;
+                    resetTranslation.disabled = true;
+                    isQueued = true;
+                    startQueueCheck(sessionId);
+                } else {
+                    isQueued = false;
+                    translationInitialized = false;
+                    updateLatency.disabled = false;
+                    resetTranslation.disabled = false;
+                    updateStatus('Model loaded successfully. Upload audio and press play to start translation.', 'ready');
+                    updateElectronStatus('Model loaded. Ready to translate.', 'ready');
+                    console.log('Model loaded successfully:', {
+                        model: agentType.value,
+                        languagePair: languagePair.value,
+                        latency: latencyMultiplier.value + 'x',
+                        glossaryPreset: data.glossary_preset || initPayload.glossary_preset,
+                        presetTerms: data.preset_terms,
+                        manualTerms: data.manual_terms
+                    });
+                    startPinging();
+                    resetIdleTimer();
+                }
+            } catch (error) {
+                updateStatus('Error loading model: ' + error, 'error');
+                console.error('Error loading model:', error);
+            }
+        });
+
+        audioFile.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                createMediaElement(file);
+                translationInitialized = false;
+                updateStatus('Audio loaded. Press play to start translation.', 'ready');
+                resetIdleTimer();
+            }
+        });
+
+        // Upload button click handler
+        uploadBtn.addEventListener('click', () => {
+            audioFile.click();
+        });
+
+        // Microphone functionality
+        toggleMic.addEventListener('click', async () => {
+            if (isMicRecording) {
+                stopMicrophone(true);
+            } else {
+                startMicrophone();
+            }
+        });
+
+        // System Audio Capture functionality (Electron only)
+        if (systemAudioBtn) {
+            systemAudioBtn.addEventListener('click', async () => {
+                if (isSystemAudioCapturing) {
+                    stopSystemAudioCapture(true);
+                } else {
+                    
+                    console.log('🎯 System audio capture requested (sessionId:', sessionId, ')');
+                    console.log('Environment check:', {
+                        isElectron: isElectron,
+                        hasElectronAPI: !!window.electronAPI,
+                        hasSystemAudioConfig: !!(window.electronAPI && window.electronAPI.checkSystemAudioConfig)
+                    });
+                    
+                    if (isElectron && window.electronAPI && window.electronAPI.checkSystemAudioConfig) {
+                        console.log('🔍 Starting complete system audio configuration check...');
+                        
+                        // 首先测试 IPC 连接
+                        console.log('🧪 Testing IPC connection before audio config check...');
+                        try {
+                            const testResult = await window.electronAPI.testIPC();
+                            console.log('🧪 IPC test successful:', testResult);
+                        } catch (error) {
+                            console.error('🧪 IPC test failed:', error);
+                            updateStatus('IPC connection failed', 'error');
+                            return;
+                        }
+                        
+                        try {
+                            console.log('📞 Calling window.electronAPI.checkSystemAudioConfig()...');
+                            const audioConfig = await window.electronAPI.checkSystemAudioConfig();
+                            console.log('✅ checkSystemAudioConfig result:', audioConfig);
+                            
+                            if (audioConfig.configured) {
+                                console.log('✅ System audio properly configured for capture');
+                                updateStatus('System audio configured - Please play any audio/video to begin translation', 'ready');
+                            } else if (audioConfig.setupAttempted) {
+                                console.log('🔧 Setup script was attempted');
+                                
+                                if (audioConfig.setupResult && audioConfig.setupResult.success) {
+                                    updateStatus('Setup script started. Please follow the instructions in Terminal, then restart the app to use system audio capture.', 'ready');
+                                    return; // 不继续尝试系统音频捕获，因为需要重启
+                                } else if (audioConfig.setupResult) {
+                                    updateStatus(`Setup script failed: ${audioConfig.setupResult.message}. System audio capture is not available.`, 'error');
+                                    return; // 不继续尝试，因为直接捕获不可能
+                                } else {
+                                    updateStatus('Setup script had an unknown result. System audio capture is not available.', 'error');
+                                    return;
+                                }
+                            } else if (audioConfig.setupCancelled) {
+                                console.log('❌ User cancelled setup');
+                                updateStatus(`System audio capture requires configuration. Issue: ${audioConfig.reason}. Setup was cancelled.`, 'error');
+                                return; // 不继续尝试，因为直接捕获不可能
+                            } else {
+                                // 显示配置问题但没有运行安装脚本的情况（不应该发生）
+                                console.log('❌ Configuration issue but no setup attempted:', audioConfig.reason, audioConfig.details);
+                                updateStatus(`System audio configuration error: ${audioConfig.reason}. ${audioConfig.details || ''}`, 'error');
+                                return; // 不继续尝试，因为直接捕获不可能
+                            }
+                        } catch (error) {
+                            console.error('❌ Error checking system audio configuration:', error);
+                            console.error('Error details:', {
+                                name: error.name,
+                                message: error.message,
+                                stack: error.stack
+                            });
+                            updateStatus('Configuration check failed, trying direct capture...', 'processing');
+                        }
+                    } else {
+                        console.log('❌ Not in Electron environment or checkSystemAudioConfig not available');
+                        console.log('isElectron:', isElectron);
+                        console.log('window.electronAPI:', !!window.electronAPI);
+                        if (window.electronAPI) {
+                            console.log('electronAPI methods:', Object.keys(window.electronAPI));
+                        }
+                        updateStatus('System audio capture is only available in Electron app', 'error');
+                        return;
+                    }
+                    
+                    // 只有在配置正确的情况下才尝试系统音频捕获
+                    startSystemAudioCapture();
+                }
+            });
+        }
+
+
+
+        async function startMicrophone() {
+            try {
+                if (!sessionId) {
+                    micStatus.textContent = 'Please load a model first';
+                    console.warn('Microphone access attempted without loaded model');
+                    updateStatus('Please load a model first', 'error');
+                    return;
+                }
+                
+                console.log('Starting microphone with session ID:', sessionId);
+                
+                // 在Electron环境中检查麦克风权限
+                if (isElectron && window.electronAPI) {
+                    console.log('Checking microphone permission in Electron...');
+                    try {
+                        const permissionStatus = await window.electronAPI.checkMicrophonePermission();
+                        console.log('Microphone permission status:', permissionStatus);
+                        
+                        if (permissionStatus === 'denied') {
+                            updateStatus('Microphone permission denied. Please grant permission in System Preferences.', 'error');
+                            micStatus.textContent = 'Microphone permission denied. Please check System Preferences.';
+                            return;
+                        } else if (permissionStatus === 'unknown' || permissionStatus === 'not-determined') {
+                            console.log('Requesting microphone permission...');
+                            updateStatus('Requesting microphone permission...', 'processing');
+                            const granted = await window.electronAPI.requestMicrophonePermission();
+                            if (!granted) {
+                                updateStatus('Microphone permission denied. Please grant permission and restart the app.', 'error');
+                                micStatus.textContent = 'Microphone permission denied.';
+                                return;
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error checking microphone permission:', error);
+                        // 继续执行，可能是旧版本的Electron或其他问题
+                    }
+                }
+                
+                // Show translation panel
+                showPanel();
+                
+                // 确保在Electron环境中翻译窗口已显示并更新状态
+                if (isElectron) {
+                    console.log('Electron environment detected, ensuring translation window is shown');
+                    updateStatus('Requesting microphone access...', 'processing');
+                }
+            
+            try {
+                console.log('Requesting microphone access...');
+                updateStatus('Requesting microphone access...', 'processing');
+                
+                micStream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                });
+                
+                console.log('Microphone access granted, stream obtained:', micStream);
+                updateStatus('Microphone access granted, connecting...', 'processing');
+                
+                const wsUrl = getWebSocketUrl(sessionId);
+                console.log(`Connecting to WebSocket at: ${wsUrl}`);
+                
+                ws = new WebSocket(wsUrl);
+                
+                ws.onmessage = (event) => {
+                    const message = event.data;
+                    console.log('WebSocket message received:', message);
+
+                    // 处理控制消息
+                    if (typeof message === 'string' && message.startsWith('INITIALIZING:')) {
+                        updateStatus(message.substring('INITIALIZING:'.length).trim(), 'processing');
+                        return;
+                    } else if (typeof message === 'string' && message.startsWith('READY:')) {
+                        updateStatus('Model is ready. Processing audio...', 'processing');
+                        return;
+                    } else if (typeof message === 'string' && message.startsWith('ERROR:')) {
+                        updateStatus(message, 'error');
+                        return;
+                    }
+                    
+                    renderTranslationMessage(message);
+                };
+                
+                ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    const errorMsg = 'WebSocket connection error';
+                    micStatus.textContent = errorMsg;
+                    updateStatus(errorMsg, 'error');
+                    stopMicrophone(false);
+                };
+                
+                // ws.onclose = (event) => {
+                //     console.log('WebSocket closed:', event.code, event.reason);
+                //     if (event.code !== 1000) { // Not a normal closure
+                //         const errorMsg = `Connection lost: ${event.code} - ${event.reason || 'Unknown error'}`;
+                //         updateStatus(errorMsg, 'error');
+                //         console.error('WebSocket connection error:', errorMsg);
+                //     } else {
+                //         console.log('WebSocket closed normally');
+                //     }
+                // };
+                
+                ws.onopen = async () => {
+                    console.log('WebSocket connected successfully');
+                    
+                    try {
+                        // 在Electron环境中使用专用音频处理器
+                        if (isElectron && window.ElectronAudioProcessor) {
+                            console.log('🎵 Using Electron-specific audio processor...');
+                            
+                            try {
+                                // 确保没有其他音频处理在运行
+                                if (audioContext) {
+                                    try {
+                                        await audioContext.close();
+                                        audioContext = null;
+                                        console.log('🧹 Closed existing AudioContext');
+                                    } catch (e) {
+                                        console.warn('⚠️ Error closing existing AudioContext:', e);
+                                    }
+                                }
+                                
+                                // 禁用全局音频处理标志
+                                audioProcessingActive = false;
+                                
+                                electronAudioProcessor = new window.ElectronAudioProcessor();
+                                await electronAudioProcessor.initializeAudio(micStream, ws, 'microphone');
+                                
+                                // 设置UI状态
+                                translationPaused = false;
+                                translationInitialized = true; // 添加这一行，确保idle timer检查正确工作
+                                
+                                console.log('🎯 Microphone status set:', {
+                                    translationPaused: translationPaused,
+                                    translationInitialized: translationInitialized,
+                                    electronAudioProcessor: !!electronAudioProcessor
+                                });
+                                
+                                updateMicrophoneUI(true);
+                                updateStatus('Microphone ready - Speak to begin translation', 'ready');
+                                resetIdleTimer();
+                                
+                                console.log('✅ Electron audio processor initialized, skipping traditional processing');
+                                return; // 使用Electron处理器，完全跳过传统处理
+                            } catch (electronError) {
+                                console.error('❌ Electron audio processor failed:', electronError);
+                                updateStatus('Electron audio processor failed, using fallback...', 'processing');
+                                
+                                // 清理失败的Electron处理器
+                                if (electronAudioProcessor) {
+                                    try {
+                                        electronAudioProcessor.stop();
+                                        electronAudioProcessor = null;
+                                    } catch (cleanupError) {
+                                        console.error('Error cleaning up failed Electron processor:', cleanupError);
+                                    }
+                                }
+                                
+                                // 继续使用传统浏览器处理方式作为备用方案
+                                console.log('🔄 Falling back to traditional browser audio processing...');
+                            }
+                        }
+                        
+                        // 传统浏览器处理方式
+                        console.log('Creating AudioContext...');
+                        audioContext = new AudioContext();
+                        console.log('AudioContext created with sample rate:', audioContext.sampleRate);
+                        
+                        console.log('Creating MediaStreamSource...');
+                        const micSource = audioContext.createMediaStreamSource(micStream);
+                        console.log('MediaStreamSource created');
+                        
+                        console.log('Creating ScriptProcessor...');
+                        processor = audioContext.createScriptProcessor(4096, 1, 1);
+                        console.log('ScriptProcessor created');
+                        
+                        const originalSampleRate = audioContext.sampleRate;
+                        const resampleRatio = targetSampleRate / originalSampleRate;
+                        console.log('Resample ratio:', resampleRatio);
+                        
+                        processor.onaudioprocess = (e) => {
+                            if (ws && ws.readyState === WebSocket.OPEN) {
+                                const inputData = e.inputBuffer.getChannelData(0);
+                                
+                                // 音量检测
+                                let hasSound = false;
+                                let volumeSum = 0;
+                                for (let i = 0; i < inputData.length; i++) {
+                                    const volume = Math.abs(inputData[i]);
+                                    volumeSum += volume;
+                                    if (volume > 0.01) {
+                                        hasSound = true;
+                                    }
+                                }
+                                
+                                const averageVolume = volumeSum / inputData.length;
+                                const volumePercent = Math.min(100, Math.round(averageVolume * 1000));
+                                volumeLevel.style.width = volumePercent + '%';
+                                
+                                if (hasSound) {
+                                    resetIdleTimer();
+                                }
+                                
+                                // 重采样
+                                const resampledLength = Math.floor(inputData.length * resampleRatio);
+                                const resampledChunk = new Float32Array(resampledLength);
+                                
+                                for (let i = 0; i < resampledLength; i++) {
+                                    const originalIndex = Math.floor(i / resampleRatio);
+                                    resampledChunk[i] = inputData[originalIndex];
+                                }
+                                
+                                const newBuffer = new Float32Array(resampledBuffer.length + resampledChunk.length);
+                                newBuffer.set(resampledBuffer);
+                                newBuffer.set(resampledChunk, resampledBuffer.length);
+                                resampledBuffer = newBuffer;
+                                
+                                const targetChunkSize = baseChunkSize * currentLatencyMultiplier;
+                                
+                                while (resampledBuffer.length >= targetChunkSize) {
+                                    const chunk = resampledBuffer.slice(0, targetChunkSize);
+                                    try {
+                                        sendAudioChunk(chunk, 'microphone');
+                                    } catch (error) {
+                                        console.error('Error sending audio data:', error);
+                                        updateStatus('Error sending audio data: ' + error.message, 'error');
+                                        stopMicrophone(false);
+                                        return;
+                                    }
+                                    resampledBuffer = resampledBuffer.slice(targetChunkSize);
+                                }
+                            }
+                        };
+                        
+                        console.log('Connecting audio nodes...');
+                        micSource.connect(processor);
+                        processor.connect(audioContext.destination);
+                        console.log('Audio nodes connected');
+                        
+                        translationPaused = false;
+                        translationInitialized = true; // 修复：确保传统浏览器方式也正确设置状态
+                        
+                        console.log('🎯 Traditional browser microphone status set:', {
+                            translationPaused: translationPaused,
+                            translationInitialized: translationInitialized
+                        });
+                        
+                        toggleMic.innerHTML = `
+                            <svg class="icon" viewBox="0 0 24 24">
+                                <path d="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z"/>
+                            </svg>
+                            Pause Microphone
+                        `;
+                        toggleMic.classList.add('recording');
+                        micStatus.textContent = 'Microphone active. Speaking will be translated in real-time.';
+                        volumeIndicator.classList.remove('hidden');
+                        isMicRecording = true;
+                        updateStatus('Translating from microphone...', 'processing');
+                        resetIdleTimer();
+                        
+                    } catch (audioError) {
+                        console.error('Error setting up audio processing:', audioError);
+                        updateStatus('Error setting up audio processing: ' + audioError.message, 'error');
+                        stopMicrophone(false);
+                    }
+                };
+                
+            } catch (error) {
+                console.error('Microphone access error:', error);
+                let errorMessage = 'Error accessing microphone: ';
+                
+                if (error.name === 'NotAllowedError') {
+                    errorMessage += 'Permission denied. Please allow microphone access and try again.';
+                } else if (error.name === 'NotFoundError') {
+                    errorMessage += 'No microphone found. Please connect a microphone and try again.';
+                } else if (error.name === 'NotReadableError') {
+                    errorMessage += 'Microphone is already in use by another application.';
+                } else {
+                    errorMessage += error.message;
+                }
+                
+                micStatus.textContent = errorMessage;
+                updateStatus(errorMessage, 'error');
+                console.error('Full error details:', error);
+            }
+            } catch (outerError) {
+                console.error('Unexpected error in startMicrophone:', outerError);
+                updateStatus('Unexpected error starting microphone: ' + outerError.message, 'error');
+            }
+        }
+
+        // 辅助函数：更新麦克风UI状态
+        function updateMicrophoneUI(isRecording) {
+            if (isRecording) {
+                toggleMic.innerHTML = `
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path d="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z"/>
+                    </svg>
+                    Pause Microphone
+                `;
+                toggleMic.classList.add('recording');
+                micStatus.textContent = 'Microphone active. Speaking will be translated in real-time.';
+                volumeIndicator.classList.remove('hidden');
+                isMicRecording = true;
+            } else {
+                toggleMic.innerHTML = `
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path d="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z"/>
+                    </svg>
+                    Record Audio
+                `;
+                toggleMic.classList.remove('recording');
+                micStatus.textContent = '';
+                volumeIndicator.classList.add('hidden');
+                isMicRecording = false;
+            }
+        }
+
+        function stopMicrophone(isManualPause = false) {
+            console.log('🛑 Stopping microphone...');
+            
+            // 如果使用Electron音频处理器，优先停止它
+            if (electronAudioProcessor) {
+                console.log('🧹 Stopping Electron audio processor...');
+                try {
+                    electronAudioProcessor.stop();
+                    electronAudioProcessor = null;
+                    console.log('✅ Electron audio processor stopped');
+                } catch (error) {
+                    console.error('❌ Error stopping Electron audio processor:', error);
+                }
+            }
+            
+            // 立即停止音频处理
+            if (typeof audioProcessingActive !== 'undefined') {
+                audioProcessingActive = false;
+                console.log('🚫 Audio processing disabled');
+            }
+            
+            if (ws && ws.readyState === WebSocket.OPEN && resampledBuffer.length > 0) {
+                const targetChunkSize = baseChunkSize * currentLatencyMultiplier;
+                const finalChunk = new Float32Array(targetChunkSize);
+                finalChunk.set(resampledBuffer);
+                try {
+                    sendAudioChunk(finalChunk, 'microphone');
+                } catch (error) {
+                    console.error('Error sending final audio chunk:', error);
+                }
+            }
+            
+            if (ws) {
+                try {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        ws.close();
+                    }
+                } catch (e) {
+                    console.error('Error closing WebSocket:', e);
+                }
+                ws = null;
+            }
+            
+            if (micStream) {
+                micStream.getTracks().forEach(track => {
+                    track.stop();
+                });
+                micStream = null;
+            }
+            
+            if (processor) {
+                try {
+                    processor.disconnect();
+                } catch (e) {
+                    console.error('Error disconnecting processor:', e);
+                }
+                processor = null;
+            }
+            
+            if (audioContext) {
+                try {
+                    if (audioContext.state !== 'closed') {
+                        audioContext.close().catch(e => {
+                            console.error('Error closing audio context:', e);
+                        });
+                    }
+                } catch (e) {
+                    console.error('Error in audio context cleanup:', e);
+                }
+                audioContext = null;
+            }
+            
+            resampledBuffer = new Float32Array();
+            volumeLevel.style.width = '0%';
+            volumeIndicator.classList.add('hidden');
+            
+            // 更新UI状态
+            updateMicrophoneUI(false);
+            
+            if (isManualPause) {
+                micStatus.textContent = 'Microphone paused.';
+            } else {
+                micStatus.textContent = '';
+            }
+            translationPaused = true;
+            translationInitialized = false;
+        }
+
+        // System Audio Capture functionality
+        async function startSystemAudioCapture() {
+            try {
+                if (!sessionId) {
+                    updateStatus('Please load a model first', 'error');
+                    return;
+                }
+                
+                console.log('🔊 Starting system audio capture...');
+                updateStatus('Requesting system audio access...', 'processing');
+                
+                // 通过BlackHole虚拟音频设备获取系统音频
+                console.log('🔄 Looking for BlackHole virtual audio device...');
+                updateStatus('Searching for BlackHole audio device...', 'processing');
+                
+                // 获取所有可用的音频设备
+                const audioDevices = await navigator.mediaDevices.enumerateDevices();
+                const audioInputs = audioDevices.filter(device => device.kind === 'audioinput');
+                
+                console.log('🔍 Total audio devices found:', audioDevices.length);
+                console.log('🎤 Audio input devices found:', audioInputs.length);
+                console.log('📋 Available audio input devices:');
+                audioInputs.forEach((device, index) => {
+                    console.log(`  ${index + 1}. "${device.label || 'Unnamed Device'}" (ID: ${device.deviceId.substring(0, 20)}...)`);
+                    console.log(`      Kind: ${device.kind}, GroupId: ${device.groupId ? device.groupId.substring(0, 20) + '...' : 'No Group'}`);
+                });
+                
+                // 寻找BlackHole或其他虚拟音频设备 - 增强检测逻辑
+                console.log('🔍 Searching for virtual audio devices...');
+                
+                const virtualDeviceCandidates = audioInputs.filter(device => {
+                    const label = device.label.toLowerCase();
+                    const originalLabel = device.label; // 保留原始标签用于调试
+                    
+                    // 更全面的虚拟设备检测
+                    const isBlackHole = label.includes('blackhole') || label.includes('black hole');
+                    const isSoundFlower = label.includes('soundflower') || label.includes('sound flower');
+                    const isVirtual = label.includes('virtual');
+                    const isAggregate = label.includes('aggregate');
+                    const isMultiOutput = label.includes('multi-output') || label.includes('multi output') || label.includes('multioutput') || label.includes('multi_output');
+                    const isLoopback = label.includes('loopback');
+                    const isSystem = label.includes('system') && (label.includes('audio') || label.includes('sound'));
+                    
+                    // 特别检查包含"device"关键词的设备
+                    const isDeviceKeyword = label.includes('device') && (
+                        label.includes('multi') || 
+                        label.includes('aggregate') || 
+                        label.includes('virtual') ||
+                        label.includes('output')
+                    );
+                    
+                    const isVirtualDevice = isBlackHole || isSoundFlower || isVirtual || isAggregate || isMultiOutput || isLoopback || isSystem || isDeviceKeyword;
+                    
+                    console.log(`🎧 Checking device: "${originalLabel}"`, {
+                        labelLower: label,
+                        isBlackHole, isSoundFlower, isVirtual, isAggregate, isMultiOutput, isLoopback, isSystem, isDeviceKeyword,
+                        isVirtualDevice: isVirtualDevice ? '✅ YES' : '❌ NO'
+                    });
+                    
+                    return isVirtualDevice;
+                });
+                
+                console.log('🎯 Virtual device candidates found:', virtualDeviceCandidates.length);
+                virtualDeviceCandidates.forEach((device, index) => {
+                    console.log(`  ${index + 1}. "${device.label}" (ID: ${device.deviceId.substring(0, 20)}...)`);
+                });
+                
+                const virtualDevice = virtualDeviceCandidates[0]; // 选择第一个匹配的虚拟设备
+                
+                if (virtualDevice) {
+                    console.log('🎯 Found virtual audio device:', virtualDevice.label);
+                    updateStatus('Connecting to ' + virtualDevice.label + '...', 'processing');
+                    
+                    systemAudioStream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            deviceId: { exact: virtualDevice.deviceId },
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: false,
+                            channelCount: 2,
+                            sampleRate: 48000
+                        }
+                    });
+                    
+                    console.log('✅ System audio stream obtained from virtual device:', systemAudioStream);
+                    console.log('🎯 Stream details:', {
+                        active: systemAudioStream.active,
+                        tracks: systemAudioStream.getTracks().length,
+                        audioTracks: systemAudioStream.getAudioTracks().map(track => ({
+                            label: track.label,
+                            enabled: track.enabled,
+                            readyState: track.readyState
+                        }))
+                    });
+                    updateStatus('Ready - Please play any audio/video to begin translation', 'ready');
+                } else {
+                    // 提供更详细的设备列表和解决方案
+                    console.log('🔍 All available audio input devices:');
+                    audioInputs.forEach((device, index) => {
+                        console.log(`  ${index + 1}. "${device.label}" (ID: ${device.deviceId.substring(0, 20)}...)`);
+                    });
+                    
+                    const errorMessage = `Virtual audio device not found. Available options:\n\n1. Install BlackHole and create a multi-output device\n2. Use existing aggregate or virtual audio devices\n3. Create a multi-output device in Audio MIDI Setup\n\nFound ${audioInputs.length} audio input devices, but none matched virtual device patterns.`;
+                    
+                    console.error('❌ Virtual audio device not found:', errorMessage);
+                    updateStatus('Virtual audio device not found. Please set up a multi-output device or install BlackHole.', 'error');
+                    
+                    throw new Error(errorMessage);
+                }
+                
+                // Show translation panel
+                showPanel();
+                
+                const wsUrl = getWebSocketUrl(sessionId);
+                console.log(`Connecting to WebSocket at: ${wsUrl}`);
+                
+                ws = new WebSocket(wsUrl);
+                
+                ws.onmessage = (event) => {
+                    const message = event.data;
+                    console.log('WebSocket message received:', message);
+
+                    // 处理控制消息
+                    if (typeof message === 'string' && message.startsWith('INITIALIZING:')) {
+                        updateStatus(message.substring('INITIALIZING:'.length).trim(), 'processing');
+                        return;
+                    } else if (typeof message === 'string' && message.startsWith('READY:')) {
+                        updateStatus('Model is ready. Processing system audio...', 'processing');
+                        return;
+                    } else if (typeof message === 'string' && message.startsWith('ERROR:')) {
+                        updateStatus(message, 'error');
+                        return;
+                    }
+                    
+                    renderTranslationMessage(message);
+                };
+                
+                ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    const errorMsg = 'WebSocket connection error';
+                    updateStatus(errorMsg, 'error');
+                    stopSystemAudioCapture(false);
+                };
+                
+                ws.onopen = async () => {
+                    console.log('WebSocket connected successfully for system audio');
+                    
+                    try {
+                        // 在Electron环境中使用专用音频处理器
+                        if (isElectron && window.ElectronAudioProcessor) {
+                            console.log('🎵 Using Electron-specific audio processor for system audio...');
+                            
+                            try {
+                                // 确保没有其他音频处理在运行
+                                if (audioContext) {
+                                    try {
+                                        await audioContext.close();
+                                        audioContext = null;
+                                        console.log('🧹 Closed existing AudioContext');
+                                    } catch (e) {
+                                        console.warn('⚠️ Error closing existing AudioContext:', e);
+                                    }
+                                }
+                                
+                                // 禁用全局音频处理标志
+                                audioProcessingActive = false;
+                                
+                                electronAudioProcessor = new window.ElectronAudioProcessor();
+                                await electronAudioProcessor.initializeAudio(systemAudioStream, ws, 'system_audio');
+                                
+                                                        // 设置UI状态
+                        translationPaused = false;
+                        translationInitialized = true;
+                        
+                        updateSystemAudioUI(true);
+                        updateStatus('System audio connected - Play audio/video to see translation', 'ready');
+                        resetIdleTimer();
+                                
+                                console.log('✅ Electron audio processor initialized for system audio');
+                                return;
+                            } catch (electronError) {
+                                console.error('❌ Electron audio processor failed for system audio:', electronError);
+                                updateStatus('Electron audio processor failed, using fallback...', 'processing');
+                                
+                                // 清理失败的Electron处理器
+                                if (electronAudioProcessor) {
+                                    try {
+                                        electronAudioProcessor.stop();
+                                        electronAudioProcessor = null;
+                                    } catch (cleanupError) {
+                                        console.error('Error cleaning up failed Electron processor:', cleanupError);
+                                    }
+                                }
+                                
+                                // 继续使用传统浏览器处理方式作为备用方案
+                                console.log('🔄 Falling back to traditional browser audio processing...');
+                            }
+                        }
+                        
+                        // 传统浏览器处理方式
+                        console.log('Creating AudioContext for system audio...');
+                        audioContext = new AudioContext();
+                        console.log('AudioContext created with sample rate:', audioContext.sampleRate);
+                        
+                        console.log('Creating MediaStreamSource for system audio...');
+                        const systemAudioSource = audioContext.createMediaStreamSource(systemAudioStream);
+                        console.log('MediaStreamSource created for system audio');
+                        
+                        // 使用与麦克风相同的音频处理逻辑 - 内联处理器创建
+                        processor = audioContext.createScriptProcessor(segmentSize, 1, 1);
+                        
+                        // 添加音频检测标志
+                        let hasDetectedSystemAudio = false;
+                        
+                        processor.onaudioprocess = (event) => {
+                            const inputData = event.inputBuffer.getChannelData(0);
+                            
+                            // 检测音频活动
+                            let hasSound = false;
+                            let volumeSum = 0;
+                            for (let i = 0; i < inputData.length; i++) {
+                                const volume = Math.abs(inputData[i]);
+                                volumeSum += volume;
+                                if (volume > 0.01) {
+                                    hasSound = true;
+                                }
+                            }
+                            
+                            // 首次检测到音频时更新状态
+                            if (hasSound && !hasDetectedSystemAudio) {
+                                hasDetectedSystemAudio = true;
+                                updateStatus('Processing audio from system...', 'processing');
+                                console.log('🔊 First audio detected from system audio device');
+                            }
+                            
+                            // Resample to target sample rate
+                            const resampleRatio = targetSampleRate / audioContext.sampleRate;
+                            const resampledLength = Math.floor(inputData.length * resampleRatio);
+                            const resampledChunk = new Float32Array(resampledLength);
+                            for (let i = 0; i < resampledLength; i++) {
+                                const originalIndex = Math.floor(i / resampleRatio);
+                                resampledChunk[i] = inputData[originalIndex];
+                            }
+                            
+                            // Add to buffer
+                            const newBuffer = new Float32Array(resampledBuffer.length + resampledChunk.length);
+                            newBuffer.set(resampledBuffer);
+                            newBuffer.set(resampledChunk, resampledBuffer.length);
+                            resampledBuffer = newBuffer;
+                            
+                            // Send chunks when buffer is large enough
+                            const targetChunkSize = baseChunkSize * currentLatencyMultiplier;
+                            while (resampledBuffer.length >= targetChunkSize) {
+                                const chunk = resampledBuffer.slice(0, targetChunkSize);
+                                if (ws && ws.readyState === WebSocket.OPEN) {
+                                    ws.send(chunk.buffer);
+                                }
+                                resampledBuffer = resampledBuffer.slice(targetChunkSize);
+                            }
+                        };
+                        
+                        systemAudioSource.connect(processor);
+                        processor.connect(audioContext.destination);
+                        
+                        translationPaused = false;
+                        translationInitialized = true;
+                        updateSystemAudioUI(true);
+                        updateStatus('System audio connected - Play audio/video to see translation', 'ready');
+                        resetIdleTimer();
+                        
+                    } catch (audioError) {
+                        console.error('Error setting up system audio processing:', audioError);
+                        updateStatus('Error setting up system audio processing: ' + audioError.message, 'error');
+                        stopSystemAudioCapture(false);
+                    }
+                };
+                
+            } catch (error) {
+                console.error('System audio capture error:', error);
+                let errorMessage = 'Error accessing system audio: ';
+                
+                if (error.name === 'NotAllowedError') {
+                    errorMessage += 'Permission denied. Please allow screen recording/audio access.';
+                } else if (error.name === 'NotFoundError') {
+                    errorMessage += 'No audio source found. Please ensure you have a virtual audio device installed (like BlackHole).';
+                } else {
+                    errorMessage += error.message;
+                }
+                
+                updateStatus(errorMessage, 'error');
+                console.error('Full error details:', error);
+            }
+        }
+
+        function updateSystemAudioUI(isCapturing) {
+            if (isCapturing) {
+                systemAudioBtn.innerHTML = `
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path d="M3,9V15H7L12,20V4L7,9H3M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.71V20.77C18.01,19.86 21,16.28 21,12C21,7.72 18.01,4.14 14,3.23Z"/>
+                    </svg>
+                    Stop System Audio
+                `;
+                systemAudioBtn.classList.add('capturing');
+                isSystemAudioCapturing = true;
+            } else {
+                systemAudioBtn.innerHTML = `
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path d="M3,9V15H7L12,20V4L7,9H3M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.71V20.77C18.01,19.86 21,16.28 21,12C21,7.72 18.01,4.14 14,3.23Z"/>
+                    </svg>
+                    Capture System Audio
+                `;
+                systemAudioBtn.classList.remove('capturing');
+                isSystemAudioCapturing = false;
+            }
+        }
+
+        function stopSystemAudioCapture(isManualPause = false) {
+            console.log('🛑 Stopping system audio capture...');
+            
+            // 如果使用Electron音频处理器，优先停止它
+            if (electronAudioProcessor) {
+                console.log('🧹 Stopping Electron audio processor...');
+                try {
+                    electronAudioProcessor.stop();
+                    electronAudioProcessor = null;
+                    console.log('✅ Electron audio processor stopped');
+                } catch (error) {
+                    console.error('❌ Error stopping Electron audio processor:', error);
+                }
+            }
+            
+            // 立即停止音频处理
+            if (typeof audioProcessingActive !== 'undefined') {
+                audioProcessingActive = false;
+                console.log('🚫 Audio processing disabled');
+            }
+            
+            if (ws && ws.readyState === WebSocket.OPEN && resampledBuffer.length > 0) {
+                const targetChunkSize = baseChunkSize * currentLatencyMultiplier;
+                const finalChunk = new Float32Array(targetChunkSize);
+                finalChunk.set(resampledBuffer);
+                try {
+                    ws.send(finalChunk.buffer);
+                } catch (error) {
+                    console.error('Error sending final audio chunk:', error);
+                }
+            }
+            
+            if (ws) {
+                try {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        ws.close();
+                    }
+                } catch (e) {
+                    console.error('Error closing WebSocket:', e);
+                }
+                ws = null;
+            }
+            
+            if (systemAudioStream) {
+                systemAudioStream.getTracks().forEach(track => {
+                    track.stop();
+                });
+                systemAudioStream = null;
+            }
+            
+            if (processor) {
+                try {
+                    processor.disconnect();
+                } catch (e) {
+                    console.error('Error disconnecting processor:', e);
+                }
+                processor = null;
+            }
+            
+            if (audioContext) {
+                try {
+                    if (audioContext.state !== 'closed') {
+                        audioContext.close().catch(e => {
+                            console.error('Error closing audio context:', e);
+                        });
+                    }
+                } catch (e) {
+                    console.error('Error in audio context cleanup:', e);
+                }
+                audioContext = null;
+            }
+            
+            resampledBuffer = new Float32Array();
+            
+            // 更新UI状态
+            updateSystemAudioUI(false);
+            
+            if (isManualPause) {
+                updateStatus('System audio capture stopped.', 'ready');
+            } else {
+                updateStatus('', 'ready');
+            }
+            translationPaused = true;
+            translationInitialized = false;
+        }
+
+        // Reset translation
+        resetTranslation.addEventListener('click', async () => {
+            if (!sessionId) return;
+            
+            try {
+                if (isMicRecording) {
+                    stopMicrophone(false);
+                } else if (isSystemAudioCapturing) {
+                    stopSystemAudioCapture(false);
+                } else {
+                    volumeLevel.style.width = '0%';
+                    volumeIndicator.classList.add('hidden');
+                    micStatus.textContent = '';
+                }
+                
+                cleanupAudioResources();
+                
+                if (audioContext) {
+                    try {
+                        if (audioContext.state !== 'closed') {
+                            await audioContext.close();
+                        }
+                        audioContext = null;
+                    } catch (e) {
+                        console.error('Error closing AudioContext:', e);
+                    }
+                }
+                
+                audioElementConnected = false;
+                
+                // Reset media container
+                const existingMedia = mediaContainer.querySelector('audio, video');
+                if (existingMedia) {
+                    existingMedia.remove();
+                }
+                
+                const placeholder = mediaContainer.querySelector('.video-placeholder');
+                if (placeholder) {
+                    placeholder.style.display = 'block';
+                }
+                
+                currentMediaElement = null;
+                
+                if (audioFile) {
+                    audioFile.value = '';
+                }
+                
+                if (youtubeUrl) {
+                    youtubeUrl.value = '';
+                }
+                
+                volumeLevel.style.width = '0%';
+                volumeIndicator.classList.add('hidden');
+                translationInitialized = false;
+                
+                const response = await fetch('/reset_translation?' + new URLSearchParams({
+                    session_id: sessionId
+                }), {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    updateStatus(data.message || 'Translation reset successfully. Please select an audio source.', 'ready');
+                    updateLatency.disabled = false;
+                    console.log('Translation reset successfully');
+                } else {
+                    updateStatus('Failed to reset translation: ' + data.error, 'error');
+                    console.error('Failed to reset translation:', data.error);
+                }
+            } catch (error) {
+                updateStatus('Error resetting translation: ' + error, 'error');
+                console.error('Error resetting translation:', error);
+            }
+        });
+
+        // Update latency
+        updateLatency.addEventListener('click', async () => {
+            if (!sessionId) return;
+            
+            try {
+                currentLatencyMultiplier = parseInt(latencyMultiplier.value);
+                const response = await fetch('/update_latency?' + new URLSearchParams({
+                    session_id: sessionId,
+                    latency_multiplier: currentLatencyMultiplier
+                }), {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    updateStatus('Latency updated successfully', 'ready');
+                    console.log('Latency updated to:', latencyMultiplier.value + 'x');
+                } else {
+                    updateStatus('Failed to update latency: ' + data.error, 'error');
+                    console.error('Failed to update latency:', data.error);
+                }
+            } catch (error) {
+                updateStatus('Error updating latency: ' + error, 'error');
+                console.error('Error updating latency:', error);
+            }
+        });
+
+        // 供Electron调用的重置翻译函数
+        window.resetTranslationFromElectron = async function() {
+            if (!sessionId) return;
+            
+            try {
+                if (isMicRecording) {
+                    stopMicrophone(false);
+                } else if (isSystemAudioCapturing) {
+                    stopSystemAudioCapture(false);
+                } else {
+                    volumeLevel.style.width = '0%';
+                    volumeIndicator.classList.add('hidden');
+                    micStatus.textContent = '';
+                }
+                
+                cleanupAudioResources();
+                
+                if (audioContext) {
+                    try {
+                        if (audioContext.state !== 'closed') {
+                            await audioContext.close();
+                        }
+                        audioContext = null;
+                    } catch (e) {
+                        console.error('Error closing AudioContext:', e);
+                    }
+                }
+                
+                audioElementConnected = false;
+                
+                // Reset media container
+                const existingMedia = mediaContainer.querySelector('audio, video');
+                if (existingMedia) {
+                    existingMedia.remove();
+                }
+                
+                const placeholder = mediaContainer.querySelector('.video-placeholder');
+                if (placeholder) {
+                    placeholder.style.display = 'block';
+                }
+                
+                currentMediaElement = null;
+                
+                if (audioFile) {
+                    audioFile.value = '';
+                }
+                
+                if (youtubeUrl) {
+                    youtubeUrl.value = '';
+                }
+                
+                volumeLevel.style.width = '0%';
+                volumeIndicator.classList.add('hidden');
+                translationInitialized = false;
+                
+                const response = await fetch('/reset_translation?' + new URLSearchParams({
+                    session_id: sessionId
+                }), {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    updateStatus(data.message || 'Translation reset successfully. Please select an audio source.', 'ready');
+                    updateLatency.disabled = false;
+                    console.log('Translation reset successfully from Electron');
+                } else {
+                    updateStatus('Failed to reset translation: ' + data.error, 'error');
+                    console.error('Failed to reset translation:', data.error);
+                }
+            } catch (error) {
+                updateStatus('Error resetting translation: ' + error, 'error');
+                console.error('Error resetting translation:', error);
+            }
+        };
+
+        // 全局错误处理，防止白屏
+        window.addEventListener('error', (event) => {
+            console.error('Global error caught:', event.error);
+            if (isElectron) {
+                updateElectronStatus('Error: ' + event.error.message, 'error');
+            } else {
+                // 尝试恢复UI状态
+                try {
+                    updateStatus('Application error occurred: ' + event.error.message, 'error');
+                } catch (e) {
+                    console.error('Error in error handler:', e);
+                }
+            }
+        });
+
+        window.addEventListener('unhandledrejection', (event) => {
+            console.error('Unhandled promise rejection:', event.reason);
+            if (isElectron) {
+                updateElectronStatus('Error: ' + event.reason, 'error');
+            } else {
+                try {
+                    updateStatus('Promise rejection: ' + event.reason, 'error');
+                } catch (e) {
+                    console.error('Error in rejection handler:', e);
+                }
+            }
+        });
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                // Electron环境下强制调整按钮位置和UI切换
+                if (typeof window !== 'undefined' && window.electronAPI) {
+                    console.log('🔄 DOMContentLoaded: Re-applying Electron mode UI...');
+                    
+                    // 立即执行强制UI切换
+                    forceElectronModeUI();
+                    
+                    setTimeout(() => {
+                        const buttonsGroup = document.querySelector('.buttons-group');
+                        if (buttonsGroup) {
+                            buttonsGroup.style.transform = 'translateY(-25px)';
+                            buttonsGroup.style.position = 'relative';
+                            buttonsGroup.style.zIndex = '10';
+                            console.log('Electron: 按钮位置已调整到-25px');
+                        }
+                        
+                        // 再次强制执行UI切换，防止任何时序问题
+                        console.log('🔄 DOMContentLoaded: Final UI enforcement...');
+                        forceElectronModeUI();
+                        
+                    }, 100);
+                }
+                
+                ensureClientId();
+                loadServerConfig();
+                
+                // 只在非Electron环境下初始化面板拖拽
+                if (!isElectron) {
+                    initializePanelDragging();
+                }
+                
+                const userEvents = ['mousedown', 'keypress', 'scroll', 'touchstart'];
+                userEvents.forEach(eventType => {
+                    document.addEventListener(eventType, resetIdleTimer);
+                });
+                
+                resetIdleTimer();
+                
+                const storedSessionId = localStorage.getItem('translationSessionId_' + clientId);
+                if (storedSessionId) {
+                    console.log('Found stored session ID:', storedSessionId);
+                    checkSessionStatus(storedSessionId);
+                } else {
+                    console.log('No stored session found, starting fresh');
+                }
+                
+                const pendingDeleteSessions = JSON.parse(localStorage.getItem('pendingDeleteSessions_' + clientId) || '{}');
+                if (Object.keys(pendingDeleteSessions).length > 0) {
+                    console.log(`Found ${Object.keys(pendingDeleteSessions).length} orphaned sessions to delete`);
+                    // Add session cleanup logic here if needed
+                }
+            } catch (error) {
+                console.error('Error during initialization:', error);
+                if (isElectron) {
+                    updateElectronStatus('Init error: ' + error.message, 'error');
+                }
+            }
+        });
+
+        async function checkSessionStatus(checkSessionId) {
+            try {
+                const response = await fetch('/delete_session?' + new URLSearchParams({
+                    session_id: checkSessionId
+                }), {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    console.log('Session exists and was deleted:', checkSessionId);
+                    localStorage.removeItem('translationSessionId_' + clientId);
+                } else if (data.error && data.error.includes('Invalid session ID')) {
+                    console.log('Stored session no longer exists:', checkSessionId);
+                    localStorage.removeItem('translationSessionId_' + clientId);
+                } else {
+                    console.error('Unexpected error checking session:', data.error);
+                    localStorage.removeItem('translationSessionId_' + clientId);
+                }
+            } catch (error) {
+                console.error('Error checking session status:', error);
+                localStorage.removeItem('translationSessionId_' + clientId);
+            }
+        }
+
+        // Toast通知系统已移除
+        
+        // 更新Electron状态栏
+        function updateElectronStatusBar(text, type = 'ready') {
+            const statusBar = document.getElementById('electronStatusBar');
+            const statusIcon = document.getElementById('electronStatusIcon');
+            const statusText = document.getElementById('electronStatusText');
+            
+            if (statusBar && statusIcon && statusText) {
+                // 更新状态栏样式
+                statusBar.className = `electron-status-bar ${type}`;
+                statusIcon.className = `electron-status-icon ${type}`;
+                statusText.textContent = text;
+            }
+        }
+    </script>
+</body>
+</html> 

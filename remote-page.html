@@ -632,9 +632,7 @@
             </div>
         </div>
         <div class="translation-content" id="translationContent">
-            <div id="translationOutput" class="translation-output">
-                Translation will appear here...
-            </div>
+            <div id="translationOutput" class="translation-output"></div>
         </div>
         <div class="resize-handle" id="resizeHandle"></div>
     </div>
@@ -707,6 +705,37 @@
         const minimizeBtn = document.getElementById('minimizeBtn');
         const closeBtn = document.getElementById('closeBtn');
         const resizeHandle = document.getElementById('resizeHandle');
+        const TRANSLATION_PLACEHOLDER = 'Translation will appear here...';
+
+        function targetLanguageFromPair() {
+            const pair = languagePair && languagePair.value ? languagePair.value : '';
+            if (pair.includes('Chinese')) return 'zh';
+            if (pair.includes('Japanese')) return 'ja';
+            if (pair.includes('German')) return 'de';
+            return 'default';
+        }
+
+        function joinTranslationText(current, next) {
+            const base = String(current || '').trimEnd();
+            const text = String(next || '').trim();
+            if (!base || base === TRANSLATION_PLACEHOLDER) return text;
+            const targetLang = targetLanguageFromPair();
+            if (targetLang === 'zh' || targetLang === 'ja') {
+                return `${base}${text}`;
+            }
+            if (/^[,.;:!?，。！？；：、)\]}]/.test(text) || /[\s([{]$/.test(base)) {
+                return `${base}${text}`;
+            }
+            return `${base} ${text}`;
+        }
+
+        function appendTranslationMessage(message) {
+            if (!translationOutput) return;
+            const text = String(message || '').trim();
+            if (!text) return;
+            translationOutput.textContent = joinTranslationText(translationOutput.textContent, text);
+            scrollTranslationToBottom();
+        }
 
         // Electron 集成检测和初始化
         let isElectron = false;
@@ -1098,8 +1127,7 @@
                             updateElectronTranslation(message);
                         } else {
                             // 在浏览器环境中更新主窗口面板
-                            translationOutput.textContent = message;
-                            scrollTranslationToBottom();
+                            appendTranslationMessage(message);
                         }
                     }
                 };
@@ -1391,7 +1419,7 @@
                     isQueued = false;
                 }
                 
-                translationOutput.textContent = 'Translation will appear here...';
+                translationOutput.textContent = '';
                 updateLatency.disabled = true;
                 resetTranslation.disabled = true;
                 
@@ -1658,8 +1686,7 @@
                         updateElectronTranslation(event.data);
                     } else {
                         // 在浏览器环境中更新主窗口面板
-                        translationOutput.textContent = event.data;
-                        scrollTranslationToBottom();
+                        appendTranslationMessage(event.data);
                     }
                 };
                 
@@ -1954,7 +1981,7 @@
                 if (data.success) {
                     if (!isElectron) {
                         // 只在非Electron环境下更新主窗口面板
-                        translationOutput.textContent = 'Translation will appear here...';
+                        translationOutput.textContent = '';
                     }
                     updateStatus(data.message || 'Translation reset successfully. Please select an audio source.', 'ready');
                     updateLatency.disabled = false;
@@ -2120,4 +2147,4 @@
         }
     </script>
 </body>
-</html> 
+</html>

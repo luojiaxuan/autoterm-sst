@@ -15,7 +15,7 @@ import time
 import urllib.parse
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import requests
@@ -127,28 +127,57 @@ def _parse_audio_yaml(path: Path) -> List[dict]:
     return items
 
 
+def _infer_reference_source_file(ref_file: str) -> Optional[Path]:
+    path = Path(ref_file)
+    name = path.name
+    match = re.match(r"(.+\.en-xx\.)[a-z]{2}(\.txt)$", name)
+    if not match:
+        return None
+    candidate = path.with_name(f"{match.group(1)}en{match.group(2)}")
+    return candidate if candidate.is_file() else None
+
+
+def load_reference_segments(args) -> Optional[List[Dict[str, Any]]]:
+    if not args.reference_audio_yaml or not args.reference_ref_file:
+        return None
+
+    items = _parse_audio_yaml(Path(args.reference_audio_yaml))
+    refs = Path(args.reference_ref_file).read_text(encoding="utf-8").splitlines()
+    source_file = Path(args.reference_source_file) if args.reference_source_file else _infer_reference_source_file(args.reference_ref_file)
+    source_refs: List[str] = []
+    if source_file and source_file.is_file():
+        source_refs = source_file.read_text(encoding="utf-8").splitlines()
+
+    target_wav = Path(args.reference_wav or args.audio_file).name
+    selected = []
+    for idx, item in enumerate(items):
+        wav = str(item.get("wav", ""))
+        if Path(wav).name != target_wav or idx >= len(refs):
+            continue
+        selected.append(
+            {
+                "audio": item,
+                "reference": clean_text_for_bleu(refs[idx]),
+                "source_reference": source_refs[idx].strip() if idx < len(source_refs) else "",
+            }
+        )
+    if not selected:
+        raise RuntimeError(
+            f"no reference segments matched wav={target_wav} in {args.reference_audio_yaml}"
+        )
+    return selected
+
+
 def load_reference_text(args) -> Optional[str]:
     if args.reference_text_file:
         return "".join(
             clean_text_for_bleu(line)
             for line in Path(args.reference_text_file).read_text(encoding="utf-8").splitlines()
         )
-    if not args.reference_audio_yaml or not args.reference_ref_file:
+    segments = load_reference_segments(args)
+    if not segments:
         return None
-
-    items = _parse_audio_yaml(Path(args.reference_audio_yaml))
-    refs = Path(args.reference_ref_file).read_text(encoding="utf-8").splitlines()
-    target_wav = Path(args.reference_wav or args.audio_file).name
-    selected_lines = []
-    for idx, item in enumerate(items):
-        wav = str(item.get("wav", ""))
-        if Path(wav).name == target_wav and idx < len(refs):
-            selected_lines.append(clean_text_for_bleu(refs[idx]))
-    if not selected_lines:
-        raise RuntimeError(
-            f"no reference segments matched wav={target_wav} in {args.reference_audio_yaml}"
-        )
-    return "".join(selected_lines)
+    return "".join(item["reference"] for item in segments)
 
 
 def compute_sentence_bleu(hypothesis: str, reference: str, tokenize: str) -> float:
@@ -184,6 +213,197 @@ def compute_corpus_bleu(hypotheses: List[str], reference: str, tokenize: str) ->
         return float(sacrebleu.corpus_bleu(hypotheses, references, tokenize=tokenize).score)
 
 
+def latency_unit_for_language_pair(language_pair: str) -> str:
+    lower_pair = language_pair.lower()
+    if "chinese" in lower_pair or "japanese" in lower_pair:
+        return "char"
+    return "word"
+
+
+def prediction_unit_len(text: str, latency_unit: str) -> int:
+    stripped = text.strip()
+    if not stripped:
+        return 0
+    if latency_unit == "word":
+        return len(stripped.split())
+    return len(stripped)
+
+
+def audio_source_info(audio_file: str) -> List[str]:
+    info = sf.info(audio_file)
+    return [
+        audio_file,
+        f"samplerate: {info.samplerate} Hz",
+        f"channels: {info.channels}",
+        f"duration: {info.duration:.3f} s",
+        f"format: {info.format}",
+        f"subtype: {info.subtype}",
+    ]
+
+
+def build_simuleval_record(
+    args,
+    item: SessionStats,
+    *,
+    source_path: str,
+    reference_text: str,
+    source_length_ms: float,
+) -> Dict[str, Any]:
+    latency_unit = latency_unit_for_language_pair(args.language_pair)
+    prediction = join_hypothesis(item.texts, args.language_pair)
+    delays: List[float] = []
+    elapsed: List[float] = []
+    for text, result_time_s in zip(item.texts, item.result_times_s):
+        cleaned = clean_text_for_bleu(text)
+        unit_count = prediction_unit_len(cleaned, latency_unit)
+        if unit_count <= 0:
+            continue
+        elapsed_ms = max(0.0, float(result_time_s) * 1000.0)
+        delay_ms = min(elapsed_ms, source_length_ms)
+        delays.extend([delay_ms] * unit_count)
+        elapsed.extend([elapsed_ms] * unit_count)
+
+    prediction_length = prediction_unit_len(prediction, latency_unit)
+    if len(delays) != prediction_length:
+        # Keep the log usable even when whitespace cleanup changes word counts.
+        if len(delays) < prediction_length:
+            last_delay = delays[-1] if delays else 0.0
+            last_elapsed = elapsed[-1] if elapsed else last_delay
+            delays.extend([last_delay] * (prediction_length - len(delays)))
+            elapsed.extend([last_elapsed] * (prediction_length - len(elapsed)))
+        else:
+            delays = delays[:prediction_length]
+            elapsed = elapsed[:prediction_length]
+
+    source_info = audio_source_info(args.audio_file)
+    source_info[0] = source_path
+    return {
+        "index": item.idx,
+        "prediction": prediction,
+        "delays": delays,
+        "elapsed": elapsed,
+        "prediction_length": prediction_length,
+        "reference": reference_text,
+        "source": source_info,
+        "source_length": source_length_ms,
+    }
+
+
+def write_yaml(path: Path, data: Sequence[Dict[str, Any]]) -> None:
+    try:
+        import yaml
+
+        path.write_text(yaml.safe_dump(list(data), allow_unicode=True, sort_keys=False), encoding="utf-8")
+    except Exception:
+        lines = []
+        for item in data:
+            lines.append("-")
+            for key, value in item.items():
+                lines.append(f"  {key}: {value}")
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def write_simuleval_inputs(
+    directory: Path,
+    *,
+    source_path: str,
+    reference_segments: Optional[List[Dict[str, Any]]],
+    reference_text: str,
+    source_length_s: float,
+) -> Tuple[Path, Path, Path]:
+    directory.mkdir(parents=True, exist_ok=True)
+    audio_yaml = directory / "audio.yaml"
+    ref_file = directory / "ref.txt"
+    source_file = directory / "source.txt"
+
+    if reference_segments:
+        audio_items = []
+        references = []
+        sources = []
+        for segment in reference_segments:
+            audio_item = dict(segment["audio"])
+            audio_item["wav"] = source_path
+            audio_items.append(audio_item)
+            references.append(str(segment["reference"]))
+            sources.append(str(segment.get("source_reference") or ""))
+    else:
+        audio_items = [{"wav": source_path, "offset": 0.0, "duration": float(source_length_s)}]
+        references = [reference_text]
+        sources = [""]
+
+    write_yaml(audio_yaml, audio_items)
+    ref_file.write_text("\n".join(references) + "\n", encoding="utf-8")
+    source_file.write_text("\n".join(sources) + "\n", encoding="utf-8")
+    return audio_yaml, ref_file, source_file
+
+
+def write_simuleval_artifacts(
+    args,
+    stats_list: List[SessionStats],
+    reference_text: str,
+    reference_segments: Optional[List[Dict[str, Any]]],
+) -> Optional[Path]:
+    if not args.save_dir or not args.write_simuleval_instances:
+        return None
+
+    root_dir = Path(args.save_dir) / "simuleval"
+    root_dir.mkdir(parents=True, exist_ok=True)
+    source_length_ms = float(args.duration_sec) * 1000.0
+    combined_instances = root_dir / "instances.log"
+    base_name = Path(args.audio_file).name
+
+    combined_audio_items: List[Dict[str, Any]] = []
+    combined_refs: List[str] = []
+    combined_sources: List[str] = []
+    with combined_instances.open("w", encoding="utf-8") as combined_handle:
+        for item in stats_list:
+            session_dir = root_dir / f"session_{item.idx:03d}"
+            source_path = str(session_dir / f"session_{item.idx:03d}_{base_name}")
+            record = build_simuleval_record(
+                args,
+                item,
+                source_path=source_path,
+                reference_text=reference_text,
+                source_length_ms=source_length_ms,
+            )
+            combined_handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+            session_instances = session_dir / "instances.log"
+            session_dir.mkdir(parents=True, exist_ok=True)
+            session_instances.write_text(json.dumps(record, ensure_ascii=False) + "\n", encoding="utf-8")
+            write_simuleval_inputs(
+                session_dir,
+                source_path=source_path,
+                reference_segments=reference_segments,
+                reference_text=reference_text,
+                source_length_s=float(args.duration_sec),
+            )
+
+            if reference_segments:
+                for segment in reference_segments:
+                    audio_item = dict(segment["audio"])
+                    audio_item["wav"] = source_path
+                    combined_audio_items.append(audio_item)
+                    combined_refs.append(str(segment["reference"]))
+                    combined_sources.append(str(segment.get("source_reference") or ""))
+            else:
+                combined_audio_items.append({"wav": source_path, "offset": 0.0, "duration": float(args.duration_sec)})
+                combined_refs.append(reference_text)
+                combined_sources.append("")
+
+    write_yaml(root_dir / "audio.yaml", combined_audio_items)
+    (root_dir / "ref.txt").write_text("\n".join(combined_refs) + "\n", encoding="utf-8")
+    (root_dir / "source.txt").write_text("\n".join(combined_sources) + "\n", encoding="utf-8")
+    (root_dir / "README.txt").write_text(
+        "Stress-derived SimulEval-compatible logs.\n"
+        "delays use browser-observed real-time emission timestamps capped by source length; "
+        "elapsed uses uncapped browser-observed emission timestamps.\n",
+        encoding="utf-8",
+    )
+    print(f"simuleval_instances={combined_instances}")
+    return combined_instances
+
+
 def write_bleu_artifacts(args, stats_list: List[SessionStats], reference_text: str) -> List[float]:
     hypotheses = [join_hypothesis(item.texts, args.language_pair) for item in stats_list]
     scores = [
@@ -207,7 +427,7 @@ def write_bleu_artifacts(args, stats_list: List[SessionStats], reference_text: s
     if args.save_dir:
         output_dir = Path(args.save_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
-        jsonl_path = output_dir / "session_predictions.jsonl"
+        jsonl_path = output_dir / "session_bleu_predictions.jsonl"
         with jsonl_path.open("w", encoding="utf-8") as handle:
             for item, hypothesis, score in zip(stats_list, hypotheses, scores):
                 handle.write(
@@ -233,7 +453,7 @@ def write_bleu_artifacts(args, stats_list: List[SessionStats], reference_text: s
                     )
                     + "\n"
                 )
-        summary_path = output_dir / "summary.json"
+        summary_path = output_dir / "bleu_summary.json"
         summary_path.write_text(
             json.dumps(
                 {
@@ -528,12 +748,20 @@ async def run_all(args) -> int:
         raise RuntimeError("server is in mock_mode; refusing real stress test")
 
     audio = load_audio(args.audio_file, args.duration_sec)
-    reference_text = load_reference_text(args)
+    reference_segments = load_reference_segments(args)
+    if args.reference_text_file:
+        reference_text = load_reference_text(args)
+    elif reference_segments:
+        reference_text = "".join(item["reference"] for item in reference_segments)
+    else:
+        reference_text = None
     if reference_text is not None:
         print(
             "reference_config="
             f"chars={len(reference_text)} "
             f"audio_yaml={args.reference_audio_yaml} ref_file={args.reference_ref_file} "
+            f"source_file={args.reference_source_file or _infer_reference_source_file(args.reference_ref_file or '')} "
+            f"segments={len(reference_segments) if reference_segments else 0} "
             f"reference_wav={args.reference_wav or args.audio_file}"
         )
     chunk_samples = args.chunk_samples or BASE_CHUNK_SAMPLES * args.latency_multiplier
@@ -722,6 +950,7 @@ async def run_all(args) -> int:
 
     if reference_text is not None and stats_list:
         write_bleu_artifacts(args, stats_list, reference_text)
+        write_simuleval_artifacts(args, stats_list, reference_text, reference_segments)
 
     return 1 if failures else 0
 
@@ -751,9 +980,11 @@ def parse_args():
     parser.add_argument("--reference-text-file", default=None)
     parser.add_argument("--reference-audio-yaml", default=None)
     parser.add_argument("--reference-ref-file", default=None)
+    parser.add_argument("--reference-source-file", default=None)
     parser.add_argument("--reference-wav", default=None)
     parser.add_argument("--bleu-tokenize", default="zh")
     parser.add_argument("--save-dir", default=None)
+    parser.add_argument("--write-simuleval-instances", action="store_true")
     parser.set_defaults(
         realtime=True,
         require_realtime_wallclock=True,

@@ -1003,9 +1003,7 @@
             </div>
         </div>
         <div class="translation-content" id="translationContent">
-            <div id="translationOutput" class="translation-output">
-                Translation will appear here...
-            </div>
+            <div id="translationOutput" class="translation-output"></div>
         </div>
         <div class="resize-handle" id="resizeHandle"></div>
     </div>
@@ -1315,7 +1313,7 @@
 
         function clearTranslationOutput() {
             if (translationOutput) {
-                translationOutput.textContent = TRANSLATION_PLACEHOLDER;
+                translationOutput.textContent = '';
             }
             if (isElectron) {
                 updateElectronTranslation('');

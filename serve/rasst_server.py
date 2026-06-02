@@ -19,6 +19,7 @@ import sys
 import time
 import urllib.parse
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Deque, Dict, List, Optional, Sequence, Set
@@ -145,7 +146,7 @@ class StreamState:
     target_lang: str
     lang_code: str
     samplerate: int = TARGET_SAMPLE_RATE
-    audio: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float32))
+    audio_bytes: bytearray = field(default_factory=bytearray)
     cursor_samples: int = 0
     last_vllm_samples: int = 0
     segment_idx: int = 0
@@ -154,6 +155,11 @@ class StreamState:
 
 def _split_csv(value: str) -> List[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _split_rag_devices(value: str, fallback: str) -> List[str]:
+    devices = _split_csv(value) if value else []
+    return devices or [fallback]
 
 
 def _split_worker_gpu_groups(value: str, tp_size: int) -> List[str]:
@@ -183,6 +189,16 @@ def _format_term_map(references: Sequence[Dict[str, Any]], mode: str) -> str:
         else:
             lines.append(f"{term}={translation}")
     return "\n".join(lines)
+
+
+def _audio_slice(state: StreamState, start_samples: int, end_samples: int) -> np.ndarray:
+    start_samples = max(0, int(start_samples))
+    end_samples = min(int(end_samples), int(state.cursor_samples))
+    if end_samples <= start_samples:
+        return np.zeros(0, dtype=np.float32)
+    start_byte = start_samples * np.dtype(np.float32).itemsize
+    end_byte = end_samples * np.dtype(np.float32).itemsize
+    return np.frombuffer(state.audio_bytes[start_byte:end_byte], dtype=np.float32).copy()
 
 
 def _system_prompt(source_lang: str, target_lang: str, lang_code: str, rag_enabled: bool) -> str:
@@ -347,22 +363,28 @@ def _worker_main(worker_idx: int, gpu_token: str, command_queue: mp.Queue, resul
             seed=int(config["seed"]),
         )
 
-        retriever = None
+        retrievers = []
+        rag_pool: Optional[ThreadPoolExecutor] = None
         if bool(config["rag_enabled"]):
-            result_queue.put({"type": "worker_loading_retriever", **worker_info})
-            retriever = StreamingMaxSimRetriever(
-                model_path=config["rag_model_path"],
-                index_path=lang_cfg["index_path"],
-                device=config["rag_device"],
-                top_k=int(config["rag_top_k"]),
-                lora_rank=int(config["rag_lora_r"]),
-                text_lora_rank=int(config["rag_text_lora_r"]),
-                target_lang=lang_cfg["lang_code"],
-                window_sec=0.0,
-                score_threshold=float(config["rag_score_threshold"]),
-                maxsim_windows=MAXSIM_WINDOWS,
-                maxsim_stride=MAXSIM_STRIDE,
-            )
+            for rag_device in config["rag_devices"]:
+                result_queue.put({"type": "worker_loading_retriever", **worker_info, "rag_device": rag_device})
+                retrievers.append(
+                    StreamingMaxSimRetriever(
+                        model_path=config["rag_model_path"],
+                        index_path=lang_cfg["index_path"],
+                        device=rag_device,
+                        top_k=int(config["rag_top_k"]),
+                        lora_rank=int(config["rag_lora_r"]),
+                        text_lora_rank=int(config["rag_text_lora_r"]),
+                        target_lang=lang_cfg["lang_code"],
+                        window_sec=0.0,
+                        score_threshold=float(config["rag_score_threshold"]),
+                        maxsim_windows=MAXSIM_WINDOWS,
+                        maxsim_stride=MAXSIM_STRIDE,
+                    )
+                )
+            if retrievers:
+                rag_pool = ThreadPoolExecutor(max_workers=len(retrievers), thread_name_prefix="rasst-rag")
 
         if torch.cuda.is_available():
             free, total = torch.cuda.mem_get_info(0)
@@ -403,36 +425,73 @@ def _worker_main(worker_idx: int, gpu_token: str, command_queue: mp.Queue, resul
         states_batch = [states[session_id] for session_id in batch_session_ids]
         increments: List[np.ndarray] = []
         for state in states_batch:
-            increment = state.audio[state.last_vllm_samples : state.cursor_samples]
+            increment = _audio_slice(state, state.last_vllm_samples, state.cursor_samples)
             if len(increment) < 15360:
                 increment = np.pad(increment, (0, 15360 - len(increment)))
             increments.append(np.asarray(increment, dtype=np.float32))
 
         refs_by_state: List[List[Dict[str, Any]]]
-        if retriever is None:
+        if not retrievers:
             refs_by_state = [[] for _ in states_batch]
         else:
             requests = []
             for state in states_batch:
+                lookback_sec = float(config["rag_timeline_lookback_sec"])
+                lookback_samples = int(round(lookback_sec * TARGET_SAMPLE_RATE))
+                window_start_samples = max(0, int(state.last_vllm_samples) - lookback_samples)
+                audio_window = _audio_slice(state, window_start_samples, state.cursor_samples)
+                window_offset_sec = float(window_start_samples) / TARGET_SAMPLE_RATE
                 requests.append(
                     {
-                        "audio_buffer": state.audio[: state.cursor_samples],
-                        "current_start_sec": float(state.last_vllm_samples) / TARGET_SAMPLE_RATE,
-                        "current_end_sec": float(state.cursor_samples) / TARGET_SAMPLE_RATE,
-                        "lookback_sec": float(config["rag_timeline_lookback_sec"]),
+                        "audio_buffer": audio_window,
+                        "current_start_sec": float(state.last_vllm_samples) / TARGET_SAMPLE_RATE - window_offset_sec,
+                        "current_end_sec": float(state.cursor_samples) / TARGET_SAMPLE_RATE - window_offset_sec,
+                        "lookback_sec": lookback_sec,
                     }
                 )
             t_rag = time.perf_counter()
-            refs_by_state = retriever.retrieve_timeline_batch(
-                requests,
-                top_k=int(config["rag_top_k"]),
-                lookback_sec=float(config["rag_timeline_lookback_sec"]),
-            )
+            if len(retrievers) == 1:
+                refs_by_state = retrievers[0].retrieve_timeline_batch(
+                    requests,
+                    top_k=int(config["rag_top_k"]),
+                    lookback_sec=float(config["rag_timeline_lookback_sec"]),
+                )
+            else:
+                assert rag_pool is not None
+                shard_indices: List[List[int]] = [[] for _ in retrievers]
+                shard_requests: List[List[Dict[str, Any]]] = [[] for _ in retrievers]
+                for req_idx, request in enumerate(requests):
+                    shard_idx = req_idx % len(retrievers)
+                    shard_indices[shard_idx].append(req_idx)
+                    shard_requests[shard_idx].append(request)
+
+                futures = []
+                for shard_idx, shard in enumerate(shard_requests):
+                    if not shard:
+                        continue
+                    futures.append(
+                        (
+                            shard_idx,
+                            rag_pool.submit(
+                                retrievers[shard_idx].retrieve_timeline_batch,
+                                shard,
+                                top_k=int(config["rag_top_k"]),
+                                lookback_sec=float(config["rag_timeline_lookback_sec"]),
+                            ),
+                        )
+                    )
+
+                refs_by_state = [[] for _ in states_batch]
+                for shard_idx, future in futures:
+                    shard_refs = future.result()
+                    for req_idx, refs in zip(shard_indices[shard_idx], shard_refs):
+                        refs_by_state[req_idx] = refs
             result_queue.put(
                 {
                     "type": "batch_rag_done",
                     "worker_idx": worker_idx,
                     "batch_size": len(states_batch),
+                    "rag_shards": len(retrievers),
                     "elapsed_s": round(time.perf_counter() - t_rag, 6),
                 }
             )
@@ -446,7 +505,7 @@ def _worker_main(worker_idx: int, gpu_token: str, command_queue: mp.Queue, resul
                     process_mm_info=process_mm_info,
                     increment=increment,
                     references=refs,
-                    rag_enabled=retriever is not None,
+                    rag_enabled=bool(retrievers),
                     term_map_format=config["term_map_format"],
                     empty_term_map_policy=config["empty_term_map_policy"],
                     vllm_prompt_audio_limit=int(config["vllm_limit_audio"]),
@@ -531,11 +590,13 @@ def _worker_main(worker_idx: int, gpu_token: str, command_queue: mp.Queue, resul
             chunk = np.asarray(command["audio"], dtype=np.float32).flatten()
             if chunk.size == 0:
                 continue
-            state.audio = np.concatenate([state.audio, chunk])
-            state.cursor_samples = int(state.audio.shape[0])
+            contiguous = np.ascontiguousarray(chunk, dtype=np.float32)
+            state.audio_bytes.extend(contiguous.tobytes())
+            state.cursor_samples += int(chunk.shape[0])
             if state.cursor_samples - state.last_vllm_samples >= segment_samples:
                 mark_pending(session_id)
-            process_ready_batch()
+            if len(pending) >= max_batch_size:
+                process_ready_batch()
 
 
 class RasstRuntime:
@@ -577,6 +638,7 @@ class RasstRuntime:
             "rag_enabled": self.args.rag_enabled,
             "rag_model_path": self.args.rag_model_path,
             "rag_device": self.args.rag_device,
+            "rag_devices": _split_rag_devices(self.args.rag_devices, self.args.rag_device),
             "rag_top_k": self.args.rag_top_k,
             "rag_lora_r": self.args.rag_lora_r,
             "rag_text_lora_r": self.args.rag_text_lora_r,
@@ -632,7 +694,8 @@ class RasstRuntime:
                     current = self.worker_status.get(int(worker_idx), {})
                     current.update({"status": current.get("status", "starting"), "last_event": item})
                     self.worker_status[int(worker_idx)] = current
-                print(json.dumps(item, ensure_ascii=False), flush=True)
+                if bool(self.args.log_batch_events) or item_type.startswith("worker_"):
+                    print(json.dumps(item, ensure_ascii=False), flush=True)
             elif item_type in {"translation", "translation_error"}:
                 session_id = item["session_id"]
                 q = self.session_queues.get(session_id)
@@ -702,6 +765,7 @@ class RasstRuntime:
             "mock_mode": False,
             "tp_size_per_worker": self.args.vllm_tp_size,
             "rag_device_per_worker": self.args.rag_device,
+            "rag_devices_per_worker": _split_rag_devices(self.args.rag_devices, self.args.rag_device),
         }
 
 
@@ -844,6 +908,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument("--rag-enabled", type=int, default=int(os.environ.get("RASST_RAG_ENABLED", "1")))
     parser.add_argument("--rag-device", default=os.environ.get("RASST_RAG_DEVICE", "cuda:0"))
+    parser.add_argument("--rag-devices", default=os.environ.get("RASST_RAG_DEVICES", ""))
     parser.add_argument("--rag-top-k", type=int, default=int(os.environ.get("RASST_RAG_TOP_K", "10")))
     parser.add_argument("--rag-score-threshold", type=float, default=float(os.environ.get("RASST_RAG_SCORE_THRESHOLD", "0.78")))
     parser.add_argument("--rag-lora-r", type=int, default=128)
@@ -860,6 +925,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--vllm-segment-sec", type=float, default=float(os.environ.get("RASST_VLLM_SEGMENT_SEC", str(DEFAULT_VLLM_SEGMENT_SEC))))
     parser.add_argument("--scheduler-batch-size", type=int, default=int(os.environ.get("RASST_SCHEDULER_BATCH_SIZE", "16")))
     parser.add_argument("--batch-timeout", type=float, default=float(os.environ.get("RASST_BATCH_TIMEOUT", "0.05")))
+    parser.add_argument("--log-batch-events", type=int, default=int(os.environ.get("RASST_LOG_BATCH_EVENTS", "1")))
     parser.add_argument("--max-cache-chunks", type=int, default=int(os.environ.get("RASST_MAX_CACHE_CHUNKS", str(DEFAULT_MAX_CACHE_CHUNKS))))
     parser.add_argument("--keep-cache-chunks", type=int, default=int(os.environ.get("RASST_KEEP_CACHE_CHUNKS", str(DEFAULT_KEEP_CACHE_CHUNKS))))
     parser.add_argument("--max-new-tokens", type=int, default=int(os.environ.get("RASST_MAX_NEW_TOKENS", "40")))

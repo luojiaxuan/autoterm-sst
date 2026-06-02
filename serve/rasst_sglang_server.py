@@ -360,7 +360,7 @@ def _build_system_prompt(
         return (
             "You are a professional simultaneous interpreter. "
             "Your task is to translate English audio chunks into accurate and fluent "
-            "Chinese. Use the ‘term_map’ as a reference for terminology if provided."
+            "Chinese. Use the 'term_map' as a reference for terminology if provided."
         )
     if system_prompt_style == "given_chunks":
         system_text = (
@@ -1026,18 +1026,28 @@ class RasstSglangRuntime:
             rag_enabled=rag_enabled_for_prompt,
         )
         merged_references = _merge_references(state.imported_glossary, references)
-        user_content: List[Dict[str, Any]] = [{"type": "audio", "audio": str(wav_path)}]
         term_map = _format_term_map(merged_references, self.args.term_map_format)
+        user_text = ""
         if term_map:
-            user_content.append({"type": "text", "text": f"\n\nterm_map:\n{term_map}"})
+            user_text = f"\n\nterm_map:\n{term_map}"
         elif rag_enabled_for_prompt and self.args.empty_term_map_policy == "none_block":
-            user_content.append({"type": "text", "text": "\n\nterm_map:\nNONE"})
-        user_message = {"role": "user", "content": user_content}
+            user_text = "\n\nterm_map:\nNONE"
+        if self.args.audio_schema == "inline":
+            user_content: List[Dict[str, Any]] = [{"type": "audio", "audio": str(wav_path)}]
+            if user_text:
+                user_content.append({"type": "text", "text": user_text})
+            user_message = {"role": "user", "content": user_content}
+            audios_payload: List[str] = []
+        else:
+            user_message = {"role": "user", "content": user_text}
+            audios_payload = [str(wav_path)]
         state.messages.append(user_message)
         payload = {
             "model": "rasst-qwen3-omni",
             "request_id": f"{state.session_id}-{state.segment_idx + 1}",
             "messages": state.messages,
+            "audios": audios_payload,
+            "audio_target_sr": TARGET_SAMPLE_RATE,
             "modalities": ["text"],
             "max_tokens": int(self.args.max_new_tokens),
             "temperature": float(self.args.temperature),
@@ -1476,6 +1486,11 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=int(os.environ.get("RASST_SEED", "998244353")))
     parser.add_argument("--term-map-format", default=os.environ.get("RASST_TERM_MAP_FORMAT", "plain"))
     parser.add_argument("--empty-term-map-policy", default=os.environ.get("RASST_EMPTY_TERM_MAP_POLICY", "none_block"))
+    parser.add_argument(
+        "--audio-schema",
+        default=os.environ.get("RASST_SGLANG_AUDIO_SCHEMA", "top_level"),
+        choices=["top_level", "inline"],
+    )
     parser.add_argument(
         "--system-prompt-style",
         default=os.environ.get("RASST_SYSTEM_PROMPT_STYLE", DEFAULT_SYSTEM_PROMPT_STYLE),

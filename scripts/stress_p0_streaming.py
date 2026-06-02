@@ -252,6 +252,113 @@ def write_bleu_artifacts(args, stats_list: List[SessionStats], reference_text: s
     return scores
 
 
+def _metric_summary(values: List[float]) -> Optional[dict]:
+    if not values:
+        return None
+    return {
+        "avg": float(np.mean(values)),
+        "p50": float(np.percentile(values, 50)),
+        "p95": float(np.percentile(values, 95)),
+        "min": float(min(values)),
+        "max": float(max(values)),
+    }
+
+
+def write_stress_artifacts(
+    args,
+    stats_list: List[SessionStats],
+    failures: List[Exception],
+    *,
+    before_health: dict,
+    after_health: dict,
+    wall_elapsed_s: float,
+    expected_chunks: int,
+    total_chunks: int,
+    total_messages: int,
+    disconnected: int,
+) -> None:
+    if not args.save_dir:
+        return
+
+    output_dir = Path(args.save_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    jsonl_path = output_dir / "session_predictions.jsonl"
+    with jsonl_path.open("w", encoding="utf-8") as handle:
+        for item in stats_list:
+            handle.write(
+                json.dumps(
+                    {
+                        "idx": item.idx,
+                        "session_id": item.session_id,
+                        "hypothesis": join_hypothesis(item.texts, args.language_pair),
+                        "messages": item.texts,
+                        "result_times_s": item.result_times_s,
+                        "stream_laal_s": item.stream_laal_s(args.duration_sec),
+                        "max_tbt_s": item.max_tbt_s,
+                        "first_result_s": item.first_result_s,
+                        "last_result_s": item.last_result_s,
+                        "send_done_s": item.send_done_s,
+                        "session_done_s": item.session_done_s,
+                        "chunks_sent": item.chunks_sent,
+                        "errors": item.errors,
+                        "disconnected": item.disconnected,
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
+
+    stream_laal_values = [
+        value
+        for value in (item.stream_laal_s(args.duration_sec) for item in stats_list)
+        if value is not None
+    ]
+    summary_path = output_dir / "summary.json"
+    summary_path.write_text(
+        json.dumps(
+            {
+                "sessions": args.sessions,
+                "completed": len(stats_list),
+                "failures": [str(failure) for failure in failures[:20]],
+                "wall_elapsed_s": wall_elapsed_s,
+                "total_chunks": total_chunks,
+                "expected_chunks_per_session": expected_chunks,
+                "total_messages": total_messages,
+                "disconnected": disconnected,
+                "realtime": args.realtime,
+                "audio_file": args.audio_file,
+                "duration_sec": args.duration_sec,
+                "language_pair": args.language_pair,
+                "glossary_preset": args.glossary_preset,
+                "audio_send_elapsed_s": _metric_summary(
+                    [item.send_done_s for item in stats_list if item.send_done_s is not None]
+                ),
+                "session_elapsed_s": _metric_summary(
+                    [item.session_done_s for item in stats_list if item.session_done_s is not None]
+                ),
+                "first_result_s": _metric_summary(
+                    [item.first_result_s for item in stats_list if item.first_result_s is not None]
+                ),
+                "max_tbt_s": _metric_summary([item.max_tbt_s for item in stats_list if item.max_tbt_s > 0]),
+                "stream_laal_s": _metric_summary(stream_laal_values),
+                "last_result_lag_s": _metric_summary(
+                    [
+                        item.last_result_s - args.duration_sec
+                        for item in stats_list
+                        if item.last_result_s is not None
+                    ]
+                ),
+                "health_before": before_health,
+                "health_after": after_health,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    print(f"stress_artifacts={output_dir}")
+
+
 def load_audio(path: str, duration_sec: float) -> np.ndarray:
     audio, sample_rate = sf.read(path, dtype="float32", always_2d=False)
     if audio.ndim > 1:
@@ -281,6 +388,8 @@ def init_session(args, idx: int, run_id: str) -> str:
         "glossary_text": args.glossary_text,
     }
     response = requests.post(f"{args.base_url}/init", json=payload, timeout=20)
+    if response.status_code == 422:
+        response = requests.post(f"{args.base_url}/init", params=payload, timeout=20)
     response.raise_for_status()
     data = response.json()
     if "session_id" not in data:
@@ -517,6 +626,19 @@ async def run_all(args) -> int:
         )
     for failure in failures[:10]:
         print(f"failure={failure}")
+
+    write_stress_artifacts(
+        args,
+        stats_list,
+        failures,
+        before_health=before_health,
+        after_health=after_health,
+        wall_elapsed_s=wall_elapsed,
+        expected_chunks=expected_chunks,
+        total_chunks=total_chunks,
+        total_messages=total_messages,
+        disconnected=disconnected,
+    )
 
     if reference_text is not None and stats_list:
         write_bleu_artifacts(args, stats_list, reference_text)

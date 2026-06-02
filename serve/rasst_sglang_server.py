@@ -430,6 +430,7 @@ class RasstSglangRuntime:
         self.retriever_lock = asyncio.Lock()
         self.batch_seq = 0
         self.recent_batch_metrics: Deque[Dict[str, Any]] = deque(maxlen=64)
+        self.batch_gate = asyncio.Semaphore(max(1, int(self.args.max_inflight_batches)))
         self.tmp_dir = Path(args.tmp_dir)
         self.tmp_dir.mkdir(parents=True, exist_ok=True)
 
@@ -696,6 +697,9 @@ class RasstSglangRuntime:
             "active_text_index_path": self.active_text_index_path or None,
             "cached_text_indexes": len(self.text_index_cache),
             "scheduler_batch_size": self.args.scheduler_batch_size,
+            "batch_timeout": self.args.batch_timeout,
+            "coalesce_sec": self.args.coalesce_sec,
+            "max_inflight_batches": self.args.max_inflight_batches,
             "segment_sec": self.args.segment_sec,
             "batch_metrics": self._batch_metric_summary(),
         }
@@ -855,20 +859,37 @@ class RasstSglangRuntime:
     async def _scheduler_loop(self) -> None:
         while True:
             await asyncio.sleep(float(self.args.batch_timeout))
+            await self.batch_gate.acquire()
             batch: List[StreamState] = []
-            while self.pending and len(batch) < int(self.args.scheduler_batch_size):
-                session_id = self.pending.popleft()
-                self.pending_set.discard(session_id)
-                state = self.states.get(session_id)
-                if state is None or state.inflight:
-                    continue
-                segment_samples = int(float(self.args.segment_sec) * TARGET_SAMPLE_RATE)
-                if state.cursor_samples - state.last_llm_samples < segment_samples:
-                    continue
-                state.inflight = True
-                batch.append(state)
+            deadline = time.perf_counter() + max(0.0, float(self.args.coalesce_sec))
+            while True:
+                while self.pending and len(batch) < int(self.args.scheduler_batch_size):
+                    session_id = self.pending.popleft()
+                    self.pending_set.discard(session_id)
+                    state = self.states.get(session_id)
+                    if state is None or state.inflight:
+                        continue
+                    segment_samples = int(float(self.args.segment_sec) * TARGET_SAMPLE_RATE)
+                    if state.cursor_samples - state.last_llm_samples < segment_samples:
+                        continue
+                    state.inflight = True
+                    batch.append(state)
+                if len(batch) >= int(self.args.scheduler_batch_size):
+                    break
+                remaining_s = deadline - time.perf_counter()
+                if not batch or remaining_s <= 0:
+                    break
+                await asyncio.sleep(min(float(self.args.batch_timeout), remaining_s))
             if batch:
-                asyncio.create_task(self._process_batch(batch))
+                asyncio.create_task(self._process_batch_guarded(batch))
+            else:
+                self.batch_gate.release()
+
+    async def _process_batch_guarded(self, batch: List[StreamState]) -> None:
+        try:
+            await self._process_batch(batch)
+        finally:
+            self.batch_gate.release()
 
     async def _process_batch(self, batch: List[StreamState]) -> None:
         batch_t0 = time.perf_counter()
@@ -1477,6 +1498,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--segment-sec", type=float, default=float(os.environ.get("RASST_SGLANG_SEGMENT_SEC", str(DEFAULT_SEGMENT_SEC))))
     parser.add_argument("--scheduler-batch-size", type=int, default=int(os.environ.get("RASST_SCHEDULER_BATCH_SIZE", "32")))
     parser.add_argument("--batch-timeout", type=float, default=float(os.environ.get("RASST_BATCH_TIMEOUT", "0.05")))
+    parser.add_argument("--coalesce-sec", type=float, default=float(os.environ.get("RASST_SGLANG_COALESCE_SEC", "0.06")))
+    parser.add_argument("--max-inflight-batches", type=int, default=int(os.environ.get("RASST_SGLANG_MAX_INFLIGHT_BATCHES", "2")))
     parser.add_argument("--keep-cache-chunks", type=int, default=int(os.environ.get("RASST_KEEP_CACHE_CHUNKS", str(DEFAULT_KEEP_CACHE_CHUNKS))))
     parser.add_argument("--max-cache-chunks", type=int, default=int(os.environ.get("RASST_MAX_CACHE_CHUNKS", str(DEFAULT_MAX_CACHE_CHUNKS))))
     parser.add_argument("--max-new-tokens", type=int, default=int(os.environ.get("RASST_MAX_NEW_TOKENS", "40")))

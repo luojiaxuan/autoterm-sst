@@ -60,13 +60,14 @@ class SessionStats:
             self.max_tbt_s = max(self.max_tbt_s, elapsed_s - self.last_result_s)
         self.last_result_s = elapsed_s
 
-    def stream_laal_s(self, audio_duration_s: float) -> Optional[float]:
-        """Message-level streaming LAAL proxy using wall-clock emission times.
+    def wallclock_laal_proxy_s(self, audio_duration_s: float) -> Optional[float]:
+        """Message-level wall-clock LAAL proxy using emission times.
 
-        This is not token-level SimulEval LAAL. It measures how far each emitted
-        text update lags behind an even target-message schedule over the source
-        audio duration, which is the signal this browser-style stress test can
-        observe without token timestamps.
+        This is not token-level SimulEval StreamLAAL and must not be reported
+        as StreamLAAL. It measures how far each emitted text update lags behind
+        an even target-message schedule over the source audio duration, which
+        is the signal this browser-style stress test can observe without token
+        timestamps.
         """
         if not self.result_times_s:
             return None
@@ -214,7 +215,7 @@ def write_bleu_artifacts(args, stats_list: List[SessionStats], reference_text: s
                             "reference": reference_text,
                             "messages": item.texts,
                             "result_times_s": item.result_times_s,
-                            "stream_laal_s": item.stream_laal_s(args.duration_sec),
+                            "wallclock_laal_proxy_s": item.wallclock_laal_proxy_s(args.duration_sec),
                             "max_tbt_s": item.max_tbt_s,
                             "first_result_s": item.first_result_s,
                             "last_result_s": item.last_result_s,
@@ -236,6 +237,12 @@ def write_bleu_artifacts(args, stats_list: List[SessionStats], reference_text: s
                     "language_pair": args.language_pair,
                     "glossary_preset": args.glossary_preset,
                     "bleu_tokenize": args.bleu_tokenize,
+                    "metric_notes": {
+                        "wallclock_laal_proxy_s": (
+                            "Browser-observed message-level wall-clock proxy; "
+                            "not SimulEval StreamLAAL."
+                        )
+                    },
                     "sentence_bleu_avg": float(np.mean(scores)) if scores else None,
                     "sentence_bleu_p50": float(np.percentile(scores, 50)) if scores else None,
                     "sentence_bleu_min": min(scores) if scores else None,
@@ -293,7 +300,7 @@ def write_stress_artifacts(
                         "hypothesis": join_hypothesis(item.texts, args.language_pair),
                         "messages": item.texts,
                         "result_times_s": item.result_times_s,
-                        "stream_laal_s": item.stream_laal_s(args.duration_sec),
+                        "wallclock_laal_proxy_s": item.wallclock_laal_proxy_s(args.duration_sec),
                         "max_tbt_s": item.max_tbt_s,
                         "first_result_s": item.first_result_s,
                         "last_result_s": item.last_result_s,
@@ -308,9 +315,9 @@ def write_stress_artifacts(
                 + "\n"
             )
 
-    stream_laal_values = [
+    wallclock_laal_proxy_values = [
         value
-        for value in (item.stream_laal_s(args.duration_sec) for item in stats_list)
+        for value in (item.wallclock_laal_proxy_s(args.duration_sec) for item in stats_list)
         if value is not None
     ]
     summary_path = output_dir / "summary.json"
@@ -330,6 +337,12 @@ def write_stress_artifacts(
                 "duration_sec": args.duration_sec,
                 "language_pair": args.language_pair,
                 "glossary_preset": args.glossary_preset,
+                "metric_notes": {
+                    "wallclock_laal_proxy_s": (
+                        "Browser-observed message-level wall-clock proxy; "
+                        "not SimulEval StreamLAAL."
+                    )
+                },
                 "audio_send_elapsed_s": _metric_summary(
                     [item.send_done_s for item in stats_list if item.send_done_s is not None]
                 ),
@@ -340,7 +353,7 @@ def write_stress_artifacts(
                     [item.first_result_s for item in stats_list if item.first_result_s is not None]
                 ),
                 "max_tbt_s": _metric_summary([item.max_tbt_s for item in stats_list if item.max_tbt_s > 0]),
-                "stream_laal_s": _metric_summary(stream_laal_values),
+                "wallclock_laal_proxy_s": _metric_summary(wallclock_laal_proxy_values),
                 "last_result_lag_s": _metric_summary(
                     [
                         item.last_result_s - args.duration_sec
@@ -543,9 +556,9 @@ async def run_all(args) -> int:
         for item in stats_list
         if item.last_result_s is not None
     ]
-    stream_laal_values = [
+    wallclock_laal_proxy_values = [
         value
-        for value in (item.stream_laal_s(args.duration_sec) for item in stats_list)
+        for value in (item.wallclock_laal_proxy_s(args.duration_sec) for item in stats_list)
         if value is not None
     ]
     disconnected = sum(1 for item in stats_list if item.disconnected)
@@ -598,16 +611,16 @@ async def run_all(args) -> int:
         )
     else:
         print("max_tbt_s=none")
-    if stream_laal_values:
+    if wallclock_laal_proxy_values:
         print(
-            "stream_laal_s="
-            f"avg={float(np.mean(stream_laal_values)):.3f} "
-            f"p50={np.percentile(stream_laal_values, 50):.3f} "
-            f"p95={np.percentile(stream_laal_values, 95):.3f} "
-            f"max={max(stream_laal_values):.3f}"
+            "wallclock_laal_proxy_s="
+            f"avg={float(np.mean(wallclock_laal_proxy_values)):.3f} "
+            f"p50={np.percentile(wallclock_laal_proxy_values, 50):.3f} "
+            f"p95={np.percentile(wallclock_laal_proxy_values, 95):.3f} "
+            f"max={max(wallclock_laal_proxy_values):.3f}"
         )
     else:
-        print("stream_laal_s=none")
+        print("wallclock_laal_proxy_s=none")
     if last_result_lag_values:
         print(
             "last_result_lag_s="
@@ -617,12 +630,13 @@ async def run_all(args) -> int:
         )
 
     for item in stats_list[:5]:
-        stream_laal = item.stream_laal_s(args.duration_sec)
+        wallclock_laal_proxy = item.wallclock_laal_proxy_s(args.duration_sec)
         print(
             f"session_sample idx={item.idx} chunks={item.chunks_sent} messages={item.messages} "
             f"send_done_s={item.send_done_s} session_done_s={item.session_done_s} "
             f"first_result_s={item.first_result_s} last_result_s={item.last_result_s} "
-            f"stream_laal_s={stream_laal} max_tbt_s={item.max_tbt_s:.3f} errors={item.errors[:2]}"
+            f"wallclock_laal_proxy_s={wallclock_laal_proxy} max_tbt_s={item.max_tbt_s:.3f} "
+            f"errors={item.errors[:2]}"
         )
     for failure in failures[:10]:
         print(f"failure={failure}")

@@ -40,17 +40,21 @@ class SessionStats:
     last_result_s: Optional[float] = None
     send_done_s: Optional[float] = None
     session_done_s: Optional[float] = None
+    processing_complete_s: Optional[float] = None
     max_tbt_s: float = 0.0
     disconnected: bool = False
     result_times_s: List[float] = field(default_factory=list)
     texts: List[str] = field(default_factory=list)
 
-    def observe_message(self, elapsed_s: float, message: str) -> None:
+    def observe_message(self, elapsed_s: float, message: str) -> bool:
         if message.startswith("ERROR"):
             self.errors.append(message)
-            return
-        if message.startswith("READY") or message.startswith("PROCESSING_COMPLETE"):
-            return
+            return False
+        if message.startswith("READY"):
+            return False
+        if message.startswith("PROCESSING_COMPLETE"):
+            self.processing_complete_s = elapsed_s
+            return True
         self.messages += 1
         self.texts.append(message)
         self.result_times_s.append(elapsed_s)
@@ -59,6 +63,7 @@ class SessionStats:
         if self.last_result_s is not None:
             self.max_tbt_s = max(self.max_tbt_s, elapsed_s - self.last_result_s)
         self.last_result_s = elapsed_s
+        return False
 
     def wallclock_laal_proxy_s(self, audio_duration_s: float) -> Optional[float]:
         """Message-level wall-clock LAAL proxy using emission times.
@@ -221,6 +226,7 @@ def write_bleu_artifacts(args, stats_list: List[SessionStats], reference_text: s
                             "last_result_s": item.last_result_s,
                             "send_done_s": item.send_done_s,
                             "session_done_s": item.session_done_s,
+                            "processing_complete_s": item.processing_complete_s,
                             "errors": item.errors,
                         },
                         ensure_ascii=False,
@@ -306,6 +312,7 @@ def write_stress_artifacts(
                         "last_result_s": item.last_result_s,
                         "send_done_s": item.send_done_s,
                         "session_done_s": item.session_done_s,
+                        "processing_complete_s": item.processing_complete_s,
                         "chunks_sent": item.chunks_sent,
                         "errors": item.errors,
                         "disconnected": item.disconnected,
@@ -341,13 +348,34 @@ def write_stress_artifacts(
                     "wallclock_laal_proxy_s": (
                         "Browser-observed message-level wall-clock proxy; "
                         "not SimulEval StreamLAAL."
-                    )
+                    ),
+                    "session_elapsed_s": (
+                        "Client WebSocket lifetime from stream start through EOF/drain; "
+                        "use result_stream_elapsed_s and last_result_lag_s for translation timing."
+                    ),
                 },
                 "audio_send_elapsed_s": _metric_summary(
                     [item.send_done_s for item in stats_list if item.send_done_s is not None]
                 ),
                 "session_elapsed_s": _metric_summary(
                     [item.session_done_s for item in stats_list if item.session_done_s is not None]
+                ),
+                "result_stream_elapsed_s": _metric_summary(
+                    [item.last_result_s for item in stats_list if item.last_result_s is not None]
+                ),
+                "processing_complete_s": _metric_summary(
+                    [
+                        item.processing_complete_s
+                        for item in stats_list
+                        if item.processing_complete_s is not None
+                    ]
+                ),
+                "post_send_wait_s": _metric_summary(
+                    [
+                        item.session_done_s - item.send_done_s
+                        for item in stats_list
+                        if item.session_done_s is not None and item.send_done_s is not None
+                    ]
                 ),
                 "first_result_s": _metric_summary(
                     [item.first_result_s for item in stats_list if item.first_result_s is not None]
@@ -425,7 +453,8 @@ async def reader(websocket, stats: SessionStats, start_time: float, stop_event: 
     while not stop_event.is_set():
         try:
             message = await asyncio.wait_for(websocket.recv(), timeout=1.0)
-            stats.observe_message(time.time() - start_time, str(message))
+            if stats.observe_message(time.time() - start_time, str(message)):
+                return
         except asyncio.TimeoutError:
             continue
         except websockets.ConnectionClosed as exc:
@@ -476,7 +505,12 @@ async def run_streaming_session(args, session_id: str, idx: int, audio: np.ndarr
 
             if args.send_eof:
                 await websocket.send("EOF")
-            await asyncio.sleep(args.drain_sec)
+                try:
+                    await asyncio.wait_for(reader_task, timeout=args.drain_sec)
+                except asyncio.TimeoutError:
+                    pass
+            else:
+                await asyncio.sleep(args.drain_sec)
             stats.session_done_s = time.time() - stream_start
         finally:
             stop_event.set()
@@ -551,6 +585,15 @@ async def run_all(args) -> int:
     max_tbt_values = [item.max_tbt_s for item in stats_list if item.max_tbt_s > 0]
     send_done_values = [item.send_done_s for item in stats_list if item.send_done_s is not None]
     session_done_values = [item.session_done_s for item in stats_list if item.session_done_s is not None]
+    result_stream_values = [item.last_result_s for item in stats_list if item.last_result_s is not None]
+    processing_complete_values = [
+        item.processing_complete_s for item in stats_list if item.processing_complete_s is not None
+    ]
+    post_send_wait_values = [
+        item.session_done_s - item.send_done_s
+        for item in stats_list
+        if item.session_done_s is not None and item.send_done_s is not None
+    ]
     last_result_lag_values = [
         item.last_result_s - args.duration_sec
         for item in stats_list
@@ -594,6 +637,28 @@ async def run_all(args) -> int:
             f"p50={np.percentile(session_done_values, 50):.3f} "
             f"min={min(session_done_values):.3f} max={max(session_done_values):.3f}"
         )
+    if result_stream_values:
+        print(
+            "result_stream_elapsed_s="
+            f"avg={float(np.mean(result_stream_values)):.3f} "
+            f"p50={np.percentile(result_stream_values, 50):.3f} "
+            f"min={min(result_stream_values):.3f} max={max(result_stream_values):.3f} "
+            f"target={args.duration_sec:.3f}"
+        )
+    if processing_complete_values:
+        print(
+            "processing_complete_s="
+            f"avg={float(np.mean(processing_complete_values)):.3f} "
+            f"p50={np.percentile(processing_complete_values, 50):.3f} "
+            f"min={min(processing_complete_values):.3f} max={max(processing_complete_values):.3f}"
+        )
+    if post_send_wait_values:
+        print(
+            "post_send_wait_s="
+            f"avg={float(np.mean(post_send_wait_values)):.3f} "
+            f"p50={np.percentile(post_send_wait_values, 50):.3f} "
+            f"min={min(post_send_wait_values):.3f} max={max(post_send_wait_values):.3f}"
+        )
     if first_result_values:
         print(
             "first_result_s="
@@ -634,6 +699,7 @@ async def run_all(args) -> int:
         print(
             f"session_sample idx={item.idx} chunks={item.chunks_sent} messages={item.messages} "
             f"send_done_s={item.send_done_s} session_done_s={item.session_done_s} "
+            f"processing_complete_s={item.processing_complete_s} "
             f"first_result_s={item.first_result_s} last_result_s={item.last_result_s} "
             f"wallclock_laal_proxy_s={wallclock_laal_proxy} max_tbt_s={item.max_tbt_s:.3f} "
             f"errors={item.errors[:2]}"

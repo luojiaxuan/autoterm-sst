@@ -49,6 +49,10 @@ MIXED_CHUNK_ARGS=""
 PER_STAGE_PROCESSES="${PER_STAGE_PROCESSES:-}"
 SPLIT_ARGS=""
 [ -n "${PER_STAGE_PROCESSES}" ] && SPLIT_ARGS="--per-stage-processes"
+# Optional profiler hook (#760 P1): set NSYS_PREFIX to a full
+# "nsys profile ... -o /mnt/.../report --force-overwrite true" string to wrap the
+# engine launch. Default empty = no profiling. Forwarded into the container shell.
+NSYS_PREFIX="${NSYS_PREFIX:-}"
 
 mkdir -p "${SEG_TMP_DIR}"
 docker rm -f "${CONTAINER_NAME}" >/dev/null 2>&1 || true
@@ -95,7 +99,7 @@ export PYTHONPATH="'"${SGLANG_OMNI_SRC}"':${PYTHONPATH:-}"
 python -c "import sglang_omni.serve, typer, msgpack, av, qwen_vl_utils, librosa, peft, soundfile" >/dev/null 2>&1 \
   || python -m pip install -q msgpack typer av qwen-vl-utils==0.0.11 librosa==0.11.0 numba==0.63.1 peft==0.13.2 soundfile
 python -c "import torch;print(\"[sglang] torch\",torch.__version__,\"cuda\",torch.version.cuda,\"gpus\",torch.cuda.device_count())"
-exec python scripts/sglang_omni_qwen3_text_tp_server.py \
+exec '"${NSYS_PREFIX}"' python scripts/sglang_omni_qwen3_text_tp_server.py \
   --model-path "'"${MODEL_PATH}"'" \
   --model-name "'"${SERVED_NAME}"'" \
   --pipeline-name qwen3-omni \

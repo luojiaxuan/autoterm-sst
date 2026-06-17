@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import multiprocessing as mp
+import os
 from typing import Any, Sequence
 
 
@@ -93,6 +94,20 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-running-requests", type=int, default=32)
     parser.add_argument("--max-prefill-tokens", type=int, default=16384)
     parser.add_argument("--mem-fraction-static", type=float, default=None)
+    # M2 experiment (#760): mix the small streaming chunk-prefills into decode
+    # steps instead of running them as separate decode-stalling steps. Both must
+    # be set for SGLang to enable mixed-chunk (is_mixed_chunk requires a positive
+    # chunked_prefill_size AND enable_mixed_chunk). Default off = current behavior.
+    parser.add_argument("--enable-mixed-chunk", action="store_true")
+    parser.add_argument("--chunked-prefill-size", type=int, default=0)
+    # M2 de-GIL experiment (#760): run each non-thinker stage in its OWN OS
+    # process (mirrors _SPEECH_DEFAULT_PROCESSES) instead of cramming
+    # preprocessing+image_encoder+audio_encoder+mm_aggregate+decode into one
+    # GIL-bound "pipeline" process. Under 32 concurrent streams that shared
+    # process serializes all host work (an identity mm_aggregate alone parked
+    # ~170 ms in pure queue). Splitting adds only the measured ~2% relay-hop
+    # cost. Default off = current single-"pipeline"-process behavior.
+    parser.add_argument("--per-stage-processes", action="store_true")
     parser.add_argument("--encoder-memory-fraction", type=float, default=0.025)
     parser.add_argument("--thinker-memory-fraction", type=float, default=0.75)
     parser.add_argument("--relay-backend", default="shm", choices=["shm", "nccl", "nixl"])
@@ -126,14 +141,36 @@ def main(argv: Sequence[str] | None = None) -> int:
     _set_stage_memory_fraction(config, "audio_encoder", float(args.encoder_memory_fraction))
     _set_stage_memory_fraction(config, "thinker", float(args.thinker_memory_fraction))
 
+    if args.per_stage_processes:
+        # De-GIL the host path: give every non-thinker stage its own OS process
+        # (the speech pipeline already runs this way). thinker keeps its own TP
+        # process group set above.
+        for stage_name in (
+            "preprocessing",
+            "image_encoder",
+            "audio_encoder",
+            "mm_aggregate",
+            "decode",
+        ):
+            _set_stage_process(config, stage_name, stage_name)
+
     stage_updates = {"thinker_max_seq_len": int(args.thinker_max_seq_len)}
+    # disable_custom_all_reduce defaults True (project standard for the omni
+    # thinker). Diagnostic A/B: SGLANG_OMNI_DISABLE_CUSTOM_AR=0 re-enables the
+    # custom (P2P/NVLink) all-reduce to measure the TP-comm share of the
+    # GPU-bound decode/prefill forward.
+    _disable_custom_ar = os.environ.get("SGLANG_OMNI_DISABLE_CUSTOM_AR", "1") != "0"
     server_arg_updates: dict[str, object] = {
-        "disable_custom_all_reduce": True,
+        "disable_custom_all_reduce": _disable_custom_ar,
         "max_running_requests": int(args.max_running_requests),
         "max_prefill_tokens": int(args.max_prefill_tokens),
     }
     if args.mem_fraction_static is not None:
         server_arg_updates["mem_fraction_static"] = float(args.mem_fraction_static)
+    if args.chunked_prefill_size > 0:
+        server_arg_updates["chunked_prefill_size"] = int(args.chunked_prefill_size)
+    if args.enable_mixed_chunk:
+        server_arg_updates["enable_mixed_chunk"] = True
 
     _apply_stage_factory_updates(
         config,

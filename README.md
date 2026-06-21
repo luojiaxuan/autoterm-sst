@@ -46,6 +46,7 @@ flowchart LR
       direction TB
       PB[PromptBuilder] --- BK[ModelBackend\nvLLM / SGLang / mock]
       RET[RetrievalPlugin\nMaxSim RAG · optional]
+      TR[AudioNativeRouter\nadaptive working glossary] --> RET
     end
     AG -- TranslationEvent via emit() --> RT --> APP --> Client
 ```
@@ -187,6 +188,24 @@ Selected environment variables (all optional; sensible defaults in the scripts).
 If retrieval fails to load, the agent logs it and continues **without** RAG
 (graceful degradation).
 
+**Adaptive working glossary**
+
+| Var | Default | Meaning |
+|-----|---------|---------|
+| `RASST_AUTO_GLOSSARY_ENABLED` | `1` | default to zero-setup `auto_working` mode |
+| `RASST_AUTO_GLOSSARY_DEFAULT` | `common_10k` | initial active slice |
+| `RASST_AUTO_GLOSSARY_PRESETS` | `common_10k,nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k` | slices the topic router may activate |
+| `RASST_AUTO_GLOSSARY_UPDATE_SEC` | `45` | minimum interval between topic decisions |
+| `RASST_AUTO_GLOSSARY_WARMUP_SEC` | `30` | no switching before this many session seconds |
+| `RASST_AUTO_GLOSSARY_MIN_CONF` | `0.60` | minimum router confidence to switch |
+| `RASST_AUTO_GLOSSARY_MIN_MARGIN` | `0.15` | minimum top-vs-runner-up domain margin |
+| `RASST_AUTO_GLOSSARY_MIN_CONSISTENT_WINDOWS` | `2` | repeated windows required before switching |
+| `RASST_AUTO_GLOSSARY_FALLBACK` | `common_10k` | conservative fallback slice |
+| `RASST_ROUTER_MODE` | `embedding_refs` | audio-native router; `legacy_keywords` is debug-only |
+| `RASST_ROUTER_EMBED_WEIGHT` / `RASST_ROUTER_REF_WEIGHT` | `0.65` / `0.35` | embedding-centroid vs reference-metadata weights |
+| `RASST_PROMPT_TOP_K` | `10` | max retrieved refs injected into the prompt |
+| `RASST_UI_TOP_K` | `10` | max refs surfaced in JSON metadata/UI evidence |
+
 ---
 
 ## HTTP / WebSocket API
@@ -201,8 +220,67 @@ If retrieval fails to load, the agent logs it and continues **without** RAG
 | `POST` | `/reset_translation`, `/update_latency`, `/glossary/build`, `/ping`, `/delete_session` | session control (forwarded to the agent) |
 | `GET`  | `/queue_status/{session_id}` | admission/queue info |
 
-Output events are plain text over the WS; errors arrive as `ERROR: ...`,
-end-of-file as `PROCESSING_COMPLETE: ...`.
+By default output events are **plain text** over the WS (errors as `ERROR: ...`,
+end-of-file as `PROCESSING_COMPLETE: ...`) — unchanged for existing clients.
+
+Add **`?event_format=json`** to the WS URL to opt into the **structured
+protocol**: each message is a JSON object `{"type", "text", "meta"}` where
+`type` is `partial` / `final` / `status` / `error`, and `meta` carries the
+agent's evidence — retrieved terms (`references`), per-tick retrieval latency
+(`retrieve_s`), generation latency (`elapsed_s`), segment index, and adaptive
+router evidence (`topic_router`). The web UI uses this to render the live
+**Retrieved Terms** evidence panel and active glossary status. `GET /health`
+exposes a `term_memory` block (active backend, snapshot id, active term count,
+retrieval p50/p95 ms, router mode) for the same panel's status line.
+
+---
+
+## Open terminology memory
+
+Beyond the curated glossary presets, the agent can serve a large, swappable
+**open terminology memory** (Wikidata/Wikipedia-derived). A small **manifest**
+(`framework/agents/term_memory/manifest.py`) points the agent at a snapshot's
+term files + precomputed `maxsim` indexes; selecting an `open_wiki_*` preset
+retrieves from it exactly like a glossary, with retrieved terms surfaced in the
+evidence panel and `term_memory` health.
+
+The default demo path is now **zero-setup adaptive working glossary**:
+`auto_working` starts with `common_10k`, observes speech-side retrieval
+embeddings plus retrieved-reference metadata, and switches to compact domain
+slices such as `nlp_core_10k` or `medicine_core_10k` only after the target
+MaxSim index is preloaded. It is not a trained topic classifier and does not
+use ASR, source transcripts, generated target text, or manual glossary terms
+for routing. Large
+100k/500k/1M memories remain useful as offline memory and scale evidence, but
+the runtime active glossary is kept small to reduce prompt noise. See
+[`docs/adaptive_working_glossary.md`](docs/adaptive_working_glossary.md).
+
+```bash
+# 1. normalize a Wikidata-derived glossary -> rows, filter/rank/scale -> glossary
+python scripts/term_memory/extract_wikidata_terms.py --glossary <wiki_glossary.json> \
+    --target-lang zh --out rows.en-zh.jsonl
+python scripts/term_memory/filter_terms.py --in rows.en-zh.jsonl --target-lang zh \
+    --limit 100000 --out wiki_open_zh_100k.json
+
+# 2. build the maxsim index (GPU; RASST text encoder)
+python <RASST>/retriever/build_maxsim_index.py --model-path checkpoints/retriever/rasst-hn1024.pt \
+    --glossary-path wiki_open_zh_100k.json --output-path <root>/indexes/wiki_100k/en-zh/maxsim.pt --device cuda:0
+
+# 3. write terms.jsonl + publish a manifest exposing the preset (atomic swap)
+python scripts/term_memory/build_term_memory_snapshot.py --glossary wiki_open_zh_100k.json \
+    --snapshot-id wiki_100k --langs zh --preset-id open_wiki_100k \
+    --root <root> --maxsim-index zh=<root>/indexes/wiki_100k/en-zh/maxsim.pt
+
+# 4. point the agent at it (default preset optional)
+export RASST_TERM_MEMORY_MANIFEST=<root>/manifests/current.json
+export RASST_DEFAULT_GLOSSARY_PRESET=open_wiki_100k   # or leave 'none'; users pick in the UI
+```
+
+Manifests/snapshots/indexes live under a runtime root (e.g.
+`$RASST_DEMO_DATA_ROOT/runtime/term_memory`), **never in the repo**. Open presets
+degrade to `none` if no manifest/index is available, so a missing snapshot never
+breaks a session. `scripts/slurm_framework_vllm_aries.sh` runs the framework
+(not the legacy server) on the aries SLURM node.
 
 ---
 
@@ -235,6 +313,11 @@ and allows a single concurrent agent session per authtoken.
 | `scripts/run_taurus_framework_vllm.sh` | resident real RASST run (spaCyEnv, in-process vLLM tp=2 + RAG) |
 | `scripts/run_ngrok_tunnel.sh` | resident ngrok tunnel (static or ephemeral) |
 | `scripts/smoke_p0_protocol.py` | client-side protocol/concurrency smoke test |
+| `scripts/term_memory/*.py` | open-memory pipeline (extract/filter/build working slices/build snapshot/publish manifest) |
+| `eval/streaming_sst/eval_auto_glossary.py` | adaptive glossary switch/latency/reference-volume eval |
+| `eval/streaming_sst/score_auto_glossary.py` | summarize adaptive glossary eval JSON as a table |
+| `eval/streaming_sst/sweep_term_memory.py` | term-memory scale sweep (retrieve p50/p95, refs/chunk) over the JSON WS |
+| `eval/streaming_sst/score_terms.py` | terminology accuracy plus regular/masked-term BLEU vs references |
 | `scripts/legacy/*.sh` | the original standalone servers (`serve.api`, `serve.rasst_sglang_server`) |
 | `scripts/slurm_*_aries.sh` | SLURM batch variants for the aries node |
 

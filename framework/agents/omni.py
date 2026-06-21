@@ -33,6 +33,7 @@ from fastapi import HTTPException
 from framework.agent import (
     EVENT_ERROR,
     EVENT_PARTIAL,
+    EVENT_STATUS,
     Agent,
     EmitFn,
     SessionInfo,
@@ -46,7 +47,32 @@ from framework.agents.glossary import (
 )
 from framework.agents.plugins.backends import ModelTemplate, Sampling, build_backend, get_template
 from framework.agents.plugins.prompt import PromptBuilder
-from framework.agents.plugins.retrieval import MaxSimRetrievalPlugin, NullRetrieval, RetrievalPlugin
+from framework.agents.plugins.retrieval import (
+    MaxSimRetrievalPlugin,
+    MockRetrieval,
+    NullRetrieval,
+    RetrievalPlugin,
+    RetrievalResult,
+)
+from framework.agents.term_memory.active_glossary import (
+    ActiveGlossaryManager,
+    glossary_topic_meta,
+)
+from framework.agents.term_memory.domain_taxonomy import (
+    AUTO_WORKING_PRESET,
+    GENERAL_DOMAIN,
+    configured_working_presets,
+    domain_for_preset,
+)
+from framework.agents.term_memory.topic_router import TopicContext
+from framework.agents.term_memory.topic_router import (
+    AudioNativeActiveGlossaryRouter,
+    DomainSlice,
+    LegacyKeywordTopicRouter,
+    RouterConfig,
+    RouterDecision,
+    RouterSessionState,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +105,21 @@ def _env_bool(key: str, default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _meta_bool(value: Any, default: bool) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 @dataclass
 class OmniConfig:
     """Self-contained, env-driven config (defaults match the RASST server)."""
@@ -103,6 +144,12 @@ class OmniConfig:
     sglang_timeout_sec: float = 900.0
 
     segment_sec: float = 1.92
+    # latency-multiplier streaming: chunk = base_segment_sec * lm (lm in 1..4 ->
+    # 0.96/1.92/2.88/3.84s). The MaxSim retriever adds rag_timeline_lookback_sec
+    # (1.92s) of left context, so its encode window is 2.88/3.84/4.8/5.76s,
+    # matching the trained variable-context (varctx) form.
+    base_segment_sec: float = 0.96
+    default_latency_multiplier: int = 2
     scheduler_batch_size: int = 32
     batch_timeout: float = 0.05
     coalesce_sec: float = 0.06
@@ -131,6 +178,25 @@ class OmniConfig:
     rag_score_threshold: float = 0.78
     rag_timeline_lookback_sec: float = 1.92
 
+    auto_glossary_enabled: bool = True
+    auto_glossary_default_preset: str = "common_10k"
+    auto_glossary_presets: str = "common_10k,nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k"
+    auto_glossary_update_sec: float = 45.0
+    auto_glossary_warmup_sec: float = 30.0
+    auto_glossary_min_conf: float = 0.60
+    auto_glossary_switch_margin: float = 0.15
+    auto_glossary_min_consistent_windows: int = 2
+    auto_glossary_fallback_preset: str = "common_10k"
+    auto_glossary_preload: bool = True
+    auto_glossary_preload_presets: str = "common_10k,nlp_core_10k,medicine_core_10k"
+    router_mode: str = "embedding_refs"
+    router_legacy_keywords: bool = False
+    router_embed_weight: float = 0.65
+    router_ref_weight: float = 0.35
+    router_ema_alpha: float = 0.80
+    prompt_top_k: int = 10
+    ui_top_k: int = 10
+
     max_imported_glossary_terms: int = 10000
     tmp_dir: str = ""
 
@@ -153,6 +219,8 @@ class OmniConfig:
             sglang_base_url=_env_str("RASST_SGLANG_BASE_URL", "http://127.0.0.1:8100"),
             sglang_timeout_sec=_env_float("RASST_SGLANG_TIMEOUT_SEC", 900.0),
             segment_sec=_env_float("RASST_VLLM_SEGMENT_SEC", _env_float("RASST_SGLANG_SEGMENT_SEC", 1.92)),
+            base_segment_sec=_env_float("RASST_BASE_SEGMENT_SEC", 0.96),
+            default_latency_multiplier=_env_int("RASST_DEFAULT_LATENCY_MULTIPLIER", 2),
             scheduler_batch_size=_env_int("RASST_SCHEDULER_BATCH_SIZE", 32),
             batch_timeout=_env_float("RASST_BATCH_TIMEOUT", 0.05),
             coalesce_sec=_env_float("RASST_SGLANG_COALESCE_SEC", 0.06),
@@ -179,6 +247,33 @@ class OmniConfig:
             rag_text_lora_r=_env_int("RASST_RAG_TEXT_LORA_R", 128),
             rag_score_threshold=_env_float("RASST_RAG_SCORE_THRESHOLD", 0.78),
             rag_timeline_lookback_sec=_env_float("RASST_RAG_LOOKBACK_SEC", 1.92),
+            auto_glossary_enabled=_env_bool("RASST_AUTO_GLOSSARY_ENABLED", True),
+            auto_glossary_default_preset=_env_str("RASST_AUTO_GLOSSARY_DEFAULT", "common_10k"),
+            auto_glossary_presets=_env_str(
+                "RASST_AUTO_GLOSSARY_PRESETS",
+                "common_10k,nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k",
+            ),
+            auto_glossary_update_sec=_env_float("RASST_AUTO_GLOSSARY_UPDATE_SEC", 45.0),
+            auto_glossary_warmup_sec=_env_float("RASST_AUTO_GLOSSARY_WARMUP_SEC", 30.0),
+            auto_glossary_min_conf=_env_float("RASST_AUTO_GLOSSARY_MIN_CONF", 0.60),
+            auto_glossary_switch_margin=_env_float(
+                "RASST_AUTO_GLOSSARY_MIN_MARGIN",
+                _env_float("RASST_AUTO_GLOSSARY_SWITCH_MARGIN", 0.15),
+            ),
+            auto_glossary_min_consistent_windows=_env_int("RASST_AUTO_GLOSSARY_MIN_CONSISTENT_WINDOWS", 2),
+            auto_glossary_fallback_preset=_env_str("RASST_AUTO_GLOSSARY_FALLBACK", "common_10k"),
+            auto_glossary_preload=_env_bool("RASST_AUTO_GLOSSARY_PRELOAD", True),
+            auto_glossary_preload_presets=_env_str(
+                "RASST_AUTO_GLOSSARY_PRELOAD_PRESETS",
+                "common_10k,nlp_core_10k,medicine_core_10k",
+            ),
+            router_mode=_env_str("RASST_ROUTER_MODE", "embedding_refs"),
+            router_legacy_keywords=_env_bool("RASST_ROUTER_LEGACY_KEYWORDS", False),
+            router_embed_weight=_env_float("RASST_ROUTER_EMBED_WEIGHT", 0.65),
+            router_ref_weight=_env_float("RASST_ROUTER_REF_WEIGHT", 0.35),
+            router_ema_alpha=_env_float("RASST_ROUTER_EMA_ALPHA", 0.80),
+            prompt_top_k=_env_int("RASST_PROMPT_TOP_K", 10),
+            ui_top_k=_env_int("RASST_UI_TOP_K", 10),
             max_imported_glossary_terms=_env_int("RASST_MAX_IMPORTED_GLOSSARY_TERMS", 10000),
             tmp_dir=_env_str("RASST_TMP_DIR", f"/dev/shm/rasst_omni_{os.getpid()}"),
         )
@@ -204,7 +299,23 @@ class OmniSession:
     imported_glossary: List[Dict[str, Any]] = field(default_factory=list)
     glossary_preset: str = DEFAULT_GLOSSARY_PRESET
     glossary_index_path: str = ""
+    requested_glossary_preset: str = DEFAULT_GLOSSARY_PRESET
+    active_glossary_preset: str = "none"
+    active_domain: str = GENERAL_DOMAIN
+    auto_glossary_enabled: bool = False
+    topic_confidence: float = 0.0
+    last_topic_update_s: float = 0.0
+    created_s: float = field(default_factory=time.perf_counter)
+    topic_history: List[Dict[str, Any]] = field(default_factory=list)
+    glossary_switch_count: int = 0
+    topic_update_task: Optional[asyncio.Task] = None
+    recent_references: Deque[Dict[str, Any]] = field(default_factory=lambda: deque(maxlen=64))
+    last_topic_reason: str = ""
+    router_state: Optional[RouterSessionState] = None
+    last_router_decision: Optional[Dict[str, Any]] = None
+    last_query_embedding: Any = None
     pending_since_s: Optional[float] = None
+    latency_multiplier: int = 2
 
 
 class OmniAgent(Agent):
@@ -235,6 +346,18 @@ class OmniAgent(Agent):
         self.batch_seq = 0
         self.recent_batch_metrics: Deque[Dict[str, Any]] = deque(maxlen=64)
         self._catalogs: Dict[str, GlossaryCatalog] = {}
+        self._legacy_topic_router = LegacyKeywordTopicRouter(
+            warmup_sec=self.config.auto_glossary_warmup_sec,
+            update_sec=self.config.auto_glossary_update_sec,
+            min_confidence=self.config.auto_glossary_min_conf,
+            switch_margin=self.config.auto_glossary_switch_margin,
+        )
+        self._topic_routers: Dict[str, AudioNativeActiveGlossaryRouter] = {}
+        self.active_glossary = ActiveGlossaryManager(
+            default_preset=self.config.auto_glossary_default_preset,
+            allowed_presets=configured_working_presets(self.config.auto_glossary_presets),
+        )
+        self._index_preload_tasks: Dict[str, asyncio.Task] = {}
         self.tmp_dir = Path(self.config.tmp_dir)
 
     def _catalog(self, language_pair: str) -> GlossaryCatalog:
@@ -244,8 +367,99 @@ class OmniAgent(Agent):
             self._catalogs[language_pair] = catalog
         return catalog
 
-    def _segment_samples(self) -> int:
-        return int(float(self.config.segment_sec) * TARGET_SAMPLE_RATE)
+    def _topic_router_for(self, language_pair: str) -> AudioNativeActiveGlossaryRouter:
+        router = self._topic_routers.get(language_pair)
+        if router is not None:
+            return router
+        catalog = self._catalog(language_pair)
+        router_config = RouterConfig(
+            warmup_sec=self.config.auto_glossary_warmup_sec,
+            update_interval_sec=self.config.auto_glossary_update_sec,
+            min_confidence=self.config.auto_glossary_min_conf,
+            min_margin=self.config.auto_glossary_switch_margin,
+            min_consistent_windows=self.config.auto_glossary_min_consistent_windows,
+            embedding_weight=self.config.router_embed_weight,
+            reference_weight=self.config.router_ref_weight,
+            ema_alpha=self.config.router_ema_alpha,
+            fallback_preset_id=self.config.auto_glossary_fallback_preset,
+        )
+        router = AudioNativeActiveGlossaryRouter(
+            self._domain_slices_for(catalog),
+            router_config,
+        )
+        self._topic_routers[language_pair] = router
+        return router
+
+    def _domain_slices_for(self, catalog: GlossaryCatalog) -> List[DomainSlice]:
+        allowed = configured_working_presets(self.config.auto_glossary_presets)
+        slices: List[DomainSlice] = []
+        for preset_id in allowed:
+            meta = catalog.manifest.meta_for_preset(preset_id) if catalog.manifest else {}
+            domain_id = str(meta.get("domain_id") or meta.get("domain") or domain_for_preset(preset_id)).strip()
+            if domain_id == "general":
+                domain_id = GENERAL_DOMAIN
+            enabled = _meta_bool(meta.get("enabled_for_auto_router"), True)
+            snapshot = catalog._open_snapshot(preset_id)  # agent-internal catalog helper
+            index_path = str(
+                meta.get("maxsim_index_path")
+                or meta.get("index_path")
+                or (snapshot.index_path("maxsim") if snapshot is not None else "")
+                or catalog.index_path_for_preset(preset_id)
+            )
+            if self.config.mock and not index_path and preset_id != "none":
+                index_path = f"mock://{preset_id}"
+            term_count = 0
+            try:
+                term_count = int(
+                    meta.get("term_count")
+                    or meta.get("terms")
+                    or (snapshot.num_terms if snapshot is not None else 0)
+                    or 0
+                )
+            except (TypeError, ValueError):
+                term_count = 0
+            slices.append(
+                DomainSlice(
+                    preset_id=preset_id,
+                    domain_id=domain_id or domain_for_preset(preset_id),
+                    parent_domain_id=str(meta.get("parent_domain_id") or "") or None,
+                    fallback_preset_id=str(meta.get("fallback_preset_id") or self.config.auto_glossary_fallback_preset or "") or None,
+                    centroid=self._load_centroid(meta.get("centroid_path")),
+                    enabled=enabled,
+                    priority=_safe_int(meta.get("priority"), 0),
+                    term_count=term_count,
+                    index_path=index_path,
+                    description=str(meta.get("domain_description") or meta.get("description") or ""),
+                )
+            )
+        return slices
+
+    def _load_centroid(self, centroid_path: Any) -> Any:
+        path = str(centroid_path or "").strip()
+        if not path:
+            return None
+        centroid_file = Path(path)
+        if not centroid_file.is_file():
+            logger.warning("router centroid missing: %s", centroid_file)
+            return None
+        try:
+            import torch  # noqa: WPS433 - optional real-backend dependency
+
+            data = torch.load(str(centroid_file), map_location="cpu")
+            if isinstance(data, dict):
+                centroid = data.get("centroid")
+                if centroid is None and data.get("prototypes") is not None:
+                    prototypes = data["prototypes"]
+                    centroid = prototypes[0] if getattr(prototypes, "ndim", 0) >= 2 else prototypes
+                return centroid
+            return data
+        except Exception:  # noqa: BLE001 - missing centroid must not break serving
+            logger.exception("failed to load router centroid %s", centroid_file)
+            return None
+
+    def _segment_samples(self, session: "OmniSession") -> int:
+        lm = max(1, min(4, int(session.latency_multiplier)))
+        return int(float(self.config.base_segment_sec) * lm * TARGET_SAMPLE_RATE)
 
     def _vllm_config(self) -> Dict[str, Any]:
         """Kwargs for VLLMBackend; model_path falls back to the per-language path."""
@@ -268,6 +482,56 @@ class OmniAgent(Agent):
             "default_target_lang": catalog.target_lang,
             "default_lang_code": catalog.lang_code,
         }
+
+    def _schedule_auto_preloads(self) -> None:
+        catalog = self._catalog(self.config.language_pair)
+        for preset in configured_working_presets(self.config.auto_glossary_preload_presets):
+            try:
+                selection = self.active_glossary.initial_selection(
+                    catalog,
+                    preset,
+                    "",
+                    auto_allowed=False,
+                    mock=self.config.mock,
+                )
+            except Exception:  # noqa: BLE001 - optional warm path
+                logger.exception("failed to resolve auto preload preset %s", preset)
+                continue
+            if selection.index_path:
+                self._schedule_index_preload(selection.index_path)
+
+    def _schedule_index_preload(self, index_path: str) -> None:
+        if not index_path or not self.retrieval.enabled or self.retrieval.is_index_ready(index_path):
+            return
+        existing = self._index_preload_tasks.get(index_path)
+        if existing is not None and not existing.done():
+            return
+
+        async def _runner() -> None:
+            try:
+                await self.retrieval.preload_index(index_path)
+            except asyncio.CancelledError:
+                raise
+            except Exception:  # noqa: BLE001 - cold preload must not sink serving
+                logger.exception("failed to preload glossary index %s", index_path)
+            finally:
+                self._index_preload_tasks.pop(index_path, None)
+
+        self._index_preload_tasks[index_path] = asyncio.create_task(_runner())
+
+    def _select_initial_glossary(
+        self,
+        catalog: GlossaryCatalog,
+        requested_preset: Optional[str],
+        glossary_text: str,
+    ):
+        return self.active_glossary.initial_selection(
+            catalog,
+            requested_preset,
+            glossary_text,
+            auto_allowed=self.config.auto_glossary_enabled,
+            mock=self.config.mock,
+        )
 
     async def start(self, emit: EmitFn) -> None:
         self._emit = emit
@@ -303,8 +567,19 @@ class OmniAgent(Agent):
                 logger.exception("retrieval failed to load; continuing without RAG")
                 self.retrieval = NullRetrieval()
                 self.config.rag_enabled = False
+        elif self.config.mock:
+            # GPU-free dev/demo: deterministic fake retrieval so the evidence
+            # UI + JSON protocol can be exercised without a model or retriever.
+            self.retrieval = MockRetrieval(
+                target_lang=self._catalog(self.config.language_pair).lang_code,
+                top_k=max(self.config.rag_top_k, self.config.ui_top_k),
+            )
+            await self.retrieval.start()
         else:
             self.retrieval = NullRetrieval()
+
+        if self.config.auto_glossary_enabled and self.retrieval.enabled:
+            self._schedule_auto_preloads()
 
         self._scheduler_task = asyncio.create_task(self._scheduler_loop())
         logger.info(
@@ -324,6 +599,13 @@ class OmniAgent(Agent):
                 await self.backend.stop()
             except Exception:  # noqa: BLE001
                 logger.exception("backend stop failed")
+        for task in list(self._index_preload_tasks.values()):
+            task.cancel()
+        if self._index_preload_tasks:
+            await asyncio.gather(*self._index_preload_tasks.values(), return_exceptions=True)
+        for session in list(self.sessions.values()):
+            if session.topic_update_task is not None:
+                session.topic_update_task.cancel()
         try:
             await self.retrieval.stop()
         except Exception:  # noqa: BLE001
@@ -345,17 +627,23 @@ class OmniAgent(Agent):
             )
         catalog = self._catalog(language_pair)
         try:
-            selection = catalog.describe_selection(
+            selection = self._select_initial_glossary(
+                catalog,
                 config.get("glossary_preset", DEFAULT_GLOSSARY_PRESET),
                 str(config.get("glossary_text") or ""),
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
-        if self.config.rag_enabled and selection["index_path"] and not selection["index_ready"]:
+        if self.config.rag_enabled and selection.index_path and not selection.index_ready:
             raise HTTPException(
-                status_code=400, detail=f"RAG text index is not ready: {selection['index_path']}"
+                status_code=400, detail=f"RAG text index is not ready: {selection.index_path}"
             )
 
+        try:
+            lm = int(config.get("latency_multiplier", self.config.default_latency_multiplier))
+        except (TypeError, ValueError):
+            lm = self.config.default_latency_multiplier
+        lm = max(1, min(4, lm))
         lang_cfg = LANGUAGE_PAIRS[language_pair]
         session = OmniSession(
             session_id=session_id,
@@ -363,10 +651,26 @@ class OmniAgent(Agent):
             source_lang=str(lang_cfg["source_lang"]),
             target_lang=str(lang_cfg["target_lang"]),
             lang_code=str(lang_cfg["lang_code"]),
-            imported_glossary=selection["manual_refs"],
-            glossary_preset=selection["glossary_preset"],
-            glossary_index_path=selection["index_path"],
+            imported_glossary=selection.manual_refs,
+            glossary_preset=selection.active_preset,
+            glossary_index_path=selection.index_path,
+            requested_glossary_preset=selection.requested_preset,
+            active_glossary_preset=selection.active_preset,
+            active_domain=selection.active_domain,
+            auto_glossary_enabled=selection.auto_enabled,
+            last_topic_update_s=time.perf_counter(),
+            last_topic_reason=selection.reason,
+            latency_multiplier=lm,
         )
+        session.router_state = RouterSessionState(
+            active_preset_id=session.active_glossary_preset,
+            active_domain_id=session.active_domain,
+            created_s=session.created_s,
+            last_decision_s=time.perf_counter(),
+            last_switch_s=session.created_s,
+        )
+        if session.auto_glossary_enabled and session.glossary_index_path:
+            self._schedule_index_preload(session.glossary_index_path)
         self.sessions[session_id] = session
         if self.backend is not None and getattr(self.backend, "batched", False):
             await self.backend.open_session(
@@ -384,19 +688,16 @@ class OmniAgent(Agent):
             "sglang_backend": (not self.config.mock) and self.template.backend_kind == "sglang_http",
             "mock_mode": self.config.mock,
             "model": self.name,
-            "glossary_preset": selection["glossary_preset"],
-            "glossary_path": selection["glossary_path"],
-            "preset_terms": selection["preset_terms"],
-            "manual_terms": selection["manual_terms"],
-            "glossary_terms": selection["manual_terms"],
-            "index_path": selection["index_path"],
-            "index_ready": selection["index_ready"],
+            **selection.to_session_meta(),
+            "topic": self._topic_meta(session),
         }
         return SessionInfo(admitted=True, queued=False, queue_position=0, meta=meta)
 
     async def close_session(self, session_id: str) -> None:
         session = self.sessions.pop(session_id, None)
         if session is not None:
+            if session.topic_update_task is not None:
+                session.topic_update_task.cancel()
             self._cleanup_audio(session)
         if self.backend is not None and getattr(self.backend, "batched", False):
             try:
@@ -434,7 +735,7 @@ class OmniAgent(Agent):
     def _mark_pending(self, session: OmniSession, *, force: bool) -> None:
         if session.inflight:
             return
-        if not force and (session.cursor_samples - session.last_llm_samples < self._segment_samples()):
+        if not force and (session.cursor_samples - session.last_llm_samples < self._segment_samples(session)):
             return
         if session.session_id not in self.pending_set:
             self.pending.append(session.session_id)
@@ -458,7 +759,14 @@ class OmniAgent(Agent):
                     logger.exception("backend reset_session failed for %s", session_id)
             return result
         if mtype == "update_latency":
-            return {"success": True, "latency_multiplier": message.get("latency_multiplier")}
+            session = self.sessions.get(session_id) if session_id else None
+            try:
+                lm = max(1, min(4, int(message.get("latency_multiplier"))))
+            except (TypeError, ValueError):
+                lm = None
+            if session is not None and lm is not None:
+                session.latency_multiplier = lm
+            return {"success": True, "latency_multiplier": lm}
         if mtype == "glossary_build":
             return await self._glossary_build(message)
         return None
@@ -477,6 +785,38 @@ class OmniAgent(Agent):
         session.final = False
         session.messages.clear()
         session.history.clear()
+        session.recent_references.clear()
+        session.topic_history.clear()
+        session.topic_confidence = 0.0
+        session.glossary_switch_count = 0
+        session.last_topic_update_s = time.perf_counter()
+        session.last_topic_reason = "reset"
+        session.last_router_decision = None
+        session.last_query_embedding = None
+        if session.auto_glossary_enabled:
+            try:
+                selection = self.active_glossary.initial_selection(
+                    self._catalog(session.language_pair),
+                    AUTO_WORKING_PRESET,
+                    "",
+                    auto_allowed=True,
+                    mock=self.config.mock,
+                )
+                session.glossary_preset = selection.active_preset
+                session.active_glossary_preset = selection.active_preset
+                session.active_domain = selection.active_domain
+                session.glossary_index_path = selection.index_path
+                session.router_state = RouterSessionState(
+                    active_preset_id=session.active_glossary_preset,
+                    active_domain_id=session.active_domain,
+                    created_s=time.perf_counter(),
+                    last_decision_s=time.perf_counter(),
+                    last_switch_s=time.perf_counter(),
+                )
+                if selection.index_path:
+                    self._schedule_index_preload(selection.index_path)
+            except Exception:  # noqa: BLE001
+                logger.exception("failed to reset auto glossary for %s", session.session_id)
         session.pending_since_s = None
         self.pending_set.discard(session.session_id)
         self.pending = deque(item for item in self.pending if item != session.session_id)
@@ -493,21 +833,22 @@ class OmniAgent(Agent):
             )
         catalog = self._catalog(language_pair)
         try:
-            selection = catalog.describe_selection(
+            selection = self._select_initial_glossary(
+                catalog,
                 message.get("glossary_preset", DEFAULT_GLOSSARY_PRESET),
                 str(message.get("glossary_text") or ""),
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
-        if self.config.rag_enabled and selection["index_path"] and not selection["index_ready"]:
+        if self.config.rag_enabled and selection.index_path and not selection.index_ready:
             raise HTTPException(
-                status_code=400, detail=f"RAG text index is not ready: {selection['index_path']}"
+                status_code=400, detail=f"RAG text index is not ready: {selection.index_path}"
             )
-        if self.retrieval.enabled and selection["index_path"]:
+        if self.retrieval.enabled and selection.index_path:
             try:
-                await self.retrieval.activate_index(selection["index_path"])
+                await self.retrieval.preload_index(selection.index_path)
             except Exception:  # noqa: BLE001
-                logger.exception("failed to warm glossary index %s", selection["index_path"])
+                logger.exception("failed to warm glossary index %s", selection.index_path)
 
         session_updated = False
         session_id = message.get("session_id")
@@ -515,21 +856,37 @@ class OmniAgent(Agent):
             session = self.sessions.get(session_id)
             if session is None:
                 raise HTTPException(status_code=400, detail=f"Unknown session: {session_id}")
-            session.glossary_preset = selection["glossary_preset"]
-            session.glossary_index_path = selection["index_path"]
-            session.imported_glossary = selection["manual_refs"]
+            if session.topic_update_task is not None and not session.topic_update_task.done():
+                session.topic_update_task.cancel()
+            session.requested_glossary_preset = selection.requested_preset
+            session.glossary_preset = selection.active_preset
+            session.active_glossary_preset = selection.active_preset
+            session.active_domain = selection.active_domain
+            session.auto_glossary_enabled = selection.auto_enabled
+            session.topic_confidence = 0.0
+            session.last_topic_update_s = time.perf_counter()
+            session.last_topic_reason = selection.reason
+            session.glossary_index_path = selection.index_path
+            session.imported_glossary = selection.manual_refs
+            session.last_router_decision = None
+            session.last_query_embedding = None
+            session.router_state = RouterSessionState(
+                active_preset_id=session.active_glossary_preset,
+                active_domain_id=session.active_domain,
+                created_s=session.created_s,
+                last_decision_s=time.perf_counter(),
+                last_switch_s=time.perf_counter(),
+            )
             session_updated = True
-        return {
+        result = {
             "success": True,
             "session_updated": session_updated,
-            "glossary_preset": selection["glossary_preset"],
-            "glossary_path": selection["glossary_path"],
-            "preset_terms": selection["preset_terms"],
-            "manual_terms": selection["manual_terms"],
-            "imported_glossary_terms": selection["manual_terms"],
-            "index_path": selection["index_path"],
-            "index_ready": selection["index_ready"],
+            **selection.to_session_meta(),
+            "imported_glossary_terms": selection.manual_terms,
         }
+        if session_id and session_id in self.sessions:
+            result["topic"] = self._topic_meta(self.sessions[session_id])
+        return result
 
     async def _scheduler_loop(self) -> None:
         assert self._batch_gate is not None
@@ -539,7 +896,6 @@ class OmniAgent(Agent):
                 await self._batch_gate.acquire()
                 batch: List[OmniSession] = []
                 deadline = time.perf_counter() + max(0.0, float(self.config.coalesce_sec))
-                segment_samples = self._segment_samples()
                 while True:
                     while self.pending and len(batch) < int(self.config.scheduler_batch_size):
                         session_id = self.pending.popleft()
@@ -548,7 +904,7 @@ class OmniAgent(Agent):
                         if session is None or session.inflight:
                             continue
                         ready = session.flush or (
-                            session.cursor_samples - session.last_llm_samples >= segment_samples
+                            session.cursor_samples - session.last_llm_samples >= self._segment_samples(session)
                         )
                         if not ready:
                             continue
@@ -612,7 +968,8 @@ class OmniAgent(Agent):
             generate_t0 = time.perf_counter()
             if getattr(self.backend, "batched", False):
                 results = await self._generate_batch(
-                    batch, increments, refs_by_session, start_by_session, end_by_session
+                    batch, increments, refs_by_session, start_by_session, end_by_session,
+                    retrieve_s=retrieve_s,
                 )
             else:
                 tasks = [
@@ -622,6 +979,7 @@ class OmniAgent(Agent):
                         refs,
                         start_by_session[session.session_id],
                         end_by_session[session.session_id],
+                        retrieve_s=retrieve_s,
                     )
                     for session, increment, refs in zip(batch, increments, refs_by_session)
                 ]
@@ -689,6 +1047,9 @@ class OmniAgent(Agent):
             ).index_path_for_preset(session.glossary_preset)
             if not index_path:
                 continue
+            if session.auto_glossary_enabled and not self.retrieval.is_index_ready(index_path):
+                self._schedule_index_preload(index_path)
+                continue
             grouped.setdefault(index_path, []).append((idx, session))
 
         assert self._retriever_lock is not None
@@ -704,14 +1065,338 @@ class OmniAgent(Agent):
                     }
                     for _, session in indexed_sessions
                 ]
-                group_results = await self.retrieval.retrieve(
+                group_results = await self.retrieval.retrieve_with_metadata(
                     requests,
                     top_k=self.config.rag_top_k,
                     lookback_sec=self.config.rag_timeline_lookback_sec,
                 )
-                for (original_idx, _), refs in zip(indexed_sessions, group_results):
-                    outputs[original_idx] = refs
+                for (original_idx, session), result in zip(indexed_sessions, group_results):
+                    if not isinstance(result, RetrievalResult):
+                        result = RetrievalResult(references=list(result or []))
+                    outputs[original_idx] = result.references
+                    session.last_query_embedding = result.query_embedding
+                    self._observe_active_glossary(session, result)
         return outputs
+
+    def _annotate_references(
+        self,
+        session: OmniSession,
+        references: Sequence[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        annotated: List[Dict[str, Any]] = []
+        for ref in references or []:
+            item = dict(ref)
+            item["active_glossary_preset"] = session.active_glossary_preset or session.glossary_preset
+            item["active_domain"] = session.active_domain
+            item.setdefault("domain", session.active_domain)
+            item.setdefault("source_preset", session.active_glossary_preset or session.glossary_preset)
+            if session.auto_glossary_enabled:
+                item["source"] = f"auto:{session.active_glossary_preset or session.glossary_preset}"
+            elif session.glossary_preset and session.glossary_preset != "none":
+                source = str(item.get("source") or "")
+                if source in {"", "rag", "wikidata", "glossary"}:
+                    item["source"] = f"preset:{session.glossary_preset}"
+            annotated.append(item)
+        return self._rank_references(annotated)
+
+    def _rank_references(self, references: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        def _priority(ref: Dict[str, Any]) -> Tuple[int, float]:
+            source = str(ref.get("source") or "").lower()
+            if source == "manual" or source.startswith("manual"):
+                pri = 0
+            elif source.startswith("preset:") or source.startswith("curated"):
+                pri = 1
+            elif source.startswith("auto:"):
+                pri = 2
+            elif source.startswith("open"):
+                pri = 3
+            else:
+                pri = 4
+            try:
+                score = float(ref.get("score") or 0.0)
+            except (TypeError, ValueError):
+                score = 0.0
+            return pri, -score
+
+        return sorted((dict(ref) for ref in references or []), key=_priority)
+
+    def _prompt_references(
+        self,
+        session: OmniSession,
+        references: Sequence[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        return self._annotate_references(session, references)[: max(0, int(self.config.prompt_top_k))]
+
+    def _ui_references(
+        self,
+        session: OmniSession,
+        references: Sequence[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        return self._annotate_references(session, references)[: max(0, int(self.config.ui_top_k))]
+
+    def _topic_meta(self, session: OmniSession) -> Dict[str, Any]:
+        return glossary_topic_meta(
+            active_domain=session.active_domain,
+            confidence=session.topic_confidence,
+            active_glossary_preset=session.active_glossary_preset,
+            switch_count=session.glossary_switch_count,
+            last_reason=session.last_topic_reason,
+        )
+
+    def _event_meta(
+        self,
+        session: OmniSession,
+        *,
+        segment_idx: int,
+        elapsed_s: Optional[float],
+        retrieve_s: Optional[float],
+        cursor_samples: int,
+        start_sample: int,
+        references: Sequence[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        return {
+            "segment_idx": segment_idx,
+            "elapsed_s": elapsed_s,
+            "retrieve_s": round(retrieve_s, 6) if retrieve_s is not None else None,
+            "cursor_samples": cursor_samples,
+            "start_sample": start_sample,
+            "references": self._ui_references(session, references),
+            "prompt_reference_count": min(len(references or []), max(0, int(self.config.prompt_top_k))),
+            "ui_reference_count": min(len(references or []), max(0, int(self.config.ui_top_k))),
+            "topic": self._topic_meta(session),
+            "topic_router": session.last_router_decision,
+        }
+
+    def _after_translation_tick(
+        self,
+        session: OmniSession,
+        *,
+        text: str,
+        references: Sequence[Dict[str, Any]],
+    ) -> None:
+        return None
+
+    def _observe_active_glossary(
+        self,
+        session: OmniSession,
+        result: RetrievalResult,
+    ) -> None:
+        if not session.auto_glossary_enabled:
+            return
+        annotated_refs = self._annotate_references(session, result.references)
+        for ref in annotated_refs:
+            session.recent_references.append(ref)
+
+        mode = (self.config.router_mode or "embedding_refs").strip().lower()
+        if self.config.router_legacy_keywords or mode == "legacy_keywords":
+            self._schedule_topic_update(session)
+            return
+
+        if session.router_state is None:
+            session.router_state = RouterSessionState(
+                active_preset_id=session.active_glossary_preset,
+                active_domain_id=session.active_domain,
+                created_s=session.created_s,
+                last_decision_s=time.perf_counter(),
+                last_switch_s=session.created_s,
+            )
+        now = time.perf_counter()
+        decision = self._topic_router_for(session.language_pair).observe(
+            session.router_state,
+            result.query_embedding,
+            annotated_refs,
+            now,
+        )
+        session.topic_confidence = decision.confidence
+        session.last_topic_reason = decision.reason
+        session.last_topic_update_s = now
+        session.last_router_decision = decision.to_meta()
+        session.topic_history.append(
+            {
+                "t": round(now - session.created_s, 3),
+                "router_mode": "embedding_refs",
+                "action": decision.action,
+                "domain": decision.target_domain_id,
+                "preset": decision.target_preset_id,
+                "confidence": decision.confidence,
+                "margin": decision.margin,
+                "scores": decision.scores,
+                "reason": decision.reason,
+            }
+        )
+        session.topic_history = session.topic_history[-16:]
+        if decision.action not in {"switch", "fallback"}:
+            return
+        if session.topic_update_task is not None and not session.topic_update_task.done():
+            return
+        session.topic_update_task = asyncio.create_task(
+            self._apply_router_decision_guarded(session.session_id, decision)
+        )
+
+    def _schedule_topic_update(self, session: OmniSession) -> None:
+        if not session.auto_glossary_enabled:
+            return
+        if session.topic_update_task is not None and not session.topic_update_task.done():
+            return
+        now = time.perf_counter()
+        if now - session.created_s < float(self.config.auto_glossary_warmup_sec):
+            return
+        if now - session.last_topic_update_s < float(self.config.auto_glossary_update_sec):
+            return
+        session.topic_update_task = asyncio.create_task(self._update_active_glossary_guarded(session.session_id))
+
+    async def _apply_router_decision_guarded(
+        self,
+        session_id: str,
+        decision: RouterDecision,
+    ) -> None:
+        try:
+            await self._apply_router_decision(session_id, decision)
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001 - adaptive routing must never fail translation
+            logger.exception("auto glossary switch failed for %s", session_id)
+
+    async def _apply_router_decision(
+        self,
+        session_id: str,
+        decision: RouterDecision,
+    ) -> None:
+        session = self.sessions.get(session_id)
+        if session is None or not session.auto_glossary_enabled:
+            return
+        selection = self.active_glossary.selection_for_decision(
+            self._catalog(session.language_pair),
+            decision,
+            glossary_text="",
+            mock=self.config.mock,
+        )
+        if selection is None:
+            session.last_topic_reason = f"{decision.reason}; target_unavailable"
+            if session.router_state is not None:
+                session.router_state.pending_preset_id = None
+            return
+        if selection.active_preset == session.active_glossary_preset:
+            if session.router_state is not None:
+                session.router_state.pending_preset_id = None
+            return
+        if selection.index_path and self.config.auto_glossary_preload:
+            await self.retrieval.preload_index(selection.index_path)
+            if not self.retrieval.is_index_ready(selection.index_path):
+                session.last_topic_reason = f"{decision.reason}; preload_not_ready"
+                if session.router_state is not None:
+                    session.router_state.pending_preset_id = None
+                return
+
+        old_preset = session.active_glossary_preset
+        old_domain = session.active_domain
+        session.glossary_preset = selection.active_preset
+        session.active_glossary_preset = selection.active_preset
+        session.active_domain = selection.active_domain
+        session.glossary_index_path = selection.index_path
+        session.glossary_switch_count += 1
+        session.last_topic_reason = selection.reason
+        if session.router_state is not None:
+            session.router_state.active_preset_id = selection.active_preset
+            session.router_state.active_domain_id = selection.active_domain
+            session.router_state.last_switch_s = time.perf_counter()
+            session.router_state.pending_preset_id = None
+        meta = decision.to_meta()
+        meta["from_preset"] = old_preset
+        meta["from_domain"] = old_domain
+        meta["to_preset"] = selection.active_preset
+        meta["to_domain"] = selection.active_domain
+        session.last_router_decision = meta
+        self._emit_event(
+            TranslationEvent(
+                session_id=session.session_id,
+                type=EVENT_STATUS,
+                text=f"AUTO_GLOSSARY_SWITCH: {old_preset} -> {selection.active_preset}",
+                meta={
+                    "topic": self._topic_meta(session),
+                    "topic_router": meta,
+                    "active_glossary_preset": selection.active_preset,
+                    "active_domain": selection.active_domain,
+                    "active_terms": selection.preset_terms,
+                },
+            )
+        )
+        logger.info(
+            "session %s switched active glossary to %s (domain=%s conf=%.3f)",
+            session.session_id,
+            selection.active_preset,
+            selection.active_domain,
+            decision.confidence,
+        )
+
+    async def _update_active_glossary_guarded(self, session_id: str) -> None:
+        try:
+            await self._update_active_glossary(session_id)
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001 - adaptive routing must never fail translation
+            logger.exception("auto glossary update failed for %s", session_id)
+
+    async def _update_active_glossary(self, session_id: str) -> None:
+        session = self.sessions.get(session_id)
+        if session is None or not session.auto_glossary_enabled:
+            return
+        now = time.perf_counter()
+        context = TopicContext(
+            recent_text="\n".join(session.history[-int(self.config.keep_cache_chunks):]),
+            recent_references=list(session.recent_references),
+            manual_glossary_terms=list(session.imported_glossary),
+            current_domain=session.active_domain,
+            elapsed_s=now - session.created_s,
+            seconds_since_update=now - session.last_topic_update_s,
+        )
+        decision = self._legacy_topic_router.decide(context)
+        session.topic_confidence = decision.confidence
+        session.last_topic_reason = decision.reason
+        session.last_topic_update_s = now
+        session.topic_history.append(
+            {
+                "t": round(now - session.created_s, 3),
+                "domain": decision.primary_domain,
+                "confidence": decision.confidence,
+                "scores": decision.scores,
+                "should_switch": decision.should_switch,
+                "reason": decision.reason,
+            }
+        )
+        session.topic_history = session.topic_history[-16:]
+        if not decision.should_switch:
+            return
+
+        selection = self.active_glossary.selection_for_decision(
+            self._catalog(session.language_pair),
+            decision,
+            glossary_text="",
+            mock=self.config.mock,
+        )
+        if selection is None:
+            session.last_topic_reason = f"{decision.reason}; target_unavailable"
+            return
+        if selection.active_preset == session.active_glossary_preset:
+            return
+        if selection.index_path:
+            await self.retrieval.preload_index(selection.index_path)
+            if not self.retrieval.is_index_ready(selection.index_path):
+                session.last_topic_reason = f"{decision.reason}; preload_not_ready"
+                return
+        session.glossary_preset = selection.active_preset
+        session.active_glossary_preset = selection.active_preset
+        session.active_domain = selection.active_domain
+        session.glossary_index_path = selection.index_path
+        session.glossary_switch_count += 1
+        session.last_topic_reason = selection.reason
+        logger.info(
+            "session %s switched active glossary to %s (domain=%s conf=%.3f)",
+            session.session_id,
+            selection.active_preset,
+            selection.active_domain,
+            decision.confidence,
+        )
 
     async def _generate_one(
         self,
@@ -720,6 +1405,8 @@ class OmniAgent(Agent):
         references: Sequence[Dict[str, Any]],
         start_sample: int,
         end_sample: int,
+        *,
+        retrieve_s: Optional[float] = None,
     ) -> Dict[str, Any]:
         chunk_rms = float(np.sqrt(np.mean(np.square(increment)))) if increment.size else 0.0
         if chunk_rms < float(self.config.min_audio_rms):
@@ -736,13 +1423,14 @@ class OmniAgent(Agent):
             session.audio_paths.append(wav_path)
 
         rag_enabled_for_prompt = bool(
-            self.config.rag_enabled and (session.glossary_index_path or session.imported_glossary)
+            self.retrieval.enabled and (session.glossary_index_path or session.imported_glossary)
         )
         if not session.messages:
             session.messages.append(
                 self.prompt.system_message(session.source_lang, session.target_lang, rag_enabled_for_prompt)
             )
-        term_map_text = self.prompt.term_map(session.imported_glossary, references)
+        prompt_refs = self._prompt_references(session, references)
+        term_map_text = self.prompt.term_map(session.imported_glossary, prompt_refs)
         user_message, audios_payload = self.prompt.user_message(
             str(wav_path), term_map_text, rag_enabled_for_prompt
         )
@@ -772,18 +1460,21 @@ class OmniAgent(Agent):
             if text:
                 session.history.append(text)
                 session.history = session.history[-int(self.config.keep_cache_chunks) :]
+                self._after_translation_tick(session, text=text, references=references)
                 self._emit_event(
                     TranslationEvent(
                         session_id=session.session_id,
                         type=EVENT_PARTIAL,
                         text=text,
-                        meta={
-                            "segment_idx": session.segment_idx,
-                            "elapsed_s": round(elapsed, 6),
-                            "cursor_samples": end_sample,
-                            "start_sample": start_sample,
-                            "references": list(references),
-                        },
+                        meta=self._event_meta(
+                            session,
+                            segment_idx=session.segment_idx,
+                            elapsed_s=round(elapsed, 6),
+                            retrieve_s=retrieve_s,
+                            cursor_samples=end_sample,
+                            start_sample=start_sample,
+                            references=references,
+                        ),
                     )
                 )
             return {"ok": True, "elapsed_s": elapsed}
@@ -807,6 +1498,8 @@ class OmniAgent(Agent):
         refs_by_session: Sequence[Sequence[Dict[str, Any]]],
         start_by_session: Dict[str, int],
         end_by_session: Dict[str, int],
+        *,
+        retrieve_s: Optional[float] = None,
     ) -> List[Dict[str, Any]]:
         """Batched generate for vLLM-style backends: one engine call per tick.
 
@@ -817,9 +1510,10 @@ class OmniAgent(Agent):
         requests: List[Dict[str, Any]] = []
         for session, increment, refs in zip(batch, increments, refs_by_session):
             rag_enabled_for_prompt = bool(
-                self.config.rag_enabled and (session.glossary_index_path or session.imported_glossary)
+                self.retrieval.enabled and (session.glossary_index_path or session.imported_glossary)
             )
-            term_map_text = self.prompt.term_map(session.imported_glossary, refs)
+            prompt_refs = self._prompt_references(session, refs)
+            term_map_text = self.prompt.term_map(session.imported_glossary, prompt_refs)
             requests.append(
                 {
                     "session_id": session.session_id,
@@ -864,18 +1558,21 @@ class OmniAgent(Agent):
             if ok and text:
                 session.history.append(text)
                 session.history = session.history[-int(self.config.keep_cache_chunks):]
+                self._after_translation_tick(session, text=text, references=refs)
                 self._emit_event(
                     TranslationEvent(
                         session_id=session.session_id,
                         type=EVENT_PARTIAL,
                         text=text,
-                        meta={
-                            "segment_idx": session.segment_idx,
-                            "elapsed_s": elapsed,
-                            "cursor_samples": end_sample,
-                            "start_sample": start_sample,
-                            "references": list(refs),
-                        },
+                        meta=self._event_meta(
+                            session,
+                            segment_idx=session.segment_idx,
+                            elapsed_s=elapsed,
+                            retrieve_s=retrieve_s,
+                            cursor_samples=end_sample,
+                            start_sample=start_sample,
+                            references=refs,
+                        ),
                     )
                 )
             elif not ok:
@@ -917,8 +1614,78 @@ class OmniAgent(Agent):
             ],
             "glossary_presets": catalog.preset_catalog(),
             "default_glossary_preset": DEFAULT_GLOSSARY_PRESET,
+            "auto_glossary": {
+                "enabled": self.config.auto_glossary_enabled,
+                "router_mode": self.config.router_mode,
+                "default_preset": self.config.auto_glossary_default_preset,
+                "fallback_preset": self.config.auto_glossary_fallback_preset,
+                "update_sec": self.config.auto_glossary_update_sec,
+                "warmup_sec": self.config.auto_glossary_warmup_sec,
+                "min_confidence": self.config.auto_glossary_min_conf,
+                "min_margin": self.config.auto_glossary_switch_margin,
+                "min_consistent_windows": self.config.auto_glossary_min_consistent_windows,
+                "prompt_top_k": self.config.prompt_top_k,
+                "ui_top_k": self.config.ui_top_k,
+            },
             "loaded_language_pair": self.config.language_pair,
         }
+
+    def _retrieve_latency_ms(self) -> Dict[str, Optional[float]]:
+        """p50/p95 of recent per-tick retrieval time (ms). Ignores RAG-off ticks."""
+        values = sorted(
+            float(m["retrieve_s"])
+            for m in self.recent_batch_metrics
+            if m.get("retrieve_s")
+        )
+        if not values:
+            return {"p50_retrieve_ms": None, "p95_retrieve_ms": None}
+
+        def _pct(pct: float) -> float:
+            idx = min(len(values) - 1, max(0, int(round((pct / 100.0) * (len(values) - 1)))))
+            return round(values[idx] * 1000.0, 3)
+
+        return {"p50_retrieve_ms": _pct(50.0), "p95_retrieve_ms": _pct(95.0)}
+
+    def _term_memory_status(self, rag_health: Dict[str, Any]) -> Dict[str, Any]:
+        """Summarize the active terminology memory for ``/health`` (UI evidence).
+
+        For the current MaxSim retriever this reflects the active glossary index;
+        the two-stage open-memory backend (Phase D) populates the same shape with
+        a manifest snapshot id and a larger ``active_terms``.
+        """
+        active_index = rag_health.get("active_index_path")
+        manifest = self._catalog(self.config.language_pair).manifest
+        snapshot_id = _env_str("RASST_TERM_MEMORY_SNAPSHOT", "")
+        if not snapshot_id and manifest is not None:
+            snapshot_id = manifest.snapshot_id
+        if not snapshot_id and active_index:
+            snapshot_id = Path(str(active_index)).stem
+        status = {
+            "enabled": bool(getattr(self.retrieval, "enabled", False)),
+            "backend": rag_health.get("backend") or _env_str("RASST_RETRIEVAL_BACKEND", "maxsim"),
+            "default_preset": DEFAULT_GLOSSARY_PRESET,
+            "auto_glossary_enabled": self.config.auto_glossary_enabled,
+            "router_mode": self.config.router_mode,
+            "auto_default_preset": self.config.auto_glossary_default_preset,
+            "auto_fallback_preset": self.config.auto_glossary_fallback_preset,
+            "open_presets": self._catalog(self.config.language_pair).open_preset_ids(),
+            "snapshot_id": snapshot_id,
+            "manifest": (manifest.path if manifest is not None else _env_str("RASST_TERM_MEMORY_MANIFEST", "")),
+            "active_index_path": active_index,
+            "active_terms": rag_health.get("active_terms"),
+            "sessions": {
+                sid: {
+                    "active_domain": sess.active_domain,
+                    "confidence": round(sess.topic_confidence, 4),
+                    "active_glossary_preset": sess.active_glossary_preset,
+                    "switch_count": sess.glossary_switch_count,
+                    "router": sess.last_router_decision,
+                }
+                for sid, sess in list(self.sessions.items())[:16]
+            },
+        }
+        status.update(self._retrieve_latency_ms())
+        return status
 
     def _batch_metric_summary(self) -> Dict[str, Any]:
         metrics = list(self.recent_batch_metrics)
@@ -951,10 +1718,13 @@ class OmniAgent(Agent):
             "active_sessions": len(self.sessions),
             "mock_mode": self.config.mock,
             "rag": rag_health,
+            "term_memory": self._term_memory_status(rag_health),
             "backend_health": backend_health,
             "scheduler_batch_size": self.config.scheduler_batch_size,
             "batch_timeout": self.config.batch_timeout,
             "coalesce_sec": self.config.coalesce_sec,
+            "base_segment_sec": self.config.base_segment_sec,
+            "default_latency_multiplier": self.config.default_latency_multiplier,
             "segment_sec": self.config.segment_sec,
             "batch_metrics": self._batch_metric_summary(),
         }

@@ -17,6 +17,7 @@ Control endpoints are thin shims that forward an opaque message to the agent via
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import subprocess
@@ -47,6 +48,24 @@ def _to_wire(event: TranslationEvent) -> str:
     # status/partial/final are all sent as plain text; the agent is responsible
     # for any prefix (e.g. "INITIALIZING:") it wants the client to see.
     return event.text or ""
+
+
+def _to_wire_json(event: TranslationEvent) -> Dict[str, Any]:
+    """Structured form of an event for ``?event_format=json`` clients.
+
+    Backward compatible: a client only sees this when it opts in via the query
+    param. ``meta`` is forwarded verbatim (retrieved terms, retrieval/generation
+    latency, term-memory snapshot, ...) so richer UIs can render evidence
+    without the framework interpreting any of it.
+    """
+
+    text = event.text or ""
+    if event.type == EVENT_ERROR and not text:
+        text = (event.meta or {}).get("error", "unknown error")
+    payload: Dict[str, Any] = {"type": event.type, "text": text}
+    if event.meta:
+        payload["meta"] = event.meta
+    return payload
 
 
 async def _read_init_payload(request: Request) -> Dict[str, Any]:
@@ -224,7 +243,22 @@ def create_app(router: AgentRouter) -> FastAPI:
         if record is None:
             await websocket.close(code=4000, reason="Invalid session ID")
             return
-        await websocket.send_text("READY: framework ready")
+
+        # Opt-in structured protocol. Default ("plain") keeps the original
+        # text-only wire so existing web/Electron clients work unchanged.
+        json_mode = websocket.query_params.get("event_format", "plain").lower() == "json"
+
+        def serialize(event: TranslationEvent) -> str:
+            if json_mode:
+                return json.dumps(_to_wire_json(event), ensure_ascii=False)
+            return _to_wire(event)
+
+        async def send_status(text: str) -> None:
+            await websocket.send_text(
+                serialize(TranslationEvent(session_id=session_id, type=EVENT_STATUS, text=text))
+            )
+
+        await send_status("READY: framework ready")
 
         import asyncio
 
@@ -237,7 +271,7 @@ def create_app(router: AgentRouter) -> FastAPI:
                 if websocket.client_state.name != "CONNECTED":
                     break
                 try:
-                    await websocket.send_text(_to_wire(event))
+                    await websocket.send_text(serialize(event))
                 except Exception:  # noqa: BLE001
                     break
 
@@ -265,7 +299,7 @@ def create_app(router: AgentRouter) -> FastAPI:
                         except KeyError:
                             pass
                         if websocket.client_state.name == "CONNECTED":
-                            await websocket.send_text("PROCESSING_COMPLETE: File processing finished")
+                            await send_status("PROCESSING_COMPLETE: File processing finished")
                     elif text.startswith("LATENCY:"):
                         value = text.split(":", 1)[1].strip()
                         try:

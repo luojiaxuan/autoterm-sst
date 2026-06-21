@@ -179,6 +179,40 @@
             justify-content: flex-end;
         }
 
+        .adaptive-status {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .adaptive-cell {
+            min-width: 0;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 8px 10px;
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .adaptive-cell span {
+            display: block;
+            color: rgba(255, 255, 255, 0.52);
+            font-size: 0.68rem;
+            line-height: 1.1;
+            margin-bottom: 4px;
+        }
+
+        .adaptive-cell strong {
+            display: block;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 0.82rem;
+            font-weight: 600;
+        }
+
         .glossary-textarea {
             min-height: 116px;
             resize: vertical;
@@ -673,6 +707,76 @@
             background: rgba(255, 255, 255, 0.5);
         }
 
+        /* Retrieval evidence panel */
+        .evidence-panel {
+            margin-top: 14px;
+            padding: 12px 14px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+        }
+
+        .evidence-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-size: 0.78rem;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .term-memory-status {
+            text-transform: none;
+            letter-spacing: 0;
+            font-size: 0.72rem;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .evidence-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            max-height: 160px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.1);
+        }
+
+        .evidence-empty {
+            font-size: 0.82rem;
+            color: rgba(255, 255, 255, 0.4);
+            padding: 4px 0;
+        }
+
+        .evidence-row {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr auto auto;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 8px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.03);
+            font-size: 0.85rem;
+        }
+
+        .evidence-row .ev-term { color: #cfe3ff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .evidence-row .ev-arrow { color: rgba(255, 255, 255, 0.4); }
+        .evidence-row .ev-tr { color: #ffffff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .evidence-row .ev-score { color: rgba(255, 255, 255, 0.6); font-variant-numeric: tabular-nums; }
+        .evidence-row .ev-source {
+            font-size: 0.68rem;
+            padding: 1px 6px;
+            border-radius: 6px;
+            background: rgba(120, 170, 255, 0.18);
+            color: #b9d3ff;
+            white-space: nowrap;
+        }
+        .evidence-row.used { background: rgba(120, 220, 150, 0.12); }
+        .evidence-row.used .ev-source { background: rgba(120, 220, 150, 0.22); color: #bdebca; }
+
         .volume-indicator {
             margin-top: 15px;
             height: 8px;
@@ -723,6 +827,10 @@
 
             .glossary-grid {
                 grid-template-columns: 1fr;
+            }
+
+            .adaptive-status {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
 
             .glossary-header {
@@ -888,15 +996,15 @@
                 </div>
             </div>
 
-            <!-- Imported Glossary -->
+            <!-- Terminology Memory -->
             <div class="glossary-section">
                 <div class="glossary-header">
-                    <h2>Imported Glossary</h2>
+                    <h2>Terminology Memory</h2>
                     <div id="glossaryMeta" class="glossary-meta">Preset: None · Manual: 0 · Pending</div>
                 </div>
                 <div class="glossary-grid">
                     <div class="control-group">
-                        <label>Preset</label>
+                        <label>Preset (terminology source)</label>
                         <select id="glossaryPreset">
                             <option value="none" selected>None</option>
                             <option value="acl_tagged_raw">ACL tagged glossary raw</option>
@@ -908,12 +1016,21 @@
                         </select>
                     </div>
                     <div class="control-group">
-                        <label>Manual Terms</label>
-                        <textarea id="glossaryText" class="glossary-textarea" spellcheck="false" placeholder="term=translation&#10;large language model=大语言模型"></textarea>
+                        <label>Manual Terms (optional override)</label>
+                        <textarea id="glossaryText" class="glossary-textarea" spellcheck="false" placeholder="optional — manual terms override retrieved ones&#10;term=translation&#10;large language model=大语言模型"></textarea>
                     </div>
                     <div class="glossary-actions">
                         <button id="buildGlossary" class="btn" type="button">Confirm / Build</button>
                     </div>
+                </div>
+                <div id="adaptiveStatus" class="adaptive-status">
+                    <div class="adaptive-cell"><span>Mode</span><strong id="adaptiveMode">Manual</strong></div>
+                    <div class="adaptive-cell"><span>Auto Topic</span><strong id="adaptiveTopic">General</strong></div>
+                    <div class="adaptive-cell"><span>Confidence</span><strong id="adaptiveConfidence">0.00</strong></div>
+                    <div class="adaptive-cell"><span>Active Glossary</span><strong id="adaptiveGlossary">none</strong></div>
+                    <div class="adaptive-cell"><span>Active Terms</span><strong id="adaptiveTerms">0</strong></div>
+                    <div class="adaptive-cell"><span>Switch Count</span><strong id="adaptiveSwitches">0</strong></div>
+                    <div class="adaptive-cell"><span>Router</span><strong id="adaptiveRouter">embedding_refs</strong></div>
                 </div>
             </div>
 
@@ -1004,6 +1121,15 @@
         </div>
         <div class="translation-content" id="translationContent">
             <div id="translationOutput" class="translation-output"></div>
+            <div id="evidencePanel" class="evidence-panel">
+                <div class="evidence-header">
+                    <span>Retrieved Terms</span>
+                    <span id="termMemoryStatus" class="term-memory-status">memory: —</span>
+                </div>
+                <div id="evidenceList" class="evidence-list">
+                    <div class="evidence-empty">No terms retrieved yet.</div>
+                </div>
+            </div>
         </div>
         <div class="resize-handle" id="resizeHandle"></div>
     </div>
@@ -1059,6 +1185,13 @@
         const glossaryText = document.getElementById('glossaryText');
         const glossaryMeta = document.getElementById('glossaryMeta');
         const buildGlossary = document.getElementById('buildGlossary');
+        const adaptiveMode = document.getElementById('adaptiveMode');
+        const adaptiveTopic = document.getElementById('adaptiveTopic');
+        const adaptiveConfidence = document.getElementById('adaptiveConfidence');
+        const adaptiveGlossary = document.getElementById('adaptiveGlossary');
+        const adaptiveTerms = document.getElementById('adaptiveTerms');
+        const adaptiveSwitches = document.getElementById('adaptiveSwitches');
+        const adaptiveRouter = document.getElementById('adaptiveRouter');
         const loadModel = document.getElementById('loadModel');
         const updateLatency = document.getElementById('updateLatency');
         const audioFile = document.getElementById('audioFile');
@@ -1066,6 +1199,8 @@
         const playBtn = document.getElementById('playBtn');
         const resetTranslation = document.getElementById('resetTranslation');
         const translationOutput = document.getElementById('translationOutput');
+        const evidenceList = document.getElementById('evidenceList');
+        const termMemoryStatus = document.getElementById('termMemoryStatus');
         const statusIndicator = document.getElementById('statusIndicator');
         const statusText = document.getElementById('statusText');
         const loadingSpinner = document.getElementById('loadingSpinner');
@@ -1104,6 +1239,77 @@
             indexPath: '',
             confirmedAt: 0
         };
+        let adaptiveInfo = {
+            activeDomain: 'general',
+            confidence: 0,
+            activeGlossaryPreset: 'none',
+            activeTerms: 0,
+            switchCount: 0,
+            router: 'embedding_refs',
+            updatedAt: 0
+        };
+
+        function termsFromPreset(preset) {
+            const text = String(preset || '').toLowerCase();
+            if (text.includes('1m')) return 1000000;
+            if (text.includes('500k')) return 500000;
+            if (text.includes('100k')) return 100000;
+            if (text.includes('10k')) return 10000;
+            if (text.includes('1k')) return 1000;
+            return 0;
+        }
+
+        function displayPresetMode(preset) {
+            if (preset === 'auto_working') return 'Auto Working';
+            if (!preset || preset === 'none') return 'None';
+            return 'Manual Preset';
+        }
+
+        function refreshAdaptiveStatus() {
+            const selectedPreset = glossaryPreset ? glossaryPreset.value : confirmedGlossary.preset;
+            if (adaptiveMode) adaptiveMode.textContent = displayPresetMode(selectedPreset);
+            if (adaptiveTopic) adaptiveTopic.textContent = adaptiveInfo.activeDomain || 'general';
+            if (adaptiveConfidence) adaptiveConfidence.textContent = Number(adaptiveInfo.confidence || 0).toFixed(2);
+            if (adaptiveGlossary) adaptiveGlossary.textContent = adaptiveInfo.activeGlossaryPreset || selectedPreset || 'none';
+            const terms = adaptiveInfo.activeTerms || confirmedGlossary.presetTerms || termsFromPreset(adaptiveInfo.activeGlossaryPreset);
+            if (adaptiveTerms) adaptiveTerms.textContent = Number(terms || 0).toLocaleString();
+            if (adaptiveSwitches) adaptiveSwitches.textContent = String(adaptiveInfo.switchCount || 0);
+            if (adaptiveRouter) adaptiveRouter.textContent = adaptiveInfo.router || 'embedding_refs';
+        }
+
+        function applyAdaptiveTopic(topic, extra) {
+            if (!topic) return;
+            adaptiveInfo = {
+                activeDomain: topic.active_domain || topic.activeDomain || adaptiveInfo.activeDomain,
+                confidence: Number(topic.confidence != null ? topic.confidence : adaptiveInfo.confidence) || 0,
+                activeGlossaryPreset: topic.active_glossary_preset || topic.activeGlossaryPreset || adaptiveInfo.activeGlossaryPreset,
+                activeTerms: Number((extra && extra.active_terms) || adaptiveInfo.activeTerms || 0),
+                switchCount: Number(topic.switch_count != null ? topic.switch_count : adaptiveInfo.switchCount) || 0,
+                router: adaptiveInfo.router,
+                updatedAt: Date.now()
+            };
+            if (!adaptiveInfo.activeTerms) {
+                adaptiveInfo.activeTerms = termsFromPreset(adaptiveInfo.activeGlossaryPreset);
+            }
+            refreshAdaptiveStatus();
+        }
+
+        function applyTopicRouter(routerMeta, extra) {
+            if (!routerMeta) return;
+            adaptiveInfo = {
+                activeDomain: routerMeta.to_domain || routerMeta.target_domain_id || adaptiveInfo.activeDomain,
+                confidence: Number(routerMeta.confidence != null ? routerMeta.confidence : adaptiveInfo.confidence) || 0,
+                activeGlossaryPreset: routerMeta.to_preset || routerMeta.target_preset_id || adaptiveInfo.activeGlossaryPreset,
+                activeTerms: Number((extra && extra.active_terms) || adaptiveInfo.activeTerms || 0),
+                switchCount: adaptiveInfo.switchCount,
+                router: routerMeta.action ? `${routerMeta.action}: ${routerMeta.reason || ''}` : (routerMeta.reason || 'embedding_refs'),
+                updatedAt: Date.now()
+            };
+            if (!adaptiveInfo.activeTerms) {
+                adaptiveInfo.activeTerms = termsFromPreset(adaptiveInfo.activeGlossaryPreset);
+            }
+            refreshAdaptiveStatus();
+        }
 
         function isGlossaryConfirmed() {
             const preset = glossaryPreset ? glossaryPreset.value : serverDefaultGlossaryPreset;
@@ -1118,11 +1324,14 @@
             const manualCount = countManualGlossaryTerms(glossaryText ? glossaryText.value : '');
             const state = isGlossaryConfirmed() ? 'Ready' : 'Pending';
             glossaryMeta.textContent = `Preset: ${presetLabel} · Manual: ${manualCount} · ${state}`;
+            refreshAdaptiveStatus();
         }
 
         function populateGlossaryPresets(presets) {
             if (!glossaryPreset || !Array.isArray(presets) || presets.length === 0) return;
-            const currentValue = glossaryPreset.value || serverDefaultGlossaryPreset;
+            const currentValue = confirmedGlossary.confirmedAt > 0
+                ? (glossaryPreset.value || serverDefaultGlossaryPreset)
+                : serverDefaultGlossaryPreset;
             glossaryPreset.innerHTML = '';
             presets.forEach(preset => {
                 const option = document.createElement('option');
@@ -1162,7 +1371,7 @@
                     throw new Error(data.detail || data.error || `HTTP ${response.status}`);
                 }
                 confirmedGlossary = {
-                    preset: payload.glossary_preset,
+                    preset: data.glossary_preset || payload.glossary_preset,
                     text: payload.glossary_text,
                     manualTerms: data.manual_terms || 0,
                     presetTerms: data.preset_terms || 0,
@@ -1170,6 +1379,12 @@
                     indexPath: data.index_path || '',
                     confirmedAt: Date.now()
                 };
+                applyAdaptiveTopic(data.topic || {
+                    active_domain: data.active_domain || 'general',
+                    active_glossary_preset: data.active_glossary_preset || data.glossary_preset || payload.glossary_preset,
+                    confidence: 0,
+                    switch_count: 0
+                }, { active_terms: data.preset_terms || 0 });
                 updateGlossaryMeta();
                 updateStatus(`Glossary ready: ${data.preset_terms || 0} preset terms, ${data.manual_terms || 0} manual terms.`, 'ready');
                 return data;
@@ -1315,13 +1530,21 @@
             if (translationOutput) {
                 translationOutput.textContent = '';
             }
+            clearEvidencePanel();
             if (isElectron) {
                 updateElectronTranslation('');
             }
         }
 
+        // RASST marks model-used glossary terms with <t>…</t> in tagged term_map
+        // mode; strip the markers for a clean translation display (the evidence
+        // panel already shows which terms were retrieved/used).
+        function stripTermTags(text) {
+            return String(text == null ? '' : text).replace(/<\/?t>/g, '');
+        }
+
         function renderTranslationMessage(message) {
-            const text = String(message || '').trim();
+            const text = stripTermTags(message).trim();
             if (!text) {
                 console.debug('Ignored empty translation message');
                 return;
@@ -1335,6 +1558,135 @@
                 }, 10);
             }
         }
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        // Normalize a raw WS message into {text, meta, statusLine} for both the
+        // structured (event_format=json) and legacy plain-text protocols.
+        function decodeServerMessage(data) {
+            if (typeof data === 'string') {
+                const trimmed = data.trimStart();
+                if (trimmed.startsWith('{')) {
+                    try {
+                        const obj = JSON.parse(trimmed);
+                        if (obj && typeof obj === 'object' && obj.type) {
+                            if (obj.type === 'error') {
+                                return { text: '', meta: obj.meta || null, statusLine: 'ERROR: ' + (obj.text || 'unknown error') };
+                            }
+                            if (obj.type === 'status') {
+                                return { text: '', meta: obj.meta || null, statusLine: String(obj.text || '') };
+                            }
+                            return { text: String(obj.text || ''), meta: obj.meta || null, statusLine: '' };
+                        }
+                    } catch (e) {
+                        // not JSON after all — fall through to plain handling
+                    }
+                }
+                return { text: data, meta: null, statusLine: data };
+            }
+            return { text: '', meta: null, statusLine: '' };
+        }
+
+        // Latest non-empty retrieval references rendered as the evidence panel.
+        function updateEvidencePanel(meta) {
+            if (!meta) return;
+            if (meta.topic) {
+                applyAdaptiveTopic(meta.topic, meta);
+            }
+            if (meta.topic_router) {
+                applyTopicRouter(meta.topic_router, meta);
+            }
+            if (termMemoryStatus && meta.retrieve_s != null) {
+                const ms = (Number(meta.retrieve_s) * 1000).toFixed(1);
+                termMemoryStatus.dataset.retrieveMs = ms;
+                refreshTermMemoryLine();
+            }
+            if (!evidenceList) return;
+            const refs = Array.isArray(meta.references) ? meta.references : [];
+            if (refs.length === 0) return; // keep the last non-empty set; avoid flicker
+            const accumulated = translationOutput ? (translationOutput.textContent || '') : '';
+            evidenceList.innerHTML = '';
+            refs.forEach(ref => {
+                const term = ref.term || '';
+                const translation = ref.translation || '';
+                const score = (ref.score != null && !Number.isNaN(Number(ref.score)))
+                    ? Number(ref.score).toFixed(2) : '';
+                const source = ref.source || 'rag';
+                const used = translation && accumulated.indexOf(translation) !== -1;
+                const row = document.createElement('div');
+                row.className = 'evidence-row' + (used ? ' used' : '');
+                row.innerHTML =
+                    `<span class="ev-term" title="${escapeHtml(term)}">${escapeHtml(term)}</span>` +
+                    `<span class="ev-arrow">→</span>` +
+                    `<span class="ev-tr" title="${escapeHtml(translation)}">${escapeHtml(translation)}</span>` +
+                    `<span class="ev-score">${escapeHtml(score)}</span>` +
+                    `<span class="ev-source">${escapeHtml(source)}</span>`;
+                evidenceList.appendChild(row);
+            });
+        }
+
+        function clearEvidencePanel() {
+            if (evidenceList) {
+                evidenceList.innerHTML = '<div class="evidence-empty">No terms retrieved yet.</div>';
+            }
+        }
+
+        // Holds the latest /health term_memory summary for the status line.
+        let termMemoryInfo = null;
+        function refreshTermMemoryLine() {
+            if (!termMemoryStatus) return;
+            const parts = [];
+            if (!termMemoryInfo || termMemoryInfo.enabled === false) {
+                parts.push('memory: off');
+            } else {
+                const terms = termMemoryInfo.active_terms;
+                parts.push('memory: ' + (termMemoryInfo.backend || 'rag') +
+                    (terms != null ? ` · ${Number(terms).toLocaleString()} terms` : ''));
+                if (termMemoryInfo.snapshot_id) parts.push(termMemoryInfo.snapshot_id);
+            }
+            const ms = termMemoryStatus.dataset.retrieveMs;
+            if (ms != null && ms !== '') parts.push(`retrieve ${ms}ms`);
+            termMemoryStatus.textContent = parts.join(' · ');
+        }
+
+        async function refreshTermMemoryStatus() {
+            try {
+                const response = await fetch('/health', { cache: 'no-store' });
+                if (!response.ok) return;
+                const health = await response.json();
+                // /health merges agent fields to the root and keeps per-agent
+                // detail under `agent_health`; prefer the root, then scan agents.
+                let tm = health.term_memory;
+                if (!tm && health.agent_health && typeof health.agent_health === 'object') {
+                    for (const key of Object.keys(health.agent_health)) {
+                        const ah = health.agent_health[key];
+                        if (ah && ah.term_memory) { tm = ah.term_memory; break; }
+                    }
+                }
+                termMemoryInfo = tm || null;
+                if (tm && tm.sessions && sessionId && tm.sessions[sessionId]) {
+                    applyAdaptiveTopic({
+                        active_domain: tm.sessions[sessionId].active_domain,
+                        confidence: tm.sessions[sessionId].confidence,
+                        active_glossary_preset: tm.sessions[sessionId].active_glossary_preset,
+                        switch_count: tm.sessions[sessionId].switch_count
+                    }, { active_terms: tm.active_terms });
+                } else if (tm && tm.active_terms) {
+                    adaptiveInfo.activeTerms = Number(tm.active_terms) || adaptiveInfo.activeTerms;
+                    refreshAdaptiveStatus();
+                }
+                refreshTermMemoryLine();
+            } catch (e) {
+                // health endpoint optional; leave the status line as-is
+            }
+        }
+
         window.shouldSendMicrophoneChunk = shouldSendMicrophoneChunk;
         window.sendAudioChunk = sendAudioChunk;
 
@@ -2062,16 +2414,19 @@
         }
 
         // 获取WebSocket URL的辅助函数
+        // event_format=json opts into the structured wire protocol so the client
+        // receives retrieval evidence/latency in `meta`. The server stays
+        // backward compatible (plain text) when the param is absent.
         function getWebSocketUrl(sessionId) {
             if (isElectron && serverConfig) {
                 // 在Electron环境中，使用服务器配置构造WebSocket URL
                 const wsProtocol = serverConfig.protocol === 'https' ? 'wss' : 'ws';
                 const port = serverConfig.port ? `:${serverConfig.port}` : '';
-                return `${wsProtocol}://${serverConfig.host}${port}/wss/${sessionId}`;
+                return `${wsProtocol}://${serverConfig.host}${port}/wss/${sessionId}?event_format=json`;
             } else {
                 // 在浏览器环境中，使用当前页面的协议和主机
                 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                return `${protocol}//${window.location.host}/wss/${sessionId}`;
+                return `${protocol}//${window.location.host}/wss/${sessionId}?event_format=json`;
             }
         }
 
@@ -2394,25 +2749,27 @@
                 ws = new WebSocket(wsUrl);
                 
                 ws.onmessage = (event) => {
-                    const message = event.data;
-                    console.log(`websocket message: ${message}`);
-                    
-                    if (typeof message === 'string' && message.startsWith('INITIALIZING:')) {
-                        updateStatus(message.substring('INITIALIZING:'.length).trim(), 'processing');
+                    const evt = decodeServerMessage(event.data);
+                    const statusLine = evt.statusLine;
+                    console.log(`websocket message: ${event.data}`);
+
+                    if (statusLine.startsWith('INITIALIZING:')) {
+                        updateStatus(statusLine.substring('INITIALIZING:'.length).trim(), 'processing');
                         return;
-                    } else if (typeof message === 'string' && message.startsWith('READY:')) {
+                    } else if (statusLine.startsWith('READY:')) {
                         updateStatus('Model is ready. Processing audio...', 'processing');
                         return;
-                    } else if (typeof message === 'string' && message.startsWith('ERROR:')) {
-                        updateStatus(message, 'error');
+                    } else if (statusLine.startsWith('ERROR:')) {
+                        updateStatus(statusLine, 'error');
                         return;
                     }
-                    
+
                     if (!translationPaused) {
-                        renderTranslationMessage(message);
+                        renderTranslationMessage(evt.text);
+                        updateEvidencePanel(evt.meta);
                     }
                 };
-                
+
                 ws.onerror = (error) => {
                     updateStatus('WebSocket error: ' + error, 'error');
                 };
@@ -3065,6 +3422,12 @@
                         indexPath: data.index_path || '',
                         confirmedAt: Date.now()
                     };
+                    applyAdaptiveTopic(data.topic || {
+                        active_domain: data.active_domain || 'general',
+                        active_glossary_preset: data.active_glossary_preset || data.glossary_preset || initPayload.glossary_preset,
+                        confidence: 0,
+                        switch_count: 0
+                    }, { active_terms: data.preset_terms || 0 });
                     updateGlossaryMeta();
                 }
                 
@@ -3296,22 +3659,24 @@
                 ws = new WebSocket(wsUrl);
                 
                 ws.onmessage = (event) => {
-                    const message = event.data;
-                    console.log('WebSocket message received:', message);
+                    const evt = decodeServerMessage(event.data);
+                    const statusLine = evt.statusLine;
+                    console.log('WebSocket message received:', event.data);
 
                     // 处理控制消息
-                    if (typeof message === 'string' && message.startsWith('INITIALIZING:')) {
-                        updateStatus(message.substring('INITIALIZING:'.length).trim(), 'processing');
+                    if (statusLine.startsWith('INITIALIZING:')) {
+                        updateStatus(statusLine.substring('INITIALIZING:'.length).trim(), 'processing');
                         return;
-                    } else if (typeof message === 'string' && message.startsWith('READY:')) {
+                    } else if (statusLine.startsWith('READY:')) {
                         updateStatus('Model is ready. Processing audio...', 'processing');
                         return;
-                    } else if (typeof message === 'string' && message.startsWith('ERROR:')) {
-                        updateStatus(message, 'error');
+                    } else if (statusLine.startsWith('ERROR:')) {
+                        updateStatus(statusLine, 'error');
                         return;
                     }
-                    
-                    renderTranslationMessage(message);
+
+                    renderTranslationMessage(evt.text);
+                    updateEvidencePanel(evt.meta);
                 };
                 
                 ws.onerror = (error) => {
@@ -3756,22 +4121,24 @@
                 ws = new WebSocket(wsUrl);
                 
                 ws.onmessage = (event) => {
-                    const message = event.data;
-                    console.log('WebSocket message received:', message);
+                    const evt = decodeServerMessage(event.data);
+                    const statusLine = evt.statusLine;
+                    console.log('WebSocket message received:', event.data);
 
                     // 处理控制消息
-                    if (typeof message === 'string' && message.startsWith('INITIALIZING:')) {
-                        updateStatus(message.substring('INITIALIZING:'.length).trim(), 'processing');
+                    if (statusLine.startsWith('INITIALIZING:')) {
+                        updateStatus(statusLine.substring('INITIALIZING:'.length).trim(), 'processing');
                         return;
-                    } else if (typeof message === 'string' && message.startsWith('READY:')) {
+                    } else if (statusLine.startsWith('READY:')) {
                         updateStatus('Model is ready. Processing system audio...', 'processing');
                         return;
-                    } else if (typeof message === 'string' && message.startsWith('ERROR:')) {
-                        updateStatus(message, 'error');
+                    } else if (statusLine.startsWith('ERROR:')) {
+                        updateStatus(statusLine, 'error');
                         return;
                     }
-                    
-                    renderTranslationMessage(message);
+
+                    renderTranslationMessage(evt.text);
+                    updateEvidencePanel(evt.meta);
                 };
                 
                 ws.onerror = (error) => {
@@ -4276,7 +4643,8 @@
                 
                 ensureClientId();
                 loadServerConfig();
-                
+                refreshTermMemoryStatus();
+
                 // 只在非Electron环境下初始化面板拖拽
                 if (!isElectron) {
                     initializePanelDragging();

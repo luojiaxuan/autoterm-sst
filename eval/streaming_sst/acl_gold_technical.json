@@ -1,0 +1,854 @@
+[
+ {
+  "en": "AI",
+  "zh": [
+   "AI"
+  ]
+ },
+ {
+  "en": "algorithm",
+  "zh": [
+   "算法"
+  ]
+ },
+ {
+  "en": "algorithms",
+  "zh": [
+   "算法"
+  ]
+ },
+ {
+  "en": "AmbigQA",
+  "zh": [
+   "AmbigQA"
+  ]
+ },
+ {
+  "en": "annotated",
+  "zh": [
+   "注释"
+  ]
+ },
+ {
+  "en": "Annotated Corpus",
+  "zh": [
+   "注释语料库"
+  ]
+ },
+ {
+  "en": "annotation",
+  "zh": [
+   "注释"
+  ]
+ },
+ {
+  "en": "annotations",
+  "zh": [
+   "注释"
+  ]
+ },
+ {
+  "en": "AQA",
+  "zh": [
+   "AQA"
+  ]
+ },
+ {
+  "en": "assessing",
+  "zh": [
+   "评估"
+  ]
+ },
+ {
+  "en": "attention",
+  "zh": [
+   "注意力"
+  ]
+ },
+ {
+  "en": "augmentation",
+  "zh": [
+   "增强"
+  ]
+ },
+ {
+  "en": "augmented",
+  "zh": [
+   "增强型"
+  ]
+ },
+ {
+  "en": "automatic",
+  "zh": [
+   "自动"
+  ]
+ },
+ {
+  "en": "BART",
+  "zh": [
+   "BART"
+  ]
+ },
+ {
+  "en": "baselines",
+  "zh": [
+   "基线"
+  ]
+ },
+ {
+  "en": "BERT",
+  "zh": [
+   "BERT"
+  ]
+ },
+ {
+  "en": "BERT model",
+  "zh": [
+   "BERT模型"
+  ]
+ },
+ {
+  "en": "BETO",
+  "zh": [
+   "BETO"
+  ]
+ },
+ {
+  "en": "bidirectional",
+  "zh": [
+   "双向"
+  ]
+ },
+ {
+  "en": "BiLSTM-CRF",
+  "zh": [
+   "BiLSTM-CRF"
+  ]
+ },
+ {
+  "en": "BIO",
+  "zh": [
+   "BIO"
+  ]
+ },
+ {
+  "en": "BLEU",
+  "zh": [
+   "BLEU"
+  ]
+ },
+ {
+  "en": "BLEU score",
+  "zh": [
+   "BLEU分数"
+  ]
+ },
+ {
+  "en": "BPE",
+  "zh": [
+   "BPE"
+  ]
+ },
+ {
+  "en": "byte pair encoding",
+  "zh": [
+   "字节对编码"
+  ]
+ },
+ {
+  "en": "CDA",
+  "zh": [
+   "CDA"
+  ]
+ },
+ {
+  "en": "classification",
+  "zh": [
+   "分类"
+  ]
+ },
+ {
+  "en": "compositionality",
+  "zh": [
+   "组合性"
+  ]
+ },
+ {
+  "en": "computation",
+  "zh": [
+   "计算"
+  ]
+ },
+ {
+  "en": "computational",
+  "zh": [
+   "计算"
+  ]
+ },
+ {
+  "en": "CONLL",
+  "zh": [
+   "CONLL"
+  ]
+ },
+ {
+  "en": "contextualized",
+  "zh": [
+   "情境化"
+  ]
+ },
+ {
+  "en": "conversational",
+  "zh": [
+   "会话式"
+  ]
+ },
+ {
+  "en": "correlations",
+  "zh": [
+   "相关性"
+  ]
+ },
+ {
+  "en": "corresponding",
+  "zh": [
+   "对应"
+  ]
+ },
+ {
+  "en": "counterfactual",
+  "zh": [
+   "反事实"
+  ]
+ },
+ {
+  "en": "CRF",
+  "zh": [
+   "CRF"
+  ]
+ },
+ {
+  "en": "data augmentation",
+  "zh": [
+   "数据增强"
+  ]
+ },
+ {
+  "en": "dependencies",
+  "zh": [
+   "依赖关系"
+  ]
+ },
+ {
+  "en": "dependency",
+  "zh": [
+   "依赖关系"
+  ]
+ },
+ {
+  "en": "Detecting",
+  "zh": [
+   "检测"
+  ]
+ },
+ {
+  "en": "detection",
+  "zh": [
+   "检测"
+  ]
+ },
+ {
+  "en": "downstream",
+  "zh": [
+   "下游"
+  ]
+ },
+ {
+  "en": "embedding",
+  "zh": [
+   "嵌入"
+  ]
+ },
+ {
+  "en": "embeddings",
+  "zh": [
+   "嵌入"
+  ]
+ },
+ {
+  "en": "evaluation",
+  "zh": [
+   "评估"
+  ]
+ },
+ {
+  "en": "extracting",
+  "zh": [
+   "提取"
+  ]
+ },
+ {
+  "en": "finetuning",
+  "zh": [
+   "微调"
+  ]
+ },
+ {
+  "en": "FLR",
+  "zh": [
+   "FLR"
+  ]
+ },
+ {
+  "en": "generalization",
+  "zh": [
+   "泛化"
+  ]
+ },
+ {
+  "en": "generalize",
+  "zh": [
+   "概括"
+  ]
+ },
+ {
+  "en": "generated",
+  "zh": [
+   "生成"
+  ]
+ },
+ {
+  "en": "generating",
+  "zh": [
+   "生成"
+  ]
+ },
+ {
+  "en": "generation",
+  "zh": [
+   "生成"
+  ]
+ },
+ {
+  "en": "GLUE",
+  "zh": [
+   "GLUE"
+  ]
+ },
+ {
+  "en": "heuristic",
+  "zh": [
+   "启发式"
+  ]
+ },
+ {
+  "en": "ICLR",
+  "zh": [
+   "ICLR"
+  ]
+ },
+ {
+  "en": "inference",
+  "zh": [
+   "推理"
+  ]
+ },
+ {
+  "en": "information",
+  "zh": [
+   "信息"
+  ]
+ },
+ {
+  "en": "KinyaBERT",
+  "zh": [
+   "KinyaBERT"
+  ]
+ },
+ {
+  "en": "knowledge",
+  "zh": [
+   "知识"
+  ]
+ },
+ {
+  "en": "language identification",
+  "zh": [
+   "语言识别"
+  ]
+ },
+ {
+  "en": "Language Model",
+  "zh": [
+   "语言模型"
+  ]
+ },
+ {
+  "en": "language models",
+  "zh": [
+   "语言模型"
+  ]
+ },
+ {
+  "en": "languages",
+  "zh": [
+   "语言"
+  ]
+ },
+ {
+  "en": "LinCE",
+  "zh": [
+   "LinCE"
+  ]
+ },
+ {
+  "en": "linguistic",
+  "zh": [
+   "语言学"
+  ]
+ },
+ {
+  "en": "linguistics",
+  "zh": [
+   "语言学"
+  ]
+ },
+ {
+  "en": "low resource",
+  "zh": [
+   "低资源"
+  ]
+ },
+ {
+  "en": "machine learning",
+  "zh": [
+   "machine learning"
+  ]
+ },
+ {
+  "en": "machine translation",
+  "zh": [
+   "机器翻译"
+  ]
+ },
+ {
+  "en": "masked language model",
+  "zh": [
+   "掩码语言模型"
+  ]
+ },
+ {
+  "en": "monolingual",
+  "zh": [
+   "单语"
+  ]
+ },
+ {
+  "en": "morphemes",
+  "zh": [
+   "语素"
+  ]
+ },
+ {
+  "en": "morphological",
+  "zh": [
+   "形态化"
+  ]
+ },
+ {
+  "en": "morphological analysis",
+  "zh": [
+   "形态分析"
+  ]
+ },
+ {
+  "en": "morphological analyzer",
+  "zh": [
+   "形态化分析器"
+  ]
+ },
+ {
+  "en": "morphologically",
+  "zh": [
+   "形态上"
+  ]
+ },
+ {
+  "en": "Morphology",
+  "zh": [
+   "形态学"
+  ]
+ },
+ {
+  "en": "multilingual",
+  "zh": [
+   "多语言"
+  ]
+ },
+ {
+  "en": "multilingual BERT",
+  "zh": [
+   "多语言BERT"
+  ]
+ },
+ {
+  "en": "named entity recognition",
+  "zh": [
+   "命名实体识别"
+  ]
+ },
+ {
+  "en": "natural language processing",
+  "zh": [
+   "自然语言处理"
+  ]
+ },
+ {
+  "en": "NLP",
+  "zh": [
+   "自然语言处理"
+  ]
+ },
+ {
+  "en": "NLP task",
+  "zh": [
+   "自然语言处理任务"
+  ]
+ },
+ {
+  "en": "OOV",
+  "zh": [
+   "OOV"
+  ]
+ },
+ {
+  "en": "parameter",
+  "zh": [
+   "参数"
+  ]
+ },
+ {
+  "en": "positional encoding",
+  "zh": [
+   "位置编码"
+  ]
+ },
+ {
+  "en": "pre-training",
+  "zh": [
+   "预训练"
+  ]
+ },
+ {
+  "en": "predicate",
+  "zh": [
+   "谓词"
+  ]
+ },
+ {
+  "en": "predicates",
+  "zh": [
+   "谓词"
+  ]
+ },
+ {
+  "en": "prediction",
+  "zh": [
+   "预测"
+  ]
+ },
+ {
+  "en": "pretrained",
+  "zh": [
+   "预训练"
+  ]
+ },
+ {
+  "en": "pretrained language",
+  "zh": [
+   "预训练语言"
+  ]
+ },
+ {
+  "en": "pretraining",
+  "zh": [
+   "预训练"
+  ]
+ },
+ {
+  "en": "PubMed",
+  "zh": [
+   "PubMed"
+  ]
+ },
+ {
+  "en": "QA",
+  "zh": [
+   "问答"
+  ]
+ },
+ {
+  "en": "QED",
+  "zh": [
+   "QED"
+  ]
+ },
+ {
+  "en": "qualitative",
+  "zh": [
+   "定性"
+  ]
+ },
+ {
+  "en": "question answering",
+  "zh": [
+   "问题回答"
+  ]
+ },
+ {
+  "en": "question generation",
+  "zh": [
+   "问题生成"
+  ]
+ },
+ {
+  "en": "questions",
+  "zh": [
+   "问题"
+  ]
+ },
+ {
+  "en": "QUOREF",
+  "zh": [
+   "QUOREF"
+  ]
+ },
+ {
+  "en": "reading comprehension",
+  "zh": [
+   "阅读理解"
+  ]
+ },
+ {
+  "en": "REALM",
+  "zh": [
+   "REALM"
+  ]
+ },
+ {
+  "en": "reasoning",
+  "zh": [
+   "推理"
+  ]
+ },
+ {
+  "en": "regression",
+  "zh": [
+   "回归"
+  ]
+ },
+ {
+  "en": "relations",
+  "zh": [
+   "关系"
+  ]
+ },
+ {
+  "en": "Representation",
+  "zh": [
+   "表示"
+  ]
+ },
+ {
+  "en": "representations",
+  "zh": [
+   "表示"
+  ]
+ },
+ {
+  "en": "resources",
+  "zh": [
+   "资源"
+  ]
+ },
+ {
+  "en": "retrieval",
+  "zh": [
+   "检索"
+  ]
+ },
+ {
+  "en": "retrieved",
+  "zh": [
+   "检索"
+  ]
+ },
+ {
+  "en": "RGF",
+  "zh": [
+   "RGF"
+  ]
+ },
+ {
+  "en": "robustness",
+  "zh": [
+   "鲁棒性"
+  ]
+ },
+ {
+  "en": "Semantic Parsing",
+  "zh": [
+   "语义解析"
+  ]
+ },
+ {
+  "en": "semantic role labeling",
+  "zh": [
+   "语义角色标签"
+  ]
+ },
+ {
+  "en": "semantically",
+  "zh": [
+   "语义上"
+  ]
+ },
+ {
+  "en": "sentiment",
+  "zh": [
+   "情绪"
+  ]
+ },
+ {
+  "en": "sequences",
+  "zh": [
+   "序列"
+  ]
+ },
+ {
+  "en": "similarity",
+  "zh": [
+   "相似性"
+  ]
+ },
+ {
+  "en": "SMCalFlow",
+  "zh": [
+   "SMCalFlow"
+  ]
+ },
+ {
+  "en": "structure",
+  "zh": [
+   "结构"
+  ]
+ },
+ {
+  "en": "summarization",
+  "zh": [
+   "总结"
+  ]
+ },
+ {
+  "en": "syntactic",
+  "zh": [
+   "句法"
+  ]
+ },
+ {
+  "en": "text classification",
+  "zh": [
+   "文本分类"
+  ]
+ },
+ {
+  "en": "training data",
+  "zh": [
+   "训练数据"
+  ]
+ },
+ {
+  "en": "transfer learning",
+  "zh": [
+   "迁移学习"
+  ]
+ },
+ {
+  "en": "transformer",
+  "zh": [
+   "转换器"
+  ]
+ },
+ {
+  "en": "transformer encoder",
+  "zh": [
+   "转换器编码器"
+  ]
+ },
+ {
+  "en": "transformers",
+  "zh": [
+   "转换器"
+  ]
+ },
+ {
+  "en": "translation",
+  "zh": [
+   "翻译"
+  ]
+ },
+ {
+  "en": "translations",
+  "zh": [
+   "翻译"
+  ]
+ },
+ {
+  "en": "TreeDST",
+  "zh": [
+   "TreeDST"
+  ]
+ },
+ {
+  "en": "unsupervised",
+  "zh": [
+   "无监督"
+  ]
+ },
+ {
+  "en": "utterance",
+  "zh": [
+   "话语"
+  ]
+ },
+ {
+  "en": "utterances",
+  "zh": [
+   "话语"
+  ]
+ },
+ {
+  "en": "VFL",
+  "zh": [
+   "VFL"
+  ]
+ },
+ {
+  "en": "vocabulary",
+  "zh": [
+   "词汇"
+  ]
+ },
+ {
+  "en": "Wikipedia",
+  "zh": [
+   "维基百科"
+  ]
+ },
+ {
+  "en": "XLM",
+  "zh": [
+   "XLM"
+  ]
+ }
+]

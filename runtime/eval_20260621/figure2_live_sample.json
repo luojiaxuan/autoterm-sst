@@ -1,0 +1,588 @@
+{
+  "session_id": "RASST_English2Chinese_dde9c76b_17820250899672723fd",
+  "init": {
+    "session_id": "RASST_English2Chinese_dde9c76b_17820250899672723fd",
+    "queued": false,
+    "queue_position": 0,
+    "scheduler_based": false,
+    "rasst_backend": true,
+    "vllm_backend": true,
+    "sglang_backend": false,
+    "mock_mode": false,
+    "model": "RASST",
+    "glossary_preset": "auto_working",
+    "active_glossary_preset": "common_10k",
+    "active_domain": "general",
+    "glossary_path": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/glossaries/scale_aclgold_10000.json",
+    "preset_terms": 10000,
+    "manual_terms": 0,
+    "glossary_terms": 0,
+    "index_path": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/indexes/scale_aclgold_10000/en-zh/maxsim.pt",
+    "index_ready": true,
+    "auto_glossary_enabled": true,
+    "auto_glossary_reason": "initial_auto",
+    "topic": {
+      "active_domain": "general",
+      "confidence": 0.0,
+      "active_glossary_preset": "common_10k",
+      "switch_count": 0,
+      "last_reason": "initial_auto"
+    }
+  },
+  "audio_files": [
+    "/mnt/taurus/data2/jiaxuanluo/rasst_eval/acl6060_zh_smoke/seg/00000_2022.acl-long.268.wav",
+    "/mnt/taurus/data2/jiaxuanluo/rasst_eval/acl6060_zh_smoke/seg/00001_2022.acl-long.268.wav",
+    "/mnt/taurus/data2/jiaxuanluo/rasst_eval/acl6060_zh_smoke/seg/00002_2022.acl-long.268.wav",
+    "/mnt/taurus/data2/jiaxuanluo/rasst_eval/acl6060_zh_smoke/seg/00003_2022.acl-long.268.wav",
+    "/mnt/taurus/data2/jiaxuanluo/rasst_eval/acl6060_zh_smoke/seg/00004_2022.acl-long.268.wav",
+    "/mnt/taurus/data2/jiaxuanluo/rasst_eval/acl6060_zh_smoke/seg/00005_2022.acl-long.268.wav"
+  ],
+  "translation": "嗨，我是埃琳娜，我将介绍我们在西班牙语注释语料库中检测未整合借用词的工作，以及我们的建模方法。因此，我们将涵盖词汇借用的定义，我们提出的任务，我们发布的数据集，以及一些我们探索过的模型。但首先，什么是词汇借用，为什么它作为一项自然语言处理任务如此重要？词汇借用基本上是指从一种语言中借用单词并融入另一种语言。例如，在西班牙语中，我们使用来自英语的单词，这里有一些例子，比如“podcast”、“app”、“在线”、“众筹”等单词，这些都是我们有时在西班牙语中使用的英语单词。",
+  "latest_meta": {
+    "segment_idx": 21,
+    "elapsed_s": 0.76216,
+    "retrieve_s": 0.103019,
+    "cursor_samples": 651648,
+    "start_sample": 640000,
+    "references": [
+      {
+        "key": "words",
+        "term": "words",
+        "translation": "单词",
+        "score": 0.802388608455658,
+        "retrieval_mode": "timeline_batch",
+        "time_start": 38.54729461669922,
+        "time_end": 40.104942321777344,
+        "active_glossary_preset": "common_10k",
+        "active_domain": "general",
+        "domain": "general",
+        "source_preset": "common_10k",
+        "source": "auto:common_10k"
+      }
+    ],
+    "prompt_reference_count": 1,
+    "ui_reference_count": 1,
+    "topic": {
+      "active_domain": "general",
+      "confidence": 0.8728,
+      "active_glossary_preset": "common_10k",
+      "switch_count": 0,
+      "last_reason": "speech_embedding+retrieved_refs; interval<45s"
+    },
+    "topic_router": {
+      "action": "stay",
+      "from_preset": "common_10k",
+      "from_domain": "general",
+      "to_preset": "common_10k",
+      "to_domain": "general",
+      "confidence": 0.8728,
+      "margin": 0.2228,
+      "reason": "speech_embedding+retrieved_refs; interval<45s",
+      "top_domains": [
+        [
+          "general",
+          0.8728
+        ],
+        [
+          "nlp",
+          0.65
+        ],
+        [
+          "medicine",
+          0.0
+        ]
+      ],
+      "top_scores": [
+        {
+          "preset_id": "common_10k",
+          "domain_id": "general",
+          "embedding_score": 0.7274,
+          "reference_score": 1.0,
+          "confidence": 0.8728,
+          "margin": 0.2228,
+          "evidence": {
+            "term_count": 10000,
+            "has_centroid": true,
+            "raw_embedding_cos": 0.5932
+          }
+        },
+        {
+          "preset_id": "nlp_core_10k",
+          "domain_id": "nlp",
+          "embedding_score": 1.0,
+          "reference_score": 0.0,
+          "confidence": 0.65,
+          "margin": 0.0,
+          "evidence": {
+            "term_count": 10000,
+            "has_centroid": true,
+            "raw_embedding_cos": 0.6198
+          }
+        },
+        {
+          "preset_id": "medicine_core_10k",
+          "domain_id": "medicine",
+          "embedding_score": 0.0,
+          "reference_score": 0.0,
+          "confidence": 0.0,
+          "margin": 0.0,
+          "evidence": {
+            "term_count": 23713,
+            "has_centroid": true,
+            "raw_embedding_cos": 0.5221
+          }
+        }
+      ],
+      "evidence": {
+        "has_query_embedding": true,
+        "recent_reference_count": 53
+      }
+    }
+  },
+  "references": [
+    {
+      "key": "words",
+      "term": "words",
+      "translation": "单词",
+      "score": 0.802388608455658,
+      "retrieval_mode": "timeline_batch",
+      "time_start": 38.54729461669922,
+      "time_end": 40.104942321777344,
+      "active_glossary_preset": "common_10k",
+      "active_domain": "general",
+      "domain": "general",
+      "source_preset": "common_10k",
+      "source": "auto:common_10k"
+    }
+  ],
+  "all_references": [
+    {
+      "key": "ella",
+      "term": "Ella",
+      "translation": "埃拉",
+      "score": 0.8181899785995483,
+      "retrieval_mode": "timeline_batch",
+      "time_start": 1.076923131942749,
+      "time_end": 2.0,
+      "active_glossary_preset": "common_10k",
+      "active_domain": "general",
+      "domain": "general",
+      "source_preset": "common_10k",
+      "source": "auto:common_10k"
+    },
+    {
+      "key": "lianhe",
+      "term": "Lianhe",
+      "translation": "莲河社区",
+      "score": 0.7848037481307983,
+      "retrieval_mode": "timeline_batch",
+      "time_start": 0.1538461595773697,
+      "time_end": 1.3846155405044556,
+      "active_glossary_preset": "common_10k",
+      "active_domain": "general",
+      "domain": "general",
+      "source_preset": "common_10k",
+      "source": "auto:common_10k"
+    },
+    {
+      "key": "detecting",
+      "term": "Detecting",
+      "translation": "检测",
+      "score": 0.9276898503303528,
+      "retrieval_mode": "timeline_batch",
+      "time_start": 3.7709803581237793,
+      "time_end": 4.155294418334961,
+      "active_glossary_preset": "common_10k",
+      "active_domain": "general",
+      "domain": "general",
+      "source_preset": "common_10k",
+      "source": "auto:common_10k"
+    },
+    {
+      "key": "corpus",
+      "term": "corpus",
+      "translation": "语料库",
+      "score": 0.8802760243415833,
+      "retrieval_mode": "timeline_batch",
+      "time_start": 7.000783920288086,
+      "time_end": 7.615686416625977,
+      "active_glossary_preset": "common_10k",
+      "active_domain": "general",
+      "domain": "general",
+      "source_preset": "common_10k",
+      "source": "auto:common_10k"
+    },
+    {
+      "key": "annotated corpus",
+      "term": "Annotated Corpus",
+      "translation": "注释语料库",
+      "score": 0.8557764887809753,
+      "retrieval_mode": "timeline_batch",
+      "time_start": 6.8470587730407715,
+      "time_end": 7.308235168457031,
+      "active_glossary_preset": "common_10k",
+      "active_domain": "general",
+      "domain": "general",
+      "source_preset": "common_10k",
+      "source": "auto:common_10k"
+    },
+    {
+      "key": "annotated",
+      "term": "annotated",
+      "translation": "注释",
+      "score": 0.854676365852356,
+      "retrieval_mode": "timeline_batch",
+      "time_start": 6.539608001708984,
+      "time_end": 7.000783920288086,
+      "active_glossary_preset": "common_10k",
+      "active_domain": "general",
+      "domain": "general",
+      "source_preset": "common_10k",
+      "source": "auto:common_10k"
+    },
+    {
+      "key": "modeling",
+      "term": "Modeling",
+      "translation": "建模",
+      "score": 0.945650577545166,
+      "retrieval_mode": "timeline_batch",
+      "time_start": 8.539608001708984,
+      "time_end": 8.923921585083008,
+      "active_glossary_preset": "common_10k",
+      "active_domain": "general",
+      "domain": "general",
+      "source_preset": "common_10k",
+      "source": "auto:common_10k"
+    },
+    {
+      "key": "propose",
+      "term": "propose",
+      "translation": "提出",
+      "score": 0.7895633578300476,
+      "retrieval_mode": "timeline_batch",
+      "time_start": 7.002352714538574,
+      "time_end": 8.232156753540039,
+      "active_glossary_preset": "common_10k",
+      "active_domain": "general",
+      "domain": "general",
+      "source_preset": "common_10k",
+      "source": "auto:common_10k"
+    },
+    {
+      "key": "lexical",
+      "term": "lexical",
+      "translation": "词汇",
+      "score": 0.8443334698677063,
+      "retrieval_mode": "timeline_batch",
+      "time_start": 10.84705924987793,
+      "time_end": 11.38509750366211,
+      "active_glossary_preset": "common_10k",
+      "active_domain": "general",
+      "domain": "general",
+      "source_preset": "common_10k",
+      "source": "auto:common_10k"
+    },
+    {
+      "key": "task",
+      "term": "task",
+      "translation": "任务",
+      "score": 0.9701945781707764,
+      "retrieval_mode": "timeline_batch",
+      "time_start": 12.84705924987793,
+      "time_end": 13.615686416625977,
+      "active_glossary_preset": "common_10k",
+      "active_domain": "general",
+      "domain": "general",
+      "source_preset": "common_10k",
+      "source": "auto:common_10k"
+    },
+    {
+      "key": "tasks",
+      "term": "tasks",
+      "translation": "任务",
+      "score": 0.9016044735908508,
+      "retrieval_mode": "timeline_batch",
+      "time_start": 12.693333625793457,
+      "time_end": 13.461960792541504,
+      "active_glossary_preset": "common_10k",
+      "active_domain": "general",
+      "domain": "general",
+      "source_preset": "common_10k",
+      "source": "auto:common_10k"
+    },
+    {
+      "key": "dataset",
+      "term": "dataset",
+      "translation": "数据集",
+      "score": 0.9617397785186768,
+      "retrieval_mode": "timeline_batch",
+      "time_start": 14.539608001708984,
+      "time_end": 15.461960792541504,
+      "active_glossary_preset": "common_10k",
+      "active_domain": "general",
+      "domain": "general",
+      "source_preset": "common_10k",
+      "source": "auto:common_10k"
+    },
+    {
+      "key": "data",
+      "term": "data",
+      "translation": "数据",
+      "score": 0.8527868986129761,
+      "retrieval_mode": "timeline_batch",
+      "time_start": 14.84705924987793,
+      "time_end": 15.07764720916748,
+      "active_glossary_preset": "common_10k",
+      "active_domain": "general",
+      "domain": "general",
+      "source_preset": "common_10k",
+      "source": "auto:common_10k"
+    },
+    {
+      "key": "datasets",
+      "term": "datasets",
+      "translation": "数据集",
+      "score": 0.8442358374595642,
+      "retrieval_mode": "timeline_batch",
+      "time_start": 14.539608001708984,
+      "time_end": 15.461960792541504,
+      "active_glossary_preset": "common_10k",
+      "active_domain": "general",
+      "domain": "general",
+      "source_preset": "common_10k",
+      "source": "auto:common_10k"
+    },
+    {
+      "key": "models",
+      "term": "models",
+      "translation": "模型",
+      "score": 0.9363740086555481,
+      "retrieval_mode": "timeline_batch",
+      "time_start": 17.461959838867188,
+      "time_end": 17.923137664794922,
+      "active_glossary_preset": "common_10k",
+      "active_domain": "general",
+      "domain": "general",
+      "source_preset": "common_10k",
+      "source": "auto:common_10k"
+    },
+    {
+      "key": "model",
+      "term": "model",
+      "translation": "模型",
+      "score": 0.7861477136611938,
+      "retrieval_mode": "timeline_batch",
+      "time_start": 17.61725425720215,
+      "time_end": 18.539608001708984,
+      "active_glossary_preset": "common_10k",
+      "active_domain": "general",
+      "domain": "general",
+      "source_preset": "common_10k",
+      "source": "auto:common_10k"
+    },
+    {
+      "key": "nlp task",
+      "term": "NLP task",
+      "translation": "自然语言处理任务",
+      "score": 0.9340957999229431,
+      "retrieval_mode": "timeline_batch",
+      "time_start": 22.385883331298828,
+      "time_end": 23.923137664794922,
+      "active_glossary_preset": "common_10k",
+      "active_domain": "general",
+      "domain": "general",
+      "source_preset": "common_10k",
+      "source": "auto:common_10k"
+    },
+    {
+      "key": "nlp",
+      "term": "NLP",
+      "translation": "自然语言处理",
+      "score": 0.856510579586029,
+      "retrieval_mode": "timeline_batch",
+      "time_start": 22.23215675354004,
+      "time_end": 23.154510498046875,
+      "active_glossary_preset": "common_10k",
+      "active_domain": "general",
+      "domain": "general",
+      "source_preset": "common_10k",
+      "source": "auto:common_10k"
+    },
+    {
+      "key": "bao rong",
+      "term": "Bao Rong",
+      "translation": "包融",
+      "score": 0.7915128469467163,
+      "retrieval_mode": "timeline_batch",
+      "time_start": 24.69333267211914,
+      "time_end": 25.615686416625977,
+      "active_glossary_preset": "common_10k",
+      "active_domain": "general",
+      "domain": "general",
+      "source_preset": "common_10k",
+      "source": "auto:common_10k"
+    },
+    {
+      "key": "words",
+      "term": "words",
+      "translation": "单词",
+      "score": 0.9420216679573059,
+      "retrieval_mode": "timeline_batch",
+      "time_start": 27.154510498046875,
+      "time_end": 27.5388240814209,
+      "active_glossary_preset": "common_10k",
+      "active_domain": "general",
+      "domain": "general",
+      "source_preset": "common_10k",
+      "source": "auto:common_10k"
+    },
+    {
+      "key": "word",
+      "term": "word",
+      "translation": "单词",
+      "score": 0.8665871620178223,
+      "retrieval_mode": "timeline_batch",
+      "time_start": 26.69333267211914,
+      "time_end": 27.231372833251953,
+      "active_glossary_preset": "common_10k",
+      "active_domain": "general",
+      "domain": "general",
+      "source_preset": "common_10k",
+      "source": "auto:common_10k"
+    },
+    {
+      "key": "language",
+      "term": "language",
+      "translation": "语言",
+      "score": 0.9250347018241882,
+      "retrieval_mode": "timeline_batch",
+      "time_start": 28.84705924987793,
+      "time_end": 29.30823516845703,
+      "active_glossary_preset": "common_10k",
+      "active_domain": "general",
+      "domain": "general",
+      "source_preset": "common_10k",
+      "source": "auto:common_10k"
+    },
+    {
+      "key": "languages",
+      "term": "languages",
+      "translation": "语言",
+      "score": 0.795670211315155,
+      "retrieval_mode": "timeline_batch",
+      "time_start": 27.770980834960938,
+      "time_end": 28.001567840576172,
+      "active_glossary_preset": "common_10k",
+      "active_domain": "general",
+      "domain": "general",
+      "source_preset": "common_10k",
+      "source": "auto:common_10k"
+    },
+    {
+      "key": "english",
+      "term": "English",
+      "translation": "英语",
+      "score": 0.9341669678688049,
+      "retrieval_mode": "timeline_batch",
+      "time_start": 32.38588333129883,
+      "time_end": 32.8470573425293,
+      "active_glossary_preset": "common_10k",
+      "active_domain": "general",
+      "domain": "general",
+      "source_preset": "common_10k",
+      "source": "auto:common_10k"
+    },
+    {
+      "key": "online",
+      "term": "Online",
+      "translation": "在线",
+      "score": 0.945015013217926,
+      "retrieval_mode": "timeline_batch",
+      "time_start": 36.539608001708984,
+      "time_end": 36.84706115722656,
+      "active_glossary_preset": "common_10k",
+      "active_domain": "general",
+      "domain": "general",
+      "source_preset": "common_10k",
+      "source": "auto:common_10k"
+    }
+  ],
+  "topic": {
+    "active_domain": "general",
+    "confidence": 0.8728,
+    "active_glossary_preset": "common_10k",
+    "switch_count": 0,
+    "last_reason": "speech_embedding+retrieved_refs; interval<45s"
+  },
+  "topic_router": {
+    "action": "stay",
+    "from_preset": "common_10k",
+    "from_domain": "general",
+    "to_preset": "common_10k",
+    "to_domain": "general",
+    "confidence": 0.8728,
+    "margin": 0.2228,
+    "reason": "speech_embedding+retrieved_refs; interval<45s",
+    "top_domains": [
+      [
+        "general",
+        0.8728
+      ],
+      [
+        "nlp",
+        0.65
+      ],
+      [
+        "medicine",
+        0.0
+      ]
+    ],
+    "top_scores": [
+      {
+        "preset_id": "common_10k",
+        "domain_id": "general",
+        "embedding_score": 0.7274,
+        "reference_score": 1.0,
+        "confidence": 0.8728,
+        "margin": 0.2228,
+        "evidence": {
+          "term_count": 10000,
+          "has_centroid": true,
+          "raw_embedding_cos": 0.5932
+        }
+      },
+      {
+        "preset_id": "nlp_core_10k",
+        "domain_id": "nlp",
+        "embedding_score": 1.0,
+        "reference_score": 0.0,
+        "confidence": 0.65,
+        "margin": 0.0,
+        "evidence": {
+          "term_count": 10000,
+          "has_centroid": true,
+          "raw_embedding_cos": 0.6198
+        }
+      },
+      {
+        "preset_id": "medicine_core_10k",
+        "domain_id": "medicine",
+        "embedding_score": 0.0,
+        "reference_score": 0.0,
+        "confidence": 0.0,
+        "margin": 0.0,
+        "evidence": {
+          "term_count": 23713,
+          "has_centroid": true,
+          "raw_embedding_cos": 0.5221
+        }
+      }
+    ],
+    "evidence": {
+      "has_query_embedding": true,
+      "recent_reference_count": 53
+    }
+  },
+  "retrieve_ms": 103.0,
+  "elapsed_ms": 762.2
+}

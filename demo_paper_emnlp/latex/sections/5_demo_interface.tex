@@ -1,0 +1,49 @@
+\section{Demo Interface}
+\label{sec:demo-interface}
+
+The demo is designed for three audiences: researchers inspecting terminology
+errors in streaming SST, lecture or conference users who do not want to prepare
+glossaries, and developers testing new speech translation agents behind a
+stable protocol. The same interface can run in mock mode without a GPU or in
+live GPU mode with Qwen3-Omni and MaxSim retrieval.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{ui_evidence_panel.png}
+  \caption{AutoTerm-SST web UI. The live view shows translated text, retrieved
+  term evidence, active glossary status, router confidence, active term count,
+  and retrieval/generation latency.}
+  \label{fig:ui}
+\end{figure}
+
+\paragraph{Live controls.}
+Users choose a model agent, language pair, latency multiplier, and terminology
+mode. In \texttt{auto\_working} mode, the session starts with a common working
+glossary and may switch to a compact domain slice. Users can also select a
+manual preset or provide ad-hoc terms, which are injected into the prompt but do
+not bias the router.
+
+\paragraph{Evidence panel.}
+For each partial translation, the UI renders the latest non-empty retrieved
+references as term-translation pairs with scores and source labels. A status
+line reports active memory backend, active term count, retrieval latency, and
+generation latency. The adaptive status row displays mode, inferred active
+topic, confidence, active glossary, active term count, switch count, and router
+action. This makes terminology behavior visible rather than hidden inside the
+model prompt.
+
+\paragraph{Packaging.}
+The repository includes a mock-friendly launcher for UI/protocol development
+and a Taurus GPU launcher for the real RASST agent. The mock mode exercises the
+same REST/WebSocket flow and JSON evidence protocol, enabling reviewers to test
+the demo without model weights or GPUs. The live demo additionally uses a
+resident vLLM process, a dedicated retriever GPU, and an optional public tunnel.
+
+\paragraph{Code access.}
+The demo code and installable mock-mode package are available on the
+\href{https://github.com/luojiaxuan/rasst-demo/tree/framework}{GitHub framework
+branch}. Mock mode starts the same UI and protocol without GPUs; live
+Qwen3-Omni mode requires A6000-class GPUs and the external RASST retriever
+checkpoint. The submission package tracks the final video and hosted live
+endpoint separately so that reviewer-facing URLs can be updated without changing
+the system implementation.

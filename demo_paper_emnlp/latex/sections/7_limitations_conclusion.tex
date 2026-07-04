@@ -1,0 +1,23 @@
+\section{Limitations and Conclusion}
+\label{sec:limitations}
+
+AutoTerm-SST is a live terminology-aware SST system, not a new foundation model
+or a learned topic classifier. The current live GPU demo focuses on
+English-to-Chinese; adding more target languages requires translated term files,
+MaxSim indexes, and prompt templates. Large open memories improve coverage but
+can reduce retrieval precision, which is why the system activates compact
+working slices instead of prompting directly from the full memory. The
+audio-native router is intentionally conservative and may stay on the common
+glossary when a domain is ambiguous, as in our short smoke talk. Finally, the
+real backend requires high-end NVIDIA GPUs and external model/retriever
+artifacts; mock mode supports UI and protocol testing without those weights.
+
+We presented AutoTerm-SST, a zero-setup terminology-memory workbench for streaming
+speech translation. The key design is to maintain broad terminology resources
+offline while selecting a compact active glossary online using speech-side
+retrieval evidence. The demo exposes the resulting evidence, glossary state,
+router decision, and latency to users in real time. Our current evaluation shows
+that compact zero-setup working glossaries can improve terminology recall on a
+term-dense smoke talk while warm retrieval remains efficient even for large
+background memories. This makes AutoTerm-SST a practical platform for
+inspecting and improving terminology behavior in live speech translation.

@@ -1,0 +1,68 @@
+\section{System Overview}
+\label{sec:system}
+
+AutoTerm-SST is organized as a thin framework plus swappable translation agents
+(Figure~\ref{fig:architecture}). The framework is deliberately small: it serves
+the web UI, accepts REST control requests, streams audio over WebSockets, tracks
+session lifecycle, and routes each session to an agent selected by
+\texttt{agent\_type}. The framework does not know about model prompts,
+retrieval, batching, KV cache, or glossary construction.
+
+\begin{figure}[t]
+\centering
+\fbox{\begin{minipage}{0.96\columnwidth}
+\centering
+\textbf{Client} \(\rightarrow\)
+\textbf{Thin Framework} \(\rightarrow\)
+\textbf{Agent Boundary}
+
+\vspace{0.4em}
+\begin{tabular}{p{0.27\columnwidth}p{0.30\columnwidth}p{0.27\columnwidth}}
+\centering Web / Electron &
+\centering REST, WebSocket, session routing &
+\centering OmniAgent / mock
+\tabularnewline
+\end{tabular}
+
+\vspace{0.6em}
+\hrule
+\vspace{0.6em}
+\textbf{Inside OmniAgent:}
+audio buffer + micro-batcher \(\rightarrow\)
+retrieval plugin \(\rightarrow\)
+audio-native router \(\rightarrow\)
+PromptBuilder \(\rightarrow\)
+Qwen3-Omni/vLLM backend
+
+\vspace{0.4em}
+\textbf{Output:} translation text + retrieved terms + active glossary metadata
+\end{minipage}}
+\caption{AutoTerm-SST separates transport/session logic from model-specific agent logic. Retrieval, active glossary routing, prompting, and vLLM generation all live inside the agent boundary.}
+\label{fig:architecture}
+\end{figure}
+
+\paragraph{Agent contract.}
+Agents implement a small contract: \texttt{open\_session},
+\texttt{submit\_audio}, \texttt{on\_control}, \texttt{close\_session},
+\texttt{describe}, and \texttt{health}. This lets the same UI and wire protocol
+serve a deterministic mock agent for development, a legacy InfiniSST scheduler
+agent, or the RASST/Qwen3-Omni agent used in the live GPU demo.
+The agent boundary is backend-agnostic: the current live demo uses in-process
+vLLM \citep{kwon2023efficient}, while the same protocol can connect to external
+SGLang-compatible serving backends without changing the terminology memory,
+router, or UI.
+
+\paragraph{Streaming agent.}
+For each audio chunk, the OmniAgent can run a MaxSim terminology retrieval pass,
+build a \texttt{term\_map}, and call the in-process vLLM backend. The
+PromptBuilder injects at most ten references into the prompt by default. The
+agent emits partial translations plus structured metadata, including retrieved
+terms, retrieval latency, active glossary state, and router decisions.
+
+\paragraph{Evidence protocol.}
+The default WebSocket output remains plain text for backward compatibility. A
+JSON mode returns \texttt{\{type, text, meta\}}, where \texttt{meta.references}
+drives the live evidence panel and \texttt{meta.topic} /
+\texttt{meta.topic\_router} describe the adaptive glossary state. This evidence
+protocol is central to the demo: users can see which terms were retrieved and
+whether the router stayed, switched, or deferred a glossary change.

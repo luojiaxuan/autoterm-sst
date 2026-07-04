@@ -1,0 +1,53 @@
+\section{Adaptive Terminology Memory}
+\label{sec:adaptive-memory}
+
+AutoTerm-SST maintains two different notions of terminology memory. The
+\emph{open memory} is a large offline resource derived from Wikidata/Wikipedia
+and curated glossaries. It is stored as manifest-driven snapshots with
+precomputed MaxSim indexes. The \emph{working glossary} is the compact active
+slice used during a live session. This distinction is important: a large memory
+improves coverage, but injecting many broad references directly into every
+prompt can reduce precision and make the UI harder to inspect.
+
+\paragraph{Open memory snapshots.}
+Each snapshot maps a preset id to term files, metadata, and a MaxSim index. The
+runtime never stores large indexes in the code repository; instead, manifests
+point to a runtime root on the demo host. Current presets include a common
+10k-term slice, compact domain slices such as NLP and medicine, a curated
+238-term ACL glossary, and broad open memories with 100k and 1M terms.
+
+\paragraph{Audio-native active glossary router.}
+The default router is \texttt{embedding\_refs}. It is not a trained topic
+classifier and does not use ASR, source transcripts, generated target text, LLM
+classification, or manual glossary terms for routing. Instead, it combines two
+signals already available from speech-side retrieval:
+\begin{equation}
+\begin{split}
+score(d) = & \lambda_e \cos(\mathrm{EMA}(q_{\mathrm{speech}}), c_d) \\
+           & + \lambda_r \mathrm{vote}_d(\mathrm{references}) - \mathrm{ambiguity},
+\end{split}
+\end{equation}
+where \(q_{\mathrm{speech}}\) is the pooled speech query embedding, \(c_d\) is a
+domain centroid built offline from a slice's MaxSim text embeddings, and
+reference votes come from metadata such as source preset and domain. The default
+weights are \(\lambda_e=0.65\) and \(\lambda_r=0.35\).
+
+\paragraph{Conservative switching.}
+The router is a policy for selecting an active glossary, not an open-world topic
+detector. It switches only after warmup, minimum update interval, confidence
+threshold, top-vs-runner-up margin, repeated consistent windows, and target
+index readiness. If evidence is weak or ambiguous, the session stays on the
+common glossary or the current active slice. Cold index loads are non-blocking:
+the agent preloads a target index in the background and activates it only after
+the retrieval plugin reports that the index is ready.
+
+\paragraph{Prompt and UI budgets.}
+The retriever can return up to the UI evidence budget, and prompt injection uses
+the same default budget:
+\begin{center}
+\small
+\texttt{RASST\_PROMPT\_TOP\_K}=10\\
+\texttt{RASST\_UI\_TOP\_K}=10
+\end{center}
+This cap is part of the system design. Broad memories may contain useful terms,
+but the live prompt should remain a compact, inspectable working context.

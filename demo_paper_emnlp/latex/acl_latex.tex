@@ -36,13 +36,11 @@
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{booktabs}
-\usepackage{algorithm}
-\usepackage{algorithmic}
-\usepackage{subcaption}
 \usepackage{xcolor}
-\usepackage{listings}
+\usepackage{url}
 
 \usepackage{amsfonts,amssymb,amsthm}
+\graphicspath{{../}{figures/}{latex/figures/}}
 
 % If the title and author information does not fit in the area allocated, uncomment the following
 %
@@ -50,7 +48,7 @@
 %
 % and set <dim> to something 5cm or larger.
 
-\title{InfiniSST: A High-Throughput Multi-User Speech-to-Speech Translation System with ORCA-Inspired Dynamic Scheduling}
+\title{AutoTerm-SST: Zero-Setup Adaptive Terminology Memory for Streaming Speech Translation}
 
 \author{
   Jiaxuan Luo\textsuperscript{1}\thanks{\ \ Equal contribution.} \quad
@@ -70,134 +68,16 @@
 \input{latex/sections/0_abstract}
 \input{latex/sections/1_introduction}
 \input{latex/sections/2_related_works}
-\input{latex/sections/3_preliminary}
-\input{latex/sections/4_method}
-% \input{latex/sections/5_interface}
+\input{latex/sections/3_system_overview}
+\input{latex/sections/4_adaptive_memory}
+\input{latex/sections/5_demo_interface}
 \input{latex/sections/6_evaluation}
-\input{latex/sections/7_conclusion}
-
-\section*{Limitations}
-
-Despite its advances, InfiniSST has several limitations:
-
-\begin{itemize}
-\item \textbf{Language Coverage}: Currently limited to English-Chinese and English-Italian pairs
-\item \textbf{Hardware Requirements}: Requires high-end GPUs for optimal performance
-\item \textbf{Audio Quality Sensitivity}: Performance degrades with poor audio input
-\item \textbf{Domain Specificity}: General-purpose model may not excel in specialized domains
-\item \textbf{Network Latency}: Real-time performance depends on stable, low-latency network connections
-\item \textbf{Computational Complexity}: While optimized, still requires significant computational resources for large-scale deployment
-\end{itemize}
+\input{latex/sections/7_limitations_conclusion}
 
 \section*{Acknowledgments}
 
-We thank the open-source communities behind PyTorch, FlashInfer, and Qwen for their foundational contributions. Special appreciation to the University of California, Santa Barbara for computational resources and infrastructure support. We also acknowledge the valuable feedback from early users and beta testers who helped refine the system's functionality and performance.
+We thank the open-source communities behind PyTorch, vLLM, FastAPI, and Qwen for their foundational contributions. We also thank the University of California, Santa Barbara for computational resources used in the live GPU evaluation.
 
 \bibliography{custom}
-
-\appendix
-
-\section{Detailed System Configuration}
-\label{sec:system-config}
-
-\subsection{Model Configuration}
-
-\begin{lstlisting}[language=Python, caption=Model Configuration Parameters]
-# InfiniSST Model Configuration
-MODEL_CONFIG = {
-    "base_model": "qwen-7b-chat",
-    "speech_encoder": "wav2vec2-large",
-    "attention_sink_size": 256,
-    "max_sequence_length": 4096,
-    "beam_size": 4,
-    "temperature": 0.7,
-    "repetition_penalty": 1.1,
-    "language_pairs": {
-        "en-zh": {
-            "vocab_size": 32000,
-            "special_tokens": ["<zh>", "</zh>"],
-            "context_window": 2048
-        },
-        "en-it": {
-            "vocab_size": 32000,
-            "special_tokens": ["<it>", "</it>"],
-            "context_window": 2048
-        }
-    }
-}
-\end{lstlisting}
-
-\subsection{Scheduler Configuration}
-
-\begin{lstlisting}[language=Python, caption=Scheduler Configuration Parameters]
-# ORCA-Inspired Scheduler Configuration
-SCHEDULER_CONFIG = {
-    "max_batch_size": 32,
-    "batch_timeout": 0.05,  # 50ms
-    "session_timeout": 3600,  # 1 hour
-    "dynamic_batching": {
-        "enabled": True,
-        "wait_threshold": 0.1,  # 100ms
-        "min_batch_size": 1,
-        "priority_weights": {
-            "prefill": 2.0,
-            "decode": 1.0
-        }
-    },
-    "memory_management": {
-        "kv_cache_size": 1024,
-        "attention_sink_size": 256,
-        "garbage_collection_interval": 60
-    }
-}
-\end{lstlisting}
-
-\section{Performance Benchmarks}
-\label{sec:benchmarks}
-
-\subsection{Latency Distribution Analysis}
-
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=\columnwidth]{latency-distribution}
-  \caption{Latency Distribution Across Different User Loads. The distribution shows consistent low-latency performance even under heavy load conditions.}
-  \label{fig:latency-dist}
-\end{figure}
-
-\subsection{Scalability Analysis}
-
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=\columnwidth]{scalability-analysis}
-  \caption{Scalability Analysis showing system performance degradation as user count increases. The system maintains acceptable performance up to 32 concurrent users.}
-  \label{fig:scalability}
-\end{figure}
-
-\section{User Interface Specifications}
-\label{sec:ui-specs}
-
-\subsection{Desktop Application Features}
-
-The desktop application provides comprehensive control over the translation system:
-
-\begin{itemize}
-\item \textbf{Model Selection}: Dropdown menu for choosing translation models
-\item \textbf{Language Configuration}: Dynamic language pair selection
-\item \textbf{Latency Settings}: Slider for adjusting latency/quality trade-off
-\item \textbf{Audio Input}: Toggle between system audio and microphone
-\item \textbf{Window Management}: Show/hide floating translation window
-\item \textbf{Customization}: Font size, background opacity, text color options
-\end{itemize}
-
-\subsection{Web Application Features}
-
-The web interface provides cross-platform accessibility:
-
-\begin{itemize}
-\item \textbf{Browser Compatibility}: Support for Chrome, Firefox, Safari, Edge
-\item \textbf{WebRTC Integration}: High-quality audio capture and streaming
-\item \textbf{Real-time Display}: Live translation updates
-\item \textbf{Responsive Design}: Mobile and desktop optimized layouts
-\end{itemize}
 
 \end{document}

@@ -31,7 +31,11 @@ import wave
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
-import websockets
+
+try:
+    import websockets
+except ImportError:  # pragma: no cover - only collect_output needs this optional dependency
+    websockets = None
 
 
 _ALNUM_TERM_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._+/#&%()-]*$")
@@ -222,11 +226,18 @@ def strip_tags(t: str) -> str:
 
 async def collect_output(base_url: str, lang: str, preset: str, pcm: np.ndarray,
                          chunk: int = 8000, feed_sleep: float = 0.45) -> Dict[str, Any]:
+    if websockets is None:
+        raise RuntimeError("websockets is required to collect framework JSON-WS output")
     q = urllib.parse.urlencode({"agent_type": "RASST", "language_pair": lang, "glossary_preset": preset})
     with urllib.request.urlopen(urllib.request.Request(f"{base_url}/init?{q}", data=b""), timeout=30) as r:
         sid = json.load(r)["session_id"]
     parts: List[str] = []
-    refs: List[Tuple[str, str]] = []  # (english term, zh) retrieved across all chunks
+    refs: List[Tuple[str, str]] = []
+    ref_events: List[Dict[str, Any]] = []
+    prompt_counts: List[int] = []
+    pool_counts: List[int] = []
+    shortfalls: List[int] = []
+    rescue_events = 0
     chunks = 0
     try:
         async with websockets.connect(f"{base_url.replace('http','ws')}/wss/{sid}?event_format=json", max_size=None) as ws:
@@ -251,8 +262,19 @@ async def collect_output(base_url: str, lang: str, preset: str, pcm: np.ndarray,
                 if o.get("type") == "partial":
                     chunks += 1
                     parts.append(strip_tags(o.get("text") or ""))
-                    for r in (o.get("meta") or {}).get("references") or []:
-                        refs.append((str(r.get("term") or ""), str(r.get("translation") or "")))
+                    meta = o.get("meta") or {}
+                    prompt_counts.append(int(meta.get("prompt_reference_count") or 0))
+                    pool_counts.append(int(meta.get("candidate_pool_count") or 0))
+                    shortfalls.append(int(meta.get("prompt_candidate_shortfall") or 0))
+                    if meta.get("open_wiki_rescue_triggered"):
+                        rescue_events += 1
+                    for r in meta.get("references") or []:
+                        term = str(r.get("term") or "")
+                        translation = str(r.get("translation") or "")
+                        refs.append((term, translation))
+                        event = dict(r)
+                        event["chunk_index"] = chunks - 1
+                        ref_events.append(event)
             await ft
     finally:
         try:
@@ -260,21 +282,109 @@ async def collect_output(base_url: str, lang: str, preset: str, pcm: np.ndarray,
                 f"{base_url}/delete_session?{urllib.parse.urlencode({'session_id': sid})}", data=b""), timeout=15)
         except Exception:  # noqa: BLE001
             pass
-    return {"text": "".join(parts), "refs": refs, "chunks": chunks}
+    return {
+        "text": "".join(parts),
+        "refs": refs,
+        "ref_events": ref_events,
+        "chunks": chunks,
+        "prompt_counts": prompt_counts,
+        "candidate_pool_counts": pool_counts,
+        "prompt_shortfalls": shortfalls,
+        "rescue_events": rescue_events,
+    }
 
 
-def score(output: str, gold: List[Tuple[str, List[str]]]) -> Dict[str, Any]:
+def contains_cjk_or_kana(text: str) -> bool:
+    return bool(_CJK_OR_KANA_RE.search(str(text or "")))
+
+
+def allowed_identity_retention_source(term: str) -> bool:
+    clean = normalise_space(term)
+    if not clean:
+        return False
+    compact = clean.replace("-", "").replace("_", "")
+    if len(compact) >= 2 and compact.upper() == compact and re.search(r"[A-Z]", compact):
+        return True
+    if re.search(r"[A-Z].*[A-Z]", compact) and not clean.islower():
+        return True
+    if re.search(r"[A-Za-z]+\d|\d+[A-Za-z]", compact):
+        return True
+    return False
+
+
+def output_contains_variant(output: str, variant: str) -> bool:
+    variant = normalise_space(variant)
+    if not variant:
+        return False
+    if _ALNUM_TERM_RE.fullmatch(variant):
+        return bool(re.search(r"(?<![A-Za-z0-9])" + re.escape(variant) + r"(?![A-Za-z0-9])", output, re.IGNORECASE))
+    return variant in output
+
+
+def classify_output_hit(term: str, variants: Sequence[str], output: str) -> Tuple[bool, Optional[str], Optional[str]]:
+    for variant in variants:
+        if contains_cjk_or_kana(variant) and output_contains_variant(output, variant):
+            return True, variant, "zh_translation"
+    if allowed_identity_retention_source(term):
+        for variant in variants:
+            if not contains_cjk_or_kana(variant) and output_contains_variant(output, variant):
+                kind = "acronym_retention" if term.upper() == term else "identity_retention"
+                return True, variant, kind
+    return False, None, None
+
+
+def score(output: str, gold: List[Tuple[str, List[str]]], surfaced_terms: Optional[set[str]] = None) -> Dict[str, Any]:
     rec, fc, got = 0, 0, []
+    zh_rec = 0
+    identity_rec = 0
+    surfaced_total = 0
+    surfaced_rec = 0
+    not_surfaced_total = 0
+    not_surfaced_rec = 0
+    traces: List[Dict[str, Any]] = []
+    surfaced_terms = surfaced_terms or set()
     for term, variants in gold:
-        hit = next((v for v in variants if v and v in output), None)
+        hit, hit_variant, hit_kind = classify_output_hit(term, variants, output)
         if hit:
             rec += 1
-            got.append(f"{term}->{hit}")
-        # false copy: English term verbatim in zh output AND no correct zh variant present
+            got.append(f"{term}->{hit_variant}")
+            if hit_kind == "zh_translation":
+                zh_rec += 1
+            else:
+                identity_rec += 1
         if not hit and re.search(r"\b" + re.escape(term.lower()) + r"\b", output.lower()):
             fc += 1
+        surfaced = term.lower() in surfaced_terms
+        if surfaced:
+            surfaced_total += 1
+            surfaced_rec += int(hit)
+        else:
+            not_surfaced_total += 1
+            not_surfaced_rec += int(hit)
+        traces.append(
+            {
+                "gold_source": term,
+                "surfaced_in_prompt_top10": surfaced,
+                "output_hit": hit,
+                "output_variant": hit_variant,
+                "output_hit_kind": hit_kind,
+                "allow_identity_retention_proxy": allowed_identity_retention_source(term),
+            }
+        )
     n = len(gold) or 1
-    return {"gold": len(gold), "term_recall": round(rec / n, 3), "false_copy": round(fc / n, 3), "recovered": got}
+    return {
+        "gold": len(gold),
+        "term_recall": round(rec / n, 3),
+        "false_copy": round(fc / n, 3),
+        "translation_term_recall": round(zh_rec / n, 3),
+        "identity_retention_recall": round(identity_rec / n, 3),
+        "term_recall_surfaced": round(surfaced_rec / surfaced_total, 3) if surfaced_total else None,
+        "term_recall_not_surfaced": round(not_surfaced_rec / not_surfaced_total, 3) if not_surfaced_total else None,
+        "surfaced_gold_terms": surfaced_total,
+        "not_surfaced_gold_terms": not_surfaced_total,
+        "recovered": got,
+        "gold_traces": traces,
+    }
 
 
 def main() -> None:
@@ -327,20 +437,27 @@ def main() -> None:
     for preset in [p.strip() for p in args.presets.split(",") if p.strip()]:
         try:
             res = asyncio.run(collect_output(args.base_url, args.language_pair, preset, pcm, feed_sleep=args.feed_sleep))
-            row = {"preset": preset, **score(res["text"], gold)}
             refs = res["refs"]
+            surfaced_terms = {en.lower() for en, _ in refs if en}
+            row = {"preset": preset, **score(res["text"], gold, surfaced_terms=surfaced_terms)}
             gold_refs = sum(1 for en, _ in refs if en.lower() in gold_en)
             row["chunks"] = res["chunks"]
             row["refs_total"] = len(refs)
             row["refs_per_chunk"] = round(len(refs) / res["chunks"], 2) if res["chunks"] else 0.0
-            # precision: fraction of retrieved terms that are the (fixed) gold, not distractors
+            row["avg_prompt_candidates"] = round(sum(res["prompt_counts"]) / len(res["prompt_counts"]), 3) if res["prompt_counts"] else 0.0
+            row["avg_candidate_pool"] = round(sum(res["candidate_pool_counts"]) / len(res["candidate_pool_counts"]), 3) if res["candidate_pool_counts"] else 0.0
+            row["prompt_shortfall_chunks"] = sum(1 for item in res["prompt_shortfalls"] if item)
+            row["open_wiki_rescue_chunks"] = int(res.get("rescue_events") or 0)
+            # precision: fraction of surfaced top-10 terms that are gold, not distractors
             row["retrieval_precision"] = round(gold_refs / len(refs), 3) if refs else None
+            row["retrieval_precision_at_10"] = row["retrieval_precision"]
             # gold-retrieved recall: distinct gold terms surfaced at least once / |gold|
             row["gold_retrieved"] = (
                 round(len(set(en.lower() for en, _ in refs if en.lower() in gold_en)) / len(gold), 3)
                 if gold
                 else None
             )
+            row["prompt_gold_retrieved_at_10"] = row["gold_retrieved"]
             if reference_text is not None:
                 row.update(
                     compute_bleu_scores(
@@ -354,19 +471,32 @@ def main() -> None:
             row = {"preset": preset, "error": str(exc)[:200]}
         rows.append(row)
         print(f"[score] {preset}: recall@gold={row.get('term_recall')} "
-              f"retr_precision={row.get('retrieval_precision')} gold_retrieved={row.get('gold_retrieved')} "
+              f"retr_precision@10={row.get('retrieval_precision_at_10')} "
+              f"prompt_gold@10={row.get('prompt_gold_retrieved_at_10')} "
+              f"surfaced_recall={row.get('term_recall_surfaced')} "
+              f"not_surfaced_recall={row.get('term_recall_not_surfaced')} "
               f"refs/chunk={row.get('refs_per_chunk')} masked_bleu={row.get('masked_terms_bleu')}")
 
     cols = [
         "preset",
         "gold",
         "term_recall",
+        "translation_term_recall",
+        "identity_retention_recall",
+        "term_recall_surfaced",
+        "term_recall_not_surfaced",
         "false_copy",
         "bleu",
         "masked_terms_bleu",
         "masked_terms_hyp_removed",
         "masked_terms_ref_removed",
         "masked_terms_types",
+        "prompt_gold_retrieved_at_10",
+        "retrieval_precision_at_10",
+        "avg_prompt_candidates",
+        "avg_candidate_pool",
+        "prompt_shortfall_chunks",
+        "open_wiki_rescue_chunks",
         "gold_retrieved",
         "retrieval_precision",
         "refs_per_chunk",

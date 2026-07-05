@@ -1,7 +1,7 @@
 # Zero-Setup Adaptive Working Glossary
 
 RASST-Demo maintains a large open terminology memory offline, but activates a
-compact working glossary for each streaming session. The working glossary is
+fixed 10-candidate prompt list for each streaming session. The active inventory is
 selected automatically from speech-side retrieval evidence, so a user can start
 a domain talk without uploading terms or choosing a domain preset.
 
@@ -283,22 +283,24 @@ python eval/streaming_sst/score_auto_glossary.py \
 
 ## Paper Framing
 
-The runtime budget is the active glossary, not the full domain universe.
-100k/500k/1M memories remain useful as offline memory and scale evidence, but
-the demo should inject a compact high-precision working slice. The claim is:
+The runtime budget is the fixed top-10 prompt list, not the full domain
+universe. 100k/500k/1M memories remain useful as offline memory and scale
+evidence, but the demo should select and rank candidates from an active
+inventory. The claim is:
 
 1. large open terminology memory can be maintained offline;
-2. a compact working glossary can be selected automatically from audio-native
+2. active inventory slices can be selected automatically from audio-native
    retrieval signals;
-3. selected slices reduce prompt noise relative to large open memory;
+3. fixed top-10 reranking reduces distractors relative to direct broad-memory
+   prompting;
 4. users get terminology-aware streaming speech translation with zero setup.
 
 Use this paper wording:
 
 ```text
-RASST-Demo uses a lightweight, audio-native, confidence-gated active glossary
+RASST-Demo uses a lightweight, audio-native, confidence-gated active inventory
 router. The router uses speech-side retrieval embeddings and retrieved-term
-metadata to switch from a common glossary to a compact domain slice only when
-the domain evidence is strong. When evidence is ambiguous, it falls back to a
-common glossary to avoid prompt pollution.
+metadata to add routed domain slices on top of common terms only when the domain
+evidence is strong. When evidence is ambiguous, it keeps common terms active and
+preserves the fixed 10-candidate prompt interface.
 ```

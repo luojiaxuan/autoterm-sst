@@ -1,20 +1,20 @@
 \section{Adaptive Terminology Memory}
 \label{sec:adaptive-memory}
 
-AutoTerm-SST maintains two different notions of terminology memory. The
+AutoTerm-SST separates terminology inventory from the prompt interface. The
 \emph{open memory} is a large offline resource derived from Wikidata/Wikipedia
-and curated glossaries. It is stored as manifest-driven snapshots with
-precomputed MaxSim indexes. The \emph{working glossary} is the compact active
-slice used during a live session. This distinction is important: a large memory
-improves coverage, but injecting many broad references directly into every
-prompt can reduce precision and make the UI harder to inspect.
+and curated glossaries, stored as manifest-driven snapshots with precomputed
+MaxSim indexes. The online system keeps the prompt budget fixed at 10 glossary
+candidates per chunk. The automatic strategy controls which inventory slices are
+active and how candidates are ranked into that fixed list.
 
 \paragraph{Open memory snapshots.}
 Each snapshot maps a preset id to term files, metadata, and a MaxSim index. The
 runtime never stores large indexes in the code repository; instead, manifests
-point to a runtime root on the demo host. Current presets include a common
-10k-term slice, compact domain slices such as NLP and medicine, a curated
-238-term ACL glossary, and broad open memories with 100k and 1M terms.
+point to a runtime root on the demo host. Current presets include a common-terms
+10k base slice, domain slices such as NLP and medicine, a curated 238-term ACL
+glossary used as an oracle diagnostic, and broad open memories with 100k and 1M
+terms.
 
 \paragraph{Audio-native active glossary router.}
 The default router is \texttt{embedding\_refs}. It is not a trained topic
@@ -33,21 +33,24 @@ reference votes come from metadata such as source preset and domain. The default
 weights are \(\lambda_e=0.65\) and \(\lambda_r=0.35\).
 
 \paragraph{Conservative switching.}
-The router is a policy for selecting an active glossary, not an open-world topic
-detector. It switches only after warmup, minimum update interval, confidence
-threshold, top-vs-runner-up margin, repeated consistent windows, and target
-index readiness. If evidence is weak or ambiguous, the session stays on the
-common glossary or the current active slice. Cold index loads are non-blocking:
-the agent preloads a target index in the background and activates it only after
-the retrieval plugin reports that the index is ready.
+The router is a policy for selecting active domain slices, not an open-world
+topic detector. It switches only after warmup, minimum update interval,
+confidence threshold, top-vs-runner-up margin, repeated consistent windows, and
+target index readiness. The common-terms slice always remains active; a routed
+domain slice is layered on top when evidence is strong. Cold index loads are
+non-blocking: the agent preloads a target index in the background and activates
+it only after the retrieval plugin reports that the index is ready.
 
-\paragraph{Prompt and UI budgets.}
-The retriever can return up to the UI evidence budget, and prompt injection uses
-the same default budget:
+\paragraph{Fixed prompt candidates.}
+The automatic mode retrieves a broad candidate pool from active slices, optionally
+adds \texttt{open\_wiki\_100k} under low-confidence fallback conditions, deduplicates
+by canonical source term, and reranks candidates into a fixed prompt list:
 \begin{center}
 \small
-\texttt{RASST\_PROMPT\_TOP\_K}=10\\
-\texttt{RASST\_UI\_TOP\_K}=10
+\texttt{PROMPT\_K}=10
 \end{center}
-This cap is part of the system design. Broad memories may contain useful terms,
-but the live prompt should remain a compact, inspectable working context.
+Thus slice size affects the candidate inventory, not the number of glossary
+entries shown to the model. Larger inventories improve coverage but make ranking
+harder; narrower inventories reduce distractors but may miss domain-specific
+terms. The live evidence metadata records active slices, candidate-pool size,
+prompt top-10 count, shortfall, and fallback events.

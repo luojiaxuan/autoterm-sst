@@ -20,13 +20,39 @@ from framework.agents.term_memory.manifest import (
     load_current_manifest,
 )
 from framework.agents.term_memory.schema import TermEntry
+from framework.agents.term_memory.glossary_entry import GlossaryEntry
+from framework.agents.term_memory.slice_registry import (
+    COMMON_TERMS_SLICE_ID,
+    OPEN_RESCUE_SLICE_ID,
+    ORACLE_SLICE_ID,
+    PROMPT_K,
+    RetrievalSlice,
+    domain_for_slice_preset,
+    force_exactly_k_references,
+    rank_references,
+    slice_id_for_preset,
+    slice_role_for_preset,
+    slice_weight_for_role,
+)
 
 __all__ = [
     "TermEntry",
+    "GlossaryEntry",
     "LanguageSnapshot",
     "TermMemoryManifest",
     "AUTO_PRESET",
     "ENV_MANIFEST",
     "lang_key",
     "load_current_manifest",
+    "COMMON_TERMS_SLICE_ID",
+    "OPEN_RESCUE_SLICE_ID",
+    "ORACLE_SLICE_ID",
+    "PROMPT_K",
+    "RetrievalSlice",
+    "domain_for_slice_preset",
+    "force_exactly_k_references",
+    "rank_references",
+    "slice_id_for_preset",
+    "slice_role_for_preset",
+    "slice_weight_for_role",
 ]

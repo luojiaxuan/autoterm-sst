@@ -1,0 +1,44 @@
+auto_working:
+  prompt_k: 10
+  base_slice: common_terms
+  slices:
+    common_terms:
+      path: /mnt/data2/jiaxuanluo/rasst-demo/runtime/term_memory/scale_aclgold_10000.json
+      type: base
+      always_on: true
+      weight: 1.0
+    nlp_core_10k:
+      path: /mnt/data2/jiaxuanluo/rasst-demo/runtime/term_memory/nlp_core_10k.json
+      type: domain
+      domain: nlp
+      weight: 0.8
+    medicine_core_10k:
+      path: /mnt/data2/jiaxuanluo/rasst-demo/runtime/term_memory/medicine_core_10k.json
+      type: domain
+      domain: medicine
+      weight: 0.8
+    open_wiki_100k:
+      path: /mnt/data2/jiaxuanluo/rasst-demo/runtime/term_memory/open_wiki_100k.json
+      type: rescue
+      weight: 0.4
+    acl_tagged_raw:
+      path: /mnt/data2/jiaxuanluo/rasst-demo/runtime/term_memory/acl_tagged_raw.json
+      type: oracle
+      eval_only: true
+      weight: 1.0
+  routing:
+    enable_talk_level: true
+    enable_chunk_level: true
+    enable_fallback: true
+    domain_activate_threshold: 0.55
+    domain_margin_threshold: 0.15
+    low_confidence_threshold: 0.35
+  retrieval:
+    broad_topk_per_slice: 50
+    prompt_k: 10
+    use_lexical_match: true
+    use_acronym_match: true
+    use_domain_prior: true
+    use_term_memory_prior: true
+    use_genericity_penalty: true
+    use_open_wiki_rescue: true

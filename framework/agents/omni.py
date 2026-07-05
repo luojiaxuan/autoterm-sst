@@ -64,6 +64,16 @@ from framework.agents.term_memory.domain_taxonomy import (
     configured_working_presets,
     domain_for_preset,
 )
+from framework.agents.term_memory.slice_registry import (
+    PROMPT_K,
+    RetrievalSlice,
+    domain_for_slice_preset,
+    force_exactly_k_references,
+    rank_references as rank_autoterm_references,
+    slice_id_for_preset,
+    slice_role_for_preset,
+    slice_weight_for_role,
+)
 from framework.agents.term_memory.topic_router import TopicContext
 from framework.agents.term_memory.topic_router import (
     AudioNativeActiveGlossaryRouter,
@@ -194,8 +204,12 @@ class OmniConfig:
     router_embed_weight: float = 0.65
     router_ref_weight: float = 0.35
     router_ema_alpha: float = 0.80
-    prompt_top_k: int = 10
-    ui_top_k: int = 10
+    prompt_top_k: int = PROMPT_K
+    ui_top_k: int = PROMPT_K
+    autoterm_broad_topk_per_slice: int = 50
+    autoterm_rescue_preset: str = "open_wiki_100k"
+    autoterm_candidate_score_threshold: float = 0.0
+    autoterm_enable_open_rescue: bool = True
 
     max_imported_glossary_terms: int = 10000
     tmp_dir: str = ""
@@ -314,6 +328,12 @@ class OmniSession:
     router_state: Optional[RouterSessionState] = None
     last_router_decision: Optional[Dict[str, Any]] = None
     last_query_embedding: Any = None
+    active_slice_presets: List[str] = field(default_factory=list)
+    active_slice_terms: Dict[str, int] = field(default_factory=dict)
+    last_retrieval_plan: List[Dict[str, Any]] = field(default_factory=list)
+    last_rescue_triggered: bool = False
+    last_candidate_pool_count: int = 0
+    last_prompt_reference_count: int = 0
     pending_since_s: Optional[float] = None
     latency_multiplier: int = 2
 
@@ -519,6 +539,100 @@ class OmniAgent(Agent):
 
         self._index_preload_tasks[index_path] = asyncio.create_task(_runner())
 
+    def _slice_for_preset(
+        self,
+        session: "OmniSession",
+        preset_id: str,
+        *,
+        role: Optional[str] = None,
+    ) -> Optional[RetrievalSlice]:
+        preset = (preset_id or "").strip()
+        if not preset or preset == "none":
+            return None
+        catalog = self._catalog(session.language_pair)
+        try:
+            selection = self.active_glossary.initial_selection(
+                catalog,
+                preset,
+                "",
+                auto_allowed=False,
+                mock=self.config.mock,
+            )
+        except (ValueError, KeyError):
+            return None
+        active_preset = selection.active_preset
+        index_path = selection.index_path
+        if not index_path:
+            return None
+        resolved_role = role or slice_role_for_preset(active_preset)
+        return RetrievalSlice(
+            preset_id=active_preset,
+            slice_id=slice_id_for_preset(active_preset),
+            role=resolved_role,
+            domain=domain_for_slice_preset(active_preset),
+            index_path=index_path,
+            term_count=int(selection.preset_terms or 0),
+            weight=slice_weight_for_role(resolved_role),
+            eval_only=(active_preset == "acl_tagged_raw"),
+        )
+
+    def _active_retrieval_slices(self, session: "OmniSession") -> List[RetrievalSlice]:
+        if not session.auto_glossary_enabled:
+            plan = self._slice_for_preset(session, session.glossary_preset, role=slice_role_for_preset(session.glossary_preset))
+            return [plan] if plan is not None else []
+
+        base_preset = (self.config.auto_glossary_default_preset or "common_10k").strip() or "common_10k"
+        presets: List[Tuple[str, str]] = [(base_preset, "base")]
+        active_preset = (session.active_glossary_preset or session.glossary_preset or "").strip()
+        if active_preset and active_preset != base_preset and active_preset != "none":
+            presets.append((active_preset, "domain"))
+
+        slices: List[RetrievalSlice] = []
+        seen: Set[str] = set()
+        for preset, role in presets:
+            plan = self._slice_for_preset(session, preset, role=role)
+            if plan is None or plan.preset_id in seen:
+                continue
+            seen.add(plan.preset_id)
+            slices.append(plan)
+        return slices
+
+    def _rescue_retrieval_slice(self, session: "OmniSession") -> Optional[RetrievalSlice]:
+        if not self.config.autoterm_enable_open_rescue:
+            return None
+        return self._slice_for_preset(session, self.config.autoterm_rescue_preset, role="rescue")
+
+    def _record_active_slices(self, session: "OmniSession", slices: Sequence[RetrievalSlice]) -> None:
+        session.active_slice_presets = [item.preset_id for item in slices]
+        session.active_slice_terms = {item.preset_id: int(item.term_count or 0) for item in slices}
+        session.last_retrieval_plan = [item.to_meta() for item in slices]
+
+    def _retrieval_top_k_for(self, session: "OmniSession") -> int:
+        if session.auto_glossary_enabled:
+            return max(
+                int(self.config.autoterm_broad_topk_per_slice),
+                int(self.config.prompt_top_k),
+                int(self.config.ui_top_k),
+            )
+        return max(int(self.config.rag_top_k), int(self.config.prompt_top_k), int(self.config.ui_top_k))
+
+    def _retrieval_score_threshold_for(self, session: "OmniSession") -> Optional[float]:
+        if session.auto_glossary_enabled:
+            return float(self.config.autoterm_candidate_score_threshold)
+        return None
+
+    def _should_rescue_retrieval(
+        self,
+        session: "OmniSession",
+        ranked: Sequence[Dict[str, Any]],
+    ) -> bool:
+        if not session.auto_glossary_enabled or not self.config.autoterm_enable_open_rescue:
+            return False
+        if len(ranked or []) < max(0, int(self.config.prompt_top_k)):
+            return True
+        decision = session.last_router_decision or {}
+        return str(decision.get("action") or "") == "fallback"
+
     def _select_initial_glossary(
         self,
         catalog: GlossaryCatalog,
@@ -669,7 +783,12 @@ class OmniAgent(Agent):
             last_decision_s=time.perf_counter(),
             last_switch_s=session.created_s,
         )
-        if session.auto_glossary_enabled and session.glossary_index_path:
+        active_slices = self._active_retrieval_slices(session)
+        self._record_active_slices(session, active_slices)
+        if session.auto_glossary_enabled:
+            for item in active_slices:
+                self._schedule_index_preload(item.index_path)
+        elif session.glossary_index_path:
             self._schedule_index_preload(session.glossary_index_path)
         self.sessions[session_id] = session
         if self.backend is not None and getattr(self.backend, "batched", False):
@@ -689,6 +808,9 @@ class OmniAgent(Agent):
             "mock_mode": self.config.mock,
             "model": self.name,
             **selection.to_session_meta(),
+            "active_slices": list(session.active_slice_presets),
+            "active_slice_terms": dict(session.active_slice_terms),
+            "fixed_prompt_k": int(self.config.prompt_top_k),
             "topic": self._topic_meta(session),
         }
         return SessionInfo(admitted=True, queued=False, queue_position=0, meta=meta)
@@ -813,8 +935,10 @@ class OmniAgent(Agent):
                     last_decision_s=time.perf_counter(),
                     last_switch_s=time.perf_counter(),
                 )
-                if selection.index_path:
-                    self._schedule_index_preload(selection.index_path)
+                active_slices = self._active_retrieval_slices(session)
+                self._record_active_slices(session, active_slices)
+                for item in active_slices:
+                    self._schedule_index_preload(item.index_path)
             except Exception:  # noqa: BLE001
                 logger.exception("failed to reset auto glossary for %s", session.session_id)
         session.pending_since_s = None
@@ -1040,43 +1164,110 @@ class OmniAgent(Agent):
         if not self.retrieval.enabled or not batch:
             return [[] for _ in batch]
         outputs: List[List[Dict[str, Any]]] = [[] for _ in batch]
-        grouped: Dict[str, List[Tuple[int, OmniSession]]] = {}
+        query_embeddings: List[Any] = [None for _ in batch]
+        grouped: Dict[Tuple[str, int, Optional[float]], List[Tuple[int, OmniSession, RetrievalSlice]]] = {}
+
         for idx, session in enumerate(batch):
-            index_path = session.glossary_index_path or self._catalog(
-                session.language_pair
-            ).index_path_for_preset(session.glossary_preset)
-            if not index_path:
-                continue
-            if session.auto_glossary_enabled and not self.retrieval.is_index_ready(index_path):
-                self._schedule_index_preload(index_path)
-                continue
-            grouped.setdefault(index_path, []).append((idx, session))
+            session.last_rescue_triggered = False
+            session.last_candidate_pool_count = 0
+            slices = self._active_retrieval_slices(session)
+            self._record_active_slices(session, slices)
+            for plan in slices:
+                if session.auto_glossary_enabled and not self.retrieval.is_index_ready(plan.index_path):
+                    self._schedule_index_preload(plan.index_path)
+                    continue
+                key = (
+                    plan.index_path,
+                    self._retrieval_top_k_for(session),
+                    self._retrieval_score_threshold_for(session),
+                )
+                grouped.setdefault(key, []).append((idx, session, plan))
 
         assert self._retriever_lock is not None
         async with self._retriever_lock:
-            for index_path, indexed_sessions in grouped.items():
-                await self.retrieval.activate_index(index_path)
-                requests = [
-                    {
-                        "audio_buffer": session.audio[: end_by_session[session.session_id]],
-                        "current_start_sec": float(session.last_llm_samples) / TARGET_SAMPLE_RATE,
-                        "current_end_sec": float(end_by_session[session.session_id]) / TARGET_SAMPLE_RATE,
-                        "lookback_sec": float(self.config.rag_timeline_lookback_sec),
-                    }
-                    for _, session in indexed_sessions
-                ]
-                group_results = await self.retrieval.retrieve_with_metadata(
-                    requests,
-                    top_k=self.config.rag_top_k,
-                    lookback_sec=self.config.rag_timeline_lookback_sec,
+            await self._retrieve_slice_groups(grouped, end_by_session, outputs, query_embeddings)
+
+            rescue_grouped: Dict[Tuple[str, int, Optional[float]], List[Tuple[int, OmniSession, RetrievalSlice]]] = {}
+            for idx, session in enumerate(batch):
+                if session.auto_glossary_enabled:
+                    ranked = rank_autoterm_references(outputs[idx], active_domain=session.active_domain)
+                else:
+                    ranked = self._rank_references(outputs[idx])
+                outputs[idx] = ranked
+                if not self._should_rescue_retrieval(session, ranked):
+                    continue
+                rescue = self._rescue_retrieval_slice(session)
+                if rescue is None or rescue.preset_id in set(session.active_slice_presets):
+                    continue
+                if session.auto_glossary_enabled and not self.retrieval.is_index_ready(rescue.index_path):
+                    self._schedule_index_preload(rescue.index_path)
+                    continue
+                session.last_rescue_triggered = True
+                session.last_retrieval_plan.append(rescue.to_meta())
+                key = (
+                    rescue.index_path,
+                    self._retrieval_top_k_for(session),
+                    self._retrieval_score_threshold_for(session),
                 )
-                for (original_idx, session), result in zip(indexed_sessions, group_results):
-                    if not isinstance(result, RetrievalResult):
-                        result = RetrievalResult(references=list(result or []))
-                    outputs[original_idx] = result.references
-                    session.last_query_embedding = result.query_embedding
-                    self._observe_active_glossary(session, result)
+                rescue_grouped.setdefault(key, []).append((idx, session, rescue))
+            await self._retrieve_slice_groups(rescue_grouped, end_by_session, outputs, query_embeddings)
+
+        for idx, session in enumerate(batch):
+            if session.auto_glossary_enabled:
+                outputs[idx] = rank_autoterm_references(outputs[idx], active_domain=session.active_domain)
+            else:
+                outputs[idx] = self._rank_references(outputs[idx])
+            session.last_candidate_pool_count = len(outputs[idx])
+            if session.auto_glossary_enabled:
+                observer_refs = self._prompt_references(session, outputs[idx])
+                self._observe_active_glossary(
+                    session,
+                    RetrievalResult(references=observer_refs, query_embedding=query_embeddings[idx]),
+                )
+            else:
+                session.last_query_embedding = query_embeddings[idx]
         return outputs
+
+    async def _retrieve_slice_groups(
+        self,
+        grouped: Dict[Tuple[str, int, Optional[float]], List[Tuple[int, OmniSession, RetrievalSlice]]],
+        end_by_session: Dict[str, int],
+        outputs: List[List[Dict[str, Any]]],
+        query_embeddings: List[Any],
+    ) -> None:
+        for (index_path, top_k, score_threshold), indexed_sessions in grouped.items():
+            await self.retrieval.activate_index(index_path)
+            requests = [
+                {
+                    "audio_buffer": session.audio[: end_by_session[session.session_id]],
+                    "current_start_sec": float(session.last_llm_samples) / TARGET_SAMPLE_RATE,
+                    "current_end_sec": float(end_by_session[session.session_id]) / TARGET_SAMPLE_RATE,
+                    "lookback_sec": float(self.config.rag_timeline_lookback_sec),
+                }
+                for _, session, _ in indexed_sessions
+            ]
+            group_results = await self.retrieval.retrieve_with_metadata(
+                requests,
+                top_k=top_k,
+                lookback_sec=self.config.rag_timeline_lookback_sec,
+                score_threshold=score_threshold,
+            )
+            for (original_idx, session, plan), result in zip(indexed_sessions, group_results):
+                if not isinstance(result, RetrievalResult):
+                    result = RetrievalResult(references=list(result or []))
+                if query_embeddings[original_idx] is None and result.query_embedding is not None:
+                    query_embeddings[original_idx] = result.query_embedding
+                for ref in result.references:
+                    item = dict(ref)
+                    item.setdefault("source_preset", plan.preset_id)
+                    item["source_slice"] = plan.slice_id
+                    item["source_slice_role"] = plan.role
+                    item["source_domain"] = plan.domain
+                    item["source_slice_weight"] = plan.weight
+                    item["candidate_inventory_terms"] = plan.term_count
+                    if session.auto_glossary_enabled:
+                        item["source"] = f"auto:{plan.slice_id}"
+                    outputs[original_idx].append(item)
 
     def _annotate_references(
         self,
@@ -1088,15 +1279,19 @@ class OmniAgent(Agent):
             item = dict(ref)
             item["active_glossary_preset"] = session.active_glossary_preset or session.glossary_preset
             item["active_domain"] = session.active_domain
-            item.setdefault("domain", session.active_domain)
+            item.setdefault("domain", item.get("source_domain") or session.active_domain)
             item.setdefault("source_preset", session.active_glossary_preset or session.glossary_preset)
             if session.auto_glossary_enabled:
-                item["source"] = f"auto:{session.active_glossary_preset or session.glossary_preset}"
+                source = str(item.get("source") or "")
+                if source in {"", "rag", "wikidata", "glossary"}:
+                    item["source"] = f"auto:{item.get('source_slice') or item.get('source_preset') or session.active_glossary_preset}"
             elif session.glossary_preset and session.glossary_preset != "none":
                 source = str(item.get("source") or "")
                 if source in {"", "rag", "wikidata", "glossary"}:
                     item["source"] = f"preset:{session.glossary_preset}"
             annotated.append(item)
+        if session.auto_glossary_enabled:
+            return rank_autoterm_references(annotated, active_domain=session.active_domain)
         return self._rank_references(annotated)
 
     def _rank_references(self, references: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -1125,7 +1320,18 @@ class OmniAgent(Agent):
         session: OmniSession,
         references: Sequence[Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
-        return self._annotate_references(session, references)[: max(0, int(self.config.prompt_top_k))]
+        k = max(0, int(self.config.prompt_top_k))
+        annotated = self._annotate_references(session, references)
+        if session.auto_glossary_enabled:
+            prompt_refs = force_exactly_k_references(
+                annotated,
+                k=k,
+                backfill=list(session.recent_references),
+            )
+        else:
+            prompt_refs = annotated[:k]
+        session.last_prompt_reference_count = len(prompt_refs)
+        return prompt_refs
 
     def _ui_references(
         self,
@@ -1154,15 +1360,25 @@ class OmniAgent(Agent):
         start_sample: int,
         references: Sequence[Dict[str, Any]],
     ) -> Dict[str, Any]:
+        prompt_refs = self._prompt_references(session, references)
+        ui_refs = self._ui_references(session, references)
+        prompt_k = max(0, int(self.config.prompt_top_k))
         return {
             "segment_idx": segment_idx,
             "elapsed_s": elapsed_s,
             "retrieve_s": round(retrieve_s, 6) if retrieve_s is not None else None,
             "cursor_samples": cursor_samples,
             "start_sample": start_sample,
-            "references": self._ui_references(session, references),
-            "prompt_reference_count": min(len(references or []), max(0, int(self.config.prompt_top_k))),
-            "ui_reference_count": min(len(references or []), max(0, int(self.config.ui_top_k))),
+            "references": ui_refs,
+            "prompt_reference_count": len(prompt_refs),
+            "ui_reference_count": len(ui_refs),
+            "fixed_prompt_k": prompt_k,
+            "prompt_candidate_shortfall": max(0, prompt_k - len(prompt_refs)),
+            "candidate_pool_count": int(session.last_candidate_pool_count or len(references or [])),
+            "active_slices": list(session.active_slice_presets),
+            "active_slice_terms": dict(session.active_slice_terms),
+            "retrieval_plan": list(session.last_retrieval_plan),
+            "open_wiki_rescue_triggered": bool(session.last_rescue_triggered),
             "topic": self._topic_meta(session),
             "topic_router": session.last_router_decision,
         }
@@ -1294,6 +1510,10 @@ class OmniAgent(Agent):
         session.active_glossary_preset = selection.active_preset
         session.active_domain = selection.active_domain
         session.glossary_index_path = selection.index_path
+        active_slices = self._active_retrieval_slices(session)
+        self._record_active_slices(session, active_slices)
+        for item in active_slices:
+            self._schedule_index_preload(item.index_path)
         session.glossary_switch_count += 1
         session.last_topic_reason = selection.reason
         if session.router_state is not None:
@@ -1318,6 +1538,8 @@ class OmniAgent(Agent):
                     "active_glossary_preset": selection.active_preset,
                     "active_domain": selection.active_domain,
                     "active_terms": selection.preset_terms,
+                    "active_slices": list(session.active_slice_presets),
+                    "active_slice_terms": dict(session.active_slice_terms),
                 },
             )
         )
@@ -1388,6 +1610,10 @@ class OmniAgent(Agent):
         session.active_glossary_preset = selection.active_preset
         session.active_domain = selection.active_domain
         session.glossary_index_path = selection.index_path
+        active_slices = self._active_retrieval_slices(session)
+        self._record_active_slices(session, active_slices)
+        for item in active_slices:
+            self._schedule_index_preload(item.index_path)
         session.glossary_switch_count += 1
         session.last_topic_reason = selection.reason
         logger.info(

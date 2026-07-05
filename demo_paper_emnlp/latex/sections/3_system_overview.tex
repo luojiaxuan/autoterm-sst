@@ -53,11 +53,13 @@ SGLang-compatible serving backends without changing the terminology memory,
 router, or UI.
 
 \paragraph{Streaming agent.}
-For each audio chunk, the OmniAgent can run a MaxSim terminology retrieval pass,
-build a \texttt{term\_map}, and call the in-process vLLM backend. The
-PromptBuilder injects at most ten references into the prompt by default. The
-agent emits partial translations plus structured metadata, including retrieved
-terms, retrieval latency, active glossary state, and router decisions.
+For each audio chunk, the OmniAgent can run MaxSim terminology retrieval over
+the active slices, build a \texttt{term\_map}, and call the in-process vLLM
+backend. In \texttt{auto\_working}, the PromptBuilder receives exactly 10
+ranked glossary candidates, matching the fixed-candidate RASST-style interface.
+The agent emits partial translations plus structured metadata, including
+retrieved terms, retrieval latency, active slices, prompt-candidate shortfall as
+a deployment diagnostic, and router decisions.
 
 \paragraph{Evidence protocol.}
 The default WebSocket output remains plain text for backward compatibility. A

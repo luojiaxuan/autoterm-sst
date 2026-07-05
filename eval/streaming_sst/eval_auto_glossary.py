@@ -78,6 +78,11 @@ async def run_preset(
     retrieve_s: List[float] = []
     refs_per_chunk: List[int] = []
     prompt_refs_per_chunk: List[int] = []
+    candidate_pool_counts: List[int] = []
+    prompt_shortfalls: List[int] = []
+    fixed_prompt_ks: List[int] = []
+    rescue_chunks = 0
+    active_slices_by_chunk: List[List[str]] = []
     domains: List[str] = []
     active_presets: List[str] = []
     router_actions: List[str] = []
@@ -115,6 +120,12 @@ async def run_preset(
                 refs = meta.get("references") or []
                 refs_per_chunk.append(len(refs))
                 prompt_refs_per_chunk.append(int(meta.get("prompt_reference_count") or 0))
+                candidate_pool_counts.append(int(meta.get("candidate_pool_count") or len(refs)))
+                prompt_shortfalls.append(int(meta.get("prompt_candidate_shortfall") or 0))
+                fixed_prompt_ks.append(int(meta.get("fixed_prompt_k") or 0))
+                if meta.get("open_wiki_rescue_triggered"):
+                    rescue_chunks += 1
+                active_slices_by_chunk.append([str(item) for item in (meta.get("active_slices") or [])])
                 topic = meta.get("topic") or {}
                 domains.append(str(topic.get("active_domain") or ""))
                 active_presets.append(str(topic.get("active_glossary_preset") or ""))
@@ -144,6 +155,11 @@ async def run_preset(
         "retrieve_p95_ms": round((percentile(warm, 95) or 0.0) * 1000.0, 2) if warm else None,
         "refs_per_chunk": round(statistics.mean(refs_per_chunk), 3) if refs_per_chunk else 0.0,
         "prompt_refs_per_chunk": round(statistics.mean(prompt_refs_per_chunk), 3) if prompt_refs_per_chunk else 0.0,
+        "candidate_pool_per_chunk": round(statistics.mean(candidate_pool_counts), 3) if candidate_pool_counts else 0.0,
+        "prompt_shortfall_chunks": sum(1 for item in prompt_shortfalls if item),
+        "fixed_prompt_k": max(fixed_prompt_ks) if fixed_prompt_ks else None,
+        "open_wiki_rescue_chunks": rescue_chunks,
+        "active_slices_by_chunk": active_slices_by_chunk,
         "switch_count": switch_count,
         "first_switch_chunk": first_switch_chunk,
         "first_switch_s": first_switch_s,

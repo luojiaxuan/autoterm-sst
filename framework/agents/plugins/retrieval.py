@@ -60,6 +60,7 @@ class RetrievalPlugin:
         *,
         top_k: int,
         lookback_sec: float,
+        score_threshold: Optional[float] = None,
     ) -> List[List[TermRef]]:
         """Return per-request term lists (same order as ``requests``)."""
 
@@ -67,6 +68,7 @@ class RetrievalPlugin:
             requests,
             top_k=top_k,
             lookback_sec=lookback_sec,
+            score_threshold=score_threshold,
         )
         return [item.references for item in results]
 
@@ -76,6 +78,7 @@ class RetrievalPlugin:
         *,
         top_k: int,
         lookback_sec: float,
+        score_threshold: Optional[float] = None,
     ) -> List["RetrievalResult"]:
         """Return references plus optional speech-side retrieval metadata."""
 
@@ -152,11 +155,13 @@ class MockRetrieval(RetrievalPlugin):
         *,
         top_k: int,
         lookback_sec: float,
+        score_threshold: Optional[float] = None,
     ) -> List[List[TermRef]]:
         results = await self.retrieve_with_metadata(
             requests,
             top_k=top_k,
             lookback_sec=lookback_sec,
+            score_threshold=score_threshold,
         )
         return [item.references for item in results]
 
@@ -166,7 +171,9 @@ class MockRetrieval(RetrievalPlugin):
         *,
         top_k: int,
         lookback_sec: float,
+        score_threshold: Optional[float] = None,
     ) -> List[RetrievalResult]:
+        del score_threshold
         if not self._active_index_path:
             return [RetrievalResult(references=[]) for _ in requests]
         per_request = max(1, min(3, int(top_k) if top_k else 3))
@@ -354,11 +361,13 @@ class MaxSimRetrievalPlugin(RetrievalPlugin):
         *,
         top_k: int,
         lookback_sec: float,
+        score_threshold: Optional[float] = None,
     ) -> List[List[TermRef]]:
         results = await self.retrieve_with_metadata(
             requests,
             top_k=top_k,
             lookback_sec=lookback_sec,
+            score_threshold=score_threshold,
         )
         return [item.references for item in results]
 
@@ -368,16 +377,24 @@ class MaxSimRetrievalPlugin(RetrievalPlugin):
         *,
         top_k: int,
         lookback_sec: float,
+        score_threshold: Optional[float] = None,
     ) -> List[RetrievalResult]:
         if self.retriever is None or not requests:
             return [RetrievalResult(references=[]) for _ in requests]
         async with self._lock:
-            results = await asyncio.to_thread(
-                self._retrieve_with_query_embeddings_sync,
-                list(requests),
-                int(top_k),
-                float(lookback_sec),
-            )
+            old_threshold = getattr(self.retriever, "score_threshold", None)
+            if score_threshold is not None:
+                self.retriever.score_threshold = float(score_threshold)
+            try:
+                results = await asyncio.to_thread(
+                    self._retrieve_with_query_embeddings_sync,
+                    list(requests),
+                    int(top_k),
+                    float(lookback_sec),
+                )
+            finally:
+                if score_threshold is not None and old_threshold is not None:
+                    self.retriever.score_threshold = old_threshold
         return list(results)
 
     def _retrieve_with_query_embeddings_sync(

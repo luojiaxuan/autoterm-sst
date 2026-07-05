@@ -418,6 +418,11 @@ class OmniAgent(Agent):
             domain_id = str(meta.get("domain_id") or meta.get("domain") or domain_for_preset(preset_id)).strip()
             if domain_id == "general":
                 domain_id = GENERAL_DOMAIN
+            if (
+                preset_id == self.config.auto_glossary_fallback_preset
+                or domain_id in {GENERAL_DOMAIN, "common", "general"}
+            ):
+                continue
             enabled = _meta_bool(meta.get("enabled_for_auto_router"), True)
             snapshot = catalog._open_snapshot(preset_id)  # agent-internal catalog helper
             index_path = str(
@@ -780,7 +785,7 @@ class OmniAgent(Agent):
             active_preset_id=session.active_glossary_preset,
             active_domain_id=session.active_domain,
             created_s=session.created_s,
-            last_decision_s=time.perf_counter(),
+            last_decision_s=0.0,
             last_switch_s=session.created_s,
         )
         active_slices = self._active_retrieval_slices(session)
@@ -932,7 +937,7 @@ class OmniAgent(Agent):
                     active_preset_id=session.active_glossary_preset,
                     active_domain_id=session.active_domain,
                     created_s=time.perf_counter(),
-                    last_decision_s=time.perf_counter(),
+                    last_decision_s=0.0,
                     last_switch_s=time.perf_counter(),
                 )
                 active_slices = self._active_retrieval_slices(session)

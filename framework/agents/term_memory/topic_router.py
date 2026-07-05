@@ -220,7 +220,11 @@ class AudioNativeActiveGlossaryRouter:
             "recent_reference_count": len(session_state.recent_references),
         }
 
-        unsupported_current = bool(current_preset and current_preset not in self.by_preset)
+        unsupported_current = bool(
+            current_preset
+            and current_preset not in self.by_preset
+            and current_preset != self.config.fallback_preset_id
+        )
         if unsupported_current:
             action = "fallback"
             target_preset = self.config.fallback_preset_id

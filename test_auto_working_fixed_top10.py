@@ -9,6 +9,12 @@ from framework.agents.term_memory.slice_registry import (
     slice_id_for_preset,
     slice_role_for_preset,
 )
+from framework.agents.term_memory.topic_router import (
+    AudioNativeActiveGlossaryRouter,
+    DomainSlice,
+    RouterConfig,
+    RouterSessionState,
+)
 
 
 class AutoWorkingFixedTop10Tests(unittest.TestCase):
@@ -46,6 +52,37 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(row["translation_term_recall"], 0.333)
         self.assertEqual(row["term_recall_surfaced"], 1.0)
         self.assertEqual(row["term_recall_not_surfaced"], 0.0)
+
+    def test_router_can_route_from_common_base_to_domain_slice(self) -> None:
+        router = AudioNativeActiveGlossaryRouter(
+            [
+                DomainSlice(
+                    preset_id="nlp_core_10k",
+                    domain_id="nlp",
+                    centroid=[1.0, 0.0],
+                    index_path="mock://nlp",
+                )
+            ],
+            RouterConfig(
+                warmup_sec=0.0,
+                update_interval_sec=0.0,
+                min_confidence=0.5,
+                min_margin=0.0,
+                min_consistent_windows=1,
+                fallback_preset_id="common_10k",
+            ),
+        )
+        state = RouterSessionState(
+            active_preset_id="common_10k",
+            active_domain_id="general",
+            created_s=0.0,
+            last_decision_s=0.0,
+        )
+        decision = router.observe(state, [1.0, 0.0], [], now_s=1.0)
+
+        self.assertEqual(decision.action, "switch")
+        self.assertEqual(decision.target_preset_id, "nlp_core_10k")
+        self.assertEqual(decision.target_domain_id, "nlp")
 
 
 if __name__ == "__main__":

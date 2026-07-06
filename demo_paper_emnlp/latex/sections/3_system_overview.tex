@@ -58,8 +58,8 @@ the active slices, build a \texttt{term\_map}, and call the in-process vLLM
 backend. In \texttt{auto\_working}, the PromptBuilder receives exactly 10
 ranked glossary candidates, matching the fixed-candidate RASST-style interface.
 The agent emits partial translations plus structured metadata, including
-retrieved terms, retrieval latency, active slices, prompt-candidate shortfall as
-a deployment diagnostic, and router decisions.
+retrieved terms, retrieval latency, active slices, fixed-budget invariant
+checks, and router decisions.
 
 \paragraph{Evidence protocol.}
 The default WebSocket output remains plain text for backward compatibility. A

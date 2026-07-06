@@ -43,12 +43,24 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
 
     def test_force_exactly_k_uses_common_defaults_when_pool_is_short(self) -> None:
         ranked = rank_references([{"term": "BERT", "translation": "BERT", "score": 0.9}])
-        prompt = force_exactly_k_references(ranked, k=10, backfill=[])
+        prompt = force_exactly_k_references(ranked, k=10, backfill=[], active_domain="nlp")
 
         self.assertEqual(len(prompt), 10)
         self.assertEqual(len({item["term"].lower() for item in prompt}), 10)
         self.assertTrue(all(item.get("term") and item.get("translation") for item in prompt))
         self.assertEqual(prompt[0]["term"], "BERT")
+
+    def test_force_exactly_k_uses_neutral_defaults_outside_nlp(self) -> None:
+        prompt = force_exactly_k_references([], k=10, backfill=[], active_domain="medicine")
+        terms = {item["term"] for item in prompt}
+
+        self.assertEqual(len(prompt), 10)
+        self.assertNotIn("BERT", terms)
+        self.assertNotIn("Transformer", terms)
+        self.assertNotIn("named entity recognition", terms)
+        self.assertTrue(all(item.get("term") and item.get("translation") for item in prompt))
+        self.assertTrue(all(item.get("source_domain") == "medicine" for item in prompt))
+        self.assertTrue(all(item.get("fallback_reason") == "fixed_prompt_k_domain_neutral_default" for item in prompt))
 
     def test_identity_retention_metric_allows_acronyms_not_lowercase_phrases(self) -> None:
         gold = [("AI", ["AI"]), ("machine learning", ["machine learning"]), ("syntax", ["句法"])]

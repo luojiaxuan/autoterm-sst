@@ -67,7 +67,8 @@ python eval/streaming_sst/score_auto_glossary.py \
 | masked-term BLEU | `score_terms.py --reference-text ...`; removes target-side glossary translations from hyp/ref before sacreBLEU |
 | reference precision | existing ACL tagged precision harness or postprocess refs vs gold |
 | refs/chunk | `eval_auto_glossary.py` JSON metadata |
-| prompt refs/chunk | `prompt_reference_count` metadata |
+| fixed prompt refs/chunk | `prompt_reference_count` metadata; invariant/debug only, not retrieval-quality evidence |
+| prompt shortfall chunks | invariant/debug only; should be zero for fixed-budget auto mode |
 | retrieval p50/p95 | `retrieve_s` metadata |
 | switch count | `meta.topic.switch_count` |
 | router action/reason | `meta.topic_router.action` / `meta.topic_router.reason` |

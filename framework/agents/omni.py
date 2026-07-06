@@ -1430,6 +1430,7 @@ class OmniAgent(Agent):
                 annotated,
                 k=k,
                 backfill=list(session.recent_references),
+                active_domain=session.active_domain,
             )
         else:
             prompt_refs = annotated[:k]

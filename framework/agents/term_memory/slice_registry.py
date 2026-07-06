@@ -31,7 +31,7 @@ _GENERIC_UNIGRAMS = {
 }
 _ACRONYM_RE = re.compile(r"^[A-Z][A-Z0-9.+&/-]{1,}$")
 
-_DEFAULT_COMMON_BACKFILL_TERMS = (
+_DEFAULT_NLP_COMMON_BACKFILL_TERMS = (
     ("AI", "AI"),
     ("NLP", "自然语言处理"),
     ("machine learning", "机器学习"),
@@ -53,6 +53,31 @@ _DEFAULT_COMMON_BACKFILL_TERMS = (
     ("evaluation metric", "评测指标"),
     ("training data", "训练数据"),
 )
+
+_DEFAULT_DOMAIN_NEUTRAL_BACKFILL_TERMS = (
+    ("term", "术语"),
+    ("concept", "概念"),
+    ("entity", "实体"),
+    ("method", "方法"),
+    ("data", "数据"),
+    ("result", "结果"),
+    ("system", "系统"),
+    ("analysis", "分析"),
+    ("model", "模型"),
+    ("process", "过程"),
+    ("evaluation", "评估"),
+    ("evidence", "证据"),
+    ("measurement", "测量"),
+    ("condition", "条件"),
+    ("factor", "因素"),
+    ("group", "组"),
+    ("sample", "样本"),
+    ("case study", "案例研究"),
+    ("decision", "决策"),
+    ("report", "报告"),
+)
+
+_NLP_BACKFILL_DOMAINS = {"", GENERAL_DOMAIN, "common", "nlp"}
 
 
 @dataclass(frozen=True)
@@ -210,10 +235,18 @@ def rank_references(references: Sequence[Dict[str, Any]], *, active_domain: str 
     return sorted(ranked, key=lambda item: float(item.get("rerank_score") or 0.0), reverse=True)
 
 
-def default_common_backfill_references(k: int = PROMPT_K) -> List[Dict[str, Any]]:
+def default_common_backfill_references(
+    k: int = PROMPT_K,
+    *,
+    active_domain: str = GENERAL_DOMAIN,
+) -> List[Dict[str, Any]]:
     limit = max(0, int(k))
+    domain = str(active_domain or GENERAL_DOMAIN).strip().casefold()
+    use_nlp_common = domain in _NLP_BACKFILL_DOMAINS
+    terms = _DEFAULT_NLP_COMMON_BACKFILL_TERMS if use_nlp_common else _DEFAULT_DOMAIN_NEUTRAL_BACKFILL_TERMS
+    fallback_reason = "fixed_prompt_k_default" if use_nlp_common else "fixed_prompt_k_domain_neutral_default"
     refs: List[Dict[str, Any]] = []
-    for term, translation in _DEFAULT_COMMON_BACKFILL_TERMS[:limit]:
+    for term, translation in terms[:limit]:
         refs.append(
             {
                 "term": term,
@@ -224,11 +257,11 @@ def default_common_backfill_references(k: int = PROMPT_K) -> List[Dict[str, Any]
                 "source_preset": "common_10k",
                 "source_slice_id": COMMON_TERMS_SLICE_ID,
                 "source_slice_role": "base",
-                "source_domain": GENERAL_DOMAIN,
+                "source_domain": GENERAL_DOMAIN if use_nlp_common else domain,
                 "score": -100.0,
                 "dense_score": -100.0,
                 "rerank_score": -100.0,
-                "fallback_reason": "fixed_prompt_k_default",
+                "fallback_reason": fallback_reason,
             }
         )
     return refs
@@ -239,6 +272,7 @@ def force_exactly_k_references(
     *,
     k: int = PROMPT_K,
     backfill: Sequence[Dict[str, Any]] = (),
+    active_domain: str = GENERAL_DOMAIN,
 ) -> List[Dict[str, Any]]:
     limit = max(0, int(k))
     if limit == 0:
@@ -250,7 +284,7 @@ def force_exactly_k_references(
         reverse=True,
     )
     if len(merged) < limit:
-        merged = dedupe_references(merged + default_common_backfill_references(limit))
+        merged = dedupe_references(merged + default_common_backfill_references(limit, active_domain=active_domain))
         merged = sorted(
             merged,
             key=lambda item: float(item.get("rerank_score", item.get("score", 0.0)) or 0.0),

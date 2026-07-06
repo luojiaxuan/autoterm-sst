@@ -52,5 +52,6 @@ by canonical source term, and reranks candidates into a fixed prompt list:
 Thus slice size affects the candidate inventory, not the number of glossary
 entries shown to the model. Larger inventories improve coverage but make ranking
 harder; narrower inventories reduce distractors but may miss domain-specific
-terms. The live evidence metadata records active slices, candidate-pool size,
-prompt top-10 count, shortfall, and fallback events.
+terms. The live evidence metadata records active slices, candidate-pool size, the
+fixed top-10 budget check, fallback events, and retrieval-quality metrics such as
+prompt gold retrieval and precision.

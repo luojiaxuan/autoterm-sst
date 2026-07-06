@@ -18,6 +18,9 @@ class ScoreTermsMaskedBleuTests(unittest.TestCase):
         self.assertEqual(resolve_chunk_samples(0, 0.96, 1), 15360)
         self.assertEqual(resolve_chunk_samples(0, 0.96, 2), 30720)
         self.assertEqual(resolve_chunk_samples(8000, 0.96, 2), 8000)
+        self.assertEqual(resolve_chunk_samples(0, 0.96, 9), 61440)
+        self.assertEqual(resolve_chunk_samples(0, 0.96, -2), 15360)
+        self.assertEqual(resolve_chunk_samples(0, 0.96, "bad"), 30720)
 
     def test_longer_terms_are_masked_before_overlaps(self) -> None:
         terms = target_terms_from_gold(

@@ -22,6 +22,13 @@ ratio, not a replacement for a real raw238 `term_ACC`.
   `--gold-file eval/streaming_sst/acl_gold_technical.json --gold-label technical142`
   and
   `--raw-gold-glossary /mnt/data2/jiaxuanluo/RASST/data/glossaries/acl6060_tagged_gt_raw_min_norm2.json --raw-gold-label raw238 --save-output-text`.
+- Dual-gold rerun started 2026-07-06 23:40 UTC on Aries, using physical GPUs
+  4,5 for vLLM and 6 for RAG. Run root:
+  `/mnt/data3/jiaxuanluo/rasst_eval/ai_glossary_sweep/dual_gold_20260706T2336Z`.
+  Driver PID: `2396300`. Expected rows:
+  `json_ws/strict_streaming_longaudio_dualgold_lm2.json` and
+  `json_ws/strict_streaming_longaudio_dualgold_lm1.json`. Monitor log:
+  `client_logs/gpu_monitor.log`.
 - Status: local staging only. These generated glossaries, indexes, logs, and
   benchmark rows are not yet uploaded to Hugging Face. If they become reusable
   artifacts, publish them as a HF dataset and record the repo/revision here.

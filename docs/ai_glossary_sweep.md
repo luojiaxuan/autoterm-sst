@@ -2,8 +2,10 @@
 
 This note records the full long-audio streaming benchmark for the AI glossary
 size question. The run keeps the ACL raw glossary in every tested inventory and
-adds sampled AI/RDF candidates at larger scales. Metrics are fixed across rows:
-BLEU, `term_ACC` (`term_recall` in the harness), and `masked_term_BLEU`.
+adds sampled AI/RDF candidates at larger scales. BLEU and `masked_term_BLEU`
+are fixed across rows. The originally reported `term_ACC` (`term_recall` in the
+harness) uses the source-filtered ACL gold set for this long audio: 142 ACL raw
+terms appear in the source text, out of 238 ACL raw glossary entries.
 
 ## Source Of Truth And Artifact Status
 
@@ -56,6 +58,28 @@ we have a clean 100k zh AI glossary locally.
   do not force filler refs in this harness. This benchmark is a scale/relevance
   sweep, not the unit test for the auto mode's exact-10 backfill invariant.
 
+## Term-ACC Denominator Audit
+
+The scorer used `load_gold(glossary, source_text)`, so the denominator in the
+original `term_ACC` column is `142`, not the full ACL raw glossary size of
+`238`. The fixed-238 recalculation below keeps the same output-hit numerator and
+divides by all ACL raw entries. This fixed-238 view is useful for auditing the
+glossary-scale question, but the source-filtered denominator is the usual term
+recall denominator for terms that actually occur in the evaluated audio.
+
+| lm | setting | source gold | hits | term_ACC@142 | term_ACC@238 | PromptGold@142 | PromptGold@238 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 2 | acl_tagged_raw | 142 | 138 | 0.972 | 0.580 | 0.972 | 0.580 |
+| 2 | acl_ai_translated_plus10k | 142 | 137 | 0.965 | 0.576 | 0.972 | 0.580 |
+| 2 | acl_ai_broad_plus10k | 142 | 138 | 0.972 | 0.580 | 0.979 | 0.584 |
+| 2 | acl_ai_broad_plus50k | 142 | 139 | 0.979 | 0.584 | 0.979 | 0.584 |
+| 2 | acl_ai_broad_plus100k | 142 | 137 | 0.965 | 0.576 | 0.979 | 0.584 |
+| 1 | acl_tagged_raw | 142 | 134 | 0.944 | 0.563 | 0.979 | 0.584 |
+| 1 | acl_ai_translated_plus10k | 142 | 136 | 0.958 | 0.571 | 0.979 | 0.584 |
+| 1 | acl_ai_broad_plus10k | 142 | 135 | 0.951 | 0.567 | 0.979 | 0.584 |
+| 1 | acl_ai_broad_plus50k | 142 | 136 | 0.958 | 0.571 | 0.972 | 0.580 |
+| 1 | acl_ai_broad_plus100k | 142 | 136 | 0.958 | 0.571 | 0.951 | 0.567 |
+
 ## Results: lm=2
 
 | lm | setting | terms | term_ACC | BLEU | masked_term_BLEU | PromptGold@10 | RetrPrec@10 | refs/chunk | retr p50 ms | retr p95 ms |
@@ -97,11 +121,16 @@ The conditional term metrics separate output correctness when a gold term was su
 
 For the requested question, there is no clear translation-quality regression up
 to the tested 100k broad RDF inventory when ACL raw terms are always included.
-`term_ACC`, BLEU, and `masked_term_BLEU` stay in the same band for both latency
-settings:
+`term_ACC@source142`, BLEU, and `masked_term_BLEU` stay in the same band for
+both latency settings:
 
 - lm=2: `term_ACC` ranges 0.965-0.979; `masked_term_BLEU` ranges 52.7533-53.3536.
 - lm=1: `term_ACC` ranges 0.944-0.958; `masked_term_BLEU` ranges 49.2346-49.9715.
+
+With the full ACL raw glossary as a fixed denominator, `term_ACC@238` is lower
+in absolute value but shows the same flat pattern: 0.576-0.584 for lm=2 and
+0.563-0.571 for lm=1. The small +10k increases in some rows come from a larger
+hit numerator, not from denominator drift.
 
 The systematic regression is retrieval relevance, not output quality. Retrieval
 precision drops as broad inventory size grows:
@@ -133,8 +162,9 @@ common glossary. The production route policy is:
    zh AI pool is around 13.6k, so a 10k AI/NLP core slice is the correct default
    until a larger clean AI glossary exists.
 5. Treat 50k/100k broad RDF pools as rescue/diagnostic inventories rather than
-   default routed domains. They did not cause a clear BLEU or term_ACC collapse,
-   but precision falls below 0.20 at 50k and near 0.13 at 100k.
+   default routed domains. They did not cause a clear BLEU, source-filtered
+   term_ACC, or fixed-238 term_ACC collapse, but precision falls below 0.20 at
+   50k and near 0.13 at 100k.
 6. Add diagnostics around retrieval precision, `PromptGold@10`, refs/chunk, and
    `TermRecall | surfaced` vs `TermRecall | not surfaced`; output term accuracy
    alone hides prompt-channel failure.

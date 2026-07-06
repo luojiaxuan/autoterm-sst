@@ -556,7 +556,7 @@ def main() -> None:
         "refs_per_chunk",
         "chunks",
     ]
-    print("\n=== glossary-scale terminology eval (fixed gold denominator) ===")
+    print("\n=== glossary-scale terminology eval (source-filtered gold denominator) ===")
     print(" | ".join(c.ljust(13) for c in cols))
     for r in rows:
         print(" | ".join(str(r.get(c, "")).ljust(13) for c in cols))

@@ -64,12 +64,16 @@ we have a clean 100k zh AI glossary locally.
 The strict long-audio runner scores against
 `eval/streaming_sst/acl_gold_technical.json`, which contains 142 gold terms.
 That file is a subset of the 238-entry ACL raw glossary. Therefore the valid
-`term_ACC` denominator for this run is 142. The `terms` column in the result
-tables below is the active inventory size, not the term-accuracy denominator.
+`term_ACC` denominator for this run is 142. A direct boundary match over the
+468-line ACL source text finds all 238 raw glossary entries, so the reduction to
+142 is not caused by source matching or deduplication; it is the manually chosen
+technical-term gold subset. The `terms` column in the result tables below is
+the active inventory size, not the term-accuracy denominator.
 
-Dividing by 238 is not a valid term-accuracy metric for this audio, because 96
-raw glossary entries are outside the run's gold set. It is only an inventory
-audit ratio, with a ceiling of `142/238 = 0.597` before output errors. The
+Dividing by 238 is not the metric used for this run, because 96 raw glossary
+entries were deliberately dropped from the technical gold as
+common/daily/generic terms. It is only an inventory audit ratio, with a ceiling
+of `142/238 = 0.597` before output errors. The
 `hits/238` column below is kept only to explain why a forced 238 denominator
 produces values around 0.58.
 

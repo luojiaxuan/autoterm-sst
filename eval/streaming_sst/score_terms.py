@@ -108,6 +108,45 @@ def load_gold_file(path: str) -> List[Tuple[str, List[str]]]:
     return gold
 
 
+def load_glossary_gold(path: str, lang: str) -> List[Tuple[str, List[str]]]:
+    """Full glossary gold: every entry is scored, with no source-text filtering."""
+    data = json.load(open(path, encoding="utf-8"))
+    if isinstance(data, dict):
+        raw_entries: Iterable[Any] = data.values()
+    elif isinstance(data, list):
+        raw_entries = data
+    else:
+        raise ValueError(f"Unsupported glossary format for raw gold: {path}")
+
+    gold: List[Tuple[str, List[str]]] = []
+    for entry in raw_entries:
+        if not isinstance(entry, dict):
+            continue
+        en = normalise_space(entry.get("en") or entry.get("term") or "")
+        variants: List[str] = []
+        translations = entry.get("target_translations")
+        if isinstance(translations, dict):
+            value = translations.get(lang)
+            if isinstance(value, list):
+                variants.extend(normalise_space(v) for v in value)
+            elif value:
+                variants.append(normalise_space(value))
+        for key in (lang, "zh", "translation", "target_translation"):
+            value = entry.get(key)
+            if isinstance(value, list):
+                variants.extend(normalise_space(v) for v in value)
+            elif value:
+                variants.append(normalise_space(value))
+        for key in ("variants", "acceptable_targets"):
+            value = entry.get(key)
+            if isinstance(value, list):
+                variants.extend(normalise_space(v) for v in value)
+        variants = [v for v in dict.fromkeys(variants) if v]
+        if en and variants:
+            gold.append((en, variants))
+    return gold
+
+
 def load_target_terms_for_masking(glossary_path: str, target_lang: str) -> List[str]:
     """Load target-side glossary translations for RASST-style masked BLEU."""
     data = json.load(open(glossary_path, encoding="utf-8"))
@@ -425,6 +464,39 @@ def score(output: str, gold: List[Tuple[str, List[str]]], surfaced_terms: Option
     }
 
 
+def compute_gold_metric_block(
+    output: str,
+    gold: List[Tuple[str, List[str]]],
+    refs: Sequence[Tuple[str, str]],
+    surfaced_terms: set[str],
+) -> Dict[str, Any]:
+    block = score(output, gold, surfaced_terms=surfaced_terms)
+    gold_en = set(en.lower() for en, _ in gold)
+    gold_refs = sum(1 for en, _ in refs if en.lower() in gold_en)
+    block["retrieval_precision"] = round(gold_refs / len(refs), 3) if refs else None
+    block["retrieval_precision_at_10"] = block["retrieval_precision"]
+    block["gold_retrieved"] = (
+        round(len(set(en.lower() for en, _ in refs if en.lower() in gold_en)) / len(gold), 3)
+        if gold
+        else None
+    )
+    block["prompt_gold_retrieved_at_10"] = block["gold_retrieved"]
+    return block
+
+
+def metric_prefix(label: str) -> str:
+    prefix = re.sub(r"[^A-Za-z0-9]+", "_", str(label or "").strip()).strip("_")
+    if not prefix:
+        raise ValueError("Metric label must contain at least one alphanumeric character.")
+    return prefix
+
+
+def add_prefixed_metrics(row: Dict[str, Any], label: str, block: Dict[str, Any]) -> None:
+    prefix = metric_prefix(label)
+    for key, value in block.items():
+        row[f"{prefix}_{key}"] = value
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--base-url", default="http://aries:8011")
@@ -439,11 +511,15 @@ def main() -> None:
     ap.add_argument("--presets", default="none,acl_tagged_raw,open_wiki_academic")
     ap.add_argument("--max-segs", type=int, default=8)
     ap.add_argument("--gold-file", default="", help="independent gold JSON [{en, zh:[variants]}]; avoids circular gold")
+    ap.add_argument("--gold-label", default="", help="optional prefix alias for the primary gold metrics, e.g. technical142")
+    ap.add_argument("--raw-gold-glossary", default="", help="full raw glossary JSON to score with no source-text filtering")
+    ap.add_argument("--raw-gold-label", default="raw238", help="metric prefix for --raw-gold-glossary")
     ap.add_argument("--coverage", default="", help="comma-sep glossary JSONs to report gold coverage for")
     ap.add_argument("--latency-multiplier", type=int, default=2)
     ap.add_argument("--base-segment-sec", type=float, default=0.96)
     ap.add_argument("--chunk", type=int, default=0, help="PCM samples per send; 0 uses base_segment_sec * latency_multiplier")
     ap.add_argument("--feed-sleep", type=float, default=0.45, help="per-chunk send delay (lower = faster than realtime)")
+    ap.add_argument("--save-output-text", action="store_true", help="persist full hypothesis text in --out-json rows for later rescoring audits")
     ap.add_argument("--out-json", default="")
     args = ap.parse_args()
 
@@ -460,6 +536,11 @@ def main() -> None:
             print(f"[coverage] {cg.split('/')[-1]}: {cov['covered']}/{cov['of']} (missing: {cov['missing']})")
     else:
         gold = load_gold(args.glossary, source_text, args.target_lang)
+    extra_gold_sets: List[Tuple[str, List[Tuple[str, List[str]]]]] = []
+    if args.raw_gold_glossary:
+        raw_gold = load_glossary_gold(args.raw_gold_glossary, args.target_lang)
+        extra_gold_sets.append((args.raw_gold_label, raw_gold))
+        print(f"[score] raw glossary gold {args.raw_gold_label} ({len(raw_gold)} terms): {[g[0] for g in raw_gold]}")
     fs = sorted(glob.glob(f"{args.seg_dir}/*.wav"))[: args.max_segs]
     pcm = np.concatenate([read_wav(f) for f in fs]).astype(np.float32)
     print(f"[score] {len(fs)} segs; {len(gold)} gold terms: {[g[0] for g in gold]}")
@@ -472,8 +553,6 @@ def main() -> None:
         else:
             target_terms = target_terms_from_gold(gold)
             print(f"[score] masked BLEU terms from gold variants: {len(target_terms)}")
-
-    gold_en = set(en.lower() for en, _ in gold)
     rows = []
     for preset in [p.strip() for p in args.presets.split(",") if p.strip()]:
         try:
@@ -491,8 +570,15 @@ def main() -> None:
             )
             refs = res["refs"]
             surfaced_terms = {en.lower() for en, _ in refs if en}
-            row = {"preset": preset, **score(res["text"], gold, surfaced_terms=surfaced_terms)}
-            gold_refs = sum(1 for en, _ in refs if en.lower() in gold_en)
+            primary_block = compute_gold_metric_block(res["text"], gold, refs, surfaced_terms)
+            row = {"preset": preset, **primary_block}
+            if args.gold_label:
+                add_prefixed_metrics(row, args.gold_label, primary_block)
+            for label, extra_gold in extra_gold_sets:
+                extra_block = compute_gold_metric_block(res["text"], extra_gold, refs, surfaced_terms)
+                add_prefixed_metrics(row, label, extra_block)
+            if args.save_output_text:
+                row["output_text"] = res["text"]
             row["latency_multiplier"] = res.get("latency_multiplier")
             row["streaming_chunk_samples"] = res.get("chunk_samples")
             row["chunks"] = res["chunks"]
@@ -502,16 +588,6 @@ def main() -> None:
             row["avg_candidate_pool"] = round(sum(res["candidate_pool_counts"]) / len(res["candidate_pool_counts"]), 3) if res["candidate_pool_counts"] else 0.0
             row["prompt_shortfall_chunks"] = sum(1 for item in res["prompt_shortfalls"] if item)
             row["open_wiki_rescue_chunks"] = int(res.get("rescue_events") or 0)
-            # precision: fraction of surfaced top-10 terms that are gold, not distractors
-            row["retrieval_precision"] = round(gold_refs / len(refs), 3) if refs else None
-            row["retrieval_precision_at_10"] = row["retrieval_precision"]
-            # gold-retrieved recall: distinct gold terms surfaced at least once / |gold|
-            row["gold_retrieved"] = (
-                round(len(set(en.lower() for en, _ in refs if en.lower() in gold_en)) / len(gold), 3)
-                if gold
-                else None
-            )
-            row["prompt_gold_retrieved_at_10"] = row["gold_retrieved"]
             if reference_text is not None:
                 row.update(
                     compute_bleu_scores(
@@ -556,7 +632,22 @@ def main() -> None:
         "refs_per_chunk",
         "chunks",
     ]
-    print("\n=== glossary-scale terminology eval (source-filtered gold denominator) ===")
+    if args.gold_label:
+        cols.extend([
+            f"{metric_prefix(args.gold_label)}_gold",
+            f"{metric_prefix(args.gold_label)}_term_recall",
+            f"{metric_prefix(args.gold_label)}_prompt_gold_retrieved_at_10",
+            f"{metric_prefix(args.gold_label)}_retrieval_precision_at_10",
+        ])
+    for label, _ in extra_gold_sets:
+        prefix = metric_prefix(label)
+        cols.extend([
+            f"{prefix}_gold",
+            f"{prefix}_term_recall",
+            f"{prefix}_prompt_gold_retrieved_at_10",
+            f"{prefix}_retrieval_precision_at_10",
+        ])
+    print("\n=== glossary-scale terminology eval (primary gold denominator; optional prefixed gold blocks) ===")
     print(" | ".join(c.ljust(13) for c in cols))
     for r in rows:
         print(" | ".join(str(r.get(c, "")).ljust(13) for c in cols))

@@ -171,14 +171,17 @@ that gold (`score_terms.py --gold-file ... --coverage ...`).
 
 ## Glossary-scale experiment (fixed gold denominator) — the right design
 
-Method (per the fixed-gold, scale-the-glossary design): take the ACL-238 gold,
-**drop daily/common words → 142 technical terms** (`eval/streaming_sst/acl_gold_technical.json`;
-the fixed recall denominator). Build glossaries that **all contain the 142 gold**
-(via all 238 ACL terms) padded with general-Wikidata distractors to 10k / 100k /
-500k (`scale_*` presets). So coverage is held ~constant and the only variable is
-distractor count. Metrics: `recall@142` (correct zh in output), `gold_retrieved`
-(distinct gold terms surfaced in retrieval / 142), `retrieval_precision`
-(retrieved refs that are gold / all refs). Eval audio = ACL-60-60.
+Method (per the fixed-gold, scale-the-glossary design): keep the full ACL-238
+raw glossary in every tested inventory, and report terminology accuracy with
+two denominators. `term_ACC_raw238` uses the full raw annotation so the paper
+does not hide daily/common/generic terms; `term_ACC_technical142` uses
+`eval/streaming_sst/acl_gold_technical.json`, the curated technical subset used
+by the historical scale rows below. Build glossaries that contain the raw ACL
+terms, padded with general-Wikidata distractors to 10k / 100k / 500k
+(`scale_*` presets). So coverage is held ~constant and the only variable is
+distractor count. Metrics should include both raw238 and technical142 versions
+of term accuracy, `gold_retrieved`, and retrieval precision. Eval audio =
+ACL-60-60.
 
 **Validation — terminology retrieval works (full 468-seg set, all 142 gold spoken):**
 

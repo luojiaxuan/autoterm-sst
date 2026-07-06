@@ -3,10 +3,12 @@
 This note records the full long-audio streaming benchmark for the AI glossary
 size question. The run keeps the ACL raw glossary in every tested inventory and
 adds sampled AI/RDF candidates at larger scales. BLEU and `masked_term_BLEU`
-are fixed across rows. The originally reported `term_ACC` (`term_recall` in the
-harness) uses the strict runner's ACL eval gold file with 142 terms; the ACL raw
-inventory contains 238 entries, but that inventory size is not the term-accuracy
-denominator for this run.
+are fixed across rows. Terminology accuracy must be reported with both gold
+sets: the full 238-entry ACL raw annotation and the 142-entry curated technical
+subset that removes daily/common/generic words. The historical rows below were
+scored only with the curated 142-term gold because the strict runner did not
+persist full hypothesis text; therefore the `hits/238` column is only an audit
+ratio, not a replacement for a real raw238 `term_ACC`.
 
 ## Source Of Truth And Artifact Status
 
@@ -16,6 +18,10 @@ denominator for this run.
 - Summary table: `/mnt/data1/jiaxuanluo/rasst_eval/ai_glossary_sweep/strict_longaudio_sweep_20260706T110618Z/json_ws/strict_streaming_longaudio_summary.md`.
 - Aries manifest used by the server: `/mnt/data1/jiaxuanluo/rasst_eval/ai_glossary_sweep/manifest_ai_glossary_sweep_20260706_aries.json`.
 - Server log: `/mnt/data1/jiaxuanluo/rasst_eval/ai_glossary_sweep/server_logs/server_8012_tmpfix.log`.
+- Required rerun scoring mode: score the same streaming outputs with
+  `--gold-file eval/streaming_sst/acl_gold_technical.json --gold-label technical142`
+  and
+  `--raw-gold-glossary /mnt/data2/jiaxuanluo/RASST/data/glossaries/acl6060_tagged_gt_raw_min_norm2.json --raw-gold-label raw238 --save-output-text`.
 - Status: local staging only. These generated glossaries, indexes, logs, and
   benchmark rows are not yet uploaded to Hugging Face. If they become reusable
   artifacts, publish them as a HF dataset and record the repo/revision here.
@@ -59,23 +65,28 @@ we have a clean 100k zh AI glossary locally.
   do not force filler refs in this harness. This benchmark is a scale/relevance
   sweep, not the unit test for the auto mode's exact-10 backfill invariant.
 
-## Term-ACC Denominator Audit
+## Dual Gold Denominator Audit
 
 The strict long-audio runner scores against
 `eval/streaming_sst/acl_gold_technical.json`, which contains 142 gold terms.
-That file is a subset of the 238-entry ACL raw glossary. Therefore the valid
-`term_ACC` denominator for this run is 142. A direct boundary match over the
-468-line ACL source text finds all 238 raw glossary entries, so the reduction to
-142 is not caused by source matching or deduplication; it is the manually chosen
-technical-term gold subset. The `terms` column in the result tables below is
-the active inventory size, not the term-accuracy denominator.
+That file is a curated subset of the 238-entry ACL raw glossary. A direct
+boundary match over the 468-line ACL source text finds all 238 raw glossary
+entries, so the reduction to 142 is not caused by source matching or
+deduplication; it is the manually chosen technical-term subset.
 
-Dividing by 238 is not the metric used for this run, because 96 raw glossary
-entries were deliberately dropped from the technical gold as
-common/daily/generic terms. It is only an inventory audit ratio, with a ceiling
-of `142/238 = 0.597` before output errors. The
-`hits/238` column below is kept only to explain why a forced 238 denominator
-produces values around 0.58.
+For paper reporting, do not replace raw238 with curated142. Report both:
+
+- `term_ACC_raw238`: the full ACL raw annotation, including daily/common/generic
+  words, so reviewers can verify we did not choose a favorable subset.
+- `term_ACC_technical142`: the curated technical subset, so the term metric
+  focuses on terminology rather than ordinary vocabulary.
+
+The `terms` column in the result tables below is the active inventory size, not
+the term-accuracy denominator. The historical `hits/238` audit ratio below was
+computed from the curated142 hit numerator divided by 238. It is not a true
+raw238 score, because the previous rows JSON did not save full hypothesis text
+for rescoring the 96 raw-only terms. A dual-gold rerun is required for final
+paper evidence.
 
 | lm | setting | eval gold | hits | term_ACC@142 | hits/238 audit | PromptGold@142 | surfaced/238 audit |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -90,7 +101,7 @@ produces values around 0.58.
 | 1 | acl_ai_broad_plus50k | 142 | 136 | 0.958 | 0.571 | 0.972 | 0.580 |
 | 1 | acl_ai_broad_plus100k | 142 | 136 | 0.958 | 0.571 | 0.951 | 0.567 |
 
-## Results: lm=2
+## Historical Results: lm=2, Technical142 Only
 
 | lm | setting | terms | term_ACC | BLEU | masked_term_BLEU | PromptGold@10 | RetrPrec@10 | refs/chunk | retr p50 ms | retr p95 ms |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -100,7 +111,7 @@ produces values around 0.58.
 | 2 | acl_ai_broad_plus50k | 50238 | 0.9790 | 58.65 | 53.24 | 0.9790 | 0.1960 | 3.6400 | 94.47 | 121.90 |
 | 2 | acl_ai_broad_plus100k | 100238 | 0.9650 | 58.83 | 53.32 | 0.9790 | 0.1370 | 5.0270 | 93.09 | 118.49 |
 
-## Results: lm=1
+## Historical Results: lm=1, Technical142 Only
 
 | lm | setting | terms | term_ACC | BLEU | masked_term_BLEU | PromptGold@10 | RetrPrec@10 | refs/chunk | retr p50 ms | retr p95 ms |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -131,17 +142,19 @@ The conditional term metrics separate output correctness when a gold term was su
 
 For the requested question, there is no clear translation-quality regression up
 to the tested 100k broad RDF inventory when ACL raw terms are always included.
-`term_ACC@source142`, BLEU, and `masked_term_BLEU` stay in the same band for
-both latency settings:
+technical142 `term_ACC`, BLEU, and `masked_term_BLEU` stay in the same band for
+both latency settings. Raw238 still needs the dual-gold rerun described above:
 
 - lm=2: `term_ACC` ranges 0.965-0.979; `masked_term_BLEU` ranges 52.7533-53.3536.
 - lm=1: `term_ACC` ranges 0.944-0.958; `masked_term_BLEU` ranges 49.2346-49.9715.
 
-If the hit numerator is divided by all 238 raw glossary entries, the resulting
-`hits/238` audit ratio is around 0.56-0.58 because the 142-term eval gold set is
-already only 59.7% of the raw inventory. This should not be reported as
-`term_ACC`. The small +10k increases in some rows come from a larger hit
-numerator within the 142-term eval gold set, not from denominator drift.
+If the technical142 hit numerator is divided by all 238 raw glossary entries,
+the resulting `hits/238` audit ratio is around 0.56-0.58 because the 142-term
+eval gold set is already only 59.7% of the raw inventory. This audit ratio
+should not be reported as either raw or technical `term_ACC`; it only explains
+why a forced denominator mismatch produced values around 0.58. The small +10k
+increases in some rows come from a larger hit numerator within the 142-term eval
+gold set, not from denominator drift.
 
 The systematic regression is retrieval relevance, not output quality. Retrieval
 precision drops as broad inventory size grows:

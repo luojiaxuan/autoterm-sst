@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import json
 import sys
+import tempfile
 from types import SimpleNamespace
 import unittest
 
 from eval.streaming_sst.score_terms import (
     compile_term_mask_patterns,
     compute_bleu_scores,
+    load_glossary_gold,
     mask_target_terms,
     resolve_chunk_samples,
     target_terms_from_gold,
@@ -79,6 +82,19 @@ class ScoreTermsMaskedBleuTests(unittest.TestCase):
         self.assertEqual(scores["masked_terms_ref_removed"], 1)
         self.assertEqual(scores["masked_terms_types"], 1)
         self.assertIn("masked_terms_bleu", scores)
+
+    def test_load_glossary_gold_keeps_full_raw_inventory(self) -> None:
+        entries = [
+            {"term": "algorithm", "target_translations": {"zh": "算法"}},
+            {"term": "words", "target_translations": {"zh": "词"}},
+            {"term": "BERT", "target_translations": {"zh": "BERT"}},
+        ]
+        with tempfile.NamedTemporaryFile("w", suffix=".json", encoding="utf-8") as f:
+            json.dump(entries, f, ensure_ascii=False)
+            f.flush()
+            gold = load_glossary_gold(f.name, "zh")
+
+        self.assertEqual(gold, [("algorithm", ["算法"]), ("words", ["词"]), ("BERT", ["BERT"])])
 
 
 if __name__ == "__main__":

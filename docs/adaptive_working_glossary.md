@@ -60,7 +60,7 @@ last_topic_update_s
 topic_history
 glossary_switch_count
 recent_references
-router_state                 # EMA speech embedding, recent decisions, pending target
+router_state                 # EMA speech embedding, candidate streak, pending target
 last_router_decision
 ```
 
@@ -95,19 +95,42 @@ Reference votes use metadata such as `active_glossary_preset`, `domain`, and
 `source_preset`; they do not infer topic from term strings like "patient" or
 "language model".
 
-Switch guards:
+Switch guards run in this order:
 
 - no switch during warmup;
 - update at most once per configured interval;
-- no switch unless confidence is above the threshold;
-- no switch unless the new domain beats the next best domain by a margin;
-- no switch unless the target is consistent across recent decision windows;
+- no switch if the target is already the active preset or domain;
 - no narrow switch to the general/common domain;
 - no switch until the target index is preloadable;
+- no switch unless confidence is above the threshold;
+- no switch unless the new domain beats the next best domain by a margin;
+- no switch unless the new domain also beats the current active slice by the
+  current-margin threshold;
+- no switch during the post-switch cooldown, so a just-applied slice cannot
+  immediately ping-pong on the next retrieval tick;
+- no switch unless the target is consistent across consecutive candidate
+  windows; stale candidate streaks are reset;
 - uncertain sessions stay on the current domain slice or no active fallback.
 
 Manual glossary terms may still be injected into the prompt by
 `PromptBuilder`, but they intentionally do not bias the router.
+
+The default routing thresholds live in `configs/autoterm_slices.yaml`:
+
+```yaml
+routing:
+  domain_activate_threshold: 0.60
+  domain_margin_threshold: 0.15
+  current_margin_threshold: 0.10
+  min_consistent_windows: 2
+  switch_cooldown_sec: 90
+  candidate_stale_sec: 120
+```
+
+Each `topic_router` metadata payload records the target score, current active
+slice score, target-current delta, candidate streak, top scored domains, and
+the guard that blocked or allowed a switch. These fields are the first place to
+inspect when a run appears to stay on a stale domain slice or switch too often.
 
 ## Non-Blocking Switching
 
@@ -159,7 +182,13 @@ The JSON WebSocket event contains:
       "to_preset": "medicine_core_10k",
       "confidence": 0.73,
       "margin": 0.19,
-      "reason": "speech_embedding+retrieved_refs"
+      "reason": "speech_embedding+retrieved_refs",
+      "evidence": {
+        "current_score": 0.41,
+        "target_score_delta": 0.32,
+        "candidate_preset": "medicine_core_10k",
+        "candidate_streak": 2
+      }
     }
   }
 }

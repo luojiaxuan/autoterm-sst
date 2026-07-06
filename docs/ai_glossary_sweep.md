@@ -124,7 +124,9 @@ common glossary. The production route policy is:
    ACL/AI demo.
 2. Route among domain slices using speech-embedding centroid similarity plus
    retrieved-reference metadata; do not use source transcripts, generated text,
-   or manual terms to infer the domain.
+   or manual terms to infer the domain. A slice change now also requires the
+   target to beat the current active slice, survive consecutive candidate
+   windows, and pass a post-switch cooldown.
 3. Keep the prompt candidate budget fixed at 10. Inventory size changes the pool
    from which candidates are ranked, not the prompt interface.
 4. Use clean domain slices as the default active inventory. The available clean

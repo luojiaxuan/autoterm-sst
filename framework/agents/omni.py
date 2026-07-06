@@ -265,7 +265,10 @@ class OmniConfig:
     auto_glossary_warmup_sec: float = 30.0
     auto_glossary_min_conf: float = 0.60
     auto_glossary_switch_margin: float = 0.15
+    auto_glossary_current_margin: float = 0.10
     auto_glossary_min_consistent_windows: int = 2
+    auto_glossary_switch_cooldown_sec: float = 90.0
+    auto_glossary_candidate_stale_sec: float = 120.0
     auto_glossary_fallback_preset: str = "none"
     auto_glossary_preload: bool = True
     auto_glossary_preload_presets: str = "nlp_core_10k,medicine_core_10k"
@@ -355,7 +358,13 @@ class OmniConfig:
                 "RASST_AUTO_GLOSSARY_MIN_MARGIN",
                 _env_float("RASST_AUTO_GLOSSARY_SWITCH_MARGIN", _safe_float(routing_config.get("domain_margin_threshold"), 0.15)),
             ),
-            auto_glossary_min_consistent_windows=_env_int("RASST_AUTO_GLOSSARY_MIN_CONSISTENT_WINDOWS", 2),
+            auto_glossary_current_margin=_safe_float(routing_config.get("current_margin_threshold"), 0.10),
+            auto_glossary_min_consistent_windows=_env_int(
+                "RASST_AUTO_GLOSSARY_MIN_CONSISTENT_WINDOWS",
+                _safe_int(routing_config.get("min_consistent_windows"), 2),
+            ),
+            auto_glossary_switch_cooldown_sec=_safe_float(routing_config.get("switch_cooldown_sec"), 90.0),
+            auto_glossary_candidate_stale_sec=_safe_float(routing_config.get("candidate_stale_sec"), 120.0),
             auto_glossary_fallback_preset=_env_str("RASST_AUTO_GLOSSARY_FALLBACK", "none"),
             auto_glossary_preload=_env_bool("RASST_AUTO_GLOSSARY_PRELOAD", True),
             auto_glossary_preload_presets=_env_str(
@@ -482,7 +491,10 @@ class OmniAgent(Agent):
             update_interval_sec=self.config.auto_glossary_update_sec,
             min_confidence=self.config.auto_glossary_min_conf,
             min_margin=self.config.auto_glossary_switch_margin,
+            min_current_margin=self.config.auto_glossary_current_margin,
             min_consistent_windows=self.config.auto_glossary_min_consistent_windows,
+            switch_cooldown_sec=self.config.auto_glossary_switch_cooldown_sec,
+            candidate_stale_sec=self.config.auto_glossary_candidate_stale_sec,
             embedding_weight=self.config.router_embed_weight,
             reference_weight=self.config.router_ref_weight,
             ema_alpha=self.config.router_ema_alpha,

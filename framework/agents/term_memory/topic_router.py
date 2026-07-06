@@ -69,7 +69,10 @@ class RouterConfig:
     update_interval_sec: float = 45.0
     min_confidence: float = 0.60
     min_margin: float = 0.15
+    min_current_margin: float = 0.10
     min_consistent_windows: int = 2
+    switch_cooldown_sec: float = 90.0
+    candidate_stale_sec: float = 120.0
     embedding_weight: float = 0.65
     reference_weight: float = 0.35
     ema_alpha: float = 0.80
@@ -87,10 +90,12 @@ class RouterSessionState:
     created_s: float = 0.0
     ema_query_embedding: Optional[List[float]] = None
     recent_references: Deque[Dict[str, Any]] = field(default_factory=lambda: deque(maxlen=80))
-    recent_decisions: Deque[str] = field(default_factory=lambda: deque(maxlen=8))
     last_switch_s: float = 0.0
     last_decision_s: float = 0.0
     pending_preset_id: Optional[str] = None
+    candidate_preset_id: Optional[str] = None
+    candidate_streak_count: int = 0
+    last_candidate_s: float = 0.0
 
 
 @dataclass
@@ -211,6 +216,8 @@ class AudioNativeActiveGlossaryRouter:
         current_domain = session_state.active_domain_id or GENERAL_DOMAIN
         target_preset = top.preset_id if top is not None else current_preset
         target_domain = top.domain_id if top is not None else current_domain
+        current_score = self._score_for_active(top_scores, current_preset, current_domain)
+        switch_delta = confidence - current_score if top is not None else 0.0
 
         reason = "speech_embedding+retrieved_refs"
         action: Literal["stay", "switch", "fallback"] = "stay"
@@ -218,6 +225,10 @@ class AudioNativeActiveGlossaryRouter:
         evidence = {
             "has_query_embedding": bool(query_vec or session_state.ema_query_embedding),
             "recent_reference_count": len(session_state.recent_references),
+            "current_score": round(float(current_score), 4),
+            "target_score_delta": round(float(switch_delta), 4),
+            "candidate_preset": session_state.candidate_preset_id,
+            "candidate_streak": int(session_state.candidate_streak_count),
         }
 
         unsupported_current = bool(
@@ -251,11 +262,22 @@ class AudioNativeActiveGlossaryRouter:
             guard_reason = f"confidence<{float(self.config.min_confidence):.2f}"
         elif margin < float(self.config.min_margin):
             guard_reason = f"margin<{float(self.config.min_margin):.2f}"
+        elif (
+            current_preset in self.by_preset
+            and switch_delta < float(self.config.min_current_margin)
+        ):
+            guard_reason = f"current_margin<{float(self.config.min_current_margin):.2f}"
+        elif (
+            session_state.last_switch_s > 0.0
+            and float(now_s) - float(session_state.last_switch_s) < float(self.config.switch_cooldown_sec)
+        ):
+            guard_reason = f"cooldown<{float(self.config.switch_cooldown_sec):g}s"
         else:
-            session_state.recent_decisions.append(target_preset)
+            self._note_candidate(session_state, target_preset, float(now_s))
             required = max(1, int(self.config.min_consistent_windows))
-            recent = list(session_state.recent_decisions)[-required:]
-            if len(recent) < required or any(item != target_preset for item in recent):
+            evidence["candidate_preset"] = session_state.candidate_preset_id
+            evidence["candidate_streak"] = int(session_state.candidate_streak_count)
+            if session_state.candidate_streak_count < required:
                 guard_reason = f"consistent_windows<{required}"
             else:
                 action = "switch"
@@ -288,6 +310,39 @@ class AudioNativeActiveGlossaryRouter:
         if action == "switch":
             session_state.pending_preset_id = target_preset
         return decision
+
+    def _note_candidate(
+        self,
+        session_state: RouterSessionState,
+        target_preset: str,
+        now_s: float,
+    ) -> None:
+        stale_sec = max(0.0, float(self.config.candidate_stale_sec))
+        is_stale = bool(
+            session_state.last_candidate_s > 0.0
+            and stale_sec > 0.0
+            and now_s - float(session_state.last_candidate_s) > stale_sec
+        )
+        if session_state.candidate_preset_id == target_preset and not is_stale:
+            session_state.candidate_streak_count += 1
+        else:
+            session_state.candidate_preset_id = target_preset
+            session_state.candidate_streak_count = 1
+        session_state.last_candidate_s = float(now_s)
+
+    def _score_for_active(
+        self,
+        top_scores: Sequence[DomainScore],
+        current_preset: str,
+        current_domain: str,
+    ) -> float:
+        for item in top_scores:
+            if item.preset_id == current_preset:
+                return float(item.confidence)
+        for item in top_scores:
+            if item.domain_id == current_domain:
+                return float(item.confidence)
+        return 0.0
 
     def _score(self, session_state: RouterSessionState) -> List[DomainScore]:
         ema = session_state.ema_query_embedding

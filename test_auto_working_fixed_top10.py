@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import os
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from eval.streaming_sst.score_terms import allowed_identity_retention_source, score
-from framework.agents.omni import OmniAgent
+from framework.agents.omni import OmniAgent, OmniConfig
+from framework.agents.plugins.backends import get_template
 from framework.agents.term_memory.slice_registry import (
     force_exactly_k_references,
     rank_references,
@@ -20,6 +23,17 @@ from framework.agents.term_memory.topic_router import (
 
 
 class AutoWorkingFixedTop10Tests(unittest.TestCase):
+    def test_autoterm_yaml_hysteresis_defaults_reach_omni_config(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            config = OmniConfig.from_env(get_template("qwen3_omni"))
+
+        self.assertEqual(config.auto_glossary_min_conf, 0.60)
+        self.assertEqual(config.auto_glossary_switch_margin, 0.15)
+        self.assertEqual(config.auto_glossary_current_margin, 0.10)
+        self.assertEqual(config.auto_glossary_min_consistent_windows, 2)
+        self.assertEqual(config.auto_glossary_switch_cooldown_sec, 90.0)
+        self.assertEqual(config.auto_glossary_candidate_stale_sec, 120.0)
+
     def test_common_preset_maps_to_common_terms_slice(self) -> None:
         self.assertEqual(slice_id_for_preset("common_10k"), "common_terms")
         self.assertEqual(slice_role_for_preset("common_10k"), "base")

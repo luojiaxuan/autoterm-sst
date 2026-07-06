@@ -37,6 +37,10 @@ auto_working:
     enable_fallback: true
     domain_activate_threshold: 0.60
     domain_margin_threshold: 0.15
+    current_margin_threshold: 0.10
+    min_consistent_windows: 2
+    switch_cooldown_sec: 90
+    candidate_stale_sec: 120
     low_confidence_threshold: 0.35
   retrieval:
     broad_topk_per_slice: 50

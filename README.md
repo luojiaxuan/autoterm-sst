@@ -206,6 +206,11 @@ If retrieval fails to load, the agent logs it and continues **without** RAG
 | `RASST_PROMPT_TOP_K` | `10` | max retrieved refs injected into the prompt |
 | `RASST_UI_TOP_K` | `10` | max refs surfaced in JSON metadata/UI evidence |
 
+Additional auto-router hysteresis defaults are tracked in
+`configs/autoterm_slices.yaml`: `current_margin_threshold=0.10`,
+`min_consistent_windows=2`, `switch_cooldown_sec=90`, and
+`candidate_stale_sec=120`.
+
 ---
 
 ## HTTP / WebSocket API

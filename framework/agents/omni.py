@@ -163,6 +163,9 @@ def _autoterm_base_preset(config: Dict[str, Any], default: str = "none") -> str:
     base = _preset_for_slice_id(str(config.get("base_slice") or ""))
     if base:
         return base
+    initial = _preset_for_slice_id(str(config.get("initial_slice") or ""))
+    if initial:
+        return initial
     slices = config.get("slices")
     if isinstance(slices, dict):
         for slice_id, meta in slices.items():

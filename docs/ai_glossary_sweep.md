@@ -47,13 +47,14 @@ we have a clean 100k zh AI glossary locally.
 
 - Host: Aries A6000, server port `8012`, Qwen3-Omni via in-process vLLM with MaxSim RAG.
 - Audio: five ACL 60-60 WAVs concatenated, 3441.718 seconds total.
-- Streaming feed: `PACKET_SAMPLES=8000`, `FEED_SLEEP=0.45`.
+- Client streaming feed: `PACKET_SAMPLES=8000`, `FEED_SLEEP=0.45`. These are transport packets, not the server inference chunk size. The completed rows show lm=2 produced about 1685 partial chunks and lm=1 about 3180 partial chunks, so the server-side latency multiplier changed the processing stride as intended.
 - Presets: `acl_tagged_raw`, `acl_ai_translated_plus10k`, `acl_ai_broad_plus10k`,
   `acl_ai_broad_plus50k`, `acl_ai_broad_plus100k`.
 - Latency multipliers: `2` and `1`.
 - The manual-preset sweep logs references surfaced under the fixed top-10 cap;
   `refs/chunk` can be below 10 because chunks without confident retrieved terms
-  do not force filler refs in this harness.
+  do not force filler refs in this harness. This benchmark is a scale/relevance
+  sweep, not the unit test for the auto mode's exact-10 backfill invariant.
 
 ## Results: lm=2
 
@@ -74,6 +75,23 @@ we have a clean 100k zh AI glossary locally.
 | 1 | acl_ai_broad_plus10k | 10238 | 0.9510 | 55.36 | 49.82 | 0.9790 | 0.3710 | 1.2950 | 91.96 | 106.66 |
 | 1 | acl_ai_broad_plus50k | 50238 | 0.9580 | 55.22 | 49.97 | 0.9720 | 0.1930 | 2.4370 | 90.38 | 114.14 |
 | 1 | acl_ai_broad_plus100k | 100238 | 0.9580 | 54.85 | 49.70 | 0.9510 | 0.1330 | 3.4740 | 97.77 | 115.88 |
+
+## Surfaced-Term Diagnostics
+
+The conditional term metrics separate output correctness when a gold term was surfaced by retrieval from output correctness when it was not surfaced. This is why flat `term_ACC` should not be read as proof that the prompt channel stayed healthy.
+
+| lm | setting | chunks | term_ACC surfaced | term_ACC not surfaced |
+| --- | --- | ---: | ---: | ---: |
+| 2 | acl_tagged_raw | 1681 | 0.978 | 0.75 |
+| 2 | acl_ai_translated_plus10k | 1684 | 0.978 | 0.5 |
+| 2 | acl_ai_broad_plus10k | 1689 | 0.978 | 0.667 |
+| 2 | acl_ai_broad_plus50k | 1685 | 0.986 | 0.667 |
+| 2 | acl_ai_broad_plus100k | 1685 | 0.971 | 0.667 |
+| 1 | acl_tagged_raw | 3190 | 0.964 | 0.0 |
+| 1 | acl_ai_translated_plus10k | 3202 | 0.978 | 0.0 |
+| 1 | acl_ai_broad_plus10k | 3182 | 0.95 | 1.0 |
+| 1 | acl_ai_broad_plus50k | 3185 | 0.971 | 0.5 |
+| 1 | acl_ai_broad_plus100k | 3174 | 0.978 | 0.571 |
 
 ## Interpretation
 

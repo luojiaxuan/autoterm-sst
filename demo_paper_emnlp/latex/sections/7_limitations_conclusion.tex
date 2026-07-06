@@ -6,10 +6,11 @@ or a learned topic classifier. The current live GPU demo focuses on
 English-to-Chinese; adding more target languages requires translated term files,
 MaxSim indexes, and prompt templates. Large open memories improve coverage but
 can reduce retrieval precision under a fixed 10-candidate prompt budget, which
-is why the system layers routed domain slices on a common-terms base and uses
+is why the system routes directly among domain-specific active slices and uses
 broad open memory only as a fallback candidate pool. The
-audio-native router is intentionally conservative and may stay on the common
-glossary when a domain is ambiguous, as in our short smoke talk. Finally, the
+audio-native router is intentionally conservative and may stay on the
+configured initial domain slice when evidence is ambiguous, as in our short
+smoke talk. Finally, the
 real backend requires high-end NVIDIA GPUs and external model/retriever
 artifacts; mock mode supports UI and protocol testing without those weights.
 

@@ -47,14 +47,14 @@ injecting fewer references than the broad 100k memory.}
 Table~\ref{tab:quality} compares four user-facing settings. Broad open memory is
 zero-effort, but it retrieves more low-precision candidates without improving
 term accuracy on this slice. The adaptive working glossary keeps the same zero
-user effort while selecting candidates from the common-terms base inventory; it
-recovers eight of nine gold terms and reduces retrieval p95 relative to the
-broad 100k memory. The curated
+user effort while selecting candidates from the configured domain-specific
+active inventory; it recovers eight of nine gold terms and reduces retrieval p95
+relative to the broad 100k memory. The curated
 ACL glossary has the best masked BLEU and lowest retrieval latency, but it
 requires a manually curated domain glossary. Importantly, this short smoke clip
 does not demonstrate a domain switch: the \texttt{auto\_working} run stays on
-\texttt{common\_10k} because the router's confidence and interval guards do not
-activate a narrower domain slice. We therefore frame Table~\ref{tab:quality} as
+the configured initial domain slice because the router's confidence and interval
+guards do not activate another domain slice. We therefore frame Table~\ref{tab:quality} as
 evidence for compact zero-setup working memory, while the interface exposes
 switch decisions and guard reasons for longer or clearer-domain sessions.
 

@@ -301,7 +301,7 @@ Use this paper wording:
 ```text
 RASST-Demo uses a lightweight, audio-native, confidence-gated active inventory
 router. The router uses speech-side retrieval embeddings and retrieved-term
-metadata to add routed domain slices on top of common terms only when the domain
-evidence is strong. When evidence is ambiguous, it keeps common terms active and
-preserves the fixed 10-candidate prompt interface.
+metadata to route directly among domain-specific slices only when the domain
+evidence is strong. When evidence is ambiguous, it keeps the current domain slice
+or no fallback active and preserves the fixed 10-candidate prompt interface.
 ```

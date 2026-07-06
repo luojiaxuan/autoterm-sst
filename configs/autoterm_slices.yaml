@@ -12,6 +12,16 @@ auto_working:
       type: domain
       domain: medicine
       weight: 0.8
+    finance_core_10k:
+      path: /mnt/data2/jiaxuanluo/rasst-demo/runtime/term_memory/finance_core_10k.json
+      type: domain
+      domain: finance
+      weight: 0.8
+    legal_core_10k:
+      path: /mnt/data2/jiaxuanluo/rasst-demo/runtime/term_memory/legal_core_10k.json
+      type: domain
+      domain: legal
+      weight: 0.8
     open_wiki_100k:
       path: /mnt/data2/jiaxuanluo/rasst-demo/runtime/term_memory/open_wiki_100k.json
       type: rescue

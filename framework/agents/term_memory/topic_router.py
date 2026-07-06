@@ -2,8 +2,8 @@
 
 The default router is intentionally not a topic classifier. It is a small,
 confidence-gated policy that decides whether a streaming session should keep the
-current compact glossary, switch to another manifest-described slice, or fall
-back to the common slice. Its primary signals are the speech-side retrieval
+current domain-specific glossary or switch to another manifest-described domain
+slice. Its primary signals are the speech-side retrieval
 embedding and metadata attached to retrieved references.
 
 The old keyword router remains available as ``LegacyKeywordTopicRouter`` for

@@ -4,13 +4,13 @@ Simultaneous speech translation (SST) is increasingly used for technical talks, 
 
 Glossaries are a practical way to control terminology, but they are awkward for live use. A user may not know the exact topic before a talk starts, and asking every speaker or viewer to upload a domain glossary creates friction. A naive alternative is to retrieve from a broad open memory containing hundreds of thousands of terms. AutoTerm-SST keeps the prompt interface fixed at 10 glossary candidates per chunk; the systems problem is therefore choosing the active inventory and ranking the best 10 candidates, rather than changing the prompt size.
 
-AutoTerm-SST treats this as an active-inventory and ranking problem. The automatic mode always activates a common-terms base slice, whose entries include general technical expressions, acronyms, model and dataset names, and acceptable identity-retention variants. A training-free, audio-native router observes speech-side retrieval embeddings and retrieved-reference metadata, then adds routed domain slices only when evidence is strong. Broad open memory is used as a fallback candidate pool under low confidence; candidates from all active sources are still reranked into the same fixed top-10 prompt list.
+AutoTerm-SST treats this as an active-inventory and ranking problem. The automatic mode starts from a domain-specific initial slice and routes directly among domain slices when speech-side evidence is strong. A training-free, audio-native router observes speech-side retrieval embeddings and retrieved-reference metadata; broad open memory is used only as a fallback candidate pool under low confidence. Candidates from the active inventory are still reranked into the same fixed top-10 prompt list.
 
 The result is an interactive streaming SST workbench rather than a new translation model. The framework handles REST/WebSocket transport, session lifecycle, and agent routing; agents own model inference, prompting, batching, and retrieval. The current live agent uses Qwen3-Omni served through vLLM-style continuous batching \citep{kwon2023efficient}. The web and Electron interfaces expose not only translated text, but also retrieved terms, active glossary status, router decisions, and retrieval latency.
 
 Our contributions are:
 \begin{itemize}
     \item We build a pluggable streaming SST demo framework with a live evidence panel for retrieved terminology, active glossary state, router decisions, and latency.
-    \item We introduce a zero-setup adaptive terminology strategy that keeps a fixed 10-candidate prompt interface while selecting and ranking candidates from a common-terms base slice, routed domain slices, and low-confidence fallback pools.
+    \item We introduce a zero-setup adaptive terminology strategy that keeps a fixed 10-candidate prompt interface while selecting and ranking candidates from domain-specific active slices and low-confidence fallback pools.
     \item We provide system evidence covering terminology recall on a smoke talk, prompt-reference volume, retrieval latency, scale up to million-term memories, and concurrent streaming behavior.
 \end{itemize}

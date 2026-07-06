@@ -193,14 +193,14 @@ If retrieval fails to load, the agent logs it and continues **without** RAG
 | Var | Default | Meaning |
 |-----|---------|---------|
 | `RASST_AUTO_GLOSSARY_ENABLED` | `1` | default to zero-setup `auto_working` mode |
-| `RASST_AUTO_GLOSSARY_DEFAULT` | `common_10k` | initial active slice |
-| `RASST_AUTO_GLOSSARY_PRESETS` | `common_10k,nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k` | slices the topic router may activate |
+| `RASST_AUTO_GLOSSARY_DEFAULT` | `nlp_core_10k` | initial domain-specific active slice |
+| `RASST_AUTO_GLOSSARY_PRESETS` | `nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k` | domain slices the topic router may activate |
 | `RASST_AUTO_GLOSSARY_UPDATE_SEC` | `45` | minimum interval between topic decisions |
 | `RASST_AUTO_GLOSSARY_WARMUP_SEC` | `30` | no switching before this many session seconds |
 | `RASST_AUTO_GLOSSARY_MIN_CONF` | `0.60` | minimum router confidence to switch |
 | `RASST_AUTO_GLOSSARY_MIN_MARGIN` | `0.15` | minimum top-vs-runner-up domain margin |
 | `RASST_AUTO_GLOSSARY_MIN_CONSISTENT_WINDOWS` | `2` | repeated windows required before switching |
-| `RASST_AUTO_GLOSSARY_FALLBACK` | `common_10k` | conservative fallback slice |
+| `RASST_AUTO_GLOSSARY_FALLBACK` | `none` | uncertain routing keeps the current domain slice or disables a fallback switch |
 | `RASST_ROUTER_MODE` | `embedding_refs` | audio-native router; `legacy_keywords` is debug-only |
 | `RASST_ROUTER_EMBED_WEIGHT` / `RASST_ROUTER_REF_WEIGHT` | `0.65` / `0.35` | embedding-centroid vs reference-metadata weights |
 | `RASST_PROMPT_TOP_K` | `10` | max retrieved refs injected into the prompt |
@@ -245,14 +245,15 @@ retrieves from it exactly like a glossary, with retrieved terms surfaced in the
 evidence panel and `term_memory` health.
 
 The default demo path is now **zero-setup adaptive working glossary**:
-`auto_working` starts with `common_10k`, observes speech-side retrieval
-embeddings plus retrieved-reference metadata, and switches to compact domain
-slices such as `nlp_core_10k` or `medicine_core_10k` only after the target
-MaxSim index is preloaded. It is not a trained topic classifier and does not
-use ASR, source transcripts, generated target text, or manual glossary terms
-for routing. Large
-100k/500k/1M memories remain useful as offline memory and scale evidence, but
-the runtime active glossary is kept small to reduce prompt noise. See
+`auto_working` starts from a domain-specific slice (default `nlp_core_10k`),
+observes speech-side retrieval embeddings plus retrieved-reference metadata,
+and routes directly among domain slices such as `nlp_core_10k` or
+`medicine_core_10k` only after the target MaxSim index is preloaded. It is not a
+trained topic classifier and does not use ASR, source transcripts, generated
+target text, or manual glossary terms for routing. The prompt interface is held
+constant: every streaming chunk receives exactly the fixed top-10 retrieved
+candidates, while larger 100k/500k/1M memories remain offline memory, rescue
+pools, and scale evidence. See
 [`docs/adaptive_working_glossary.md`](docs/adaptive_working_glossary.md).
 
 ```bash

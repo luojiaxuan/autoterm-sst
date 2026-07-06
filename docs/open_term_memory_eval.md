@@ -3,9 +3,10 @@
 Implementation note (2026-06-19): the scale results below motivate the
 zero-setup adaptive working glossary now documented in
 [`adaptive_working_glossary.md`](adaptive_working_glossary.md). Large
-100k/500k/1M memories remain offline memory and stress evidence; serving defaults
-to `auto_working`, which activates a compact slice such as `common_10k` or
-`nlp_core_10k` and injects only `RASST_PROMPT_TOP_K` references into the prompt.
+100k/500k/1M memories remain offline memory and stress evidence; serving
+defaults to `auto_working`, which starts from a domain-specific slice such as
+`nlp_core_10k`, routes among domain slices, and injects only the fixed
+`RASST_PROMPT_TOP_K` references into the prompt.
 
 Streaming SST with the RASST Qwen3-Omni agent (in-process vLLM tp=2 + MaxSim RAG)
 on aries (A6000). Audio: ACL 60-60 talk (`acl6060_zh_smoke`, en→zh), streamed

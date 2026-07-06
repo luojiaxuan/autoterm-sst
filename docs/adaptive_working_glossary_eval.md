@@ -29,7 +29,7 @@ cd /mnt/taurus/home/jiaxuanluo/rasst-demo
 python scripts/term_memory/build_domain_centroids.py \
   --manifest /mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/manifests/current.json \
   --out-dir /mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/centroids \
-  --presets common_10k,nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k \
+  --presets nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k \
   --target-lang zh \
   --update-manifest
 

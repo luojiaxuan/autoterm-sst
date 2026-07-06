@@ -1,18 +1,19 @@
-# Zero-Setup Adaptive Working Glossary
+# Domain-Specific Adaptive Working Glossary
 
 RASST-Demo maintains a large open terminology memory offline, but activates a
 fixed 10-candidate prompt list for each streaming session. The active inventory is
-selected automatically from speech-side retrieval evidence, so a user can start
-a domain talk without uploading terms or choosing a domain preset.
+selected automatically from speech-side retrieval evidence. The automatic path is
+domain-specific: it does not prepend a separate common/base glossary before
+routing.
 
 ## Architecture
 
 ```text
 offline open memory
-  -> working slices: common_10k / nlp_core_10k / medicine_core_10k / finance_core_10k / legal_core_10k
+  -> working slices: nlp_core_10k / medicine_core_10k / finance_core_10k / legal_core_10k
   -> manifest: preset id -> terms.jsonl + maxsim index + domain metadata + centroid
   -> runtime session starts in auto_working
-  -> active preset starts as common_10k
+  -> active preset starts as the configured domain-specific initial slice
   -> MaxSim retrieval exposes speech query embedding + retrieved refs
   -> AudioNativeActiveGlossaryRouter scores embedding-to-centroid + ref metadata
   -> ActiveGlossaryManager preloads and atomically activates target index
@@ -52,8 +53,8 @@ Each `OmniSession` tracks:
 
 ```text
 requested_glossary_preset   # user-facing mode, usually auto_working
-active_glossary_preset      # concrete retrieval preset, e.g. common_10k
-active_domain               # general / nlp / medicine / finance / legal
+active_glossary_preset      # concrete retrieval preset, e.g. nlp_core_10k
+active_domain               # nlp / medicine / finance / legal
 topic_confidence
 last_topic_update_s
 topic_history
@@ -66,7 +67,7 @@ last_router_decision
 When the user selects a concrete preset (`none`, `acl_tagged_raw`,
 `nlp_core_10k`, etc.), the session becomes manual and topic routing is disabled.
 When the user selects `auto_working`, topic routing is enabled and the initial
-active preset is `RASST_AUTO_GLOSSARY_DEFAULT` (`common_10k` by default).
+active preset is `RASST_AUTO_GLOSSARY_DEFAULT` (`nlp_core_10k` by default).
 
 ## Routing Logic
 
@@ -103,7 +104,7 @@ Switch guards:
 - no switch unless the target is consistent across recent decision windows;
 - no narrow switch to the general/common domain;
 - no switch until the target index is preloadable;
-- uncertain sessions stay on `common_10k` or the current active preset.
+- uncertain sessions stay on the current domain slice or no active fallback.
 
 Manual glossary terms may still be injected into the prompt by
 `PromptBuilder`, but they intentionally do not bias the router.
@@ -147,15 +148,15 @@ The JSON WebSocket event contains:
     "prompt_reference_count": 10,
     "ui_reference_count": 10,
     "topic": {
-      "active_domain": "nlp",
+      "active_domain": "medicine",
       "confidence": 0.73,
-      "active_glossary_preset": "nlp_core_10k",
+      "active_glossary_preset": "medicine_core_10k",
       "switch_count": 1
     },
     "topic_router": {
       "action": "switch",
-      "from_preset": "common_10k",
-      "to_preset": "nlp_core_10k",
+      "from_preset": "nlp_core_10k",
+      "to_preset": "medicine_core_10k",
       "confidence": 0.73,
       "margin": 0.19,
       "reason": "speech_embedding+retrieved_refs"
@@ -170,16 +171,16 @@ Plain-text WebSocket mode is unchanged.
 
 ```bash
 export RASST_AUTO_GLOSSARY_ENABLED=1
-export RASST_AUTO_GLOSSARY_DEFAULT=common_10k
-export RASST_AUTO_GLOSSARY_PRESETS=common_10k,nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k
+export RASST_AUTO_GLOSSARY_DEFAULT=nlp_core_10k
+export RASST_AUTO_GLOSSARY_PRESETS=nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k
 export RASST_AUTO_GLOSSARY_UPDATE_SEC=45
 export RASST_AUTO_GLOSSARY_WARMUP_SEC=30
 export RASST_AUTO_GLOSSARY_MIN_CONF=0.60
 export RASST_AUTO_GLOSSARY_MIN_MARGIN=0.15
 export RASST_AUTO_GLOSSARY_MIN_CONSISTENT_WINDOWS=2
-export RASST_AUTO_GLOSSARY_FALLBACK=common_10k
+export RASST_AUTO_GLOSSARY_FALLBACK=none
 export RASST_AUTO_GLOSSARY_PRELOAD=1
-export RASST_AUTO_GLOSSARY_PRELOAD_PRESETS=common_10k,nlp_core_10k,medicine_core_10k
+export RASST_AUTO_GLOSSARY_PRELOAD_PRESETS=nlp_core_10k,medicine_core_10k
 export RASST_ROUTER_MODE=embedding_refs
 export RASST_ROUTER_LEGACY_KEYWORDS=0
 export RASST_ROUTER_EMBED_WEIGHT=0.65
@@ -225,7 +226,7 @@ Then build and publish router centroids:
 python scripts/term_memory/build_domain_centroids.py \
   --manifest /mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/manifests/current.json \
   --out-dir /mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/centroids \
-  --presets common_10k,nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k \
+  --presets nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k \
   --target-lang zh \
   --update-manifest
 ```

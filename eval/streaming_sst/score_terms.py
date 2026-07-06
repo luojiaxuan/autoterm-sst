@@ -38,6 +38,27 @@ except ImportError:  # pragma: no cover - only collect_output needs this optiona
     websockets = None
 
 
+TARGET_SAMPLE_RATE = 16000
+
+
+def resolve_chunk_samples(chunk: int, base_segment_sec: float, latency_multiplier: int) -> int:
+    try:
+        explicit = int(chunk)
+    except (TypeError, ValueError):
+        explicit = 0
+    if explicit > 0:
+        return explicit
+    try:
+        lm = max(1, min(4, int(latency_multiplier)))
+    except (TypeError, ValueError):
+        lm = 2
+    try:
+        base_sec = float(base_segment_sec)
+    except (TypeError, ValueError):
+        base_sec = 0.96
+    return max(1, int(round(base_sec * lm * TARGET_SAMPLE_RATE)))
+
+
 _ALNUM_TERM_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._+/#&%()-]*$")
 _CJK_OR_KANA_RE = re.compile(r"[\u3040-\u30ff\u3400-\u9fff]")
 
@@ -224,11 +245,26 @@ def strip_tags(t: str) -> str:
     return re.sub(r"</?t>", "", t or "")
 
 
-async def collect_output(base_url: str, lang: str, preset: str, pcm: np.ndarray,
-                         chunk: int = 8000, feed_sleep: float = 0.45) -> Dict[str, Any]:
+async def collect_output(
+    base_url: str,
+    lang: str,
+    preset: str,
+    pcm: np.ndarray,
+    chunk: int = 0,
+    feed_sleep: float = 0.45,
+    latency_multiplier: int = 2,
+    base_segment_sec: float = 0.96,
+) -> Dict[str, Any]:
     if websockets is None:
         raise RuntimeError("websockets is required to collect framework JSON-WS output")
-    q = urllib.parse.urlencode({"agent_type": "RASST", "language_pair": lang, "glossary_preset": preset})
+    chunk_samples = resolve_chunk_samples(chunk, base_segment_sec, latency_multiplier)
+    try:
+        lm = max(1, min(4, int(latency_multiplier)))
+    except (TypeError, ValueError):
+        lm = 2
+    q = urllib.parse.urlencode(
+        {"agent_type": "RASST", "language_pair": lang, "glossary_preset": preset, "latency_multiplier": lm}
+    )
     with urllib.request.urlopen(urllib.request.Request(f"{base_url}/init?{q}", data=b""), timeout=30) as r:
         sid = json.load(r)["session_id"]
     parts: List[str] = []
@@ -244,8 +280,8 @@ async def collect_output(base_url: str, lang: str, preset: str, pcm: np.ndarray,
             await ws.recv()
 
             async def feed() -> None:
-                for i in range(0, len(pcm), chunk):
-                    await ws.send(pcm[i:i + chunk].tobytes())
+                for i in range(0, len(pcm), chunk_samples):
+                    await ws.send(pcm[i:i + chunk_samples].tobytes())
                     await asyncio.sleep(feed_sleep)
                 await ws.send("EOF")
 
@@ -291,6 +327,8 @@ async def collect_output(base_url: str, lang: str, preset: str, pcm: np.ndarray,
         "candidate_pool_counts": pool_counts,
         "prompt_shortfalls": shortfalls,
         "rescue_events": rescue_events,
+        "chunk_samples": chunk_samples,
+        "latency_multiplier": lm,
     }
 
 
@@ -305,7 +343,7 @@ def allowed_identity_retention_source(term: str) -> bool:
     compact = clean.replace("-", "").replace("_", "")
     if len(compact) >= 2 and compact.upper() == compact and re.search(r"[A-Z]", compact):
         return True
-    if re.search(r"[A-Z].*[A-Z]", compact) and not clean.islower():
+    if " " not in clean and re.search(r"[A-Z].*[A-Z]", compact) and not clean.islower():
         return True
     if re.search(r"[A-Za-z]+\d|\d+[A-Za-z]", compact):
         return True
@@ -402,6 +440,9 @@ def main() -> None:
     ap.add_argument("--max-segs", type=int, default=8)
     ap.add_argument("--gold-file", default="", help="independent gold JSON [{en, zh:[variants]}]; avoids circular gold")
     ap.add_argument("--coverage", default="", help="comma-sep glossary JSONs to report gold coverage for")
+    ap.add_argument("--latency-multiplier", type=int, default=2)
+    ap.add_argument("--base-segment-sec", type=float, default=0.96)
+    ap.add_argument("--chunk", type=int, default=0, help="PCM samples per send; 0 uses base_segment_sec * latency_multiplier")
     ap.add_argument("--feed-sleep", type=float, default=0.45, help="per-chunk send delay (lower = faster than realtime)")
     ap.add_argument("--out-json", default="")
     args = ap.parse_args()
@@ -436,11 +477,24 @@ def main() -> None:
     rows = []
     for preset in [p.strip() for p in args.presets.split(",") if p.strip()]:
         try:
-            res = asyncio.run(collect_output(args.base_url, args.language_pair, preset, pcm, feed_sleep=args.feed_sleep))
+            res = asyncio.run(
+                collect_output(
+                    args.base_url,
+                    args.language_pair,
+                    preset,
+                    pcm,
+                    chunk=args.chunk,
+                    feed_sleep=args.feed_sleep,
+                    latency_multiplier=args.latency_multiplier,
+                    base_segment_sec=args.base_segment_sec,
+                )
+            )
             refs = res["refs"]
             surfaced_terms = {en.lower() for en, _ in refs if en}
             row = {"preset": preset, **score(res["text"], gold, surfaced_terms=surfaced_terms)}
             gold_refs = sum(1 for en, _ in refs if en.lower() in gold_en)
+            row["latency_multiplier"] = res.get("latency_multiplier")
+            row["streaming_chunk_samples"] = res.get("chunk_samples")
             row["chunks"] = res["chunks"]
             row["refs_total"] = len(refs)
             row["refs_per_chunk"] = round(len(refs) / res["chunks"], 2) if res["chunks"] else 0.0

@@ -8,11 +8,17 @@ from eval.streaming_sst.score_terms import (
     compile_term_mask_patterns,
     compute_bleu_scores,
     mask_target_terms,
+    resolve_chunk_samples,
     target_terms_from_gold,
 )
 
 
 class ScoreTermsMaskedBleuTests(unittest.TestCase):
+    def test_default_streaming_chunk_follows_latency_multiplier(self) -> None:
+        self.assertEqual(resolve_chunk_samples(0, 0.96, 1), 15360)
+        self.assertEqual(resolve_chunk_samples(0, 0.96, 2), 30720)
+        self.assertEqual(resolve_chunk_samples(8000, 0.96, 2), 8000)
+
     def test_longer_terms_are_masked_before_overlaps(self) -> None:
         terms = target_terms_from_gold(
             [

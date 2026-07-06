@@ -23,6 +23,8 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import websockets
 
+TARGET_SAMPLE_RATE = 16000
+
 
 def _http_base(base_url: str) -> str:
     return base_url.rstrip("/")
@@ -38,8 +40,28 @@ def read_wav(path: str) -> np.ndarray:
     return np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
 
 
-def init_session(base_url: str, lang: str, preset: str) -> Dict[str, Any]:
-    q = urllib.parse.urlencode({"agent_type": "RASST", "language_pair": lang, "glossary_preset": preset})
+def resolve_chunk_samples(chunk: int, base_segment_sec: float, latency_multiplier: int) -> int:
+    try:
+        explicit = int(chunk)
+    except (TypeError, ValueError):
+        explicit = 0
+    if explicit > 0:
+        return explicit
+    try:
+        lm = max(1, min(4, int(latency_multiplier)))
+    except (TypeError, ValueError):
+        lm = 2
+    try:
+        base_sec = float(base_segment_sec)
+    except (TypeError, ValueError):
+        base_sec = 0.96
+    return max(1, int(round(base_sec * lm * TARGET_SAMPLE_RATE)))
+
+
+def init_session(base_url: str, lang: str, preset: str, latency_multiplier: int) -> Dict[str, Any]:
+    q = urllib.parse.urlencode(
+        {"agent_type": "RASST", "language_pair": lang, "glossary_preset": preset, "latency_multiplier": latency_multiplier}
+    )
     req = urllib.request.Request(f"{_http_base(base_url)}/init?{q}", data=b"")
     with urllib.request.urlopen(req, timeout=30) as response:
         return json.load(response)
@@ -72,8 +94,12 @@ async def run_preset(
     pcm: np.ndarray,
     chunk: int,
     feed_sleep: float,
+    latency_multiplier: int,
+    base_segment_sec: float,
 ) -> Dict[str, Any]:
-    info = init_session(base_url, language_pair, preset)
+    lm = max(1, min(4, int(latency_multiplier)))
+    chunk_samples = resolve_chunk_samples(chunk, base_segment_sec, lm)
+    info = init_session(base_url, language_pair, preset, lm)
     session_id = info["session_id"]
     retrieve_s: List[float] = []
     refs_per_chunk: List[int] = []
@@ -97,8 +123,8 @@ async def run_preset(
             await ws.recv()
 
             async def feed() -> None:
-                for start in range(0, len(pcm), chunk):
-                    await ws.send(pcm[start:start + chunk].tobytes())
+                for start in range(0, len(pcm), chunk_samples):
+                    await ws.send(pcm[start:start + chunk_samples].tobytes())
                     await asyncio.sleep(feed_sleep)
                 await ws.send("EOF")
 
@@ -150,6 +176,8 @@ async def run_preset(
         "session_id": session_id,
         "initial_active_glossary": info.get("active_glossary_preset"),
         "preset_terms": info.get("preset_terms"),
+        "latency_multiplier": lm,
+        "streaming_chunk_samples": chunk_samples,
         "chunks": chunks,
         "retrieve_p50_ms": round((percentile(warm, 50) or 0.0) * 1000.0, 2) if warm else None,
         "retrieve_p95_ms": round((percentile(warm, 95) or 0.0) * 1000.0, 2) if warm else None,
@@ -181,7 +209,9 @@ def main() -> None:
     )
     ap.add_argument("--language-pair", default="English -> Chinese")
     ap.add_argument("--max-segs", type=int, default=8)
-    ap.add_argument("--chunk", type=int, default=8000)
+    ap.add_argument("--latency-multiplier", type=int, default=2)
+    ap.add_argument("--base-segment-sec", type=float, default=0.96)
+    ap.add_argument("--chunk", type=int, default=0, help="PCM samples per send; 0 uses base_segment_sec * latency_multiplier")
     ap.add_argument("--feed-sleep", type=float, default=0.45)
     ap.add_argument("--out-json", default="")
     args = ap.parse_args()
@@ -201,6 +231,8 @@ def main() -> None:
                     pcm=pcm,
                     chunk=args.chunk,
                     feed_sleep=args.feed_sleep,
+                    latency_multiplier=args.latency_multiplier,
+                    base_segment_sec=args.base_segment_sec,
                 )
             )
         except Exception as exc:  # noqa: BLE001

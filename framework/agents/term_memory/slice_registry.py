@@ -31,6 +31,29 @@ _GENERIC_UNIGRAMS = {
 }
 _ACRONYM_RE = re.compile(r"^[A-Z][A-Z0-9.+&/-]{1,}$")
 
+_DEFAULT_COMMON_BACKFILL_TERMS = (
+    ("AI", "AI"),
+    ("NLP", "自然语言处理"),
+    ("machine learning", "机器学习"),
+    ("deep learning", "深度学习"),
+    ("language model", "语言模型"),
+    ("neural network", "神经网络"),
+    ("dataset", "数据集"),
+    ("benchmark", "基准测试"),
+    ("algorithm", "算法"),
+    ("speech recognition", "语音识别"),
+    ("speech translation", "语音翻译"),
+    ("machine translation", "机器翻译"),
+    ("named entity recognition", "命名实体识别"),
+    ("information retrieval", "信息检索"),
+    ("question answering", "问答"),
+    ("reinforcement learning", "强化学习"),
+    ("Transformer", "Transformer"),
+    ("BERT", "BERT"),
+    ("evaluation metric", "评测指标"),
+    ("training data", "训练数据"),
+)
+
 
 @dataclass(frozen=True)
 class RetrievalSlice:
@@ -187,6 +210,30 @@ def rank_references(references: Sequence[Dict[str, Any]], *, active_domain: str 
     return sorted(ranked, key=lambda item: float(item.get("rerank_score") or 0.0), reverse=True)
 
 
+def default_common_backfill_references(k: int = PROMPT_K) -> List[Dict[str, Any]]:
+    limit = max(0, int(k))
+    refs: List[Dict[str, Any]] = []
+    for term, translation in _DEFAULT_COMMON_BACKFILL_TERMS[:limit]:
+        refs.append(
+            {
+                "term": term,
+                "translation": translation,
+                "target_translations": {"zh": translation},
+                "canonical_source": term,
+                "source": "fixed_prompt_k_default",
+                "source_preset": "common_10k",
+                "source_slice_id": COMMON_TERMS_SLICE_ID,
+                "source_slice_role": "base",
+                "source_domain": GENERAL_DOMAIN,
+                "score": -100.0,
+                "dense_score": -100.0,
+                "rerank_score": -100.0,
+                "fallback_reason": "fixed_prompt_k_default",
+            }
+        )
+    return refs
+
+
 def force_exactly_k_references(
     ranked: Sequence[Dict[str, Any]],
     *,
@@ -202,6 +249,13 @@ def force_exactly_k_references(
         key=lambda item: float(item.get("rerank_score", item.get("score", 0.0)) or 0.0),
         reverse=True,
     )
+    if len(merged) < limit:
+        merged = dedupe_references(merged + default_common_backfill_references(limit))
+        merged = sorted(
+            merged,
+            key=lambda item: float(item.get("rerank_score", item.get("score", 0.0)) or 0.0),
+            reverse=True,
+        )
     return merged[:limit]
 
 

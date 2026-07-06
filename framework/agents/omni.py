@@ -130,9 +130,76 @@ def _safe_int(value: Any, default: int = 0) -> int:
         return default
 
 
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _load_autoterm_slice_config() -> Dict[str, Any]:
+    path = PROJECT_ROOT / "configs" / "autoterm_slices.yaml"
+    if not path.is_file():
+        return {}
+    try:
+        import yaml  # noqa: WPS433 - optional config parser
+
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except Exception:  # noqa: BLE001 - config defaults should never block startup
+        logger.exception("failed to load AutoTerm slice config: %s", path)
+        return {}
+    auto = data.get("auto_working") if isinstance(data, dict) else None
+    return auto if isinstance(auto, dict) else {}
+
+
+def _preset_for_slice_id(slice_id: str) -> str:
+    value = str(slice_id or "").strip()
+    if value in {"common_terms", "common_10k"}:
+        return "common_10k"
+    return value
+
+
+def _autoterm_base_preset(config: Dict[str, Any], default: str = "common_10k") -> str:
+    base = _preset_for_slice_id(str(config.get("base_slice") or ""))
+    if base:
+        return base
+    slices = config.get("slices")
+    if isinstance(slices, dict):
+        for slice_id, meta in slices.items():
+            if isinstance(meta, dict) and str(meta.get("type") or "").strip().lower() == "base":
+                return _preset_for_slice_id(str(slice_id)) or default
+    return default
+
+
+def _autoterm_working_presets(config: Dict[str, Any], default: str) -> str:
+    slices = config.get("slices")
+    if not isinstance(slices, dict):
+        return default
+    presets: List[str] = []
+    for slice_id, meta in slices.items():
+        if not isinstance(meta, dict):
+            continue
+        role = str(meta.get("type") or "").strip().lower()
+        if role not in {"base", "domain"}:
+            continue
+        preset = _preset_for_slice_id(str(slice_id))
+        if preset and preset not in presets:
+            presets.append(preset)
+    return ",".join(presets) if presets else default
+
+
+def _autoterm_rescue_preset(config: Dict[str, Any], default: str = "open_wiki_100k") -> str:
+    slices = config.get("slices")
+    if isinstance(slices, dict):
+        for slice_id, meta in slices.items():
+            if isinstance(meta, dict) and str(meta.get("type") or "").strip().lower() == "rescue":
+                return str(slice_id)
+    return default
+
+
 @dataclass
 class OmniConfig:
-    """Self-contained, env-driven config (defaults match the RASST server)."""
+    """Self-contained runtime config (defaults match the RASST server)."""
 
     language_pair: str = "English -> Chinese"
     mock: bool = False
@@ -216,6 +283,17 @@ class OmniConfig:
 
     @classmethod
     def from_env(cls, template: ModelTemplate) -> "OmniConfig":
+        autoterm_config = _load_autoterm_slice_config()
+        routing_config = autoterm_config.get("routing") if isinstance(autoterm_config.get("routing"), dict) else {}
+        retrieval_config = autoterm_config.get("retrieval") if isinstance(autoterm_config.get("retrieval"), dict) else {}
+        prompt_k_default = _safe_int(retrieval_config.get("prompt_k", autoterm_config.get("prompt_k")), PROMPT_K)
+        broad_topk_default = _safe_int(retrieval_config.get("broad_topk_per_slice"), 50)
+        base_preset_default = _autoterm_base_preset(autoterm_config, "common_10k")
+        working_presets_default = _autoterm_working_presets(
+            autoterm_config,
+            "common_10k,nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k",
+        )
+        rescue_preset_default = _autoterm_rescue_preset(autoterm_config, "open_wiki_100k")
         mock = _env_bool("RASST_DEMO_MOCK", False)
         rag_enabled = (not mock) and bool(_env_int("RASST_RAG_ENABLED", 1))
         return cls(
@@ -262,32 +340,35 @@ class OmniConfig:
             rag_score_threshold=_env_float("RASST_RAG_SCORE_THRESHOLD", 0.78),
             rag_timeline_lookback_sec=_env_float("RASST_RAG_LOOKBACK_SEC", 1.92),
             auto_glossary_enabled=_env_bool("RASST_AUTO_GLOSSARY_ENABLED", True),
-            auto_glossary_default_preset=_env_str("RASST_AUTO_GLOSSARY_DEFAULT", "common_10k"),
+            auto_glossary_default_preset=_env_str("RASST_AUTO_GLOSSARY_DEFAULT", base_preset_default),
             auto_glossary_presets=_env_str(
                 "RASST_AUTO_GLOSSARY_PRESETS",
-                "common_10k,nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k",
+                working_presets_default,
             ),
             auto_glossary_update_sec=_env_float("RASST_AUTO_GLOSSARY_UPDATE_SEC", 45.0),
             auto_glossary_warmup_sec=_env_float("RASST_AUTO_GLOSSARY_WARMUP_SEC", 30.0),
-            auto_glossary_min_conf=_env_float("RASST_AUTO_GLOSSARY_MIN_CONF", 0.60),
+            auto_glossary_min_conf=_env_float("RASST_AUTO_GLOSSARY_MIN_CONF", _safe_float(routing_config.get("domain_activate_threshold"), 0.60)),
             auto_glossary_switch_margin=_env_float(
                 "RASST_AUTO_GLOSSARY_MIN_MARGIN",
-                _env_float("RASST_AUTO_GLOSSARY_SWITCH_MARGIN", 0.15),
+                _env_float("RASST_AUTO_GLOSSARY_SWITCH_MARGIN", _safe_float(routing_config.get("domain_margin_threshold"), 0.15)),
             ),
             auto_glossary_min_consistent_windows=_env_int("RASST_AUTO_GLOSSARY_MIN_CONSISTENT_WINDOWS", 2),
-            auto_glossary_fallback_preset=_env_str("RASST_AUTO_GLOSSARY_FALLBACK", "common_10k"),
+            auto_glossary_fallback_preset=_env_str("RASST_AUTO_GLOSSARY_FALLBACK", base_preset_default),
             auto_glossary_preload=_env_bool("RASST_AUTO_GLOSSARY_PRELOAD", True),
             auto_glossary_preload_presets=_env_str(
                 "RASST_AUTO_GLOSSARY_PRELOAD_PRESETS",
-                "common_10k,nlp_core_10k,medicine_core_10k",
+                working_presets_default,
             ),
             router_mode=_env_str("RASST_ROUTER_MODE", "embedding_refs"),
             router_legacy_keywords=_env_bool("RASST_ROUTER_LEGACY_KEYWORDS", False),
             router_embed_weight=_env_float("RASST_ROUTER_EMBED_WEIGHT", 0.65),
             router_ref_weight=_env_float("RASST_ROUTER_REF_WEIGHT", 0.35),
             router_ema_alpha=_env_float("RASST_ROUTER_EMA_ALPHA", 0.80),
-            prompt_top_k=_env_int("RASST_PROMPT_TOP_K", 10),
-            ui_top_k=_env_int("RASST_UI_TOP_K", 10),
+            prompt_top_k=_env_int("RASST_PROMPT_TOP_K", prompt_k_default),
+            ui_top_k=_env_int("RASST_UI_TOP_K", prompt_k_default),
+            autoterm_broad_topk_per_slice=broad_topk_default,
+            autoterm_rescue_preset=rescue_preset_default,
+            autoterm_enable_open_rescue=_meta_bool(retrieval_config.get("use_open_wiki_rescue"), _meta_bool(routing_config.get("enable_fallback"), True)),
             max_imported_glossary_terms=_env_int("RASST_MAX_IMPORTED_GLOSSARY_TERMS", 10000),
             tmp_dir=_env_str("RASST_TMP_DIR", f"/dev/shm/rasst_omni_{os.getpid()}"),
         )
@@ -334,6 +415,7 @@ class OmniSession:
     last_rescue_triggered: bool = False
     last_candidate_pool_count: int = 0
     last_prompt_reference_count: int = 0
+    active_retrieval_slices: List[RetrievalSlice] = field(default_factory=list)
     pending_since_s: Optional[float] = None
     latency_multiplier: int = 2
 
@@ -582,9 +664,17 @@ class OmniAgent(Agent):
         )
 
     def _active_retrieval_slices(self, session: "OmniSession") -> List[RetrievalSlice]:
+        if session.active_retrieval_slices:
+            return list(session.active_retrieval_slices)
         if not session.auto_glossary_enabled:
-            plan = self._slice_for_preset(session, session.glossary_preset, role=slice_role_for_preset(session.glossary_preset))
-            return [plan] if plan is not None else []
+            plan = self._slice_for_preset(
+                session,
+                session.glossary_preset,
+                role=slice_role_for_preset(session.glossary_preset),
+            )
+            slices = [plan] if plan is not None else []
+            self._record_active_slices(session, slices)
+            return slices
 
         base_preset = (self.config.auto_glossary_default_preset or "common_10k").strip() or "common_10k"
         presets: List[Tuple[str, str]] = [(base_preset, "base")]
@@ -600,6 +690,7 @@ class OmniAgent(Agent):
                 continue
             seen.add(plan.preset_id)
             slices.append(plan)
+        self._record_active_slices(session, slices)
         return slices
 
     def _rescue_retrieval_slice(self, session: "OmniSession") -> Optional[RetrievalSlice]:
@@ -608,6 +699,7 @@ class OmniAgent(Agent):
         return self._slice_for_preset(session, self.config.autoterm_rescue_preset, role="rescue")
 
     def _record_active_slices(self, session: "OmniSession", slices: Sequence[RetrievalSlice]) -> None:
+        session.active_retrieval_slices = list(slices)
         session.active_slice_presets = [item.preset_id for item in slices]
         session.active_slice_terms = {item.preset_id: int(item.term_count or 0) for item in slices}
         session.last_retrieval_plan = [item.to_meta() for item in slices]
@@ -940,6 +1032,7 @@ class OmniAgent(Agent):
                     last_decision_s=0.0,
                     last_switch_s=time.perf_counter(),
                 )
+                session.active_retrieval_slices = []
                 active_slices = self._active_retrieval_slices(session)
                 self._record_active_slices(session, active_slices)
                 for item in active_slices:
@@ -1006,6 +1099,11 @@ class OmniAgent(Agent):
                 last_decision_s=time.perf_counter(),
                 last_switch_s=time.perf_counter(),
             )
+            session.active_retrieval_slices = []
+            active_slices = self._active_retrieval_slices(session)
+            self._record_active_slices(session, active_slices)
+            for item in active_slices:
+                self._schedule_index_preload(item.index_path)
             session_updated = True
         result = {
             "success": True,
@@ -1515,6 +1613,7 @@ class OmniAgent(Agent):
         session.active_glossary_preset = selection.active_preset
         session.active_domain = selection.active_domain
         session.glossary_index_path = selection.index_path
+        session.active_retrieval_slices = []
         active_slices = self._active_retrieval_slices(session)
         self._record_active_slices(session, active_slices)
         for item in active_slices:
@@ -1615,6 +1714,7 @@ class OmniAgent(Agent):
         session.active_glossary_preset = selection.active_preset
         session.active_domain = selection.active_domain
         session.glossary_index_path = selection.index_path
+        session.active_retrieval_slices = []
         active_slices = self._active_retrieval_slices(session)
         self._record_active_slices(session, active_slices)
         for item in active_slices:

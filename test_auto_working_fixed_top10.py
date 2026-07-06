@@ -41,11 +41,23 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(len({item["term"].lower() for item in prompt}), 3)
         self.assertIn("BERT", {item["term"] for item in prompt})
 
+    def test_force_exactly_k_uses_common_defaults_when_pool_is_short(self) -> None:
+        ranked = rank_references([{"term": "BERT", "translation": "BERT", "score": 0.9}])
+        prompt = force_exactly_k_references(ranked, k=10, backfill=[])
+
+        self.assertEqual(len(prompt), 10)
+        self.assertEqual(len({item["term"].lower() for item in prompt}), 10)
+        self.assertTrue(all(item.get("term") and item.get("translation") for item in prompt))
+        self.assertEqual(prompt[0]["term"], "BERT")
+
     def test_identity_retention_metric_allows_acronyms_not_lowercase_phrases(self) -> None:
         gold = [("AI", ["AI"]), ("machine learning", ["machine learning"]), ("syntax", ["句法"])]
         row = score("AI and machine learning improve 句法。", gold, surfaced_terms={"ai", "syntax"})
         self.assertTrue(allowed_identity_retention_source("AI"))
         self.assertFalse(allowed_identity_retention_source("machine learning"))
+        self.assertFalse(allowed_identity_retention_source("Neural Network"))
+        self.assertTrue(allowed_identity_retention_source("PubMed"))
+        self.assertTrue(allowed_identity_retention_source("KinyaBERT"))
         self.assertEqual(row["gold"], 3)
         self.assertEqual(row["term_recall"], 0.667)
         self.assertEqual(row["identity_retention_recall"], 0.333)

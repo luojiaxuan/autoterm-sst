@@ -382,7 +382,8 @@ class MaxSimRetrievalPlugin(RetrievalPlugin):
         if self.retriever is None or not requests:
             return [RetrievalResult(references=[]) for _ in requests]
         async with self._lock:
-            old_threshold = getattr(self.retriever, "score_threshold", None)
+            missing = object()
+            old_threshold = getattr(self.retriever, "score_threshold", missing)
             if score_threshold is not None:
                 self.retriever.score_threshold = float(score_threshold)
             try:
@@ -393,7 +394,7 @@ class MaxSimRetrievalPlugin(RetrievalPlugin):
                     float(lookback_sec),
                 )
             finally:
-                if score_threshold is not None and old_threshold is not None:
+                if score_threshold is not None and old_threshold is not missing:
                     self.retriever.score_threshold = old_threshold
         return list(results)
 

@@ -73,7 +73,7 @@ class RouterConfig:
     embedding_weight: float = 0.65
     reference_weight: float = 0.35
     ema_alpha: float = 0.80
-    fallback_preset_id: str = "common_10k"
+    fallback_preset_id: str = "none"
     ref_score_floor: float = 0.0
     max_recent_refs: int = 80
     consistency_bonus: float = 0.05
@@ -483,6 +483,11 @@ class LegacyKeywordTopicRouter:
         return out
 
 
+LegacyTopicRouter = LegacyKeywordTopicRouter
+
+# Backward-compatible import alias only. New runtime code should use
+# AudioNativeActiveGlossaryRouter; the keyword router is a debug fallback behind
+# RASST_ROUTER_MODE=legacy_keywords.
 TopicRouter = LegacyKeywordTopicRouter
 
 

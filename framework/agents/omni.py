@@ -159,7 +159,7 @@ def _preset_for_slice_id(slice_id: str) -> str:
     return value
 
 
-def _autoterm_base_preset(config: Dict[str, Any], default: str = "common_10k") -> str:
+def _autoterm_base_preset(config: Dict[str, Any], default: str = "none") -> str:
     base = _preset_for_slice_id(str(config.get("base_slice") or ""))
     if base:
         return base
@@ -180,7 +180,7 @@ def _autoterm_working_presets(config: Dict[str, Any], default: str) -> str:
         if not isinstance(meta, dict):
             continue
         role = str(meta.get("type") or "").strip().lower()
-        if role not in {"base", "domain"}:
+        if role != "domain":
             continue
         preset = _preset_for_slice_id(str(slice_id))
         if preset and preset not in presets:
@@ -256,16 +256,16 @@ class OmniConfig:
     rag_timeline_lookback_sec: float = 1.92
 
     auto_glossary_enabled: bool = True
-    auto_glossary_default_preset: str = "common_10k"
-    auto_glossary_presets: str = "common_10k,nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k"
+    auto_glossary_default_preset: str = "nlp_core_10k"
+    auto_glossary_presets: str = "nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k"
     auto_glossary_update_sec: float = 45.0
     auto_glossary_warmup_sec: float = 30.0
     auto_glossary_min_conf: float = 0.60
     auto_glossary_switch_margin: float = 0.15
     auto_glossary_min_consistent_windows: int = 2
-    auto_glossary_fallback_preset: str = "common_10k"
+    auto_glossary_fallback_preset: str = "none"
     auto_glossary_preload: bool = True
-    auto_glossary_preload_presets: str = "common_10k,nlp_core_10k,medicine_core_10k"
+    auto_glossary_preload_presets: str = "nlp_core_10k,medicine_core_10k"
     router_mode: str = "embedding_refs"
     router_legacy_keywords: bool = False
     router_embed_weight: float = 0.65
@@ -288,10 +288,10 @@ class OmniConfig:
         retrieval_config = autoterm_config.get("retrieval") if isinstance(autoterm_config.get("retrieval"), dict) else {}
         prompt_k_default = _safe_int(retrieval_config.get("prompt_k", autoterm_config.get("prompt_k")), PROMPT_K)
         broad_topk_default = _safe_int(retrieval_config.get("broad_topk_per_slice"), 50)
-        base_preset_default = _autoterm_base_preset(autoterm_config, "common_10k")
+        base_preset_default = _autoterm_base_preset(autoterm_config, "nlp_core_10k")
         working_presets_default = _autoterm_working_presets(
             autoterm_config,
-            "common_10k,nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k",
+            "nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k",
         )
         rescue_preset_default = _autoterm_rescue_preset(autoterm_config, "open_wiki_100k")
         mock = _env_bool("RASST_DEMO_MOCK", False)
@@ -353,7 +353,7 @@ class OmniConfig:
                 _env_float("RASST_AUTO_GLOSSARY_SWITCH_MARGIN", _safe_float(routing_config.get("domain_margin_threshold"), 0.15)),
             ),
             auto_glossary_min_consistent_windows=_env_int("RASST_AUTO_GLOSSARY_MIN_CONSISTENT_WINDOWS", 2),
-            auto_glossary_fallback_preset=_env_str("RASST_AUTO_GLOSSARY_FALLBACK", base_preset_default),
+            auto_glossary_fallback_preset=_env_str("RASST_AUTO_GLOSSARY_FALLBACK", "none"),
             auto_glossary_preload=_env_bool("RASST_AUTO_GLOSSARY_PRELOAD", True),
             auto_glossary_preload_presets=_env_str(
                 "RASST_AUTO_GLOSSARY_PRELOAD_PRESETS",
@@ -676,11 +676,20 @@ class OmniAgent(Agent):
             self._record_active_slices(session, slices)
             return slices
 
-        base_preset = (self.config.auto_glossary_default_preset or "common_10k").strip() or "common_10k"
-        presets: List[Tuple[str, str]] = [(base_preset, "base")]
         active_preset = (session.active_glossary_preset or session.glossary_preset or "").strip()
-        if active_preset and active_preset != base_preset and active_preset != "none":
+        presets: List[Tuple[str, str]] = []
+        if active_preset and active_preset != "none":
             presets.append((active_preset, "domain"))
+        else:
+            for preset in configured_working_presets(self.config.auto_glossary_presets):
+                domain = domain_for_preset(preset)
+                if not preset or preset == "none" or domain in {GENERAL_DOMAIN, "common", "general"}:
+                    continue
+                presets.append((preset, "domain_probe"))
+        if not presets:
+            default_preset = (self.config.auto_glossary_default_preset or "").strip()
+            if default_preset and default_preset != "none":
+                presets.append((default_preset, "domain"))
 
         slices: List[RetrievalSlice] = []
         seen: Set[str] = set()

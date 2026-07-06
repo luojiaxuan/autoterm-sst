@@ -77,7 +77,7 @@ _DEFAULT_DOMAIN_NEUTRAL_BACKFILL_TERMS = (
     ("report", "报告"),
 )
 
-_NLP_BACKFILL_DOMAINS = {"", GENERAL_DOMAIN, "common", "nlp"}
+_NLP_BACKFILL_DOMAINS = {"nlp"}
 
 
 @dataclass(frozen=True)
@@ -125,7 +125,7 @@ def slice_role_for_preset(preset_id: str) -> str:
 def slice_weight_for_role(role: str) -> float:
     if role == "base":
         return 1.0
-    if role == "domain":
+    if role in {"domain", "domain_probe", "domain_backfill"}:
         return 0.8
     if role == "rescue":
         return 0.4
@@ -244,7 +244,9 @@ def default_common_backfill_references(
     domain = str(active_domain or GENERAL_DOMAIN).strip().casefold()
     use_nlp_common = domain in _NLP_BACKFILL_DOMAINS
     terms = _DEFAULT_NLP_COMMON_BACKFILL_TERMS if use_nlp_common else _DEFAULT_DOMAIN_NEUTRAL_BACKFILL_TERMS
-    fallback_reason = "fixed_prompt_k_default" if use_nlp_common else "fixed_prompt_k_domain_neutral_default"
+    fallback_reason = "fixed_prompt_k_nlp_domain_default" if use_nlp_common else "fixed_prompt_k_domain_neutral_default"
+    source_preset = f"{domain}_domain_backfill" if domain != GENERAL_DOMAIN else "domain_neutral_backfill"
+    source_slice_id = f"{domain}_domain_backfill" if domain != GENERAL_DOMAIN else "domain_neutral_backfill"
     refs: List[Dict[str, Any]] = []
     for term, translation in terms[:limit]:
         refs.append(
@@ -253,11 +255,11 @@ def default_common_backfill_references(
                 "translation": translation,
                 "target_translations": {"zh": translation},
                 "canonical_source": term,
-                "source": "fixed_prompt_k_default",
-                "source_preset": "common_10k",
-                "source_slice_id": COMMON_TERMS_SLICE_ID,
-                "source_slice_role": "base",
-                "source_domain": GENERAL_DOMAIN if use_nlp_common else domain,
+                "source": "fixed_prompt_k_domain_backfill",
+                "source_preset": source_preset,
+                "source_slice_id": source_slice_id,
+                "source_slice_role": "domain_backfill",
+                "source_domain": domain,
                 "score": -100.0,
                 "dense_score": -100.0,
                 "rerank_score": -100.0,

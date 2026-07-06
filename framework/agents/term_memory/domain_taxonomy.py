@@ -14,7 +14,6 @@ AUTO_WORKING_PRESET = "auto_working"
 
 GENERAL_DOMAIN = "general"
 DOMAIN_TO_PRESET: Dict[str, str] = {
-    GENERAL_DOMAIN: "common_10k",
     "nlp": "nlp_core_10k",
     "medicine": "medicine_core_10k",
     "finance": "finance_core_10k",
@@ -28,12 +27,12 @@ WORKING_PRESET_META: Dict[str, Dict[str, str]] = {
     AUTO_WORKING_PRESET: {
         "label": "Auto working glossary",
         "domain": "auto",
-        "description": "Starts from common_10k and switches to a compact domain slice.",
+        "description": "Routes directly among domain-specific working glossary slices.",
     },
     "common_10k": {
         "label": "Common working glossary 10k",
         "domain": GENERAL_DOMAIN,
-        "description": "General high-precision terms used before a topic is clear.",
+        "description": "Manual/debug common glossary; not used as the automatic base slice.",
     },
     "nlp_core_10k": {
         "label": "NLP core working glossary 10k",
@@ -180,7 +179,7 @@ class DomainScore:
     reason: str
 
 
-def preset_for_domain(domain: str, default_preset: str = "common_10k") -> str:
+def preset_for_domain(domain: str, default_preset: str = "none") -> str:
     return DOMAIN_TO_PRESET.get((domain or "").strip().lower(), default_preset)
 
 

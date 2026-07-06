@@ -41,7 +41,7 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(len({item["term"].lower() for item in prompt}), 3)
         self.assertIn("BERT", {item["term"] for item in prompt})
 
-    def test_force_exactly_k_uses_common_defaults_when_pool_is_short(self) -> None:
+    def test_force_exactly_k_uses_nlp_domain_defaults_when_pool_is_short(self) -> None:
         ranked = rank_references([{"term": "BERT", "translation": "BERT", "score": 0.9}])
         prompt = force_exactly_k_references(ranked, k=10, backfill=[], active_domain="nlp")
 
@@ -49,6 +49,8 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(len({item["term"].lower() for item in prompt}), 10)
         self.assertTrue(all(item.get("term") and item.get("translation") for item in prompt))
         self.assertEqual(prompt[0]["term"], "BERT")
+        self.assertTrue(all(item.get("source_slice_role") != "base" for item in prompt[1:]))
+        self.assertTrue(all(item.get("source_domain") == "nlp" for item in prompt[1:]))
 
     def test_force_exactly_k_uses_neutral_defaults_outside_nlp(self) -> None:
         prompt = force_exactly_k_references([], k=10, backfill=[], active_domain="medicine")
@@ -61,6 +63,7 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertTrue(all(item.get("term") and item.get("translation") for item in prompt))
         self.assertTrue(all(item.get("source_domain") == "medicine" for item in prompt))
         self.assertTrue(all(item.get("fallback_reason") == "fixed_prompt_k_domain_neutral_default" for item in prompt))
+        self.assertTrue(all(item.get("source_preset") != "common_10k" for item in prompt))
 
     def test_identity_retention_metric_allows_acronyms_not_lowercase_phrases(self) -> None:
         gold = [("AI", ["AI"]), ("machine learning", ["machine learning"]), ("syntax", ["句法"])]
@@ -77,7 +80,7 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(row["term_recall_surfaced"], 1.0)
         self.assertEqual(row["term_recall_not_surfaced"], 0.0)
 
-    def test_router_can_route_from_common_base_to_domain_slice(self) -> None:
+    def test_router_can_route_from_unassigned_state_to_domain_slice(self) -> None:
         router = AudioNativeActiveGlossaryRouter(
             [
                 DomainSlice(
@@ -93,11 +96,11 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
                 min_confidence=0.5,
                 min_margin=0.0,
                 min_consistent_windows=1,
-                fallback_preset_id="common_10k",
+                fallback_preset_id="none",
             ),
         )
         state = RouterSessionState(
-            active_preset_id="common_10k",
+            active_preset_id="none",
             active_domain_id="general",
             created_s=0.0,
             last_decision_s=0.0,
@@ -124,11 +127,11 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
                 min_confidence=0.5,
                 min_margin=0.0,
                 min_consistent_windows=2,
-                fallback_preset_id="common_10k",
+                fallback_preset_id="none",
             ),
         )
         state = RouterSessionState(
-            active_preset_id="common_10k",
+            active_preset_id="none",
             active_domain_id="general",
             created_s=0.0,
             last_decision_s=0.0,

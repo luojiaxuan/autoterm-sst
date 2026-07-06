@@ -1,12 +1,7 @@
 auto_working:
   prompt_k: 10
-  base_slice: common_terms
+  initial_slice: nlp_core_10k
   slices:
-    common_terms:
-      path: /mnt/data2/jiaxuanluo/rasst-demo/runtime/term_memory/scale_aclgold_10000.json
-      type: base
-      always_on: true
-      weight: 1.0
     nlp_core_10k:
       path: /mnt/data2/jiaxuanluo/rasst-demo/runtime/term_memory/nlp_core_10k.json
       type: domain

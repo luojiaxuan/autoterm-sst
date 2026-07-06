@@ -52,22 +52,22 @@ class AutoGlossaryTests(unittest.TestCase):
     def test_topic_router_switches_on_clear_nlp_embedding(self) -> None:
         router = AudioNativeActiveGlossaryRouter(
             [
-                DomainSlice("common_10k", "general", centroid=[1.0, 0.0], index_path="mock://common"),
-                DomainSlice("nlp_core_10k", "nlp", centroid=[0.0, 1.0], index_path="mock://nlp"),
+                DomainSlice("nlp_core_10k", "nlp", centroid=[1.0, 0.0], index_path="mock://nlp"),
+                DomainSlice("medicine_core_10k", "medicine", centroid=[0.0, 1.0], index_path="mock://medicine"),
             ],
             RouterConfig(warmup_sec=0, update_interval_sec=0, min_confidence=0.5, min_margin=0.1, min_consistent_windows=1),
         )
-        state = RouterSessionState("common_10k", "general", created_s=0.0)
-        decision = router.observe(state, [0.0, 1.0], [], now_s=60.0)
+        state = RouterSessionState("none", "general", created_s=0.0)
+        decision = router.observe(state, [1.0, 0.0], [], now_s=60.0)
         self.assertEqual(decision.target_domain_id, "nlp")
         self.assertEqual(decision.action, "switch")
         self.assertGreaterEqual(decision.confidence, 0.5)
 
-    def test_auto_initial_selection_uses_common_slice(self) -> None:
+    def test_auto_initial_selection_uses_domain_slice(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             manifest = self._manifest(Path(tmp))
             catalog = GlossaryCatalog("English -> Chinese", manifest=manifest)
-            manager = ActiveGlossaryManager(default_preset="common_10k")
+            manager = ActiveGlossaryManager(default_preset="nlp_core_10k")
             selection = manager.initial_selection(
                 catalog,
                 AUTO_WORKING_PRESET,
@@ -77,7 +77,7 @@ class AutoGlossaryTests(unittest.TestCase):
             )
             self.assertTrue(selection.auto_enabled)
             self.assertEqual(selection.requested_preset, AUTO_WORKING_PRESET)
-            self.assertEqual(selection.active_preset, "common_10k")
+            self.assertEqual(selection.active_preset, "nlp_core_10k")
             self.assertEqual(selection.preset_terms, 10000)
             self.assertTrue(selection.index_ready)
 
@@ -85,15 +85,15 @@ class AutoGlossaryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             manifest = self._manifest(Path(tmp))
             catalog = GlossaryCatalog("English -> Chinese", manifest=manifest)
-            manager = ActiveGlossaryManager(default_preset="common_10k")
+            manager = ActiveGlossaryManager(default_preset="nlp_core_10k")
             router = AudioNativeActiveGlossaryRouter(
                 [
-                    DomainSlice("common_10k", "general", centroid=[1.0, 0.0], index_path="mock://common"),
-                    DomainSlice("nlp_core_10k", "nlp", centroid=[0.0, 1.0], index_path="mock://nlp"),
+                    DomainSlice("nlp_core_10k", "nlp", centroid=[1.0, 0.0], index_path="mock://nlp"),
+                    DomainSlice("medicine_core_10k", "medicine", centroid=[0.0, 1.0], index_path="mock://medicine"),
                 ],
                 RouterConfig(warmup_sec=0, update_interval_sec=0, min_confidence=0.5, min_margin=0.1, min_consistent_windows=1),
             )
-            decision = router.observe(RouterSessionState("common_10k", "general"), [0.0, 1.0], [], now_s=60.0)
+            decision = router.observe(RouterSessionState("none", "general"), [1.0, 0.0], [], now_s=60.0)
             selection = manager.selection_for_decision(catalog, decision, mock=False)
             self.assertIsNotNone(selection)
             assert selection is not None

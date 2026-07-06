@@ -310,7 +310,7 @@ class GlossaryCatalog:
     def index_path_for_preset(self, preset_id: Optional[str]) -> str:
         normalized = self.normalize_preset_id(preset_id)
         if normalized == AUTO_WORKING_PRESET:
-            normalized = os.environ.get("RASST_AUTO_GLOSSARY_DEFAULT", "common_10k").strip() or "common_10k"
+            normalized = os.environ.get("RASST_AUTO_GLOSSARY_DEFAULT", "nlp_core_10k").strip() or "nlp_core_10k"
         snapshot = self._open_snapshot(normalized)
         if snapshot is not None:
             return snapshot.index_path("maxsim")
@@ -330,7 +330,7 @@ class GlossaryCatalog:
     def glossary_path_for_preset(self, preset_id: Optional[str]) -> str:
         normalized = self.normalize_preset_id(preset_id)
         if normalized == AUTO_WORKING_PRESET:
-            normalized = os.environ.get("RASST_AUTO_GLOSSARY_DEFAULT", "common_10k").strip() or "common_10k"
+            normalized = os.environ.get("RASST_AUTO_GLOSSARY_DEFAULT", "nlp_core_10k").strip() or "nlp_core_10k"
         snapshot = self._open_snapshot(normalized)
         if snapshot is not None:
             return snapshot.terms_path
@@ -364,7 +364,7 @@ class GlossaryCatalog:
 
     def _preset_terms(self, normalized: str, glossary_path: str) -> int:
         if normalized == AUTO_WORKING_PRESET:
-            normalized = os.environ.get("RASST_AUTO_GLOSSARY_DEFAULT", "common_10k").strip() or "common_10k"
+            normalized = os.environ.get("RASST_AUTO_GLOSSARY_DEFAULT", "nlp_core_10k").strip() or "nlp_core_10k"
         snapshot = self._open_snapshot(normalized)
         if snapshot is not None:
             # Avoid counting a 1M-line JSONL: trust the manifest's num_terms.
@@ -375,7 +375,7 @@ class GlossaryCatalog:
         normalized = self.normalize_preset_id(preset_id)
         active_normalized = normalized
         if normalized == AUTO_WORKING_PRESET:
-            active_normalized = os.environ.get("RASST_AUTO_GLOSSARY_DEFAULT", "common_10k").strip() or "common_10k"
+            active_normalized = os.environ.get("RASST_AUTO_GLOSSARY_DEFAULT", "nlp_core_10k").strip() or "nlp_core_10k"
             active_normalized = self.normalize_preset_id(active_normalized)
         glossary_path = self.glossary_path_for_preset(active_normalized)
         index_path = self.index_path_for_preset(active_normalized)
@@ -393,7 +393,7 @@ class GlossaryCatalog:
 
     def preset_catalog(self) -> List[Dict[str, Any]]:
         catalog: List[Dict[str, Any]] = []
-        default_auto = os.environ.get("RASST_AUTO_GLOSSARY_DEFAULT", "common_10k").strip() or "common_10k"
+        default_auto = os.environ.get("RASST_AUTO_GLOSSARY_DEFAULT", "nlp_core_10k").strip() or "nlp_core_10k"
         auto_index = self.index_path_for_preset(default_auto)
         catalog.append(
             {

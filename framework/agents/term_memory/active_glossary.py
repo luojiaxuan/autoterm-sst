@@ -55,10 +55,10 @@ class ActiveGlossaryManager:
     def __init__(
         self,
         *,
-        default_preset: str = "common_10k",
+        default_preset: str = "none",
         allowed_presets: Iterable[str] = WORKING_GLOSSARY_PRESETS,
     ) -> None:
-        self.default_preset = default_preset or "common_10k"
+        self.default_preset = default_preset or "none"
         self.allowed_presets = {p for p in allowed_presets if p}
 
     def is_auto_request(self, preset: Optional[str]) -> bool:
@@ -109,7 +109,7 @@ class ActiveGlossaryManager:
         target = str(getattr(decision, "target_preset_id", "") or "").strip()
         if not target:
             target = preset_for_domain(str(getattr(decision, "primary_domain", "")), self.default_preset)
-        if target not in self.allowed_presets:
+        if target != "none" and target not in self.allowed_presets:
             return None
         selection = self._describe(catalog, target, glossary_text, mock=mock)
         if not selection["index_ready"] and selection["index_path"]:

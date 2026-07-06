@@ -11,10 +11,10 @@ from framework.agents.term_memory.topic_router import (
 
 
 class TopicRouterFallbackTests(unittest.TestCase):
-    def test_unsupported_current_preset_falls_back_to_common(self) -> None:
+    def test_unsupported_current_preset_falls_back_to_none(self) -> None:
         router = AudioNativeActiveGlossaryRouter(
-            [DomainSlice("common_10k", "general", centroid=[1.0, 0.0], index_path="mock://common")],
-            RouterConfig(warmup_sec=0, update_interval_sec=0, fallback_preset_id="common_10k"),
+            [DomainSlice("nlp_core_10k", "nlp", centroid=[1.0, 0.0], index_path="mock://nlp")],
+            RouterConfig(warmup_sec=0, update_interval_sec=0, fallback_preset_id="none"),
         )
         decision = router.observe(
             RouterSessionState("missing_core_10k", "missing", created_s=0.0),
@@ -23,7 +23,7 @@ class TopicRouterFallbackTests(unittest.TestCase):
             now_s=60.0,
         )
         self.assertEqual(decision.action, "fallback")
-        self.assertEqual(decision.target_preset_id, "common_10k")
+        self.assertEqual(decision.target_preset_id, "none")
 
     def test_common_domain_never_triggers_narrow_switch(self) -> None:
         router = AudioNativeActiveGlossaryRouter(
@@ -52,7 +52,7 @@ class TopicRouterFallbackTests(unittest.TestCase):
             RouterConfig(warmup_sec=0, update_interval_sec=0, min_confidence=0.5, min_margin=0.1),
         )
         decision = router.observe(
-            RouterSessionState("common_10k", "general", created_s=0.0),
+            RouterSessionState("none", "general", created_s=0.0),
             [0.0, 1.0],
             [],
             now_s=60.0,

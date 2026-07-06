@@ -254,7 +254,9 @@ target text, or manual glossary terms for routing. The prompt interface is held
 constant: every streaming chunk receives exactly the fixed top-10 retrieved
 candidates, while larger 100k/500k/1M memories remain offline memory, rescue
 pools, and scale evidence. See
-[`docs/adaptive_working_glossary.md`](docs/adaptive_working_glossary.md).
+[`docs/adaptive_working_glossary.md`](docs/adaptive_working_glossary.md). See
+[`docs/ai_glossary_sweep.md`](docs/ai_glossary_sweep.md) for the 2026-07-06
+ACL+AI glossary-size sweep and route policy update.
 
 ```bash
 # 1. normalize a Wikidata-derived glossary -> rows, filter/rank/scale -> glossary

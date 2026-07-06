@@ -127,6 +127,10 @@ The likely contribution shape is:
 - Keep changes scoped to the demo path unless the user explicitly asks to sync
   with another repo.
 - Prefer small smoke tests before reporting success.
+- After committing material code, config, docs, evaluation summaries, or
+  progress records, push the branch to the GitHub remote before reporting the
+  task complete unless the user explicitly says not to push. Local-only commits
+  are not a source of truth for this project.
 - Do not commit generated logs, caches, model weights, downloaded checkpoints,
   large media, or temporary LaTeX build products.
 - If borrowing code from InfiniSST, RASST, or RAPO, record the source path and

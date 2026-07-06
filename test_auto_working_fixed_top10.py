@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import unittest
+from types import SimpleNamespace
 
 from eval.streaming_sst.score_terms import allowed_identity_retention_source, score
+from framework.agents.omni import OmniAgent
 from framework.agents.term_memory.slice_registry import (
     force_exactly_k_references,
     rank_references,
@@ -64,6 +66,20 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertTrue(all(item.get("source_domain") == "medicine" for item in prompt))
         self.assertTrue(all(item.get("fallback_reason") == "fixed_prompt_k_domain_neutral_default" for item in prompt))
         self.assertTrue(all(item.get("source_preset") != "common_10k" for item in prompt))
+
+    def test_rescue_requires_router_fallback_not_prompt_shortfall(self) -> None:
+        agent = OmniAgent()
+        session = SimpleNamespace(
+            auto_glossary_enabled=True,
+            last_router_decision={},
+        )
+        agent.config.autoterm_enable_open_rescue = True
+        agent.config.prompt_top_k = 10
+
+        self.assertFalse(agent._should_rescue_retrieval(session, [{"term": "BERT"}]))
+
+        session.last_router_decision = {"action": "fallback"}
+        self.assertTrue(agent._should_rescue_retrieval(session, [{"term": "BERT"}]))
 
     def test_identity_retention_metric_allows_acronyms_not_lowercase_phrases(self) -> None:
         gold = [("AI", ["AI"]), ("machine learning", ["machine learning"]), ("syntax", ["句法"])]

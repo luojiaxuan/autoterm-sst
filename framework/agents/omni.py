@@ -737,8 +737,6 @@ class OmniAgent(Agent):
     ) -> bool:
         if not session.auto_glossary_enabled or not self.config.autoterm_enable_open_rescue:
             return False
-        if len(ranked or []) < max(0, int(self.config.prompt_top_k)):
-            return True
         decision = session.last_router_decision or {}
         return str(decision.get("action") or "") == "fallback"
 

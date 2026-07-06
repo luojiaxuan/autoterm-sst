@@ -35,7 +35,7 @@ auto_working:
     enable_talk_level: true
     enable_chunk_level: true
     enable_fallback: true
-    domain_activate_threshold: 0.55
+    domain_activate_threshold: 0.60
     domain_margin_threshold: 0.15
     low_confidence_threshold: 0.35
   retrieval:

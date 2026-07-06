@@ -269,6 +269,7 @@ class AudioNativeActiveGlossaryRouter:
             guard_reason.startswith("warmup<")
             or guard_reason.startswith("interval<")
             or guard_reason == "no_audio_or_reference_evidence"
+            or guard_reason.startswith("consistent_windows<")
         ):
             session_state.last_decision_s = float(now_s)
         decision = RouterDecision(

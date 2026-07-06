@@ -84,6 +84,41 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(decision.target_preset_id, "nlp_core_10k")
         self.assertEqual(decision.target_domain_id, "nlp")
 
+    def test_router_consistency_pending_does_not_start_interval_gate(self) -> None:
+        router = AudioNativeActiveGlossaryRouter(
+            [
+                DomainSlice(
+                    preset_id="nlp_core_10k",
+                    domain_id="nlp",
+                    centroid=[1.0, 0.0],
+                    index_path="mock://nlp",
+                )
+            ],
+            RouterConfig(
+                warmup_sec=0.0,
+                update_interval_sec=45.0,
+                min_confidence=0.5,
+                min_margin=0.0,
+                min_consistent_windows=2,
+                fallback_preset_id="common_10k",
+            ),
+        )
+        state = RouterSessionState(
+            active_preset_id="common_10k",
+            active_domain_id="general",
+            created_s=0.0,
+            last_decision_s=0.0,
+        )
+
+        first = router.observe(state, [1.0, 0.0], [], now_s=1.0)
+        second = router.observe(state, [1.0, 0.0], [], now_s=2.0)
+
+        self.assertEqual(first.action, "stay")
+        self.assertIn("consistent_windows<2", first.reason)
+        self.assertEqual(state.last_decision_s, 2.0)
+        self.assertEqual(second.action, "switch")
+        self.assertEqual(second.target_preset_id, "nlp_core_10k")
+
 
 if __name__ == "__main__":
     unittest.main()

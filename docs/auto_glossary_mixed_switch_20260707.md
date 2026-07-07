@@ -17,10 +17,10 @@ probe 下的切换问题。
 
 ## 代码与输出
 
-- Git ref: `c62b523 Guard probe-only glossary routing evidence`
+- Git ref: `88d0975 Block topic-empty centroid glossary switches`
 - Taurus checkout: `/mnt/taurus/home/jiaxuanluo/rasst-demo`
 - Taurus output dir:
-  `/mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_switch/20260707_c62b523`
+  `/mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_switch/20260707_88d0975`
 - 新脚本: `eval/streaming_sst/eval_mixed_domain_switch.py`
 - 本地/Taurus 测试: `python3 -m unittest test_mixed_domain_switch_eval test_hybrid_window_topic_router test_auto_glossary_switch_eval`
 - 数据来源:
@@ -93,8 +93,8 @@ python3 eval/streaming_sst/eval_mixed_domain_switch.py \
   --router-text-source generated_target \
   --probe-mode expected \
   --max-switch-windows 3 \
-  --out-json /mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_switch/20260707_c62b523/alternating_target64_expected_probe.json \
-  --out-md /mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_switch/20260707_c62b523/alternating_target64_expected_probe.md
+  --out-json /mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_switch/20260707_88d0975/alternating_target64_expected_probe.json \
+  --out-md /mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_switch/20260707_88d0975/alternating_target64_expected_probe.md
 
 python3 eval/streaming_sst/eval_mixed_domain_switch.py \
   --schedule random \
@@ -103,8 +103,8 @@ python3 eval/streaming_sst/eval_mixed_domain_switch.py \
   --router-text-source generated_target \
   --probe-mode expected \
   --max-switch-windows 3 \
-  --out-json /mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_switch/20260707_c62b523/random_seed20260707_target64_expected_probe.json \
-  --out-md /mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_switch/20260707_c62b523/random_seed20260707_target64_expected_probe.md
+  --out-json /mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_switch/20260707_88d0975/random_seed20260707_target64_expected_probe.json \
+  --out-md /mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_switch/20260707_88d0975/random_seed20260707_target64_expected_probe.md
 ```
 
 ## 下一步

@@ -93,6 +93,11 @@ score(domain) =
   + 0.05 * metadata_prior
 ```
 
+The router renormalizes these weights over the signals available in the current
+window. For example, if no source/ASR topic text is available, the score is
+computed over domain-probe, speech-centroid, and metadata-prior evidence rather
+than being capped at `0.25 + 0.10 + 0.05`.
+
 `text_topic_score` uses high-precision weighted keywords from
 `domain_taxonomy.py`. `domain_probe_retrieval_score` is a routing-only small
 top-k probe over ready candidate domain indexes; fresh probe runs are gated by
@@ -103,10 +108,10 @@ sees stable probe evidence without rerunning MaxSim. When source/ASR topic text
 is available, fresh probes are refreshed on the normal router update interval;
 when no topic text is available, fresh probes refresh on the streaming window
 cadence so audio-only domain changes are not frozen for the full update
-interval. Fresh probes reuse the pooled speech embedding from the main
-retrieval pass when available, and only fall back to a separate audio encode
-when no query embedding was produced. It must not change the prompt candidate
-budget.
+interval. Fresh probes reuse the per-window speech embeddings from the main
+retrieval pass when available, preserving the MaxSim-style max-over-window
+statistic; they only fall back to a separate audio encode when no query
+embedding was produced. It must not change the prompt candidate budget.
 `speech_centroid_score` is a weak tie-breaker based on offline domain centroids:
 
 ```text
@@ -334,11 +339,13 @@ python eval/streaming_sst/eval_auto_glossary_switch.py \
   --out-json /mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/eval/auto_glossary_switch_router_only_20260707.json
 ```
 
-The 2026-07-07 Taurus source-text run passed with ACL->medicine switch latency
-4 windows and medicine->ACL switch latency 2 windows. The medicine sample starts
-with generic webinar operator lines before the oncology topic appears, so the
-clean fixture regression remains stricter at 2 windows while the real-text run
-uses a 4-window threshold.
+The 2026-07-07 Taurus source-text run was rerun at
+`/mnt/data2/jiaxuanluo/rasst-demo/runtime/eval/auto_glossary_switch_router_only_20260707_final7.json`
+and passed all four router-unit scenarios. The ACL-only and medicine-only cases
+had zero false switches; ACL->medicine switched within the 4-window threshold,
+and the clean fixture regression with synthetic probe evidence passed the
+stricter 2-window threshold at
+`/tmp/auto_glossary_switch_fixture_probe_final7.json`.
 
 This script directly drives `HybridWindowTopicRouter` on fixture/source-text
 windows with wall-clock update and switch cooldown set to zero. It is a
@@ -400,18 +407,24 @@ evidence, but the demo should select and rank candidates from an active
 inventory. The claim is:
 
 1. large open terminology memory can be maintained offline;
-2. active inventory slices can be selected automatically from audio-native
-   retrieval signals;
-3. fixed top-10 reranking reduces distractors relative to direct broad-memory
+2. the active domain overlay can be selected automatically from recent
+   source/ASR window-topic evidence, with routing-only domain probes and speech
+   centroids as secondary signals;
+3. the common base slice remains active while exactly one domain overlay is
+   switched at a time;
+4. fixed top-10 reranking reduces distractors relative to direct broad-memory
    prompting;
-4. users get terminology-aware streaming speech translation with zero setup.
+5. users get terminology-aware streaming speech translation with zero setup.
 
 Use this paper wording:
 
 ```text
-RASST-Demo uses a lightweight, audio-native, confidence-gated active inventory
-router. The router uses speech-side retrieval embeddings and retrieved-term
-metadata to route directly among domain-specific slices only when the domain
-evidence is strong. When evidence is ambiguous, it keeps the current domain slice
-or no fallback active and preserves the fixed 10-candidate prompt interface.
+RASST-Demo uses a window-topic-first automatic terminology router. For each
+streaming window, it estimates the current domain from recent source-side text
+when available, using source transcript in controlled eval or streaming ASR in
+deployment. It combines this with small top-k routing-only domain probes and a
+weak speech-centroid signal, then applies hysteresis over consecutive windows
+before switching the active domain overlay. The common-terms slice remains
+active across domains, while the prompt interface remains fixed: each chunk
+receives exactly 10 retrieved glossary candidates.
 ```

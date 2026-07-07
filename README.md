@@ -46,7 +46,7 @@ flowchart LR
       direction TB
       PB[PromptBuilder] --- BK[ModelBackend\nvLLM / SGLang / mock]
       RET[RetrievalPlugin\nMaxSim RAG · optional]
-      TR[AudioNativeRouter\nadaptive working glossary] --> RET
+      TR[HybridWindowTopicRouter\nadaptive working glossary] --> RET
     end
     AG -- TranslationEvent via emit() --> RT --> APP --> Client
 ```

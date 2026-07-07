@@ -114,6 +114,7 @@ class NullRetrieval(RetrievalPlugin):
 class RetrievalResult:
     references: List[TermRef]
     query_embedding: Any = None
+    query_window_embeddings: Any = None
     retrieve_s: Optional[float] = None
 
 
@@ -755,7 +756,9 @@ class MaxSimRetrievalPlugin(RetrievalPlugin):
                 request_idx = int(meta["request_idx"])
                 row_valid = valid_windows[row_idx]
                 if int(row_valid.sum().item()) > 0:
-                    pooled = window_embs[row_idx][row_valid].mean(dim=0)
+                    valid_window_embs = window_embs[row_idx][row_valid].detach().cpu().float()
+                    outputs[request_idx].query_window_embeddings = valid_window_embs
+                    pooled = valid_window_embs.mean(dim=0)
                     pooled = F.normalize(pooled, p=2, dim=-1).detach().cpu().float()
                     outputs[request_idx].query_embedding = pooled
 

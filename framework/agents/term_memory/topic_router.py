@@ -640,6 +640,8 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
         probe_by_domain = _normalize_nonnegative_score_map(
             {key: _probe_value(value) for key, value in domain_probe_scores.items()}
         )
+        has_text = bool((router_text or "").strip() and str(router_text_source or "none") != "none")
+        has_probe = any(float(value) > 0.0 for value in probe_by_domain.values())
 
         ema = session_state.ema_query_embedding
         embedding_raw: Dict[str, Optional[float]] = {}
@@ -651,6 +653,14 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
                 embedding_raw[item.preset_id] = None
         embedding_by_preset = _normalize_score_map(embedding_raw)
         reference_by_preset = self._reference_scores(session_state.recent_references)
+        has_embedding = any(value is not None for value in embedding_raw.values())
+        has_reference = any(float(value) > 0.0 for value in reference_by_preset.values())
+        active_weight_sum = (
+            (float(self.config.text_topic_weight) if has_text else 0.0)
+            + (float(self.config.domain_probe_weight) if has_probe else 0.0)
+            + (float(self.config.speech_centroid_weight) if has_embedding else 0.0)
+            + (float(self.config.metadata_prior_weight) if has_reference else 0.0)
+        )
 
         out: List[DomainScore] = []
         raw_final_by_preset: Dict[str, float] = {}
@@ -661,15 +671,18 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             )
             speech_score = float(embedding_by_preset.get(item.preset_id, 0.0))
             metadata_prior = float(reference_by_preset.get(item.preset_id, 0.0))
-            conf = (
-                float(self.config.text_topic_weight) * text_score
-                + float(self.config.domain_probe_weight) * probe_score
-                + float(self.config.speech_centroid_weight) * speech_score
-                + float(self.config.metadata_prior_weight) * metadata_prior
-            )
+            weighted = 0.0
+            if has_text:
+                weighted += float(self.config.text_topic_weight) * text_score
+            if has_probe:
+                weighted += float(self.config.domain_probe_weight) * probe_score
+            if has_embedding:
+                weighted += float(self.config.speech_centroid_weight) * speech_score
+            if has_reference:
+                weighted += float(self.config.metadata_prior_weight) * metadata_prior
+            conf = weighted / active_weight_sum if active_weight_sum > 1e-9 else 0.0
             raw_final_by_preset[item.preset_id] = _clamp(conf, 0.0, 1.0)
 
-        has_text = bool((router_text or "").strip() and str(router_text_source or "none") != "none")
         alpha = float(self.config.text_ema_alpha if has_text else self.config.audio_ema_alpha)
         alpha = _clamp(alpha, 0.0, 0.999)
         if raw_final_by_preset:
@@ -705,6 +718,7 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
                         "domain_probe_score": round(probe_score, 4),
                         "speech_centroid_score": round(speech_score, 4),
                         "metadata_prior": round(metadata_prior, 4),
+                        "active_weight_sum": round(active_weight_sum, 4),
                         "raw_final_score": round(raw_final, 4),
                         "ema_final_score": round(ema_final, 4),
                         "topic_keyword_hits": text_hits.get(item.domain_id, [])[:8],

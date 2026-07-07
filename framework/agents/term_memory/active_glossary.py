@@ -9,7 +9,6 @@ from typing import Any, Dict, Iterable, Optional
 from framework.agents.glossary import GlossaryCatalog
 from framework.agents.term_memory.domain_taxonomy import (
     AUTO_WORKING_PRESET,
-    DOMAIN_TO_PRESET,
     GENERAL_DOMAIN,
     WORKING_GLOSSARY_PRESETS,
     domain_for_preset,
@@ -138,7 +137,7 @@ class ActiveGlossaryManager:
         mock: bool,
     ) -> Dict[str, Any]:
         selection = catalog.describe_selection(preset, glossary_text)
-        if mock and preset in DOMAIN_TO_PRESET.values() and not selection["index_path"]:
+        if mock and preset in WORKING_GLOSSARY_PRESETS and not selection["index_path"]:
             # Mock mode should exercise the full adaptive UI/protocol even when
             # the real runtime snapshot has not been built on this machine.
             selection = dict(selection)

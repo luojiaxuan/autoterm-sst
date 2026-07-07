@@ -125,6 +125,26 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(roles, {"domain_probe"})
         self.assertNotIn("common_10k", presets)
 
+    def test_auto_active_retrieval_uses_common_base_plus_domain_overlay(self) -> None:
+        agent = OmniAgent()
+        agent.config.mock = True
+        session = SimpleNamespace(
+            auto_glossary_enabled=True,
+            language_pair="English -> Chinese",
+            active_retrieval_slices=[],
+            glossary_preset="auto_working",
+            active_glossary_preset="nlp_core_10k",
+            active_slice_presets=[],
+            active_slice_terms={},
+            last_retrieval_plan=[],
+        )
+
+        slices = agent._active_retrieval_slices(session)
+
+        self.assertEqual([item.preset_id for item in slices], ["common_10k", "nlp_core_10k"])
+        self.assertEqual([item.role for item in slices], ["base", "domain"])
+        self.assertEqual(session.active_slice_presets, ["common_10k", "nlp_core_10k"])
+
     def test_domain_probe_populates_metadata_without_changing_active_inventory(self) -> None:
         agent = OmniAgent()
         agent.config.mock = True

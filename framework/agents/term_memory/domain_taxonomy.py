@@ -1,8 +1,8 @@
 """Small domain taxonomy for adaptive working-glossary defaults.
 
-Runtime routing is manifest/embedding driven by default. The keyword lists here
-are fallback labels plus offline working-slice ranking seeds; they are not the
-primary online router signal.
+Runtime routing is window-topic-first by default. The keyword lists here provide
+the high-precision source/ASR topic signal, plus offline working-slice ranking
+seeds.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from typing import Dict, Iterable, List, Tuple
 AUTO_WORKING_PRESET = "auto_working"
 
 GENERAL_DOMAIN = "general"
+COMMON_WORKING_PRESET = "common_10k"
 DOMAIN_TO_PRESET: Dict[str, str] = {
     "nlp": "nlp_core_10k",
     "medicine": "medicine_core_10k",
@@ -21,7 +22,7 @@ DOMAIN_TO_PRESET: Dict[str, str] = {
     "legal": "legal_core_10k",
 }
 
-WORKING_GLOSSARY_PRESETS = tuple(DOMAIN_TO_PRESET.values())
+WORKING_GLOSSARY_PRESETS = (COMMON_WORKING_PRESET, *DOMAIN_TO_PRESET.values())
 WORKING_DOMAINS = tuple(DOMAIN_TO_PRESET.keys())
 
 WORKING_PRESET_META: Dict[str, Dict[str, str]] = {
@@ -33,7 +34,7 @@ WORKING_PRESET_META: Dict[str, Dict[str, str]] = {
     "common_10k": {
         "label": "Common working glossary 10k",
         "domain": GENERAL_DOMAIN,
-        "description": "Manual/debug common glossary; not used as the automatic base slice.",
+        "description": "Always-on common terms base slice for automatic routing.",
     },
     "nlp_core_10k": {
         "label": "NLP core working glossary 10k",

@@ -85,7 +85,7 @@ class HybridWindowTopicRouterTests(unittest.TestCase):
         self.assertGreaterEqual(second.confidence, 0.60)
 
     def test_audio_only_probe_requires_three_consistent_windows(self) -> None:
-        router = _router(min_confidence=0.30)
+        router = _router()
         state = RouterSessionState("nlp_core_10k", "nlp", created_s=1.0)
         probe = {
             "medicine": DomainProbeScore(
@@ -107,6 +107,7 @@ class HybridWindowTopicRouterTests(unittest.TestCase):
         self.assertIn("consistent_windows<3", second.reason)
         self.assertEqual(third.action, "switch")
         self.assertEqual(third.target_domain_id, "medicine")
+        self.assertGreaterEqual(third.confidence, 0.60)
 
     def test_metadata_prior_does_not_veto_high_confidence_text_topic(self) -> None:
         router = _router()

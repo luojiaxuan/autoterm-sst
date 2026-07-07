@@ -53,11 +53,11 @@ class MaxSimRetrievalPluginTests(unittest.IsolatedAsyncioTestCase):
         def fake_ensure(index_path):  # noqa: ANN001, ANN202
             if index_path == "nlp-index":
                 return {
-                    "text_embs": torch.tensor([[1.0, 0.0], [0.1, 0.9]], dtype=torch.float32),
-                    "term_list": ["nlp-term", "weak-nlp"],
+                    "text_embs": torch.tensor([[0.0, 1.0], [0.4, 0.4]], dtype=torch.float32),
+                    "term_list": ["nlp-window2", "weak-nlp"],
                 }
             return {
-                "text_embs": torch.tensor([[0.0, 1.0], [0.2, 0.8]], dtype=torch.float32),
+                "text_embs": torch.tensor([[0.5, 0.5], [0.2, 0.2]], dtype=torch.float32),
                 "term_list": ["medicine-term", "weak-medicine"],
             }
 
@@ -70,7 +70,7 @@ class MaxSimRetrievalPluginTests(unittest.IsolatedAsyncioTestCase):
                 "audio_buffer": [0.0],
                 "current_start_sec": 0.0,
                 "current_end_sec": 1.0,
-                "query_embedding": torch.tensor([1.0, 0.0], dtype=torch.float32),
+                "query_embedding": torch.tensor([[1.0, 0.0], [0.0, 1.0]], dtype=torch.float32),
             },
             candidate_slices=[
                 {"domain": "nlp", "preset_id": "nlp_core_10k", "index_path": "nlp-index"},
@@ -82,7 +82,7 @@ class MaxSimRetrievalPluginTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(set(scores), {"nlp", "medicine"})
-        self.assertEqual(scores["nlp"].top_terms[0], "nlp-term")
+        self.assertEqual(scores["nlp"].top_terms[0], "nlp-window2")
         self.assertGreater(scores["nlp"].top_score, scores["medicine"].top_score)
         self.assertEqual(activated, [])
         self.assertEqual(plugin._active_index_path, "old-index")

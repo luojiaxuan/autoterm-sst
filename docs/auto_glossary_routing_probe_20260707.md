@@ -1,11 +1,12 @@
 # Auto Glossary Routing Probe 2026-07-07
 
-本文记录 `auto_working` 从 ACL/NLP talk 切到 medicine talk 时的真实路由检查。结论先写在前面：当前默认策略不是 window text/topic router，而是
-`speech_query_embedding + retrieved-ref metadata` router；在真实 ACL -> medicine probe 中，它没有成功切到 `medicine_core_10k`。
+本文记录 `auto_working` 从 ACL/NLP talk 切到 medicine talk 时的真实路由检查。结论先写在前面：旧版默认策略不是 window text/topic router，而是
+`speech_query_embedding + retrieved-ref metadata` router；在真实 ACL -> medicine probe 中，它没有成功切到 `medicine_core_10k`。当前实现已经改成
+`HybridWindowTopicRouter`：source/ASR window topic 是主信号，domain-probe retrieval 和 speech centroid 只作为辅助信号。
 
-## 当前实现
+## 旧版实现问题
 
-当前默认 router 是 `framework/agents/term_memory/topic_router.py` 里的
+旧版默认 router 是 `framework/agents/term_memory/topic_router.py` 里的
 `AudioNativeActiveGlossaryRouter`：
 
 - 输入：MaxSim retriever 暴露的 speech-side query embedding，以及当前 active slice 检索出的 refs metadata。
@@ -135,6 +136,6 @@ Recommended switch guard:
 ## Open implementation work
 
 - Add a real streaming ASR producer for `router_text`; the live pipeline can now accept the field.
-- Routing-only domain-probe retrieval is now wired into Omni routing ticks for ready domain indexes. Fresh probe runs are gated by the router warmup/update/cooldown schedule, cached probe scores are reused during gate windows for router consistency, audio-only sessions refresh probes on the streaming window cadence instead of the full update interval, fresh probes reuse the main retrieval pooled speech embedding when available, raw top-k probe scores are used rather than the prompt retrieval threshold, and `domain_probe_scores`, `domain_probe_slices`, `domain_probe_cached`, and `domain_probe_s` are recorded in JSON metadata without changing active prompt top-k.
-- `eval/streaming_sst/eval_auto_glossary_switch.py` now provides router-unit ACL/NLP <-> medicine switch diagnostics using source-text windows or built-in fixtures. Taurus source-text output is staged at `/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/eval/auto_glossary_switch_router_only_20260707.json`; it passes with ACL->medicine latency 4 windows and medicine->ACL latency 2 windows under the router-unit setup. This is not an end-to-end live-ASR/Omni/MaxSim probe deployment-latency benchmark.
+- Routing-only domain-probe retrieval is now wired into Omni routing ticks for ready domain indexes. Fresh probe runs are gated by the router warmup/update/cooldown schedule, cached probe scores are reused during gate windows for router consistency, audio-only sessions refresh probes on the streaming window cadence instead of the full update interval, fresh probes reuse the main retrieval per-window speech embeddings when available, raw top-k probe scores are used rather than the prompt retrieval threshold, and `domain_probe_scores`, `domain_probe_slices`, `domain_probe_cached`, and `domain_probe_s` are recorded in JSON metadata without changing active prompt top-k.
+- `eval/streaming_sst/eval_auto_glossary_switch.py` now provides router-unit ACL/NLP <-> medicine switch diagnostics using source-text windows or built-in fixtures. The latest Taurus source-text output is staged at `/mnt/data2/jiaxuanluo/rasst-demo/runtime/eval/auto_glossary_switch_router_only_20260707_final7.json`; it passes all four scenarios with zero false switches in ACL-only and medicine-only streams. The clean fixture + probe regression passes the stricter 2-window switch threshold at `/tmp/auto_glossary_switch_fixture_probe_final7.json`. This is not an end-to-end live-ASR/Omni/MaxSim probe deployment-latency benchmark.
 - Continue expanding end-to-end active-slice candidate-quality eval with real ASR-driven `router_text`.

@@ -64,9 +64,12 @@ python eval/streaming_sst/score_auto_glossary.py \
   --out-md /mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/eval/auto_glossary_table.md
 ```
 
-Taurus source-text sanity run on 2026-07-07 passed with ACL->medicine latency 4
-windows and medicine->ACL latency 2 windows. The fixture unit test keeps the
-stricter two-window threshold for clean topic windows.
+Taurus source-text sanity run on 2026-07-07 was rerun at
+`/mnt/data2/jiaxuanluo/rasst-demo/runtime/eval/auto_glossary_switch_router_only_20260707_final7.json`
+and passed all four router-unit scenarios. ACL-only and medicine-only had zero
+false switches. ACL->medicine passed within the 4-window threshold; the clean
+fixture regression with synthetic probe evidence passed the stricter 2-window
+threshold at `/tmp/auto_glossary_switch_fixture_probe_final7.json`.
 
 `eval_auto_glossary_switch.py` is a router-unit/source-text diagnostic. It
 directly drives `HybridWindowTopicRouter`, disables wall-clock update/cooldown

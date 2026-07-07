@@ -1521,6 +1521,7 @@ class OmniAgent(Agent):
             return [[] for _ in batch]
         outputs: List[List[Dict[str, Any]]] = [[] for _ in batch]
         query_embeddings: List[Any] = [None for _ in batch]
+        query_window_embeddings: List[Any] = [None for _ in batch]
         grouped: Dict[Tuple[str, int, Optional[float]], List[Tuple[int, OmniSession, RetrievalSlice]]] = {}
 
         for idx, session in enumerate(batch):
@@ -1541,7 +1542,13 @@ class OmniAgent(Agent):
 
         assert self._retriever_lock is not None
         async with self._retriever_lock:
-            await self._retrieve_slice_groups(grouped, end_by_session, outputs, query_embeddings)
+            await self._retrieve_slice_groups(
+                grouped,
+                end_by_session,
+                outputs,
+                query_embeddings,
+                query_window_embeddings,
+            )
 
             rescue_grouped: Dict[Tuple[str, int, Optional[float]], List[Tuple[int, OmniSession, RetrievalSlice]]] = {}
             for idx, session in enumerate(batch):
@@ -1566,7 +1573,13 @@ class OmniAgent(Agent):
                     self._retrieval_score_threshold_for(session),
                 )
                 rescue_grouped.setdefault(key, []).append((idx, session, rescue))
-            await self._retrieve_slice_groups(rescue_grouped, end_by_session, outputs, query_embeddings)
+            await self._retrieve_slice_groups(
+                rescue_grouped,
+                end_by_session,
+                outputs,
+                query_embeddings,
+                query_window_embeddings,
+            )
 
         for idx, session in enumerate(batch):
             if session.auto_glossary_enabled:
@@ -1576,10 +1589,15 @@ class OmniAgent(Agent):
             session.last_candidate_pool_count = len(outputs[idx])
             if session.auto_glossary_enabled:
                 observer_refs = self._prompt_references(session, outputs[idx])
+                probe_embedding = (
+                    query_window_embeddings[idx]
+                    if query_window_embeddings[idx] is not None
+                    else query_embeddings[idx]
+                )
                 domain_probe_scores = await self._probe_domain_scores(
                     session,
                     end_sample=end_by_session[session.session_id],
-                    query_embedding=query_embeddings[idx],
+                    query_embedding=probe_embedding,
                 )
                 await self._observe_active_glossary(
                     session,
@@ -1596,6 +1614,7 @@ class OmniAgent(Agent):
         end_by_session: Dict[str, int],
         outputs: List[List[Dict[str, Any]]],
         query_embeddings: List[Any],
+        query_window_embeddings: List[Any],
     ) -> None:
         for (index_path, top_k, score_threshold), indexed_sessions in grouped.items():
             await self.retrieval.activate_index(index_path)
@@ -1619,6 +1638,11 @@ class OmniAgent(Agent):
                     result = RetrievalResult(references=list(result or []))
                 if query_embeddings[original_idx] is None and result.query_embedding is not None:
                     query_embeddings[original_idx] = result.query_embedding
+                if (
+                    query_window_embeddings[original_idx] is None
+                    and result.query_window_embeddings is not None
+                ):
+                    query_window_embeddings[original_idx] = result.query_window_embeddings
                 for ref in result.references:
                     item = dict(ref)
                     item.setdefault("source_preset", plan.preset_id)

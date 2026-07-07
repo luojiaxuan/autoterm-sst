@@ -29,6 +29,16 @@ ratio, not a replacement for a real raw238 `term_ACC`.
   `json_ws/strict_streaming_longaudio_dualgold_lm2.json` and
   `json_ws/strict_streaming_longaudio_dualgold_lm1.json`. Monitor log:
   `client_logs/gpu_monitor.log`.
+- Superseding parallel rerun started 2026-07-07 00:36 UTC after replacing the
+  sequential client with one-client-per-row submission. Aries keeps the same
+  server on port `8012` and runs all five `lm=2` rows concurrently under
+  `json_rows/lm2_<preset>.json`. Taurus restarted its idle local RASST server
+  on port `8011` with
+  `/mnt/data1/jiaxuanluo/rasst_eval/ai_glossary_sweep/manifest_ai_glossary_sweep_20260706_taurus.json`
+  and runs all five `lm=1` rows concurrently under
+  `/mnt/data1/jiaxuanluo/rasst_eval/ai_glossary_sweep/dual_gold_parallel_20260707T0036Z/json_rows/lm1_<preset>.json`.
+  The old sequential Aries driver was stopped before completion; use the
+  per-row JSON outputs from the parallel rerun as the valid dual-gold results.
 - Status: local staging only. These generated glossaries, indexes, logs, and
   benchmark rows are not yet uploaded to Hugging Face. If they become reusable
   artifacts, publish them as a HF dataset and record the repo/revision here.

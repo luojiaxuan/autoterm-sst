@@ -137,6 +137,21 @@ router_text_source: generated_target
   `--max-switch-seconds`，建议真实 E2E mixed run 使用 `--max-switch-seconds 30`，同时报告
   实际 `latency_s`。
 
+Full 5 ACL + 5 medicine runs started on Taurus at commit `d63202d`:
+
+```text
+output dir:
+/mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_hybrid_8012_full_d63202d
+
+alternating PID: 3693023
+random seed 20260707 PID: 3693024
+```
+
+Both runs use real-time `--feed-sleep 1.92`, `--max-switch-seconds 30`, fixed
+prompt_k=10, and the same Taurus `127.0.0.1:8012` `hybrid_window_topic` server.
+The full playlist contains 16,848.115s of audio, so completion should take about
+4.7 hours plus drain time.
+
 ## 固定 64 命令
 
 ```bash

@@ -79,14 +79,17 @@ active preset is `RASST_AUTO_GLOSSARY_DEFAULT` (`nlp_core_10k` by default).
 
 The default router is `RASST_ROUTER_MODE=hybrid_window_topic`. It is an
 E2E-window-topic router: production does not require ASR text or source
-transcripts. Live sessions use routing-only speech-window domain probes and,
-after the first translation outputs, a generated target-translation text window.
+transcripts. The wired production path uses routing-only speech-window domain
+probes and, after the first translation outputs, a generated target-translation
+text window.
 The generated target window is one routing tick behind the current chunk, so a
 chunk's own translation cannot influence its own glossary retrieval. Controlled
 eval can still pass source transcript windows through `router_text` to isolate
 the router state machine, but those source-text numbers should not be reported
 as the deployed E2E path. Because generated target text can be biased by the
 current glossary, it uses a stricter default three-window consistency guard.
+End-to-end generated-target switch quality still needs a full streaming
+benchmark; current source-text switch artifacts are diagnostic upper bounds.
 
 The router combines four signals:
 
@@ -446,7 +449,7 @@ inventory. The claim is:
 Use this paper wording:
 
 ```text
-RASST-Demo uses an E2E window-topic automatic terminology router. For each
+RASST-Demo wires an E2E window-topic automatic terminology router. For each
 streaming window, it estimates the current domain from routing-only
 speech-window domain probes and, after translations are produced, a delayed
 generated target-translation text window. Source transcript windows are used
@@ -454,5 +457,6 @@ only in controlled router diagnostics. The router combines these signals with a
 weak speech-centroid score and a small metadata prior, then applies hysteresis
 over consecutive windows before switching the active domain slice. The prompt
 interface remains fixed: each chunk receives exactly 10 retrieved glossary
-candidates from the active domain inventory.
+candidates from the active domain inventory. Full E2E generated-target switch
+quality remains a pending benchmark.
 ```

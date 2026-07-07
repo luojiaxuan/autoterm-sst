@@ -218,8 +218,8 @@ DOMAIN_TOPIC_KEYWORDS: Dict[str, Tuple[TopicKeyword, ...]] = {
         TopicKeyword(r"自然语言处理", "nlp", 1.4),
         TopicKeyword(r"机器翻译|语音翻译|同声传译", "nlp", 1.2),
         TopicKeyword(r"数据集|基准测试|语料库", "nlp", 1.0),
-        TopicKeyword(r"标注|解析|实体识别|依存句法", "nlp", 1.0),
-        TopicKeyword(r"注意力|嵌入|预训练|微调|提示", "nlp", 0.9),
+        TopicKeyword(r"标注|实体识别|依存句法", "nlp", 1.0),
+        TopicKeyword(r"注意力|嵌入|预训练|微调", "nlp", 0.9),
     ),
     "medicine": (
         TopicKeyword(r"\bpatient(s)?\b", "medicine", 1.0),
@@ -253,8 +253,8 @@ DOMAIN_TOPIC_KEYWORDS: Dict[str, Tuple[TopicKeyword, ...]] = {
         TopicKeyword(r"临床|诊断|症状|疾病", "medicine", 1.1),
         TopicKeyword(r"治疗|处方|药物|医学|医院", "medicine", 1.0),
         TopicKeyword(r"糖尿病|高血压|癌症|肿瘤|感染|疫苗", "medicine", 1.2),
-        TopicKeyword(r"试验|手术|血压|心率|剂量|毫克", "medicine", 1.0),
-        TopicKeyword(r"核磁|磁共振|CT", "medicine", 0.9, case_sensitive=True),
+        TopicKeyword(r"临床试验|手术|血压|心率|剂量|毫克", "medicine", 1.0),
+        TopicKeyword(r"核磁|磁共振|CT", "medicine", 0.9),
     ),
     "finance": (
         TopicKeyword(r"\bmarket(s)?\b", "finance", 1.0),

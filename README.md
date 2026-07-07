@@ -252,10 +252,11 @@ evidence panel and `term_memory` health.
 The default demo path is now **zero-setup adaptive working glossary**:
 `auto_working` starts from a domain-specific active slice such as `nlp_core_10k`
 and can switch to another domain slice such as `medicine_core_10k`.
-The default `hybrid_window_topic` router is E2E-window-first: live deployment
-uses routing-only speech-window domain probes plus the generated target
-translation window; source transcript windows are only a controlled
-diagnostic/eval input through `router_text`. A small routing-only domain-probe
+The default `hybrid_window_topic` router is E2E-window-first: the wired
+production path uses routing-only speech-window domain probes plus the generated
+target translation window; source transcript windows are only a controlled
+diagnostic/eval input through `router_text`. End-to-end generated-target
+benchmarking is still pending. A small routing-only domain-probe
 retrieval pass can score candidate domain indexes without changing the active
 prompt inventory. The prompt interface is held constant: every streaming chunk
 receives exactly the fixed top-10 retrieved candidates, while larger

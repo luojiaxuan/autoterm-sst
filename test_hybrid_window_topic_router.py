@@ -193,6 +193,26 @@ class HybridWindowTopicRouterTests(unittest.TestCase):
         self.assertEqual(decisions[2].action, "switch")
         self.assertEqual(decisions[2].target_domain_id, "legal")
 
+    def test_generated_target_noisy_generic_chinese_does_not_switch_to_nlp(self) -> None:
+        router = _router_all_domains()
+        state = RouterSessionState("medicine_core_10k", "medicine", created_s=1.0)
+        noisy_text = "结果提示需要进一步解析该案例的证据。"
+
+        decisions = [
+            router.observe(
+                state,
+                None,
+                [],
+                now_s=float(step),
+                router_text=noisy_text,
+                router_text_source="generated_target",
+            )
+            for step in (10, 11, 12, 13)
+        ]
+
+        self.assertTrue(all(decision.action == "stay" for decision in decisions))
+        self.assertTrue(all(decision.confidence < 0.60 for decision in decisions))
+
     def test_audio_only_probe_requires_three_consistent_windows(self) -> None:
         router = _router()
         state = RouterSessionState("nlp_core_10k", "nlp", created_s=1.0)

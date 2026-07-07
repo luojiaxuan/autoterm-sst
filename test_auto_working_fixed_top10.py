@@ -5,6 +5,7 @@ import os
 import time
 import unittest
 from collections import deque
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -201,6 +202,29 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertTrue(session.last_router_decision["evidence"]["has_router_text"])
         self.assertEqual(session.last_router_decision["evidence"]["router_text_source"], "generated_target")
         self.assertEqual(session.last_router_decision["to_domain"], "medicine")
+
+    def test_streaming_loop_orders_routing_before_generated_target_write(self) -> None:
+        source = Path("framework/agents/omni.py").read_text(encoding="utf-8")
+        retrieve_call = source.index("refs_by_session = await self._retrieve_batch")
+        generate_batch_call = source.index("results = await self._generate_batch", retrieve_call)
+        generate_one_call = source.index("self._generate_one(", retrieve_call)
+        retrieve_def = source.index("async def _retrieve_batch")
+        retrieve_end = source.index("async def _retrieve_slice_groups", retrieve_def)
+        observe_call = source.index("await self._observe_active_glossary", retrieve_def, retrieve_end)
+
+        self.assertLess(retrieve_call, generate_batch_call)
+        self.assertLess(retrieve_call, generate_one_call)
+        self.assertLess(observe_call, retrieve_end)
+
+        generate_one_def = source.index("async def _generate_one")
+        generate_batch_def = source.index("async def _generate_batch")
+        one_history = source.index("session.history.append(text)", generate_one_def, generate_batch_def)
+        one_after_tick = source.index("self._after_translation_tick(session, text=text", one_history, generate_batch_def)
+        batch_history = source.index("session.history.append(text)", generate_batch_def)
+        batch_after_tick = source.index("self._after_translation_tick(session, text=text", batch_history)
+
+        self.assertLess(one_history, one_after_tick)
+        self.assertLess(batch_history, batch_after_tick)
 
     def test_domain_probe_slices_are_domain_only_debug_inventory(self) -> None:
         agent = OmniAgent()

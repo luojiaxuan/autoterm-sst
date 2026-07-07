@@ -81,7 +81,9 @@ delays, and uses synthetic probe scores when `--with-probe` is set. These
 numbers validate the window-topic state machine and provide a source-text upper
 bound; they are not an end-to-end Omni/MaxSim deployment-latency benchmark.
 The deployable E2E path uses speech-window domain probes plus delayed generated
-target-translation text, not source transcripts or ASR text.
+target-translation text, not source transcripts or ASR text. That path is wired
+in the runtime, but full generated-target E2E switch-quality benchmarking is
+still pending.
 
 ## Metrics
 

@@ -113,6 +113,13 @@ python3 eval/streaming_sst/eval_mixed_audio_switch.py \
   --out-json /mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_dryrun/alternating_audio_playlist.json
 ```
 
+Dry-run on Taurus at Git ref `b693168` succeeded under
+`/mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_b693168/`.
+The alternating and random playlists both contain 10 blocks and 16,848.115
+seconds of audio: 5 ACL talks and 5 medicine speeches. This is about 4.68 hours
+of audio before model generation overhead, so full E2E should be treated as a
+long run rather than a smoke test.
+
 When the demo server is live on `127.0.0.1:8011`, run a short real replay first:
 
 ```bash
@@ -126,6 +133,18 @@ python3 eval/streaming_sst/eval_mixed_audio_switch.py \
   --out-md /mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_realprobe/alternating_60s_auto_working.md
 ```
 
+Current server/GPU status on 2026-07-07:
+
+- Taurus `127.0.0.1:8011` is healthy but not valid for this target eval:
+  `router_mode=embedding_refs`, active term-memory snapshot is the AI glossary
+  sweep, and it is not the `hybrid_window_topic` generated-target/probe path.
+- Taurus preflight selected only GPU4 as free; the running server owns GPUs
+  5/6/7 and other jobs occupy 0-3. This is not enough to start a separate TP2
+  Omni server plus RAG device.
+- Aries has `/` full and GPUs 0-5 already holding about 41-45GB each; only GPU7
+  is empty and GPU6 has partial memory use. Do not start a new long server there
+  without cleanup/coordination.
+
 ## Remaining AutoTerm Todos
 
 | status | item | note |
@@ -134,8 +153,8 @@ python3 eval/streaming_sst/eval_mixed_audio_switch.py \
 | done | Fixed top-10 prompt candidate invariant | Covered by code/tests and previous benchmark docs. |
 | done | Target-text/probe state-machine proxy benchmark | ACL 5 + medicine 5 fixed-64 and full-window proxy runs passed under clean expected probe evidence. |
 | done | Router guards for generic generated text, weak probe, and centroid-only false switches | Covered by unit tests. |
-| in progress | Real mixed-audio harness | `eval_mixed_audio_switch.py` added; dry-run and server replay still need Taurus execution. |
-| pending | Real speech-window domain-probe replay result | Need live demo server/real MaxSim probe metadata, not expected/oracle probe. |
+| done | Real mixed-audio harness | `eval_mixed_audio_switch.py` added and dry-run verified on Taurus. |
+| blocked | Real speech-window domain-probe replay result | Need a live server configured with `router_mode=hybrid_window_topic`; current Taurus server is `embedding_refs`. |
 | pending | Full E2E generated-target switch benchmark | Need actual model outputs and generated-target router windows over mixed ACL/medicine audio. |
 | pending | Mixed-domain BLEU / term_ACC / masked_term_BLEU | Need combined ACL+medicine references and medicine term gold/metric mapping. |
 | pending | Route threshold retuning from real probe failure modes | Depends on real probe/E2E results: clean vs contested vs wrong probe behavior. |

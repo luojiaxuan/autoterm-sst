@@ -464,48 +464,121 @@ class MaxSimRetrievalPlugin(RetrievalPlugin):
         lookback_sec: float,
         score_threshold: Optional[float],
     ) -> Dict[str, DomainProbeScore]:
-        old_index = self._active_index_path
-        missing = object()
-        old_threshold = getattr(self.retriever, "score_threshold", missing)
         out: Dict[str, DomainProbeScore] = {}
-        try:
+        window_embs = self._encode_probe_window_sync(dict(request), float(lookback_sec))
+        if window_embs is None:
+            return out
+        for item in candidate_slices or []:
+            index_path = str(item.get("index_path") or "").strip()
+            domain = str(item.get("domain") or "").strip()
+            preset = str(item.get("preset_id") or domain).strip()
+            if not index_path or not domain:
+                continue
+            data = self._ensure_index(index_path)
+            text_embs = data["text_embs"].float()
+            term_list = data["term_list"]
+            if text_embs.numel() == 0:
+                continue
+            scores_t = window_embs.matmul(text_embs.T).max(dim=0).values
+            finite = scores_t.isfinite()
             if score_threshold is not None:
-                self.retriever.score_threshold = float(score_threshold)
-            for item in candidate_slices or []:
-                index_path = str(item.get("index_path") or "").strip()
-                domain = str(item.get("domain") or "").strip()
-                preset = str(item.get("preset_id") or domain).strip()
-                if not index_path or not domain:
-                    continue
-                self._activate_sync(index_path)
-                result = self._retrieve_with_query_embeddings_sync(
-                    [dict(request)],
-                    max(1, int(top_k)),
-                    float(lookback_sec),
-                )[0]
-                scores: List[float] = []
-                terms: List[str] = []
-                for ref in result.references[: max(1, int(top_k))]:
-                    terms.append(str(ref.get("term") or ""))
-                    try:
-                        scores.append(float(ref.get("score") or 0.0))
-                    except (TypeError, ValueError):
-                        continue
-                top_score = max(scores) if scores else 0.0
-                mean_topk = sum(scores) / len(scores) if scores else 0.0
-                out[domain] = DomainProbeScore(
-                    domain=domain,
-                    preset_id=preset,
-                    top_score=top_score,
-                    mean_topk_score=mean_topk,
-                    top_terms=tuple(terms),
-                )
-        finally:
-            if score_threshold is not None and old_threshold is not missing:
-                self.retriever.score_threshold = old_threshold
-            if old_index:
-                self._activate_sync(old_index)
+                finite = finite & (scores_t >= float(score_threshold))
+            if int(finite.sum().item()) == 0:
+                out[domain] = DomainProbeScore(domain=domain, preset_id=preset)
+                continue
+            n = min(max(1, int(top_k)), int(finite.sum().item()))
+            masked_scores = scores_t.masked_fill(~finite, -float("inf"))
+            top_scores, top_idx = masked_scores.topk(k=n, largest=True, sorted=True)
+            score_values = [float(value) for value in top_scores.detach().cpu().tolist()]
+            term_indices = [int(idx) for idx in top_idx.detach().cpu().tolist()]
+            terms = [self._term_label(term_list[idx]) for idx in term_indices if 0 <= idx < len(term_list)]
+            top_score = max(score_values) if score_values else 0.0
+            mean_topk = sum(score_values) / len(score_values) if score_values else 0.0
+            out[domain] = DomainProbeScore(
+                domain=domain,
+                preset_id=preset,
+                top_score=top_score,
+                mean_topk_score=mean_topk,
+                top_terms=tuple(terms),
+            )
         return out
+
+    def _encode_probe_window_sync(self, request: Dict[str, Any], lookback_sec: float) -> Any:
+        from agents.streaming_maxsim_retriever import (  # noqa: WPS433
+            EXPECTED_SAMPLE_RATE,
+            _build_window_time_ranges,
+            _encode_audio_projected_seq_batch,
+        )
+
+        import numpy as np  # noqa: WPS433
+        import torch  # noqa: WPS433
+        import torch.nn.functional as F  # noqa: WPS433
+
+        audio_buffer = np.asarray(request.get("audio_buffer"), dtype=np.float32).flatten()
+        if audio_buffer.size == 0:
+            return None
+        current_start_sec = max(0.0, float(request["current_start_sec"]))
+        current_end_sec = max(current_start_sec, float(request["current_end_sec"]))
+        cur_lookback = max(0.0, float(request.get("lookback_sec", lookback_sec)))
+        buffer_end = min(
+            len(audio_buffer),
+            int(round(current_end_sec * EXPECTED_SAMPLE_RATE)),
+        )
+        if buffer_end <= 0:
+            return None
+        encode_start_sec = max(0.0, current_start_sec - cur_lookback)
+        buffer_start = min(
+            buffer_end,
+            int(round(encode_start_sec * EXPECTED_SAMPLE_RATE)),
+        )
+        chunk = audio_buffer[buffer_start:buffer_end]
+        if len(chunk) == 0:
+            return None
+        projected_seq, mask = _encode_audio_projected_seq_batch(
+            [chunk],
+            self.retriever.retriever,
+            self.retriever.feat_ext,
+            self.retriever.device,
+        )
+        valid_frames = int(mask[0].sum().item())
+        if valid_frames <= 0:
+            return None
+        use_cuda = getattr(self.retriever.device, "type", "") == "cuda"
+        with torch.amp.autocast("cuda", dtype=torch.bfloat16, enabled=use_cuda):
+            window_embs = self.retriever.retriever._multiscale_pool(
+                projected_seq[:1, :valid_frames, :],
+                mask[:1, :valid_frames],
+            )
+            window_embs = F.normalize(window_embs, p=2, dim=-1).float()[0]
+        if window_embs.numel() == 0:
+            return None
+        rel_starts, rel_ends = _build_window_time_ranges(
+            self.retriever.retriever.maxsim_windows,
+            self.retriever.retriever.maxsim_stride,
+            valid_frames,
+        )
+        if rel_starts.numel() != window_embs.shape[0]:
+            return None
+        actual_start_sec = float(buffer_start) / EXPECTED_SAMPLE_RATE
+        actual_end_sec = float(buffer_end) / EXPECTED_SAMPLE_RATE
+        actual_duration = max(1e-6, actual_end_sec - actual_start_sec)
+        nominal_duration = max(float(rel_ends.max().item()), 1e-6)
+        scale = actual_duration / nominal_duration
+        rel_starts_d = rel_starts.to(self.retriever.device)
+        rel_ends_d = rel_ends.to(self.retriever.device)
+        abs_starts = actual_start_sec + rel_starts_d * scale
+        abs_ends = actual_start_sec + rel_ends_d * scale
+        valid_windows = (abs_ends > current_start_sec) & (abs_starts < current_end_sec)
+        if int(valid_windows.sum().item()) == 0:
+            return None
+        return window_embs[valid_windows].float()
+
+    def _term_label(self, item: Any) -> str:
+        if isinstance(item, dict):
+            return str(item.get("term") or item.get("source") or item.get("src") or item)
+        if isinstance(item, (list, tuple)) and item:
+            return str(item[0])
+        return str(item)
 
     def _retrieve_with_query_embeddings_sync(
         self,

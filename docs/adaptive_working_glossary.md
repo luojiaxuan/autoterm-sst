@@ -99,8 +99,11 @@ top-k probe over ready candidate domain indexes; fresh probe runs are gated by
 the router warmup/update/cooldown schedule and use raw top-k scores rather than
 the prompt retrieval score threshold. During the update/cooldown gate, the
 router reuses cached probe scores so the consistency-window state machine still
-sees stable probe evidence without rerunning MaxSim. It must not change the
-prompt candidate budget.
+sees stable probe evidence without rerunning MaxSim. When source/ASR topic text
+is available, fresh probes are refreshed on the normal router update interval;
+when no topic text is available, fresh probes refresh on the streaming window
+cadence so audio-only domain changes are not frozen for the full update
+interval. It must not change the prompt candidate budget.
 `speech_centroid_score` is a weak tie-breaker based on offline domain centroids:
 
 ```text

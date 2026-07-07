@@ -140,6 +140,7 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
             last_llm_samples=0,
             router_text_window="",
             router_text_source="none",
+            latency_multiplier=2,
             created_s=now - 100.0,
             router_state=RouterSessionState("nlp_core_10k", "nlp", created_s=now - 100.0),
             last_domain_probe_raw_scores={},
@@ -188,6 +189,7 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
             last_llm_samples=0,
             router_text_window="",
             router_text_source="none",
+            latency_multiplier=2,
             created_s=now - 100.0,
             router_state=RouterSessionState(
                 "nlp_core_10k",
@@ -199,7 +201,7 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
             last_domain_probe_scores={},
             last_domain_probe_slices=[],
             last_domain_probe_s=1.0,
-            last_domain_probe_at_s=now - 1.0,
+            last_domain_probe_at_s=now - 0.1,
             last_domain_probe_cached=False,
         )
 
@@ -226,6 +228,24 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(len(request["audio_buffer"]), 48000)
         self.assertEqual(request["current_start_sec"], 1.0)
         self.assertEqual(request["current_end_sec"], 3.0)
+
+    def test_domain_probe_refresh_uses_window_cadence_without_text(self) -> None:
+        agent = OmniAgent()
+        agent.config.base_segment_sec = 0.96
+        agent.config.auto_glossary_update_sec = 30.0
+        no_text = SimpleNamespace(
+            router_text_window="",
+            router_text_source="none",
+            latency_multiplier=2,
+        )
+        with_text = SimpleNamespace(
+            router_text_window="oncology surgery",
+            router_text_source="streaming_asr",
+            latency_multiplier=2,
+        )
+
+        self.assertEqual(agent._domain_probe_refresh_sec(no_text), 1.92)
+        self.assertEqual(agent._domain_probe_refresh_sec(with_text), 30.0)
 
     def test_cached_probe_scores_can_confirm_audio_only_switch(self) -> None:
         router = HybridWindowTopicRouter(

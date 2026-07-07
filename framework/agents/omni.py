@@ -851,6 +851,18 @@ class OmniAgent(Agent):
         session.last_domain_probe_cached = True
         return filtered
 
+    def _domain_probe_refresh_sec(self, session: "OmniSession") -> float:
+        source = str(getattr(session, "router_text_source", "none") or "none").strip()
+        text = str(getattr(session, "router_text_window", "") or "").strip()
+        if text and source != "none":
+            return max(0.0, float(self.config.auto_glossary_update_sec))
+        try:
+            latency_multiplier = int(getattr(session, "latency_multiplier", self.config.default_latency_multiplier))
+        except (TypeError, ValueError):
+            latency_multiplier = int(self.config.default_latency_multiplier)
+        latency_multiplier = max(1, min(4, latency_multiplier))
+        return max(0.1, float(self.config.base_segment_sec) * latency_multiplier)
+
     async def _probe_domain_scores(
         self,
         session: "OmniSession",
@@ -878,9 +890,10 @@ class OmniAgent(Agent):
             self._clear_domain_probe_meta(session)
             return {}
         last_probe_at = float(getattr(session, "last_domain_probe_at_s", 0.0) or 0.0)
+        refresh_sec = self._domain_probe_refresh_sec(session)
         update_gate = (
             last_probe_at > 0.0
-            and now - last_probe_at < float(self.config.auto_glossary_update_sec)
+            and now - last_probe_at < refresh_sec
         )
         cooldown_gate = (
             state is not None

@@ -298,6 +298,7 @@ class OmniConfig:
     router_metadata_prior_weight: float = 0.05
     router_domain_probe_top_k: int = 5
     router_min_consistent_windows_with_text: int = 2
+    router_min_consistent_windows_generated_target: int = 3
     router_min_consistent_windows_audio_only: int = 3
     router_audio_probe_min_top_score: float = 0.50
     router_audio_probe_min_raw_margin: float = 0.08
@@ -423,6 +424,10 @@ class OmniConfig:
             router_min_consistent_windows_with_text=_safe_int(
                 routing_config.get("min_consistent_windows_with_text"),
                 2,
+            ),
+            router_min_consistent_windows_generated_target=_safe_int(
+                routing_config.get("min_consistent_windows_generated_target"),
+                3,
             ),
             router_min_consistent_windows_audio_only=_safe_int(
                 routing_config.get("min_consistent_windows_audio_only"),
@@ -570,6 +575,7 @@ class OmniAgent(Agent):
             speech_centroid_weight=self.config.router_speech_centroid_weight,
             metadata_prior_weight=self.config.router_metadata_prior_weight,
             min_consistent_windows_with_text=self.config.router_min_consistent_windows_with_text,
+            min_consistent_windows_generated_target=self.config.router_min_consistent_windows_generated_target,
             min_consistent_windows_audio_only=self.config.router_min_consistent_windows_audio_only,
             audio_probe_min_top_score=self.config.router_audio_probe_min_top_score,
             audio_probe_min_raw_margin=self.config.router_audio_probe_min_raw_margin,
@@ -2296,6 +2302,7 @@ class OmniAgent(Agent):
                 "min_margin": self.config.auto_glossary_switch_margin,
                 "min_consistent_windows": self.config.auto_glossary_min_consistent_windows,
                 "min_consistent_windows_with_text": self.config.router_min_consistent_windows_with_text,
+                "min_consistent_windows_generated_target": self.config.router_min_consistent_windows_generated_target,
                 "min_consistent_windows_audio_only": self.config.router_min_consistent_windows_audio_only,
                 "text_topic_weight": self.config.router_text_topic_weight,
                 "domain_probe_weight": self.config.router_domain_probe_weight,

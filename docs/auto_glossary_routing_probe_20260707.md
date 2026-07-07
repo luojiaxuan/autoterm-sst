@@ -134,7 +134,9 @@ evidence, centroid similarity alone is not allowed to switch the active domain.
 
 Recommended switch guard:
 
-- Keep `min_consistent_windows = 2` for clear text-topic matches.
+- Keep `min_consistent_windows = 2` for trusted source-text diagnostics.
+- Use `min_consistent_windows_generated_target = 3` for generated target text
+  because it can be biased by the currently active glossary.
 - Use `min_consistent_windows = 3` when only audio/probe signals are available.
 - Keep cooldown to prevent ping-pong.
 - Do not let current active-slice metadata vote veto a high-confidence text-topic switch; treat it as a small prior only.

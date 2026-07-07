@@ -4,13 +4,14 @@ import asyncio
 import os
 import time
 import unittest
+from collections import deque
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from eval.streaming_sst.score_terms import allowed_identity_retention_source, score
 from framework.agents.omni import OmniAgent, OmniConfig
 from framework.agents.plugins.backends import get_template
-from framework.agents.plugins.retrieval import MockRetrieval
+from framework.agents.plugins.retrieval import MockRetrieval, RetrievalResult
 from framework.agents.term_memory.slice_registry import (
     force_exactly_k_references,
     rank_references,
@@ -41,6 +42,7 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(config.router_mode, "hybrid_window_topic")
         self.assertEqual(config.router_domain_probe_top_k, 5)
         self.assertEqual(config.router_min_consistent_windows_with_text, 2)
+        self.assertEqual(config.router_min_consistent_windows_generated_target, 3)
         self.assertEqual(config.router_min_consistent_windows_audio_only, 3)
         self.assertEqual(config.router_audio_probe_min_top_score, 0.50)
         self.assertEqual(config.router_audio_probe_min_raw_margin, 0.08)
@@ -159,6 +161,46 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
 
         self.assertEqual(session.router_text_source, "manifest_source")
         self.assertEqual(session.router_text_window, "external source text")
+
+    def test_generated_target_text_is_used_by_next_router_tick_only(self) -> None:
+        agent = OmniAgent()
+        agent.config.mock = True
+        agent.config.auto_glossary_warmup_sec = 0.0
+        agent.config.auto_glossary_update_sec = 0.0
+        agent.config.auto_glossary_switch_cooldown_sec = 0.0
+        agent.config.router_min_consistent_windows_generated_target = 1
+        now = time.perf_counter()
+        session = SimpleNamespace(
+            session_id="s-generated-target-order",
+            auto_glossary_enabled=True,
+            language_pair="English -> Chinese",
+            active_glossary_preset="nlp_core_10k",
+            active_domain="nlp",
+            router_text_window="",
+            router_text_source="none",
+            history=[],
+            recent_references=deque(maxlen=16),
+            router_state=RouterSessionState("nlp_core_10k", "nlp", created_s=now - 10.0),
+            created_s=now - 10.0,
+            topic_confidence=0.0,
+            last_topic_reason="",
+            last_topic_update_s=0.0,
+            last_router_decision={},
+            topic_history=[],
+            topic_update_task=SimpleNamespace(done=lambda: False),
+        )
+
+        asyncio.run(agent._observe_active_glossary(session, RetrievalResult(references=[])))
+
+        self.assertFalse(session.last_router_decision["evidence"]["has_router_text"])
+        self.assertEqual(session.last_router_decision["evidence"]["router_text_source"], "none")
+
+        agent._after_translation_tick(session, text="患者接受临床治疗。", references=[])
+        asyncio.run(agent._observe_active_glossary(session, RetrievalResult(references=[])))
+
+        self.assertTrue(session.last_router_decision["evidence"]["has_router_text"])
+        self.assertEqual(session.last_router_decision["evidence"]["router_text_source"], "generated_target")
+        self.assertEqual(session.last_router_decision["to_domain"], "medicine")
 
     def test_domain_probe_slices_are_domain_only_debug_inventory(self) -> None:
         agent = OmniAgent()

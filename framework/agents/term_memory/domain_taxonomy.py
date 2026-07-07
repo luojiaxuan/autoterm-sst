@@ -273,6 +273,11 @@ DOMAIN_TOPIC_KEYWORDS: Dict[str, Tuple[TopicKeyword, ...]] = {
         TopicKeyword(r"\bcash flow\b", "finance", 1.1),
         TopicKeyword(r"\bcentral bank(s)?\b", "finance", 1.1),
         TopicKeyword(r"\btreasury\b", "finance", 0.9),
+        TopicKeyword(r"市场|股票|股价|证券", "finance", 1.0),
+        TopicKeyword(r"收入|营收|估值|股权", "finance", 1.0),
+        TopicKeyword(r"债券|利率|收益率|通胀", "finance", 1.1),
+        TopicKeyword(r"交易|投资组合|衍生品|股息", "finance", 1.0),
+        TopicKeyword(r"现金流|央行|中央银行|财政部", "finance", 1.0),
     ),
     "legal": (
         TopicKeyword(r"\blaw(s)?\b", "legal", 1.0),
@@ -290,6 +295,11 @@ DOMAIN_TOPIC_KEYWORDS: Dict[str, Tuple[TopicKeyword, ...]] = {
         TopicKeyword(r"\bpatent(s)?\b", "legal", 1.0),
         TopicKeyword(r"\bcopyright(s)?\b", "legal", 1.0),
         TopicKeyword(r"\barbitration\b", "legal", 1.0),
+        TopicKeyword(r"法律|法规|条例|监管", "legal", 1.0),
+        TopicKeyword(r"法院|法庭|诉讼|起诉", "legal", 1.1),
+        TopicKeyword(r"合同|协议|责任|赔偿", "legal", 1.0),
+        TopicKeyword(r"原告|被告|管辖权|合规", "legal", 1.1),
+        TopicKeyword(r"专利|版权|仲裁|判决", "legal", 1.0),
     ),
 }
 

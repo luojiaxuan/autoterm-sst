@@ -52,6 +52,7 @@ auto_working:
     current_margin_threshold: 0.10
     min_consistent_windows: 2
     min_consistent_windows_with_text: 2
+    min_consistent_windows_generated_target: 3
     min_consistent_windows_audio_only: 3
     audio_probe_min_top_score: 0.50
     audio_probe_min_raw_margin: 0.08

@@ -85,7 +85,8 @@ The generated target window is one routing tick behind the current chunk, so a
 chunk's own translation cannot influence its own glossary retrieval. Controlled
 eval can still pass source transcript windows through `router_text` to isolate
 the router state machine, but those source-text numbers should not be reported
-as the deployed E2E path.
+as the deployed E2E path. Because generated target text can be biased by the
+current glossary, it uses a stricter default three-window consistency guard.
 
 The router combines four signals:
 
@@ -296,6 +297,7 @@ auto_working:
     domain_margin_threshold: 0.15
     current_margin_threshold: 0.10
     min_consistent_windows_with_text: 2
+    min_consistent_windows_generated_target: 3
     min_consistent_windows_audio_only: 3
     enable_generated_target_text: true
     generated_target_window_chunks: 3

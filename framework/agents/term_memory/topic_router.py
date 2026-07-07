@@ -107,6 +107,7 @@ class RouterConfig:
     speech_centroid_weight: float = 0.10
     metadata_prior_weight: float = 0.05
     min_consistent_windows_with_text: int = 2
+    min_consistent_windows_generated_target: int = 3
     min_consistent_windows_audio_only: int = 3
     text_ema_alpha: float = 0.60
     audio_ema_alpha: float = 0.80
@@ -526,6 +527,7 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
         switch_delta = confidence - current_score if top is not None else 0.0
 
         text_source = str(router_text_source or "none")
+        is_generated_target = text_source == "generated_target"
         has_text = bool((router_text or "").strip() and text_source != "none")
         has_probe = any(_probe_value(value) > 0.0 for value in (domain_probe_scores or {}).values())
         has_signal = bool(has_text or has_probe or query_vec or session_state.ema_query_embedding or session_state.recent_references)
@@ -600,9 +602,13 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             required = max(
                 1,
                 int(
-                    self.config.min_consistent_windows_with_text
-                    if has_text
-                    else self.config.min_consistent_windows_audio_only
+                    self.config.min_consistent_windows_generated_target
+                    if is_generated_target
+                    else (
+                        self.config.min_consistent_windows_with_text
+                        if has_text
+                        else self.config.min_consistent_windows_audio_only
+                    )
                 ),
             )
             evidence["candidate_preset"] = session_state.candidate_preset_id

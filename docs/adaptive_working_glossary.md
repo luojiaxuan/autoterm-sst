@@ -95,9 +95,10 @@ score(domain) =
 
 `text_topic_score` uses high-precision weighted keywords from
 `domain_taxonomy.py`. `domain_probe_retrieval_score` is a routing-only small
-top-k probe over candidate domain indexes; it must not change the prompt
-candidate budget. `speech_centroid_score` is a weak tie-breaker based on offline
-domain centroids:
+top-k probe over ready candidate domain indexes; it is gated by the router
+warmup/update/cooldown schedule and uses raw top-k scores rather than the prompt
+retrieval score threshold. It must not change the prompt candidate budget.
+`speech_centroid_score` is a weak tie-breaker based on offline domain centroids:
 
 ```text
 centroid = normalize(mean(normalize(text_embs), dim=0))

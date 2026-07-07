@@ -135,6 +135,6 @@ Recommended switch guard:
 ## Open implementation work
 
 - Add a real streaming ASR producer for `router_text`; the live pipeline can now accept the field.
-- Routing-only domain-probe retrieval is now wired into Omni routing ticks for ready domain indexes. It records `domain_probe_scores`, `domain_probe_slices`, and `domain_probe_s` in JSON metadata without changing active prompt top-k.
+- Routing-only domain-probe retrieval is now wired into Omni routing ticks for ready domain indexes. It is gated by the router warmup/update/cooldown schedule, uses raw top-k probe scores rather than the prompt retrieval threshold, and records `domain_probe_scores`, `domain_probe_slices`, and `domain_probe_s` in JSON metadata without changing active prompt top-k.
 - `eval/streaming_sst/eval_auto_glossary_switch.py` now provides router-only ACL/NLP <-> medicine switch regression using source-text windows or built-in fixtures. Taurus source-text run output is staged at `/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/eval/auto_glossary_switch_router_only_20260707.json`; it passes with ACL->medicine latency 4 windows and medicine->ACL latency 2 windows.
 - Continue expanding end-to-end active-slice candidate-quality eval with real ASR-driven `router_text`.

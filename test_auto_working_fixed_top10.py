@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import os
+import time
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -8,6 +10,7 @@ from unittest.mock import patch
 from eval.streaming_sst.score_terms import allowed_identity_retention_source, score
 from framework.agents.omni import OmniAgent, OmniConfig
 from framework.agents.plugins.backends import get_template
+from framework.agents.plugins.retrieval import MockRetrieval
 from framework.agents.term_memory.slice_registry import (
     force_exactly_k_references,
     rank_references,
@@ -119,6 +122,73 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertNotIn("general", domains)
         self.assertEqual(roles, {"domain_probe"})
         self.assertNotIn("common_10k", presets)
+
+    def test_domain_probe_populates_metadata_without_changing_active_inventory(self) -> None:
+        agent = OmniAgent()
+        agent.config.mock = True
+        agent.config.auto_glossary_warmup_sec = 0.0
+        agent.config.auto_glossary_update_sec = 30.0
+        agent.config.auto_glossary_switch_cooldown_sec = 0.0
+        agent.retrieval = MockRetrieval(target_lang="zh", top_k=10)
+        now = time.perf_counter()
+        session = SimpleNamespace(
+            auto_glossary_enabled=True,
+            language_pair="English -> Chinese",
+            audio=[0.0] * 16000,
+            last_llm_samples=0,
+            router_text_window="",
+            router_text_source="none",
+            created_s=now - 100.0,
+            router_state=RouterSessionState("nlp_core_10k", "nlp", created_s=now - 100.0),
+            last_domain_probe_scores={},
+            last_domain_probe_slices=[],
+            last_domain_probe_s=None,
+            active_slice_presets=["common_10k", "nlp_core_10k"],
+        )
+
+        before = list(session.active_slice_presets)
+        scores = asyncio.run(agent._probe_domain_scores(session, end_sample=16000))
+
+        self.assertIn("nlp", scores)
+        self.assertIn("medicine", scores)
+        self.assertEqual(session.active_slice_presets, before)
+        self.assertTrue(session.last_domain_probe_scores)
+        self.assertTrue(session.last_domain_probe_slices)
+        self.assertTrue(all(item["role"] == "domain_probe" for item in session.last_domain_probe_slices))
+
+    def test_domain_probe_respects_router_update_gate(self) -> None:
+        agent = OmniAgent()
+        agent.config.mock = True
+        agent.config.auto_glossary_warmup_sec = 0.0
+        agent.config.auto_glossary_update_sec = 30.0
+        agent.config.auto_glossary_switch_cooldown_sec = 0.0
+        agent.retrieval = MockRetrieval(target_lang="zh", top_k=10)
+        now = time.perf_counter()
+        session = SimpleNamespace(
+            auto_glossary_enabled=True,
+            language_pair="English -> Chinese",
+            audio=[0.0] * 16000,
+            last_llm_samples=0,
+            router_text_window="",
+            router_text_source="none",
+            created_s=now - 100.0,
+            router_state=RouterSessionState(
+                "nlp_core_10k",
+                "nlp",
+                created_s=now - 100.0,
+                last_decision_s=now,
+            ),
+            last_domain_probe_scores={"old": {}},
+            last_domain_probe_slices=[{"preset_id": "old"}],
+            last_domain_probe_s=1.0,
+        )
+
+        scores = asyncio.run(agent._probe_domain_scores(session, end_sample=16000))
+
+        self.assertEqual(scores, {})
+        self.assertEqual(session.last_domain_probe_scores, {})
+        self.assertEqual(session.last_domain_probe_slices, [])
+        self.assertIsNone(session.last_domain_probe_s)
 
     def test_identity_retention_metric_allows_acronyms_not_lowercase_phrases(self) -> None:
         gold = [("AI", ["AI"]), ("machine learning", ["machine learning"]), ("syntax", ["句法"])]

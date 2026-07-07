@@ -828,6 +828,22 @@ class OmniAgent(Agent):
         mode = (self.config.router_mode or "embedding_refs").strip().lower()
         if mode != "hybrid_window_topic" or not self.retrieval.enabled:
             return {}
+        now = time.perf_counter()
+        if now - float(session.created_s) < float(self.config.auto_glossary_warmup_sec):
+            return {}
+        state = session.router_state
+        if (
+            state is not None
+            and state.last_decision_s > 0.0
+            and now - float(state.last_decision_s) < float(self.config.auto_glossary_update_sec)
+        ):
+            return {}
+        if (
+            state is not None
+            and state.last_switch_s > 0.0
+            and now - float(state.last_switch_s) < float(self.config.auto_glossary_switch_cooldown_sec)
+        ):
+            return {}
 
         candidates: List[RetrievalSlice] = []
         for plan in self._domain_probe_slices(session):
@@ -845,7 +861,7 @@ class OmniAgent(Agent):
             candidate_slices=[item.to_meta() for item in candidates],
             top_k=max(1, int(self.config.router_domain_probe_top_k)),
             lookback_sec=float(self.config.rag_timeline_lookback_sec),
-            score_threshold=self._retrieval_score_threshold_for(session),
+            score_threshold=None,
         )
         session.last_domain_probe_s = time.perf_counter() - t0
         session.last_domain_probe_scores = _domain_probe_scores_to_meta(scores)

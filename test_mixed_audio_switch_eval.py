@@ -172,12 +172,12 @@ class MixedAudioSwitchEvalTests(unittest.TestCase):
                 },
                 "topic_router": {
                     "action": "stay",
-                    "to_domain": "nlp",
+                    "to_preset": "nlp_core_10k",
                     "confidence": 0.9,
                     "margin": 0.5,
                 },
                 "domain_probe_scores": {
-                    "nlp": {"domain": "nlp", "top_score": 0.8, "mean_topk_score": 0.7}
+                    "nlp": 0.8,
                 },
                 "router_text_source": "generated_target",
                 "prompt_reference_count": 10,
@@ -189,6 +189,7 @@ class MixedAudioSwitchEvalTests(unittest.TestCase):
         record = extract_record(event, event_idx=1, spans=spans)
         self.assertEqual(record["cursor_samples"], TARGET_SAMPLE_RATE)
         self.assertEqual(record["expected_domain"], "nlp")
+        self.assertEqual(record["router_target_domain"], "nlp")
         self.assertEqual(record["domain_probe_top_domain"], "nlp")
 
         bad = dict(event)

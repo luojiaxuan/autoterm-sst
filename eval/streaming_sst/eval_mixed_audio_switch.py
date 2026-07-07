@@ -33,6 +33,7 @@ from eval.streaming_sst.eval_mixed_domain_switch import (  # noqa: E402
     DEFAULT_ACL_ROOT,
     DEFAULT_MEDICINE_AUDIO_DIR,
 )
+from framework.agents.term_memory.domain_taxonomy import domain_for_preset  # noqa: E402
 
 TARGET_SAMPLE_RATE = 16000
 
@@ -91,10 +92,9 @@ def read_acl_audio_blocks(
 
     blocks: List[AudioBlock] = []
     for talk_id, wavs in by_talk.items():
-        selected = list(wavs)
+        selected = [path for path in wavs if Path(path).is_file()]
         if int(max_segs_per_talk) > 0:
             selected = selected[: int(max_segs_per_talk)]
-        selected = [path for path in selected if Path(path).is_file()]
         if selected:
             blocks.append(AudioBlock(talk_id, "nlp", "acl", selected))
         if len(blocks) >= max(0, int(limit_items)):
@@ -307,9 +307,11 @@ async def run_streaming_eval(
                             break
                     continue
                 event = json.loads(msg)
-                if str(event.get("type") or "").lower() in {"final", "done", "complete", "completed", "eof"}:
+                event_type = str(event.get("type") or "").lower()
+                event_text = str(event.get("text") or "")
+                if event_type == "status" and event_text.startswith("PROCESSING_COMPLETE") and feed_task.done():
                     break
-                if event.get("type") != "partial":
+                if event_type != "partial":
                     continue
                 events_seen += 1
                 records.append(extract_record(event, event_idx=events_seen, spans=spans))
@@ -342,6 +344,9 @@ def extract_record(
     topic = meta["topic"]
     router = meta["topic_router"]
     probe_scores = meta["domain_probe_scores"]
+    target_domain = str(router.get("to_domain") or "")
+    if not target_domain:
+        target_domain = domain_for_preset(str(router.get("to_preset") or ""))
     return {
         "event_idx": int(event_idx),
         "cursor_samples": cursor_samples,
@@ -352,7 +357,7 @@ def extract_record(
         "switch_count": int(topic["switch_count"]),
         "router_action": str(router.get("action") or ""),
         "router_reason": str(router.get("reason") or ""),
-        "router_target_domain": str(router.get("to_domain") or ""),
+        "router_target_domain": target_domain,
         "router_confidence": router.get("confidence"),
         "router_margin": router.get("margin"),
         "domain_probe_top_domain": domain_probe_top_domain(probe_scores),
@@ -536,6 +541,11 @@ def domain_probe_top_domain(scores: Dict[str, Any]) -> str:
             domain = str(value.get("domain") or key)
             try:
                 score = max(float(value.get("top_score") or 0.0), float(value.get("mean_topk_score") or 0.0))
+            except (TypeError, ValueError):
+                score = 0.0
+        else:
+            try:
+                score = float(value or 0.0)
             except (TypeError, ValueError):
                 score = 0.0
         rows.append((score, domain))

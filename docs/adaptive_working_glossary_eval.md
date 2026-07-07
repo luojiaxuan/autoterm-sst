@@ -104,6 +104,13 @@ metadata, active glossary preset/domain, prompt candidate counts, switch
 latency, and steady-state domain accuracy against playlist spans. A dry-run can
 verify the 5+5 audio playlist without a server:
 
+The live-run schema is tied to the current runtime emitter in
+`framework/agents/omni.py::_event_meta`, not the older high-level docs. The
+harness fails hard if required runtime fields such as `cursor_samples`,
+`domain_probe_scores`, `topic`, `topic_router`, `router_text_source`,
+`fixed_prompt_k`, or `candidate_pool_count` are missing, because span-aligned
+metrics are meaningless without them.
+
 ```bash
 cd /mnt/taurus/home/jiaxuanluo/rasst-demo
 

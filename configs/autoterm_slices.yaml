@@ -44,6 +44,7 @@ auto_working:
     enable_fallback: true
     text_topic_weight: 0.60
     domain_probe_weight: 0.25
+    domain_probe_top_k: 5
     speech_centroid_weight: 0.10
     metadata_prior_weight: 0.05
     domain_activate_threshold: 0.60

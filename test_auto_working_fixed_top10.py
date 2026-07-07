@@ -34,6 +34,7 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(config.auto_glossary_base_preset, "common_10k")
         self.assertEqual(config.auto_glossary_default_preset, "nlp_core_10k")
         self.assertEqual(config.router_mode, "hybrid_window_topic")
+        self.assertEqual(config.router_domain_probe_top_k, 5)
         self.assertEqual(config.router_min_consistent_windows_with_text, 2)
         self.assertEqual(config.router_min_consistent_windows_audio_only, 3)
         self.assertEqual(config.auto_glossary_switch_cooldown_sec, 90.0)
@@ -99,6 +100,25 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
 
         session.last_router_decision = {"action": "fallback"}
         self.assertTrue(agent._should_rescue_retrieval(session, [{"term": "BERT"}]))
+
+    def test_domain_probe_slices_are_domain_only_debug_inventory(self) -> None:
+        agent = OmniAgent()
+        agent.config.mock = True
+        session = SimpleNamespace(
+            auto_glossary_enabled=True,
+            language_pair="English -> Chinese",
+        )
+
+        slices = agent._domain_probe_slices(session)
+        domains = {item.domain for item in slices}
+        roles = {item.role for item in slices}
+        presets = {item.preset_id for item in slices}
+
+        self.assertIn("nlp", domains)
+        self.assertIn("medicine", domains)
+        self.assertNotIn("general", domains)
+        self.assertEqual(roles, {"domain_probe"})
+        self.assertNotIn("common_10k", presets)
 
     def test_identity_retention_metric_allows_acronyms_not_lowercase_phrases(self) -> None:
         gold = [("AI", ["AI"]), ("machine learning", ["machine learning"]), ("syntax", ["句法"])]

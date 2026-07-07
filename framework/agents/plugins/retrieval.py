@@ -446,23 +446,42 @@ class MaxSimRetrievalPlugin(RetrievalPlugin):
     ) -> Dict[str, DomainProbeScore]:
         if self.retriever is None or not request:
             return {}
+        async with self._lock:
+            return await asyncio.to_thread(
+                self._probe_domain_scores_sync,
+                dict(request),
+                list(candidate_slices or []),
+                max(1, int(top_k)),
+                float(lookback_sec),
+                score_threshold,
+            )
+
+    def _probe_domain_scores_sync(
+        self,
+        request: Dict[str, Any],
+        candidate_slices: Sequence[Dict[str, Any]],
+        top_k: int,
+        lookback_sec: float,
+        score_threshold: Optional[float],
+    ) -> Dict[str, DomainProbeScore]:
         old_index = self._active_index_path
+        missing = object()
+        old_threshold = getattr(self.retriever, "score_threshold", missing)
         out: Dict[str, DomainProbeScore] = {}
         try:
+            if score_threshold is not None:
+                self.retriever.score_threshold = float(score_threshold)
             for item in candidate_slices or []:
                 index_path = str(item.get("index_path") or "").strip()
                 domain = str(item.get("domain") or "").strip()
                 preset = str(item.get("preset_id") or domain).strip()
                 if not index_path or not domain:
                     continue
-                await self.activate_index(index_path)
-                result = (
-                    await self.retrieve_with_metadata(
-                        [dict(request)],
-                        top_k=max(1, int(top_k)),
-                        lookback_sec=lookback_sec,
-                        score_threshold=score_threshold,
-                    )
+                self._activate_sync(index_path)
+                result = self._retrieve_with_query_embeddings_sync(
+                    [dict(request)],
+                    max(1, int(top_k)),
+                    float(lookback_sec),
                 )[0]
                 scores: List[float] = []
                 terms: List[str] = []
@@ -482,8 +501,10 @@ class MaxSimRetrievalPlugin(RetrievalPlugin):
                     top_terms=tuple(terms),
                 )
         finally:
+            if score_threshold is not None and old_threshold is not missing:
+                self.retriever.score_threshold = old_threshold
             if old_index:
-                await self.activate_index(old_index)
+                self._activate_sync(old_index)
         return out
 
     def _retrieve_with_query_embeddings_sync(

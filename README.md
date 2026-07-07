@@ -201,15 +201,15 @@ If retrieval fails to load, the agent logs it and continues **without** RAG
 | `RASST_AUTO_GLOSSARY_MIN_MARGIN` | `0.15` | minimum top-vs-runner-up domain margin |
 | `RASST_AUTO_GLOSSARY_MIN_CONSISTENT_WINDOWS` | `2` | repeated windows required before switching |
 | `RASST_AUTO_GLOSSARY_FALLBACK` | `none` | uncertain routing keeps the current domain slice or disables a fallback switch |
-| `RASST_ROUTER_MODE` | `embedding_refs` | audio-native router; `legacy_keywords` is debug-only |
+| `RASST_ROUTER_MODE` | `hybrid_window_topic` | window-topic-first router; `embedding_refs` and `legacy_keywords` are compatibility/debug modes |
 | `RASST_ROUTER_EMBED_WEIGHT` / `RASST_ROUTER_REF_WEIGHT` | `0.65` / `0.35` | embedding-centroid vs reference-metadata weights |
 | `RASST_PROMPT_TOP_K` | `10` | max retrieved refs injected into the prompt |
 | `RASST_UI_TOP_K` | `10` | max refs surfaced in JSON metadata/UI evidence |
 
 Additional auto-router hysteresis defaults are tracked in
 `configs/autoterm_slices.yaml`: `current_margin_threshold=0.10`,
-`min_consistent_windows=2`, `switch_cooldown_sec=90`, and
-`candidate_stale_sec=120`.
+`min_consistent_windows_with_text=2`, `min_consistent_windows_audio_only=3`,
+`domain_probe_top_k=5`, `switch_cooldown_sec=90`, and `candidate_stale_sec=120`.
 
 ---
 
@@ -250,13 +250,14 @@ retrieves from it exactly like a glossary, with retrieved terms surfaced in the
 evidence panel and `term_memory` health.
 
 The default demo path is now **zero-setup adaptive working glossary**:
-`auto_working` starts from a domain-specific slice (default `nlp_core_10k`),
-observes speech-side retrieval embeddings plus retrieved-reference metadata,
-and routes directly among domain slices such as `nlp_core_10k` or
-`medicine_core_10k` only after the target MaxSim index is preloaded. It is not a
-trained topic classifier and does not use ASR, source transcripts, generated
-target text, or manual glossary terms for routing. The prompt interface is held
-constant: every streaming chunk receives exactly the fixed top-10 retrieved
+`auto_working` keeps `common_terms` active as a base slice and switches one
+routed domain overlay such as `nlp_core_10k` or `medicine_core_10k`.
+The default `hybrid_window_topic` router is window-topic-first: controlled eval
+can feed source transcript windows through `router_text`, live deployments can
+feed streaming ASR text, and audio/probe-only routing remains a fallback. A
+small routing-only domain-probe retrieval pass can score candidate domain
+indexes without changing the active prompt inventory. The prompt interface is
+held constant: every streaming chunk receives exactly the fixed top-10 retrieved
 candidates, while larger 100k/500k/1M memories remain offline memory, rescue
 pools, and scale evidence. See
 [`docs/adaptive_working_glossary.md`](docs/adaptive_working_glossary.md). See
@@ -323,6 +324,7 @@ and allows a single concurrent agent session per authtoken.
 | `scripts/smoke_p0_protocol.py` | client-side protocol/concurrency smoke test |
 | `scripts/term_memory/*.py` | open-memory pipeline (extract/filter/build working slices/build snapshot/publish manifest) |
 | `eval/streaming_sst/eval_auto_glossary.py` | adaptive glossary switch/latency/reference-volume eval |
+| `eval/streaming_sst/eval_auto_glossary_switch.py` | router-only ACL/NLP ↔ medicine switch regression |
 | `eval/streaming_sst/score_auto_glossary.py` | summarize adaptive glossary eval JSON as a table |
 | `eval/streaming_sst/sweep_term_memory.py` | term-memory scale sweep (retrieve p50/p95, refs/chunk) over the JSON WS |
 | `eval/streaming_sst/score_terms.py` | terminology accuracy plus regular/masked-term BLEU vs references |

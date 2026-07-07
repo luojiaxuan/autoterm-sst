@@ -77,6 +77,7 @@ from framework.agents.term_memory.slice_registry import (
 from framework.agents.term_memory.topic_router import TopicContext
 from framework.agents.term_memory.topic_router import (
     AudioNativeActiveGlossaryRouter,
+    DomainProbeScore,
     DomainSlice,
     HybridWindowTopicRouter,
     LegacyKeywordTopicRouter,
@@ -136,6 +137,19 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def _domain_probe_scores_to_meta(scores: Dict[str, DomainProbeScore]) -> Dict[str, Dict[str, Any]]:
+    out: Dict[str, Dict[str, Any]] = {}
+    for domain, item in scores.items():
+        out[str(domain)] = {
+            "domain": item.domain,
+            "preset_id": item.preset_id,
+            "top_score": round(float(item.top_score or 0.0), 4),
+            "mean_topk_score": round(float(item.mean_topk_score or 0.0), 4),
+            "top_terms": [str(term) for term in item.top_terms[:5]],
+        }
+    return out
 
 
 def _load_autoterm_slice_config() -> Dict[str, Any]:
@@ -287,6 +301,7 @@ class OmniConfig:
     router_domain_probe_weight: float = 0.25
     router_speech_centroid_weight: float = 0.10
     router_metadata_prior_weight: float = 0.05
+    router_domain_probe_top_k: int = 5
     router_min_consistent_windows_with_text: int = 2
     router_min_consistent_windows_audio_only: int = 3
     prompt_top_k: int = PROMPT_K
@@ -403,6 +418,7 @@ class OmniConfig:
             router_domain_probe_weight=_safe_float(routing_config.get("domain_probe_weight"), 0.25),
             router_speech_centroid_weight=_safe_float(routing_config.get("speech_centroid_weight"), 0.10),
             router_metadata_prior_weight=_safe_float(routing_config.get("metadata_prior_weight"), 0.05),
+            router_domain_probe_top_k=_safe_int(routing_config.get("domain_probe_top_k"), 5),
             router_min_consistent_windows_with_text=_safe_int(
                 routing_config.get("min_consistent_windows_with_text"),
                 2,
@@ -464,6 +480,9 @@ class OmniSession:
     last_rescue_triggered: bool = False
     last_candidate_pool_count: int = 0
     last_prompt_reference_count: int = 0
+    last_domain_probe_scores: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    last_domain_probe_slices: List[Dict[str, Any]] = field(default_factory=list)
+    last_domain_probe_s: Optional[float] = None
     active_retrieval_slices: List[RetrievalSlice] = field(default_factory=list)
     pending_since_s: Optional[float] = None
     latency_multiplier: int = 2
@@ -767,6 +786,70 @@ class OmniAgent(Agent):
             slices.append(plan)
         self._record_active_slices(session, slices)
         return slices
+
+    def _domain_probe_slices(self, session: "OmniSession") -> List[RetrievalSlice]:
+        if not session.auto_glossary_enabled:
+            return []
+        if float(self.config.router_domain_probe_weight) <= 0.0:
+            return []
+        slices: List[RetrievalSlice] = []
+        seen: Set[str] = set()
+        for preset in configured_working_presets(self.config.auto_glossary_presets):
+            domain = domain_for_preset(preset)
+            if not preset or preset == "none" or domain in {GENERAL_DOMAIN, "common", "general"}:
+                continue
+            plan = self._slice_for_preset(session, preset, role="domain_probe")
+            if plan is None or plan.preset_id in seen:
+                continue
+            seen.add(plan.preset_id)
+            slices.append(plan)
+        return slices
+
+    def _domain_probe_request(self, session: "OmniSession", end_sample: int) -> Dict[str, Any]:
+        end = max(0, min(int(end_sample), int(len(session.audio))))
+        return {
+            "audio_buffer": session.audio[:end],
+            "current_start_sec": float(session.last_llm_samples) / TARGET_SAMPLE_RATE,
+            "current_end_sec": float(end) / TARGET_SAMPLE_RATE,
+            "lookback_sec": float(self.config.rag_timeline_lookback_sec),
+            "query_text": session.router_text_window,
+            "router_text_source": session.router_text_source,
+        }
+
+    async def _probe_domain_scores(
+        self,
+        session: "OmniSession",
+        *,
+        end_sample: int,
+    ) -> Dict[str, DomainProbeScore]:
+        session.last_domain_probe_scores = {}
+        session.last_domain_probe_slices = []
+        session.last_domain_probe_s = None
+        mode = (self.config.router_mode or "embedding_refs").strip().lower()
+        if mode != "hybrid_window_topic" or not self.retrieval.enabled:
+            return {}
+
+        candidates: List[RetrievalSlice] = []
+        for plan in self._domain_probe_slices(session):
+            if self.retrieval.is_index_ready(plan.index_path):
+                candidates.append(plan)
+            else:
+                self._schedule_index_preload(plan.index_path)
+        session.last_domain_probe_slices = [item.to_meta() for item in candidates]
+        if not candidates:
+            return {}
+
+        t0 = time.perf_counter()
+        scores = await self.retrieval.probe_domain_scores(
+            self._domain_probe_request(session, end_sample),
+            candidate_slices=[item.to_meta() for item in candidates],
+            top_k=max(1, int(self.config.router_domain_probe_top_k)),
+            lookback_sec=float(self.config.rag_timeline_lookback_sec),
+            score_threshold=self._retrieval_score_threshold_for(session),
+        )
+        session.last_domain_probe_s = time.perf_counter() - t0
+        session.last_domain_probe_scores = _domain_probe_scores_to_meta(scores)
+        return scores
 
     def _rescue_retrieval_slice(self, session: "OmniSession") -> Optional[RetrievalSlice]:
         if not self.config.autoterm_enable_open_rescue:
@@ -1100,6 +1183,9 @@ class OmniAgent(Agent):
         session.last_query_embedding = None
         session.router_text_window = ""
         session.router_text_source = "none"
+        session.last_domain_probe_scores = {}
+        session.last_domain_probe_slices = []
+        session.last_domain_probe_s = None
         if session.auto_glossary_enabled:
             try:
                 selection = self.active_glossary.initial_selection(
@@ -1411,9 +1497,14 @@ class OmniAgent(Agent):
             session.last_candidate_pool_count = len(outputs[idx])
             if session.auto_glossary_enabled:
                 observer_refs = self._prompt_references(session, outputs[idx])
-                self._observe_active_glossary(
+                domain_probe_scores = await self._probe_domain_scores(
+                    session,
+                    end_sample=end_by_session[session.session_id],
+                )
+                await self._observe_active_glossary(
                     session,
                     RetrievalResult(references=observer_refs, query_embedding=query_embeddings[idx]),
+                    domain_probe_scores=domain_probe_scores,
                 )
             else:
                 session.last_query_embedding = query_embeddings[idx]
@@ -1571,6 +1662,13 @@ class OmniAgent(Agent):
             "active_slice_terms": dict(session.active_slice_terms),
             "retrieval_plan": list(session.last_retrieval_plan),
             "open_wiki_rescue_triggered": bool(session.last_rescue_triggered),
+            "domain_probe_s": (
+                round(float(session.last_domain_probe_s), 6)
+                if session.last_domain_probe_s is not None
+                else None
+            ),
+            "domain_probe_scores": dict(session.last_domain_probe_scores),
+            "domain_probe_slices": list(session.last_domain_probe_slices),
             "router_text_source": session.router_text_source,
             "router_text_chars": len(session.router_text_window or ""),
             "topic": self._topic_meta(session),
@@ -1586,10 +1684,12 @@ class OmniAgent(Agent):
     ) -> None:
         return None
 
-    def _observe_active_glossary(
+    async def _observe_active_glossary(
         self,
         session: OmniSession,
         result: RetrievalResult,
+        *,
+        domain_probe_scores: Optional[Dict[str, DomainProbeScore]] = None,
     ) -> None:
         if not session.auto_glossary_enabled:
             return
@@ -1620,6 +1720,7 @@ class OmniAgent(Agent):
                 now,
                 router_text=session.router_text_window,
                 router_text_source=session.router_text_source,
+                domain_probe_scores=domain_probe_scores or {},
             )
         else:
             decision = router.observe(
@@ -2063,6 +2164,7 @@ class OmniAgent(Agent):
                 "min_consistent_windows_audio_only": self.config.router_min_consistent_windows_audio_only,
                 "text_topic_weight": self.config.router_text_topic_weight,
                 "domain_probe_weight": self.config.router_domain_probe_weight,
+                "domain_probe_top_k": self.config.router_domain_probe_top_k,
                 "speech_centroid_weight": self.config.router_speech_centroid_weight,
                 "metadata_prior_weight": self.config.router_metadata_prior_weight,
                 "prompt_top_k": self.config.prompt_top_k,

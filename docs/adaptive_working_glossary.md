@@ -118,8 +118,8 @@ When no source/ASR/topic text is available, the fallback should use
 small-top-k domain-probe retrieval plus weak centroid similarity. Current
 active-slice metadata should be treated as a small prior, not as a veto against
 a high-confidence text-topic switch. These routing probes must not change the
-prompt interface: the prompt still receives exactly 10 candidates from the
-selected active domain slice.
+prompt interface: the prompt still receives exactly 10 candidates retrieved
+from `common_terms + active_domain_overlay`.
 
 Switch guards run in this order:
 
@@ -148,6 +148,7 @@ routing:
   mode: hybrid_window_topic
   text_topic_weight: 0.60
   domain_probe_weight: 0.25
+  domain_probe_top_k: 5
   speech_centroid_weight: 0.10
   metadata_prior_weight: 0.05
   domain_activate_threshold: 0.60
@@ -164,6 +165,8 @@ Each `topic_router` metadata payload records the target score, current active
 slice score, target-current delta, candidate streak, top scored domains, and
 the guard that blocked or allowed a switch. These fields are the first place to
 inspect when a run appears to stay on a stale domain slice or switch too often.
+JSON events also include `domain_probe_scores`, `domain_probe_slices`, and
+`domain_probe_s` when routing-only domain probes run for that chunk.
 
 ## Non-Blocking Switching
 
@@ -203,6 +206,14 @@ The JSON WebSocket event contains:
     "references": [{"term": "...", "translation": "...", "source": "auto:nlp_core_10k"}],
     "prompt_reference_count": 10,
     "ui_reference_count": 10,
+    "domain_probe_scores": {
+      "medicine": {
+        "preset_id": "medicine_core_10k",
+        "top_score": 0.84,
+        "mean_topk_score": 0.71,
+        "top_terms": ["clinical trial", "patient"]
+      }
+    },
     "topic": {
       "active_domain": "medicine",
       "confidence": 0.73,
@@ -215,8 +226,9 @@ The JSON WebSocket event contains:
       "to_preset": "medicine_core_10k",
       "confidence": 0.73,
       "margin": 0.19,
-      "reason": "speech_embedding+retrieved_refs",
+      "reason": "hybrid_window_topic",
       "evidence": {
+        "router_text_source": "streaming_asr",
         "current_score": 0.41,
         "target_score_delta": 0.32,
         "candidate_preset": "medicine_core_10k",
@@ -301,6 +313,23 @@ not in this repo.
 ## Evaluation
 
 Routing/latency/switch metrics:
+
+```bash
+python eval/streaming_sst/eval_auto_glossary_switch.py \
+  --acl-text /mnt/taurus/data2/jiaxuanluo/rasst_eval/acl6060_zh_smoke/source_text.txt \
+  --medicine-text /mnt/taurus/data2/jiaxuanluo/RASST/data/main_result/inputs/medicine_zh/medicine.source_text.en__medicine_404.txt \
+  --max-windows-per-domain 8 \
+  --max-switch-windows 4 \
+  --out-json /mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/eval/auto_glossary_switch_router_only_20260707.json
+```
+
+The 2026-07-07 Taurus source-text run passed with ACL->medicine switch latency
+4 windows and medicine->ACL switch latency 2 windows. The medicine sample starts
+with generic webinar operator lines before the oncology topic appears, so the
+clean fixture regression remains stricter at 2 windows while the real-text run
+uses a 4-window threshold.
+
+End-to-end streaming metrics:
 
 ```bash
 python eval/streaming_sst/eval_auto_glossary.py \

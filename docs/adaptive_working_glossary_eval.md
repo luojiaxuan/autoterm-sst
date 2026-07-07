@@ -33,6 +33,13 @@ python scripts/term_memory/build_domain_centroids.py \
   --target-lang zh \
   --update-manifest
 
+python eval/streaming_sst/eval_auto_glossary_switch.py \
+  --acl-text /mnt/taurus/data2/jiaxuanluo/rasst_eval/acl6060_zh_smoke/source_text.txt \
+  --medicine-text /mnt/taurus/data2/jiaxuanluo/RASST/data/main_result/inputs/medicine_zh/medicine.source_text.en__medicine_404.txt \
+  --max-windows-per-domain 8 \
+  --max-switch-windows 4 \
+  --out-json /mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/eval/auto_glossary_switch_router_only_20260707.json
+
 python eval/streaming_sst/eval_auto_glossary.py \
   --base-url http://127.0.0.1:8011 \
   --seg-dir /mnt/taurus/data2/jiaxuanluo/rasst_eval/acl6060_zh_smoke/seg \
@@ -57,6 +64,10 @@ python eval/streaming_sst/score_auto_glossary.py \
   --out-md /mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/eval/auto_glossary_table.md
 ```
 
+Taurus source-text sanity run on 2026-07-07 passed with ACL->medicine latency 4
+windows and medicine->ACL latency 2 windows. The fixture unit test keeps the
+stricter two-window threshold for clean topic windows.
+
 ## Metrics
 
 | metric | source |
@@ -72,6 +83,10 @@ python eval/streaming_sst/score_auto_glossary.py \
 | retrieval p50/p95 | `retrieve_s` metadata |
 | switch count | `meta.topic.switch_count` |
 | router action/reason | `meta.topic_router.action` / `meta.topic_router.reason` |
+| router-only switch success | `eval_auto_glossary_switch.py` |
+| switch latency windows | `eval_auto_glossary_switch.py` |
+| false medicine switch on ACL windows | `eval_auto_glossary_switch.py` |
+| routing-only domain probe scores | `meta.domain_probe_scores` |
 | time to first switch | first chunk whose switch count increases |
 | active glossary over time | `meta.topic.active_glossary_preset` |
 

@@ -465,7 +465,9 @@ class MaxSimRetrievalPlugin(RetrievalPlugin):
         score_threshold: Optional[float],
     ) -> Dict[str, DomainProbeScore]:
         out: Dict[str, DomainProbeScore] = {}
-        window_embs = self._encode_probe_window_sync(dict(request), float(lookback_sec))
+        window_embs = self._probe_window_embeddings_from_request(dict(request))
+        if window_embs is None:
+            window_embs = self._encode_probe_window_sync(dict(request), float(lookback_sec))
         if window_embs is None:
             return out
         for item in candidate_slices or []:
@@ -502,6 +504,29 @@ class MaxSimRetrievalPlugin(RetrievalPlugin):
                 top_terms=tuple(terms),
             )
         return out
+
+    def _probe_window_embeddings_from_request(self, request: Dict[str, Any]) -> Any:
+        query_embedding = request.get("query_embedding")
+        if query_embedding is None:
+            return None
+        import torch  # noqa: WPS433
+        import torch.nn.functional as F  # noqa: WPS433
+
+        try:
+            tensor = torch.as_tensor(
+                query_embedding,
+                dtype=torch.float32,
+                device=self.retriever.device,
+            )
+        except Exception:  # noqa: BLE001 - malformed optional embedding should fall back to audio
+            return None
+        if tensor.numel() == 0:
+            return None
+        if tensor.ndim == 1:
+            tensor = tensor.unsqueeze(0)
+        elif tensor.ndim > 2:
+            tensor = tensor.reshape(-1, tensor.shape[-1])
+        return F.normalize(tensor.float(), p=2, dim=-1)
 
     def _encode_probe_window_sync(self, request: Dict[str, Any], lookback_sec: float) -> Any:
         from agents.streaming_maxsim_retriever import (  # noqa: WPS433

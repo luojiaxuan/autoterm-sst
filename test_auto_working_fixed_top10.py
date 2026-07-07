@@ -210,7 +210,7 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(scores, cached)
         self.assertIn("medicine", session.last_domain_probe_scores)
         self.assertTrue(session.last_domain_probe_slices)
-        self.assertEqual(session.last_domain_probe_s, 1.0)
+        self.assertEqual(session.last_domain_probe_s, 0.0)
         self.assertTrue(session.last_domain_probe_cached)
 
     def test_domain_probe_request_uses_recent_audio_window(self) -> None:

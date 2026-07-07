@@ -808,7 +808,12 @@ class OmniAgent(Agent):
             slices.append(plan)
         return slices
 
-    def _domain_probe_request(self, session: "OmniSession", end_sample: int) -> Dict[str, Any]:
+    def _domain_probe_request(
+        self,
+        session: "OmniSession",
+        end_sample: int,
+        query_embedding: Any = None,
+    ) -> Dict[str, Any]:
         end = max(0, min(int(end_sample), int(len(session.audio))))
         current_start = max(0, min(int(session.last_llm_samples), end))
         lookback_samples = max(
@@ -822,8 +827,7 @@ class OmniAgent(Agent):
             "current_start_sec": float(current_start - start) / TARGET_SAMPLE_RATE,
             "current_end_sec": float(end - start) / TARGET_SAMPLE_RATE,
             "lookback_sec": float(self.config.rag_timeline_lookback_sec),
-            "query_text": session.router_text_window,
-            "router_text_source": session.router_text_source,
+            "query_embedding": query_embedding,
         }
 
     def _clear_domain_probe_meta(self, session: "OmniSession") -> None:
@@ -848,6 +852,7 @@ class OmniAgent(Agent):
             return {}
         session.last_domain_probe_slices = [item.to_meta() for item in candidates]
         session.last_domain_probe_scores = _domain_probe_scores_to_meta(filtered)
+        session.last_domain_probe_s = 0.0
         session.last_domain_probe_cached = True
         return filtered
 
@@ -868,6 +873,7 @@ class OmniAgent(Agent):
         session: "OmniSession",
         *,
         end_sample: int,
+        query_embedding: Any = None,
     ) -> Dict[str, DomainProbeScore]:
         mode = (self.config.router_mode or "embedding_refs").strip().lower()
         if mode != "hybrid_window_topic" or not self.retrieval.enabled:
@@ -904,10 +910,16 @@ class OmniAgent(Agent):
             cached_scores = self._cached_domain_probe_scores(session, candidates)
             if cached_scores:
                 return cached_scores
+            if update_gate:
+                session.last_domain_probe_scores = {}
+                session.last_domain_probe_slices = [item.to_meta() for item in candidates]
+                session.last_domain_probe_s = 0.0
+                session.last_domain_probe_cached = True
+                return {}
 
         t0 = time.perf_counter()
         scores = await self.retrieval.probe_domain_scores(
-            self._domain_probe_request(session, end_sample),
+            self._domain_probe_request(session, end_sample, query_embedding),
             candidate_slices=[item.to_meta() for item in candidates],
             top_k=max(1, int(self.config.router_domain_probe_top_k)),
             lookback_sec=float(self.config.rag_timeline_lookback_sec),
@@ -1567,6 +1579,7 @@ class OmniAgent(Agent):
                 domain_probe_scores = await self._probe_domain_scores(
                     session,
                     end_sample=end_by_session[session.session_id],
+                    query_embedding=query_embeddings[idx],
                 )
                 await self._observe_active_glossary(
                     session,

@@ -103,7 +103,10 @@ sees stable probe evidence without rerunning MaxSim. When source/ASR topic text
 is available, fresh probes are refreshed on the normal router update interval;
 when no topic text is available, fresh probes refresh on the streaming window
 cadence so audio-only domain changes are not frozen for the full update
-interval. It must not change the prompt candidate budget.
+interval. Fresh probes reuse the pooled speech embedding from the main
+retrieval pass when available, and only fall back to a separate audio encode
+when no query embedding was produced. It must not change the prompt candidate
+budget.
 `speech_centroid_score` is a weak tie-breaker based on offline domain centroids:
 
 ```text

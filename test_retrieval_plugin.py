@@ -9,6 +9,7 @@ from framework.agents.plugins.retrieval import MaxSimRetrievalPlugin, RetrievalR
 
 class DummyRetriever:
     score_threshold = None
+    device = torch.device("cpu")
 
 
 class MaxSimRetrievalPluginTests(unittest.IsolatedAsyncioTestCase):
@@ -47,7 +48,7 @@ class MaxSimRetrievalPluginTests(unittest.IsolatedAsyncioTestCase):
 
         def fake_encode(request, lookback_sec):  # noqa: ANN001, ANN202
             del request, lookback_sec
-            return torch.tensor([[1.0, 0.0]], dtype=torch.float32)
+            raise AssertionError("probe should reuse query_embedding instead of re-encoding audio")
 
         def fake_ensure(index_path):  # noqa: ANN001, ANN202
             if index_path == "nlp-index":
@@ -65,7 +66,12 @@ class MaxSimRetrievalPluginTests(unittest.IsolatedAsyncioTestCase):
         plugin._ensure_index = fake_ensure  # type: ignore[method-assign]
 
         scores = await plugin.probe_domain_scores(
-            {"audio_buffer": [0.0], "current_start_sec": 0.0, "current_end_sec": 1.0},
+            {
+                "audio_buffer": [0.0],
+                "current_start_sec": 0.0,
+                "current_end_sec": 1.0,
+                "query_embedding": torch.tensor([1.0, 0.0], dtype=torch.float32),
+            },
             candidate_slices=[
                 {"domain": "nlp", "preset_id": "nlp_core_10k", "index_path": "nlp-index"},
                 {"domain": "medicine", "preset_id": "medicine_core_10k", "index_path": "medicine-index"},

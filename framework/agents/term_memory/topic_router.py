@@ -1,10 +1,10 @@
-"""Audio-native active-glossary routing.
+"""Active-glossary routing for automatic terminology slices.
 
-The default router is intentionally not a topic classifier. It is a small,
-confidence-gated policy that decides whether a streaming session should keep the
-current domain-specific glossary or switch to another manifest-described domain
-slice. Its primary signals are the speech-side retrieval
-embedding and metadata attached to retrieved references.
+The default router is window-topic-first: it combines recent source/ASR topic
+text with optional domain-probe retrieval, weak speech-centroid evidence, and a
+small retrieved-reference metadata prior. The older audio-native router remains
+available for explicit compatibility with the previous embedding/ref-metadata
+policy.
 
 The old keyword router remains available as ``LegacyKeywordTopicRouter`` for
 explicit debug fallback only.

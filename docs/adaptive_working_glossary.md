@@ -229,32 +229,34 @@ The JSON WebSocket event contains:
 
 Plain-text WebSocket mode is unchanged.
 
-## Environment Knobs
+## Runtime Configuration
 
-```bash
-export RASST_AUTO_GLOSSARY_ENABLED=1
-export RASST_AUTO_GLOSSARY_DEFAULT=nlp_core_10k
-export RASST_AUTO_GLOSSARY_PRESETS=nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k
-export RASST_AUTO_GLOSSARY_UPDATE_SEC=45
-export RASST_AUTO_GLOSSARY_WARMUP_SEC=30
-export RASST_AUTO_GLOSSARY_MIN_CONF=0.60
-export RASST_AUTO_GLOSSARY_MIN_MARGIN=0.15
-export RASST_AUTO_GLOSSARY_MIN_CONSISTENT_WINDOWS=2
-export RASST_AUTO_GLOSSARY_FALLBACK=none
-export RASST_AUTO_GLOSSARY_PRELOAD=1
-export RASST_AUTO_GLOSSARY_PRELOAD_PRESETS=nlp_core_10k,medicine_core_10k
-export RASST_ROUTER_MODE=embedding_refs
-export RASST_ROUTER_LEGACY_KEYWORDS=0
-export RASST_ROUTER_EMBED_WEIGHT=0.65
-export RASST_ROUTER_REF_WEIGHT=0.35
-export RASST_ROUTER_EMA_ALPHA=0.80
-export RASST_PROMPT_TOP_K=10
-export RASST_UI_TOP_K=10
-export RASST_TERM_MEMORY_MANIFEST=/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/manifests/current.json
+`configs/autoterm_slices.yaml` is the source of truth for the default automatic
+router. The current production defaults are:
+
+```yaml
+auto_working:
+  prompt_k: 10
+  base_slice: common_terms
+  initial_slice: nlp_core_10k
+  routing:
+    mode: hybrid_window_topic
+    text_topic_weight: 0.60
+    domain_probe_weight: 0.25
+    speech_centroid_weight: 0.10
+    metadata_prior_weight: 0.05
+    domain_activate_threshold: 0.60
+    domain_margin_threshold: 0.15
+    current_margin_threshold: 0.10
+    min_consistent_windows_with_text: 2
+    min_consistent_windows_audio_only: 3
+    production_update_sec: 30
+    production_warmup_sec: 20
+    production_cooldown_sec: 90
 ```
 
-`auto_working` is the default when `RASST_AUTO_GLOSSARY_ENABLED=1`, unless
-`RASST_DEFAULT_GLOSSARY_PRESET` explicitly overrides it.
+`embedding_refs` and `legacy_keywords` remain explicit compatibility router
+modes for debugging, but they are not the default auto-term strategy.
 
 ## Building Working Slices
 

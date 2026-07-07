@@ -137,7 +137,9 @@ router_text_source: generated_target
   `--max-switch-seconds`，建议真实 E2E mixed run 使用 `--max-switch-seconds 30`，同时报告
   实际 `latency_s`。
 
-Full 5 ACL + 5 medicine runs started on Taurus at commit `d63202d`:
+Full 5 ACL + 5 medicine runs were started on Taurus at commit `d63202d` and
+then canceled to save resources after confirming they were unnecessarily long
+for the current routing question:
 
 ```text
 output dir:
@@ -147,10 +149,43 @@ alternating PID: 3693023
 random seed 20260707 PID: 3693024
 ```
 
-Both runs use real-time `--feed-sleep 1.92`, `--max-switch-seconds 30`, fixed
-prompt_k=10, and the same Taurus `127.0.0.1:8012` `hybrid_window_topic` server.
-The full playlist contains 16,848.115s of audio, so completion should take about
-4.7 hours plus drain time.
+The replacement run is a 4-block real E2E streaming playlist:
+
+```text
+ACL 120s -> medicine 120s -> ACL 120s -> medicine 120s
+output:
+/mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_hybrid_8012_4block/alternating_acl_med_acl_med_120s_realtime_switch30.json
+```
+
+Metrics:
+
+| metric | value |
+|---|---:|
+| audio seconds | 480.0 |
+| events | 238 |
+| domain transitions | 3 |
+| switches | 3 |
+| wrong switches | 0 |
+| active domain accuracy | 0.8613 |
+| steady-state active domain accuracy, 30s tolerance | 0.9947 |
+| retrieval p95 | 88.29ms |
+| prompt invariant violations | 0 |
+| probe top accuracy | 0.5242 |
+
+Transition latencies:
+
+| transition | latency |
+|---|---:|
+| ACL -> medicine_404 | 20.16s |
+| medicine_404 -> ACL | 17.28s |
+| ACL -> medicine_606 | 37.44s |
+
+Strict `--max-switch-seconds 30` marks the final transition as failed because
+37.44s is over the 30s threshold. Recomputing on the same record with 40s or
+45s tolerance passes with steady-state accuracy 1.0. The delayed final switch is
+not a wrong switch: the medicine_606 opening is mostly speaker/session framing
+until the generated translation reaches explicit oncology terms such as
+`肿瘤内科医生` and `放射肿瘤科医生`.
 
 ## 固定 64 命令
 

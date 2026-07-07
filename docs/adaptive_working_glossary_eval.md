@@ -176,10 +176,19 @@ Short real E2E results under
 | medicine-only 80s | switched from initial `nlp` to `medicine` at 59.52s; wrong switches 0 |
 | ACL 120s -> medicine 120s | switched to `medicine` 20.16s after boundary; wrong switches 0; steady-state accuracy 1.0 with `--max-switch-seconds 30`; retrieval p95 88.66ms |
 
-Full 5 ACL + 5 medicine real-time runs were launched at commit `d63202d` under
-`/mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_hybrid_8012_full_d63202d`.
-The alternating run PID is `3693023`; the random seed 20260707 run PID is
-`3693024`. Both use `--feed-sleep 1.92` and `--max-switch-seconds 30`.
+The full 5 ACL + 5 medicine real-time runs launched at commit `d63202d` were
+canceled because the full playlist is longer than needed for the current router
+question. The replacement run is a 4-block playlist under
+`/mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_hybrid_8012_4block`:
+
+```text
+ACL 120s -> medicine 120s -> ACL 120s -> medicine 120s
+```
+
+It produced 3/3 correct switches, 0 wrong switches, fixed prompt_k=10 on every
+event, retrieval p95 88.29ms, and transition latencies of 20.16s, 17.28s, and
+37.44s. The strict 30s tolerance fails only on the final medicine_606 switch;
+40s/45s tolerance passes on the same record.
 
 ## Remaining AutoTerm Todos
 
@@ -191,7 +200,7 @@ The alternating run PID is `3693023`; the random seed 20260707 run PID is
 | done | Router guards for generic generated text, weak probe, and centroid-only false switches | Covered by unit tests. |
 | done | Real mixed-audio harness | `eval_mixed_audio_switch.py` added and dry-run verified on Taurus. |
 | done | Short real E2E generated-target switch probe | Taurus 8012 produced ACL-only, medicine-only, and ACL->medicine mixed results with zero wrong switches. |
-| running | Full 5 ACL + 5 medicine E2E generated-target switch benchmark | Taurus PIDs `3693023` and `3693024`; output under `20260707_hybrid_8012_full_d63202d`. |
+| done | 4-block E2E generated-target switch benchmark | ACL -> medicine -> ACL -> medicine, 3/3 correct switches, 0 wrong switches; final switch latency 37.44s exceeds strict 30s tolerance. |
 | pending | Mixed-domain BLEU / term_ACC / masked_term_BLEU | Need combined ACL+medicine references and medicine term gold/metric mapping. |
 | in progress | Route threshold retuning from real probe failure modes | Current tuning uses generated-target text first and `current_margin_threshold=0.30`; speech probe is noisy and should stay auxiliary. |
 | pending | Paper claim update | Claim can mention short real E2E probe, but full 5+5 and metric sweep are still pending. |

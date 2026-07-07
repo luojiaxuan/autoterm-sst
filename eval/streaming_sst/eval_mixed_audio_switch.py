@@ -310,9 +310,10 @@ async def run_streaming_eval(
                 event_type = str(event.get("type") or "").lower()
                 event_text = str(event.get("text") or "")
                 if event_type == "status" and event_text.startswith("PROCESSING_COMPLETE") and feed_task.done():
-                    break
+                    continue
                 if event_type != "partial":
                     continue
+                idle_after_eof = 0
                 events_seen += 1
                 records.append(extract_record(event, event_idx=events_seen, spans=spans))
             await feed_task

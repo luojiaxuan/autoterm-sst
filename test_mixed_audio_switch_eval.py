@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import sys
 import unittest
 import wave
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import numpy as np
@@ -19,6 +22,7 @@ from eval.streaming_sst.eval_mixed_audio_switch import (
     expected_domain_at,
     read_acl_audio_blocks,
     read_medicine_audio_blocks,
+    run_streaming_eval,
     summarize_run,
 )
 
@@ -197,6 +201,102 @@ class MixedAudioSwitchEvalTests(unittest.TestCase):
         del bad["meta"]["cursor_samples"]
         with self.assertRaisesRegex(RuntimeError, "cursor_samples"):
             extract_record(bad, event_idx=1, spans=spans)
+
+    def test_streaming_eval_drains_partials_after_processing_complete(self) -> None:
+        blocks = [AudioBlock("acl", "nlp", "acl", ["mock-a.wav"])]
+        spans = [
+            SimpleNamespace(
+                start_sample=0,
+                end_sample=TARGET_SAMPLE_RATE,
+                expected_domain="nlp",
+            )
+        ]
+        partial = {
+            "type": "partial",
+            "text": "测试",
+            "meta": {
+                "cursor_samples": TARGET_SAMPLE_RATE,
+                "topic": {
+                    "active_domain": "nlp",
+                    "active_glossary_preset": "nlp_core_10k",
+                    "switch_count": 0,
+                },
+                "topic_router": {
+                    "action": "stay",
+                    "to_preset": "nlp_core_10k",
+                    "confidence": 0.9,
+                    "margin": 0.5,
+                },
+                "domain_probe_scores": {"nlp": 0.8},
+                "router_text_source": "generated_target",
+                "prompt_reference_count": 10,
+                "fixed_prompt_k": 10,
+                "candidate_pool_count": 50,
+            },
+        }
+
+        class FakeWebSocket:
+            def __init__(self) -> None:
+                self.sent = []
+                self.messages = [
+                    json.dumps({"type": "status", "text": "READY: framework ready"}),
+                    json.dumps({"type": "status", "text": "PROCESSING_COMPLETE: File processing finished"}),
+                    json.dumps(partial),
+                ]
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+            async def send(self, payload):
+                self.sent.append(payload)
+
+            async def recv(self):
+                if self.messages:
+                    if len(self.messages) == 2:
+                        await asyncio.sleep(0.01)
+                    return self.messages.pop(0)
+                await asyncio.sleep(1.0)
+                return json.dumps({"type": "status", "text": "unused"})
+
+        fake_ws = FakeWebSocket()
+        fake_module = SimpleNamespace(connect=lambda *args, **kwargs: fake_ws)
+        previous_module = sys.modules.get("websockets")
+        sys.modules["websockets"] = fake_module
+        try:
+            with (
+                patch("eval.streaming_sst.eval_mixed_audio_switch.init_session", return_value={"session_id": "s1"}),
+                patch("eval.streaming_sst.eval_mixed_audio_switch.delete_session"),
+                patch(
+                    "eval.streaming_sst.eval_mixed_audio_switch.iter_pcm_chunks",
+                    return_value=iter([np.zeros((16,), dtype=np.float32)]),
+                ),
+            ):
+                payload = asyncio.run(
+                    run_streaming_eval(
+                        base_url="http://127.0.0.1:8012",
+                        language_pair="English -> Chinese",
+                        preset="auto_working",
+                        blocks=blocks,
+                        spans=spans,
+                        chunk_samples=16,
+                        feed_sleep=0.0,
+                        latency_multiplier=2,
+                        idle_timeout_sec=0.02,
+                        idle_timeouts_after_eof=1,
+                    )
+                )
+        finally:
+            if previous_module is None:
+                sys.modules.pop("websockets", None)
+            else:
+                sys.modules["websockets"] = previous_module
+
+        self.assertEqual(len(payload["records"]), 1)
+        self.assertEqual(payload["records"][0]["active_domain"], "nlp")
+        self.assertEqual(fake_ws.sent[-1], "EOF")
 
 
 if __name__ == "__main__":

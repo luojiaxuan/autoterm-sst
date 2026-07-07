@@ -100,7 +100,9 @@ than being capped at `0.25 + 0.10 + 0.05`. Audio-only probe routing has an
 additional raw-evidence guard: the probe must score at least two positive
 candidate domains, the top raw probe score must be at least `0.50`, the top-vs-
 second raw margin must be at least `0.08`, and the top raw probe domain must
-match the proposed switch target.
+match the proposed switch target. If no source/ASR text is available and no
+domain-probe evidence is available, centroid similarity alone cannot switch the
+active domain.
 
 `text_topic_score` uses high-precision weighted keywords from
 `domain_taxonomy.py`. `domain_probe_retrieval_score` is a routing-only small
@@ -149,6 +151,7 @@ Switch guards run in this order:
 - no switch until the target index is preloadable;
 - no audio-only probe switch unless raw probe evidence has enough top-score,
   margin, and competing-domain support;
+- no audio-only centroid-only switch without domain-probe evidence;
 - no switch unless confidence is above the threshold;
 - no switch unless the new domain beats the next best domain by a margin;
 - no switch unless the new domain also beats the current active slice by the

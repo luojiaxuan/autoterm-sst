@@ -578,6 +578,8 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             guard_reason = "general_or_common"
         elif not self._slice_available(target_preset):
             guard_reason = "target_unavailable"
+        elif not has_text and not has_probe:
+            guard_reason = "audio_probe_required"
         elif not has_text and has_probe and not audio_probe_guard.get("ok", False):
             guard_reason = "audio_probe_evidence_insufficient"
         elif confidence < float(self.config.min_confidence):

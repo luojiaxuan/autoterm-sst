@@ -145,6 +145,19 @@ class HybridWindowTopicRouterTests(unittest.TestCase):
         self.assertTrue(all("audio_probe_evidence_insufficient" in decision.reason for decision in decisions))
         self.assertEqual(state.active_domain_id, "nlp")
 
+    def test_audio_only_centroid_without_probe_does_not_switch(self) -> None:
+        router = _router()
+        state = RouterSessionState("nlp_core_10k", "nlp", created_s=1.0)
+
+        decisions = [
+            router.observe(state, [0.0, 1.0], [], now_s=float(step), domain_probe_scores={})
+            for step in (10, 11, 12, 13)
+        ]
+
+        self.assertTrue(all(decision.action == "stay" for decision in decisions))
+        self.assertTrue(all("audio_probe_required" in decision.reason for decision in decisions))
+        self.assertEqual(state.active_domain_id, "nlp")
+
     def test_metadata_prior_does_not_veto_high_confidence_text_topic(self) -> None:
         router = _router()
         state = RouterSessionState("nlp_core_10k", "nlp", created_s=1.0)

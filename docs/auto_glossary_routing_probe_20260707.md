@@ -127,7 +127,8 @@ When no source/ASR/topic text is available, route should fall back to domain-pro
 The fallback is intentionally conservative: audio-only probe switches require
 at least two positive probe-domain scores, a raw top score of at least `0.50`, a
 raw top-vs-second margin of at least `0.08`, and agreement between the top probe
-domain and the proposed target.
+domain and the proposed target. Without source/ASR text and without domain-probe
+evidence, centroid similarity alone is not allowed to switch the active domain.
 
 Recommended switch guard:
 

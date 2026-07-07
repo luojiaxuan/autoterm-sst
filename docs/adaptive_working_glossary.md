@@ -2,9 +2,9 @@
 
 RASST-Demo maintains a large open terminology memory offline, but activates a
 fixed 10-candidate prompt list for each streaming session. The active inventory is
-selected automatically from speech-side retrieval evidence. The automatic path is
-domain-specific: it does not prepend a separate common/base glossary before
-routing.
+selected automatically from recent window topic evidence. The automatic path now
+keeps a compact `common_terms` base slice active and switches one routed domain
+overlay at a time.
 
 ## Architecture
 
@@ -13,11 +13,12 @@ offline open memory
   -> working slices: nlp_core_10k / medicine_core_10k / finance_core_10k / legal_core_10k
   -> manifest: preset id -> terms.jsonl + maxsim index + domain metadata + centroid
   -> runtime session starts in auto_working
-  -> active preset starts as the configured domain-specific initial slice
-  -> MaxSim retrieval exposes speech query embedding + retrieved refs
-  -> AudioNativeActiveGlossaryRouter scores embedding-to-centroid + ref metadata
+  -> common_terms stays active as the base retrieval slice
+  -> active preset starts as the configured domain-specific overlay
+  -> router observes recent source/ASR topic text, optional domain probes, speech embedding, and refs
+  -> HybridWindowTopicRouter scores window topic first
   -> ActiveGlossaryManager preloads and atomically activates target index
-  -> future chunks retrieve from the active slice
+  -> future chunks retrieve from common_terms + active domain overlay
   -> prompt receives top 10 refs, UI receives top 10 refs + router metadata
 ```
 
@@ -30,10 +31,12 @@ concerns.
 ## Runtime Modules
 
 - `framework/agents/term_memory/domain_taxonomy.py`: fallback/default domain
-  labels and offline slice-ranking helpers. Runtime routing does not depend on
-  keyword lists by default.
-- `framework/agents/term_memory/topic_router.py`: audio-native active glossary
-  router using speech query embeddings and retrieved-reference metadata. The
+  labels, weighted high-precision topic keywords, and offline working-slice
+  ranking helpers.
+- `framework/agents/term_memory/topic_router.py`: `HybridWindowTopicRouter`
+  routes from recent source/ASR topic text first, with domain-probe retrieval
+  and speech-centroid signals as secondary evidence. The older
+  `AudioNativeActiveGlossaryRouter` remains available as `embedding_refs`; the
   old keyword router remains only as `RASST_ROUTER_MODE=legacy_keywords`.
 - `framework/agents/term_memory/active_glossary.py`: maps topic decisions to
   concrete active presets and handles fallback when a slice is unavailable.
@@ -55,6 +58,8 @@ Each `OmniSession` tracks:
 requested_glossary_preset   # user-facing mode, usually auto_working
 active_glossary_preset      # concrete retrieval preset, e.g. nlp_core_10k
 active_domain               # nlp / medicine / finance / legal
+router_text_window          # source/ASR/topic text for routing, if available
+router_text_source          # manifest_source / streaming_asr / generated_target / none
 topic_confidence
 last_topic_update_s
 topic_history
@@ -71,47 +76,43 @@ active preset is `RASST_AUTO_GLOSSARY_DEFAULT` (`nlp_core_10k` by default).
 
 ## Routing Logic
 
-The current default router is `RASST_ROUTER_MODE=embedding_refs`. It is not a
-trained topic classifier and it does not use ASR, source transcripts, generated
-target text, LLM classification, or manual glossary terms for routing.
+The default router is `RASST_ROUTER_MODE=hybrid_window_topic`. It is a
+window-topic-first router: recent source-side text is the primary signal when
+available. In controlled eval this text can come from RASST source segments; in
+deployable live mode it should come from streaming ASR. Generated target text is
+only a weak diagnostic signal because it can be biased by the current glossary
+and model errors.
 
-The router combines two signals:
+The router combines four signals:
 
 ```text
-score(domain slice) =
-    0.65 * cosine(EMA(speech_query_embedding), domain_centroid)
-  + 0.35 * score-weighted retrieved-reference metadata votes
-  + small consistency bonus
-  - ambiguity penalty
+score(domain) =
+    0.60 * text_topic_score
+  + 0.25 * domain_probe_retrieval_score
+  + 0.10 * speech_centroid_score
+  + 0.05 * metadata_prior
 ```
 
-Domain centroids are built offline from each preset's MaxSim text index:
+`text_topic_score` uses high-precision weighted keywords from
+`domain_taxonomy.py`. `domain_probe_retrieval_score` is a routing-only small
+top-k probe over candidate domain indexes; it must not change the prompt
+candidate budget. `speech_centroid_score` is a weak tie-breaker based on offline
+domain centroids:
 
 ```text
 centroid = normalize(mean(normalize(text_embs), dim=0))
 ```
 
-Reference votes use metadata such as `active_glossary_preset`, `domain`, and
-`source_preset`; they do not infer topic from term strings like "patient" or
-"language model".
+`metadata_prior` uses metadata such as `active_glossary_preset`, `domain`, and
+`source_preset`, but it is intentionally small so the current active slice does
+not veto a high-confidence window-topic switch.
 
-This current implementation is not sufficient for robust cross-domain switching
+The earlier `embedding_refs` implementation is not sufficient for robust cross-domain switching
 when a session moves from an ACL/NLP talk to a medicine talk. A 2026-07-07
 probe found that real medicine audio windows often remained closer to the NLP
 centroid than to the medicine centroid, while window-level source text/topic
 signals cleanly identified the medicine domain. See
 [`auto_glossary_routing_probe_20260707.md`](auto_glossary_routing_probe_20260707.md).
-
-The next routing version should therefore be window-topic-first when recent
-source/ASR/topic text is available:
-
-```text
-score(domain) =
-    0.55 * text_topic_score
-  + 0.25 * domain_probe_retrieval_score
-  + 0.15 * speech_centroid_score
-  + 0.05 * metadata_prior
-```
 
 When no source/ASR/topic text is available, the fallback should use
 small-top-k domain-probe retrieval plus weak centroid similarity. Current
@@ -144,10 +145,17 @@ The default routing thresholds live in `configs/autoterm_slices.yaml`:
 
 ```yaml
 routing:
+  mode: hybrid_window_topic
+  text_topic_weight: 0.60
+  domain_probe_weight: 0.25
+  speech_centroid_weight: 0.10
+  metadata_prior_weight: 0.05
   domain_activate_threshold: 0.60
   domain_margin_threshold: 0.15
   current_margin_threshold: 0.10
   min_consistent_windows: 2
+  min_consistent_windows_with_text: 2
+  min_consistent_windows_audio_only: 3
   switch_cooldown_sec: 90
   candidate_stale_sec: 120
 ```

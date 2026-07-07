@@ -20,6 +20,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
+from framework.agents.term_memory.topic_router import DomainProbeScore
+
 logger = logging.getLogger(__name__)
 
 TermRef = Dict[str, Any]
@@ -83,6 +85,17 @@ class RetrievalPlugin:
         """Return references plus optional speech-side retrieval metadata."""
 
         return [RetrievalResult(references=[]) for _ in requests]
+
+    async def probe_domain_scores(
+        self,
+        request: Dict[str, Any],
+        *,
+        candidate_slices: Sequence[Dict[str, Any]],
+        top_k: int = 5,
+        lookback_sec: float = 1.92,
+        score_threshold: Optional[float] = None,
+    ) -> Dict[str, DomainProbeScore]:
+        return {}
 
     async def health(self) -> Dict[str, Any]:
         return {"status": "disabled"}
@@ -213,6 +226,30 @@ class MockRetrieval(RetrievalPlugin):
                 "legal": [0.5, 0.0, 0.0, 0.5],
             }.get(domain, [1.0, 0.0, 0.0, 0.0])
             out.append(RetrievalResult(references=refs, query_embedding=embedding, retrieve_s=0.0))
+        return out
+
+    async def probe_domain_scores(
+        self,
+        request: Dict[str, Any],
+        *,
+        candidate_slices: Sequence[Dict[str, Any]],
+        top_k: int = 5,
+        lookback_sec: float = 1.92,
+        score_threshold: Optional[float] = None,
+    ) -> Dict[str, DomainProbeScore]:
+        del request, lookback_sec, score_threshold
+        out: Dict[str, DomainProbeScore] = {}
+        for item in candidate_slices or []:
+            domain = str(item.get("domain") or "general")
+            preset = str(item.get("preset_id") or domain)
+            base = 0.8 if domain in {"nlp", "medicine", "finance", "legal"} else 0.1
+            out[domain] = DomainProbeScore(
+                domain=domain,
+                preset_id=preset,
+                top_score=base,
+                mean_topk_score=base * 0.9,
+                top_terms=tuple(term for term, _translation in self._SAMPLE[: max(1, int(top_k))]),
+            )
         return out
 
     async def health(self) -> Dict[str, Any]:
@@ -397,6 +434,57 @@ class MaxSimRetrievalPlugin(RetrievalPlugin):
                 if score_threshold is not None and old_threshold is not missing:
                     self.retriever.score_threshold = old_threshold
         return list(results)
+
+    async def probe_domain_scores(
+        self,
+        request: Dict[str, Any],
+        *,
+        candidate_slices: Sequence[Dict[str, Any]],
+        top_k: int = 5,
+        lookback_sec: float = 1.92,
+        score_threshold: Optional[float] = None,
+    ) -> Dict[str, DomainProbeScore]:
+        if self.retriever is None or not request:
+            return {}
+        old_index = self._active_index_path
+        out: Dict[str, DomainProbeScore] = {}
+        try:
+            for item in candidate_slices or []:
+                index_path = str(item.get("index_path") or "").strip()
+                domain = str(item.get("domain") or "").strip()
+                preset = str(item.get("preset_id") or domain).strip()
+                if not index_path or not domain:
+                    continue
+                await self.activate_index(index_path)
+                result = (
+                    await self.retrieve_with_metadata(
+                        [dict(request)],
+                        top_k=max(1, int(top_k)),
+                        lookback_sec=lookback_sec,
+                        score_threshold=score_threshold,
+                    )
+                )[0]
+                scores: List[float] = []
+                terms: List[str] = []
+                for ref in result.references[: max(1, int(top_k))]:
+                    terms.append(str(ref.get("term") or ""))
+                    try:
+                        scores.append(float(ref.get("score") or 0.0))
+                    except (TypeError, ValueError):
+                        continue
+                top_score = max(scores) if scores else 0.0
+                mean_topk = sum(scores) / len(scores) if scores else 0.0
+                out[domain] = DomainProbeScore(
+                    domain=domain,
+                    preset_id=preset,
+                    top_score=top_score,
+                    mean_topk_score=mean_topk,
+                    top_terms=tuple(terms),
+                )
+        finally:
+            if old_index:
+                await self.activate_index(old_index)
+        return out
 
     def _retrieve_with_query_embeddings_sync(
         self,

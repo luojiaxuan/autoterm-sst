@@ -78,6 +78,7 @@ from framework.agents.term_memory.topic_router import TopicContext
 from framework.agents.term_memory.topic_router import (
     AudioNativeActiveGlossaryRouter,
     DomainSlice,
+    HybridWindowTopicRouter,
     LegacyKeywordTopicRouter,
     RouterConfig,
     RouterDecision,
@@ -163,14 +164,18 @@ def _autoterm_base_preset(config: Dict[str, Any], default: str = "none") -> str:
     base = _preset_for_slice_id(str(config.get("base_slice") or ""))
     if base:
         return base
-    initial = _preset_for_slice_id(str(config.get("initial_slice") or ""))
-    if initial:
-        return initial
     slices = config.get("slices")
     if isinstance(slices, dict):
         for slice_id, meta in slices.items():
             if isinstance(meta, dict) and str(meta.get("type") or "").strip().lower() == "base":
                 return _preset_for_slice_id(str(slice_id)) or default
+    return default
+
+
+def _autoterm_initial_preset(config: Dict[str, Any], default: str = "nlp_core_10k") -> str:
+    initial = _preset_for_slice_id(str(config.get("initial_slice") or ""))
+    if initial:
+        return initial
     return default
 
 
@@ -259,6 +264,7 @@ class OmniConfig:
     rag_timeline_lookback_sec: float = 1.92
 
     auto_glossary_enabled: bool = True
+    auto_glossary_base_preset: str = "common_10k"
     auto_glossary_default_preset: str = "nlp_core_10k"
     auto_glossary_presets: str = "nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k"
     auto_glossary_update_sec: float = 45.0
@@ -272,11 +278,17 @@ class OmniConfig:
     auto_glossary_fallback_preset: str = "none"
     auto_glossary_preload: bool = True
     auto_glossary_preload_presets: str = "nlp_core_10k,medicine_core_10k"
-    router_mode: str = "embedding_refs"
+    router_mode: str = "hybrid_window_topic"
     router_legacy_keywords: bool = False
     router_embed_weight: float = 0.65
     router_ref_weight: float = 0.35
     router_ema_alpha: float = 0.80
+    router_text_topic_weight: float = 0.60
+    router_domain_probe_weight: float = 0.25
+    router_speech_centroid_weight: float = 0.10
+    router_metadata_prior_weight: float = 0.05
+    router_min_consistent_windows_with_text: int = 2
+    router_min_consistent_windows_audio_only: int = 3
     prompt_top_k: int = PROMPT_K
     ui_top_k: int = PROMPT_K
     autoterm_broad_topk_per_slice: int = 50
@@ -294,7 +306,8 @@ class OmniConfig:
         retrieval_config = autoterm_config.get("retrieval") if isinstance(autoterm_config.get("retrieval"), dict) else {}
         prompt_k_default = _safe_int(retrieval_config.get("prompt_k", autoterm_config.get("prompt_k")), PROMPT_K)
         broad_topk_default = _safe_int(retrieval_config.get("broad_topk_per_slice"), 50)
-        base_preset_default = _autoterm_base_preset(autoterm_config, "nlp_core_10k")
+        base_preset_default = _autoterm_base_preset(autoterm_config, "common_10k")
+        initial_preset_default = _autoterm_initial_preset(autoterm_config, "nlp_core_10k")
         working_presets_default = _autoterm_working_presets(
             autoterm_config,
             "nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k",
@@ -346,13 +359,20 @@ class OmniConfig:
             rag_score_threshold=_env_float("RASST_RAG_SCORE_THRESHOLD", 0.78),
             rag_timeline_lookback_sec=_env_float("RASST_RAG_LOOKBACK_SEC", 1.92),
             auto_glossary_enabled=_env_bool("RASST_AUTO_GLOSSARY_ENABLED", True),
-            auto_glossary_default_preset=_env_str("RASST_AUTO_GLOSSARY_DEFAULT", base_preset_default),
+            auto_glossary_base_preset=base_preset_default,
+            auto_glossary_default_preset=_env_str("RASST_AUTO_GLOSSARY_DEFAULT", initial_preset_default),
             auto_glossary_presets=_env_str(
                 "RASST_AUTO_GLOSSARY_PRESETS",
                 working_presets_default,
             ),
-            auto_glossary_update_sec=_env_float("RASST_AUTO_GLOSSARY_UPDATE_SEC", 45.0),
-            auto_glossary_warmup_sec=_env_float("RASST_AUTO_GLOSSARY_WARMUP_SEC", 30.0),
+            auto_glossary_update_sec=_env_float(
+                "RASST_AUTO_GLOSSARY_UPDATE_SEC",
+                _safe_float(routing_config.get("production_update_sec"), _safe_float(routing_config.get("update_sec"), 45.0)),
+            ),
+            auto_glossary_warmup_sec=_env_float(
+                "RASST_AUTO_GLOSSARY_WARMUP_SEC",
+                _safe_float(routing_config.get("production_warmup_sec"), _safe_float(routing_config.get("warmup_sec"), 30.0)),
+            ),
             auto_glossary_min_conf=_env_float("RASST_AUTO_GLOSSARY_MIN_CONF", _safe_float(routing_config.get("domain_activate_threshold"), 0.60)),
             auto_glossary_switch_margin=_env_float(
                 "RASST_AUTO_GLOSSARY_MIN_MARGIN",
@@ -363,7 +383,10 @@ class OmniConfig:
                 "RASST_AUTO_GLOSSARY_MIN_CONSISTENT_WINDOWS",
                 _safe_int(routing_config.get("min_consistent_windows"), 2),
             ),
-            auto_glossary_switch_cooldown_sec=_safe_float(routing_config.get("switch_cooldown_sec"), 90.0),
+            auto_glossary_switch_cooldown_sec=_safe_float(
+                routing_config.get("production_cooldown_sec"),
+                _safe_float(routing_config.get("switch_cooldown_sec"), 90.0),
+            ),
             auto_glossary_candidate_stale_sec=_safe_float(routing_config.get("candidate_stale_sec"), 120.0),
             auto_glossary_fallback_preset=_env_str("RASST_AUTO_GLOSSARY_FALLBACK", "none"),
             auto_glossary_preload=_env_bool("RASST_AUTO_GLOSSARY_PRELOAD", True),
@@ -371,11 +394,23 @@ class OmniConfig:
                 "RASST_AUTO_GLOSSARY_PRELOAD_PRESETS",
                 working_presets_default,
             ),
-            router_mode=_env_str("RASST_ROUTER_MODE", "embedding_refs"),
+            router_mode=_env_str("RASST_ROUTER_MODE", str(routing_config.get("mode") or "hybrid_window_topic")),
             router_legacy_keywords=_env_bool("RASST_ROUTER_LEGACY_KEYWORDS", False),
             router_embed_weight=_env_float("RASST_ROUTER_EMBED_WEIGHT", 0.65),
             router_ref_weight=_env_float("RASST_ROUTER_REF_WEIGHT", 0.35),
             router_ema_alpha=_env_float("RASST_ROUTER_EMA_ALPHA", 0.80),
+            router_text_topic_weight=_safe_float(routing_config.get("text_topic_weight"), 0.60),
+            router_domain_probe_weight=_safe_float(routing_config.get("domain_probe_weight"), 0.25),
+            router_speech_centroid_weight=_safe_float(routing_config.get("speech_centroid_weight"), 0.10),
+            router_metadata_prior_weight=_safe_float(routing_config.get("metadata_prior_weight"), 0.05),
+            router_min_consistent_windows_with_text=_safe_int(
+                routing_config.get("min_consistent_windows_with_text"),
+                2,
+            ),
+            router_min_consistent_windows_audio_only=_safe_int(
+                routing_config.get("min_consistent_windows_audio_only"),
+                3,
+            ),
             prompt_top_k=_env_int("RASST_PROMPT_TOP_K", prompt_k_default),
             ui_top_k=_env_int("RASST_UI_TOP_K", prompt_k_default),
             autoterm_broad_topk_per_slice=broad_topk_default,
@@ -421,6 +456,8 @@ class OmniSession:
     router_state: Optional[RouterSessionState] = None
     last_router_decision: Optional[Dict[str, Any]] = None
     last_query_embedding: Any = None
+    router_text_window: str = ""
+    router_text_source: str = "none"
     active_slice_presets: List[str] = field(default_factory=list)
     active_slice_terms: Dict[str, int] = field(default_factory=dict)
     last_retrieval_plan: List[Dict[str, Any]] = field(default_factory=list)
@@ -499,8 +536,19 @@ class OmniAgent(Agent):
             reference_weight=self.config.router_ref_weight,
             ema_alpha=self.config.router_ema_alpha,
             fallback_preset_id=self.config.auto_glossary_fallback_preset,
+            text_topic_weight=self.config.router_text_topic_weight,
+            domain_probe_weight=self.config.router_domain_probe_weight,
+            speech_centroid_weight=self.config.router_speech_centroid_weight,
+            metadata_prior_weight=self.config.router_metadata_prior_weight,
+            min_consistent_windows_with_text=self.config.router_min_consistent_windows_with_text,
+            min_consistent_windows_audio_only=self.config.router_min_consistent_windows_audio_only,
         )
-        router = AudioNativeActiveGlossaryRouter(
+        router_cls = (
+            HybridWindowTopicRouter
+            if (self.config.router_mode or "").strip().lower() == "hybrid_window_topic"
+            else AudioNativeActiveGlossaryRouter
+        )
+        router = router_cls(
             self._domain_slices_for(catalog),
             router_config,
         )
@@ -693,6 +741,9 @@ class OmniAgent(Agent):
 
         active_preset = (session.active_glossary_preset or session.glossary_preset or "").strip()
         presets: List[Tuple[str, str]] = []
+        base_preset = (self.config.auto_glossary_base_preset or "").strip()
+        if base_preset and base_preset != "none" and base_preset != active_preset:
+            presets.append((base_preset, "base"))
         if active_preset and active_preset != "none":
             presets.append((active_preset, "domain"))
         else:
@@ -893,6 +944,8 @@ class OmniAgent(Agent):
             auto_glossary_enabled=selection.auto_enabled,
             last_topic_update_s=time.perf_counter(),
             last_topic_reason=selection.reason,
+            router_text_window=str(config.get("router_text") or ""),
+            router_text_source=str(config.get("router_text_source") or "none"),
             latency_multiplier=lm,
         )
         session.router_state = RouterSessionState(
@@ -1008,6 +1061,17 @@ class OmniAgent(Agent):
             if session is not None and lm is not None:
                 session.latency_multiplier = lm
             return {"success": True, "latency_multiplier": lm}
+        if mtype == "router_text":
+            session = self.sessions.get(session_id) if session_id else None
+            if session is None:
+                return {"success": False, "error": "Invalid session ID"}
+            session.router_text_window = str(message.get("router_text") or "")
+            session.router_text_source = str(message.get("router_text_source") or "none")
+            return {
+                "success": True,
+                "router_text_source": session.router_text_source,
+                "router_text_chars": len(session.router_text_window),
+            }
         if mtype == "glossary_build":
             return await self._glossary_build(message)
         return None
@@ -1034,6 +1098,8 @@ class OmniAgent(Agent):
         session.last_topic_reason = "reset"
         session.last_router_decision = None
         session.last_query_embedding = None
+        session.router_text_window = ""
+        session.router_text_source = "none"
         if session.auto_glossary_enabled:
             try:
                 selection = self.active_glossary.initial_selection(
@@ -1505,6 +1571,8 @@ class OmniAgent(Agent):
             "active_slice_terms": dict(session.active_slice_terms),
             "retrieval_plan": list(session.last_retrieval_plan),
             "open_wiki_rescue_triggered": bool(session.last_rescue_triggered),
+            "router_text_source": session.router_text_source,
+            "router_text_chars": len(session.router_text_window or ""),
             "topic": self._topic_meta(session),
             "topic_router": session.last_router_decision,
         }
@@ -1543,12 +1611,23 @@ class OmniAgent(Agent):
                 last_switch_s=session.created_s,
             )
         now = time.perf_counter()
-        decision = self._topic_router_for(session.language_pair).observe(
-            session.router_state,
-            result.query_embedding,
-            annotated_refs,
-            now,
-        )
+        router = self._topic_router_for(session.language_pair)
+        if mode == "hybrid_window_topic":
+            decision = router.observe(
+                session.router_state,
+                result.query_embedding,
+                annotated_refs,
+                now,
+                router_text=session.router_text_window,
+                router_text_source=session.router_text_source,
+            )
+        else:
+            decision = router.observe(
+                session.router_state,
+                result.query_embedding,
+                annotated_refs,
+                now,
+            )
         session.topic_confidence = decision.confidence
         session.last_topic_reason = decision.reason
         session.last_topic_update_s = now
@@ -1556,7 +1635,8 @@ class OmniAgent(Agent):
         session.topic_history.append(
             {
                 "t": round(now - session.created_s, 3),
-                "router_mode": "embedding_refs",
+                "router_mode": mode,
+                "router_text_source": session.router_text_source,
                 "action": decision.action,
                 "domain": decision.target_domain_id,
                 "preset": decision.target_preset_id,
@@ -1971,6 +2051,7 @@ class OmniAgent(Agent):
             "auto_glossary": {
                 "enabled": self.config.auto_glossary_enabled,
                 "router_mode": self.config.router_mode,
+                "base_preset": self.config.auto_glossary_base_preset,
                 "default_preset": self.config.auto_glossary_default_preset,
                 "fallback_preset": self.config.auto_glossary_fallback_preset,
                 "update_sec": self.config.auto_glossary_update_sec,
@@ -1978,6 +2059,12 @@ class OmniAgent(Agent):
                 "min_confidence": self.config.auto_glossary_min_conf,
                 "min_margin": self.config.auto_glossary_switch_margin,
                 "min_consistent_windows": self.config.auto_glossary_min_consistent_windows,
+                "min_consistent_windows_with_text": self.config.router_min_consistent_windows_with_text,
+                "min_consistent_windows_audio_only": self.config.router_min_consistent_windows_audio_only,
+                "text_topic_weight": self.config.router_text_topic_weight,
+                "domain_probe_weight": self.config.router_domain_probe_weight,
+                "speech_centroid_weight": self.config.router_speech_centroid_weight,
+                "metadata_prior_weight": self.config.router_metadata_prior_weight,
                 "prompt_top_k": self.config.prompt_top_k,
                 "ui_top_k": self.config.ui_top_k,
             },

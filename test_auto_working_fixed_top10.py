@@ -31,6 +31,11 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(config.auto_glossary_switch_margin, 0.15)
         self.assertEqual(config.auto_glossary_current_margin, 0.10)
         self.assertEqual(config.auto_glossary_min_consistent_windows, 2)
+        self.assertEqual(config.auto_glossary_base_preset, "common_10k")
+        self.assertEqual(config.auto_glossary_default_preset, "nlp_core_10k")
+        self.assertEqual(config.router_mode, "hybrid_window_topic")
+        self.assertEqual(config.router_min_consistent_windows_with_text, 2)
+        self.assertEqual(config.router_min_consistent_windows_audio_only, 3)
         self.assertEqual(config.auto_glossary_switch_cooldown_sec, 90.0)
         self.assertEqual(config.auto_glossary_candidate_stale_sec, 120.0)
 

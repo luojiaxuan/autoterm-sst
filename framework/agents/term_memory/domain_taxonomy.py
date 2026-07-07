@@ -7,8 +7,9 @@ primary online router signal.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
-from typing import Dict, Iterable, Tuple
+from typing import Dict, Iterable, List, Tuple
 
 AUTO_WORKING_PRESET = "auto_working"
 
@@ -177,6 +178,121 @@ class DomainScore:
     domain: str
     score: float
     reason: str
+
+
+@dataclass(frozen=True)
+class TopicKeyword:
+    pattern: str
+    domain: str
+    weight: float = 1.0
+    case_sensitive: bool = False
+
+
+DOMAIN_TOPIC_KEYWORDS: Dict[str, Tuple[TopicKeyword, ...]] = {
+    "nlp": (
+        TopicKeyword(r"\blanguage model(s)?\b", "nlp", 1.2),
+        TopicKeyword(r"\blarge language model(s)?\b", "nlp", 1.3),
+        TopicKeyword(r"\bnatural language processing\b", "nlp", 1.4),
+        TopicKeyword(r"\bNLP\b", "nlp", 1.2, case_sensitive=True),
+        TopicKeyword(r"\bBERT\b", "nlp", 1.2, case_sensitive=True),
+        TopicKeyword(r"\btransformer(s)?\b", "nlp", 1.0),
+        TopicKeyword(r"\bencoder(s)?\b", "nlp", 0.8),
+        TopicKeyword(r"\bdecoder(s)?\b", "nlp", 0.8),
+        TopicKeyword(r"\bdataset(s)?\b", "nlp", 0.7),
+        TopicKeyword(r"\bbenchmark(s)?\b", "nlp", 0.8),
+        TopicKeyword(r"\bcorpus|corpora\b", "nlp", 1.0),
+        TopicKeyword(r"\bannotation(s)?\b", "nlp", 0.8),
+        TopicKeyword(r"\bparser(s)?|parsing\b", "nlp", 1.0),
+        TopicKeyword(r"\bmachine translation\b", "nlp", 1.2),
+        TopicKeyword(r"\bentity recognition\b", "nlp", 1.1),
+        TopicKeyword(r"\bdependency parsing\b", "nlp", 1.1),
+        TopicKeyword(r"\bBLEU\b", "nlp", 1.1, case_sensitive=True),
+        TopicKeyword(r"\battention\b", "nlp", 0.9),
+        TopicKeyword(r"\bembedding(s)?\b", "nlp", 0.9),
+        TopicKeyword(r"\btoken(s|ization|izer)?\b", "nlp", 0.9),
+        TopicKeyword(r"\bpretraining|pre-trained|pretrained\b", "nlp", 1.0),
+        TopicKeyword(r"\bfine[- ]?tuning\b", "nlp", 1.0),
+        TopicKeyword(r"\bprompt(s|ing)?\b", "nlp", 0.8),
+    ),
+    "medicine": (
+        TopicKeyword(r"\bpatient(s)?\b", "medicine", 1.0),
+        TopicKeyword(r"\bclinical\b", "medicine", 1.1),
+        TopicKeyword(r"\bdiagnos(is|es|tic)\b", "medicine", 1.1),
+        TopicKeyword(r"\bsymptom(s)?\b", "medicine", 1.0),
+        TopicKeyword(r"\bdisease(s)?\b", "medicine", 1.0),
+        TopicKeyword(r"\bfever(s)?\b", "medicine", 1.0),
+        TopicKeyword(r"\bheadache(s)?\b", "medicine", 1.0),
+        TopicKeyword(r"\btablet(s)?\b", "medicine", 1.0),
+        TopicKeyword(r"\bdose(s)?\b", "medicine", 1.0),
+        TopicKeyword(r"\bmg\b", "medicine", 0.9),
+        TopicKeyword(r"\btreatment(s)?\b", "medicine", 1.0),
+        TopicKeyword(r"\bprescrib(e|ed|es|ing)\b", "medicine", 1.1),
+        TopicKeyword(r"\bdrug(s)?\b", "medicine", 1.0),
+        TopicKeyword(r"\bmedicine(s)?\b", "medicine", 1.0),
+        TopicKeyword(r"\bdiabetes\b", "medicine", 1.2),
+        TopicKeyword(r"\bhypertension\b", "medicine", 1.2),
+        TopicKeyword(r"\bcancer(s)?\b", "medicine", 1.2),
+        TopicKeyword(r"\btrial(s)?\b", "medicine", 0.9),
+        TopicKeyword(r"\binfection(s)?\b", "medicine", 1.0),
+        TopicKeyword(r"\bvaccine(s)?\b", "medicine", 1.1),
+        TopicKeyword(r"\bMRI\b", "medicine", 1.1, case_sensitive=True),
+        TopicKeyword(r"\bCT\b", "medicine", 0.9, case_sensitive=True),
+        TopicKeyword(r"\bblood pressure\b", "medicine", 1.2),
+        TopicKeyword(r"\bheart rate\b", "medicine", 1.1),
+        TopicKeyword(r"\bsurger(y|ies|ical)\b", "medicine", 1.1),
+        TopicKeyword(r"\boncolog(y|ical|ist|ists)\b", "medicine", 1.2),
+        TopicKeyword(r"\bhospital(s)?\b", "medicine", 1.0),
+    ),
+    "finance": (
+        TopicKeyword(r"\bmarket(s)?\b", "finance", 1.0),
+        TopicKeyword(r"\bstock(s)?\b", "finance", 1.0),
+        TopicKeyword(r"\brevenue\b", "finance", 1.0),
+        TopicKeyword(r"\bvaluation(s)?\b", "finance", 1.0),
+        TopicKeyword(r"\bequity\b", "finance", 1.0),
+        TopicKeyword(r"\bbond(s)?\b", "finance", 1.0),
+        TopicKeyword(r"\binterest rate(s)?\b", "finance", 1.1),
+        TopicKeyword(r"\bearnings\b", "finance", 1.0),
+        TopicKeyword(r"\binflation\b", "finance", 1.0),
+        TopicKeyword(r"\btrading\b", "finance", 1.0),
+        TopicKeyword(r"\bportfolio(s)?\b", "finance", 1.0),
+        TopicKeyword(r"\bderivative(s)?\b", "finance", 1.0),
+        TopicKeyword(r"\bdividend(s)?\b", "finance", 1.0),
+        TopicKeyword(r"\bcash flow\b", "finance", 1.1),
+        TopicKeyword(r"\bcentral bank(s)?\b", "finance", 1.1),
+        TopicKeyword(r"\btreasury\b", "finance", 0.9),
+    ),
+    "legal": (
+        TopicKeyword(r"\blaw(s)?\b", "legal", 1.0),
+        TopicKeyword(r"\bcourt(s)?\b", "legal", 1.0),
+        TopicKeyword(r"\bregulation(s)?\b", "legal", 1.0),
+        TopicKeyword(r"\bcontract(s)?\b", "legal", 1.0),
+        TopicKeyword(r"\bliabilit(y|ies)\b", "legal", 1.0),
+        TopicKeyword(r"\bstatute(s)?\b", "legal", 1.0),
+        TopicKeyword(r"\blegal\b", "legal", 0.9),
+        TopicKeyword(r"\blawsuit(s)?\b", "legal", 1.1),
+        TopicKeyword(r"\bplaintiff(s)?\b", "legal", 1.1),
+        TopicKeyword(r"\bdefendant(s)?\b", "legal", 1.1),
+        TopicKeyword(r"\bjurisdiction(s)?\b", "legal", 1.0),
+        TopicKeyword(r"\bcompliance\b", "legal", 0.9),
+        TopicKeyword(r"\bpatent(s)?\b", "legal", 1.0),
+        TopicKeyword(r"\bcopyright(s)?\b", "legal", 1.0),
+        TopicKeyword(r"\barbitration\b", "legal", 1.0),
+    ),
+}
+
+
+def topic_keyword_scores(text: str) -> Tuple[Dict[str, float], Dict[str, List[str]]]:
+    scores = {domain: 0.0 for domain in DOMAIN_TOPIC_KEYWORDS}
+    hits: Dict[str, List[str]] = {domain: [] for domain in DOMAIN_TOPIC_KEYWORDS}
+    if not text:
+        return scores, hits
+    for domain, keywords in DOMAIN_TOPIC_KEYWORDS.items():
+        for keyword in keywords:
+            flags = 0 if keyword.case_sensitive else re.IGNORECASE
+            if re.search(keyword.pattern, text, flags):
+                scores[domain] += float(keyword.weight)
+                hits[domain].append(keyword.pattern)
+    return scores, hits
 
 
 def preset_for_domain(domain: str, default_preset: str = "none") -> str:

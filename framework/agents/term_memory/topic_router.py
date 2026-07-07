@@ -21,6 +21,7 @@ from framework.agents.term_memory.domain_taxonomy import (
     DOMAIN_KEYWORDS,
     GENERAL_DOMAIN,
     WORKING_DOMAINS,
+    topic_keyword_scores,
 )
 
 
@@ -63,6 +64,24 @@ class DomainScore:
         }
 
 
+@dataclass(frozen=True)
+class DomainProbeScore:
+    domain: str
+    preset_id: str
+    top_score: float = 0.0
+    mean_topk_score: float = 0.0
+    top_terms: Sequence[str] = field(default_factory=tuple)
+
+
+@dataclass(frozen=True)
+class RouterObservation:
+    query_embedding: Optional[VectorLike] = None
+    references: Sequence[Dict[str, Any]] = field(default_factory=list)
+    router_text: str = ""
+    router_text_source: Literal["manifest_source", "streaming_asr", "generated_target", "none"] = "none"
+    domain_probe_scores: Dict[str, Any] = field(default_factory=dict)
+
+
 @dataclass
 class RouterConfig:
     warmup_sec: float = 30.0
@@ -81,6 +100,14 @@ class RouterConfig:
     max_recent_refs: int = 80
     consistency_bonus: float = 0.05
     ambiguity_penalty: float = 0.10
+    text_topic_weight: float = 0.60
+    domain_probe_weight: float = 0.25
+    speech_centroid_weight: float = 0.10
+    metadata_prior_weight: float = 0.05
+    min_consistent_windows_with_text: int = 2
+    min_consistent_windows_audio_only: int = 3
+    text_ema_alpha: float = 0.60
+    audio_ema_alpha: float = 0.80
 
 
 @dataclass
@@ -96,6 +123,7 @@ class RouterSessionState:
     candidate_preset_id: Optional[str] = None
     candidate_streak_count: int = 0
     last_candidate_s: float = 0.0
+    ema_domain_scores: Dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -436,6 +464,270 @@ class AudioNativeActiveGlossaryRouter:
         return bool(item.index_path) or item.preset_id == self.config.fallback_preset_id
 
 
+class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
+    """Route glossary overlays from recent window topic text first."""
+
+    def observe(
+        self,
+        session_state: RouterSessionState,
+        query_embedding: Optional[VectorLike],
+        references: Sequence[Dict[str, Any]],
+        now_s: float,
+        *,
+        router_text: str = "",
+        router_text_source: Literal["manifest_source", "streaming_asr", "generated_target", "none"] = "none",
+        domain_probe_scores: Optional[Dict[str, Any]] = None,
+    ) -> RouterDecision:
+        session_state.recent_references = _bounded_deque(
+            session_state.recent_references,
+            maxlen=max(1, int(self.config.max_recent_refs)),
+        )
+        for ref in references or []:
+            if isinstance(ref, dict):
+                session_state.recent_references.append(dict(ref))
+
+        query_vec = _normalize(_as_vector(query_embedding))
+        if query_vec:
+            if session_state.ema_query_embedding and len(session_state.ema_query_embedding) == len(query_vec):
+                alpha = _clamp(float(self.config.ema_alpha), 0.0, 0.999)
+                session_state.ema_query_embedding = _normalize(
+                    [
+                        alpha * old + (1.0 - alpha) * new
+                        for old, new in zip(session_state.ema_query_embedding, query_vec)
+                    ]
+                )
+            else:
+                session_state.ema_query_embedding = query_vec
+
+        top_scores = self._score_hybrid(
+            session_state,
+            router_text=router_text,
+            router_text_source=router_text_source,
+            domain_probe_scores=domain_probe_scores or {},
+        )
+        top = top_scores[0] if top_scores else None
+        second = top_scores[1] if len(top_scores) > 1 else None
+        if top is not None:
+            top.margin = max(0.0, top.confidence - (second.confidence if second else 0.0))
+        margin = top.margin if top is not None else 0.0
+        confidence = top.confidence if top is not None else 0.0
+
+        elapsed = max(0.0, float(now_s) - float(session_state.created_s or now_s))
+        current_preset = session_state.active_preset_id or self.config.fallback_preset_id
+        current_domain = session_state.active_domain_id or GENERAL_DOMAIN
+        target_preset = top.preset_id if top is not None else current_preset
+        target_domain = top.domain_id if top is not None else current_domain
+        current_score = self._score_for_active(top_scores, current_preset, current_domain)
+        switch_delta = confidence - current_score if top is not None else 0.0
+
+        text_source = str(router_text_source or "none")
+        has_text = bool((router_text or "").strip() and text_source != "none")
+        has_probe = any(_probe_value(value) > 0.0 for value in (domain_probe_scores or {}).values())
+        has_signal = bool(has_text or has_probe or query_vec or session_state.ema_query_embedding or session_state.recent_references)
+        reason = "hybrid_window_topic"
+        action: Literal["stay", "switch", "fallback"] = "stay"
+        guard_reason = ""
+        evidence = {
+            "router_text_source": text_source,
+            "has_router_text": has_text,
+            "has_domain_probe": has_probe,
+            "has_query_embedding": bool(query_vec or session_state.ema_query_embedding),
+            "recent_reference_count": len(session_state.recent_references),
+            "current_score": round(float(current_score), 4),
+            "target_score_delta": round(float(switch_delta), 4),
+            "candidate_preset": session_state.candidate_preset_id,
+            "candidate_streak": int(session_state.candidate_streak_count),
+            "ema_domain_scores": {
+                key: round(float(value), 4) for key, value in session_state.ema_domain_scores.items()
+            },
+        }
+
+        unsupported_current = bool(
+            current_preset
+            and current_preset not in self.by_preset
+            and current_preset != self.config.fallback_preset_id
+        )
+        if unsupported_current:
+            action = "fallback"
+            target_preset = self.config.fallback_preset_id
+            target_domain = self._domain_for_preset(target_preset)
+            guard_reason = "unsupported_current_preset"
+        elif top is None:
+            guard_reason = "no_domain_slices"
+        elif not has_signal:
+            guard_reason = "no_topic_audio_or_reference_evidence"
+        elif elapsed < float(self.config.warmup_sec):
+            guard_reason = f"warmup<{float(self.config.warmup_sec):g}s"
+        elif (
+            session_state.last_decision_s > 0.0
+            and float(now_s) - float(session_state.last_decision_s) < float(self.config.update_interval_sec)
+        ):
+            guard_reason = f"interval<{float(self.config.update_interval_sec):g}s"
+        elif target_preset == current_preset or target_domain == current_domain:
+            guard_reason = "same_domain"
+        elif target_domain in {GENERAL_DOMAIN, "common", "general"}:
+            guard_reason = "general_or_common"
+        elif not self._slice_available(target_preset):
+            guard_reason = "target_unavailable"
+        elif confidence < float(self.config.min_confidence):
+            guard_reason = f"confidence<{float(self.config.min_confidence):.2f}"
+        elif margin < float(self.config.min_margin):
+            guard_reason = f"margin<{float(self.config.min_margin):.2f}"
+        elif current_preset in self.by_preset and switch_delta < float(self.config.min_current_margin):
+            guard_reason = f"current_margin<{float(self.config.min_current_margin):.2f}"
+        elif (
+            session_state.last_switch_s > 0.0
+            and float(now_s) - float(session_state.last_switch_s) < float(self.config.switch_cooldown_sec)
+        ):
+            guard_reason = f"cooldown<{float(self.config.switch_cooldown_sec):g}s"
+        else:
+            self._note_candidate(session_state, target_preset, float(now_s))
+            required = max(
+                1,
+                int(
+                    self.config.min_consistent_windows_with_text
+                    if has_text
+                    else self.config.min_consistent_windows_audio_only
+                ),
+            )
+            evidence["candidate_preset"] = session_state.candidate_preset_id
+            evidence["candidate_streak"] = int(session_state.candidate_streak_count)
+            evidence["required_consistent_windows"] = required
+            if session_state.candidate_streak_count < required:
+                guard_reason = f"consistent_windows<{required}"
+            else:
+                action = "switch"
+
+        if guard_reason and action == "stay" and top is not None:
+            reason = f"{reason}; {guard_reason}"
+        elif guard_reason:
+            reason = guard_reason
+
+        if not (
+            guard_reason.startswith("warmup<")
+            or guard_reason.startswith("interval<")
+            or guard_reason == "no_topic_audio_or_reference_evidence"
+            or guard_reason.startswith("consistent_windows<")
+        ):
+            session_state.last_decision_s = float(now_s)
+        decision = RouterDecision(
+            action=action,
+            target_preset_id=target_preset,
+            target_domain_id=target_domain,
+            confidence=round(float(confidence), 4),
+            margin=round(float(margin), 4),
+            reason=reason,
+            top_scores=top_scores,
+            from_preset_id=current_preset,
+            from_domain_id=current_domain,
+            at_s=round(elapsed, 3),
+            evidence=evidence,
+        )
+        if action == "switch":
+            session_state.pending_preset_id = target_preset
+        return decision
+
+    def _score_hybrid(
+        self,
+        session_state: RouterSessionState,
+        *,
+        router_text: str,
+        router_text_source: str,
+        domain_probe_scores: Dict[str, Any],
+    ) -> List[DomainScore]:
+        text_raw, text_hits = topic_keyword_scores(router_text)
+        text_by_domain = _normalize_nonnegative_score_map({key: value for key, value in text_raw.items()})
+        probe_by_domain = _normalize_nonnegative_score_map(
+            {key: _probe_value(value) for key, value in domain_probe_scores.items()}
+        )
+
+        ema = session_state.ema_query_embedding
+        embedding_raw: Dict[str, Optional[float]] = {}
+        for item in self.domain_slices:
+            centroid = _normalize(_as_vector(item.centroid))
+            if ema and centroid and len(ema) == len(centroid):
+                embedding_raw[item.preset_id] = _dot(ema, centroid)
+            else:
+                embedding_raw[item.preset_id] = None
+        embedding_by_preset = _normalize_score_map(embedding_raw)
+        reference_by_preset = self._reference_scores(session_state.recent_references)
+
+        out: List[DomainScore] = []
+        raw_final_by_preset: Dict[str, float] = {}
+        for item in self.domain_slices:
+            text_score = float(text_by_domain.get(item.domain_id, 0.0))
+            probe_score = float(
+                probe_by_domain.get(item.domain_id, probe_by_domain.get(item.preset_id, 0.0))
+            )
+            speech_score = float(embedding_by_preset.get(item.preset_id, 0.0))
+            metadata_prior = float(reference_by_preset.get(item.preset_id, 0.0))
+            conf = (
+                float(self.config.text_topic_weight) * text_score
+                + float(self.config.domain_probe_weight) * probe_score
+                + float(self.config.speech_centroid_weight) * speech_score
+                + float(self.config.metadata_prior_weight) * metadata_prior
+            )
+            raw_final_by_preset[item.preset_id] = _clamp(conf, 0.0, 1.0)
+
+        has_text = bool((router_text or "").strip() and str(router_text_source or "none") != "none")
+        alpha = float(self.config.text_ema_alpha if has_text else self.config.audio_ema_alpha)
+        alpha = _clamp(alpha, 0.0, 0.999)
+        if raw_final_by_preset:
+            if not session_state.ema_domain_scores:
+                session_state.ema_domain_scores = dict(raw_final_by_preset)
+            else:
+                session_state.ema_domain_scores = {
+                    preset: alpha * float(session_state.ema_domain_scores.get(preset, value))
+                    + (1.0 - alpha) * float(value)
+                    for preset, value in raw_final_by_preset.items()
+                }
+
+        for item in self.domain_slices:
+            text_score = float(text_by_domain.get(item.domain_id, 0.0))
+            probe_score = float(
+                probe_by_domain.get(item.domain_id, probe_by_domain.get(item.preset_id, 0.0))
+            )
+            speech_score = float(embedding_by_preset.get(item.preset_id, 0.0))
+            metadata_prior = float(reference_by_preset.get(item.preset_id, 0.0))
+            raw_final = float(raw_final_by_preset.get(item.preset_id, 0.0))
+            ema_final = float(session_state.ema_domain_scores.get(item.preset_id, raw_final))
+            out.append(
+                DomainScore(
+                    preset_id=item.preset_id,
+                    domain_id=item.domain_id,
+                    embedding_score=round(speech_score, 4),
+                    reference_score=round(metadata_prior, 4),
+                    confidence=round(raw_final, 4),
+                    evidence={
+                        "term_count": item.term_count,
+                        "router_text_source": router_text_source or "none",
+                        "text_topic_score": round(text_score, 4),
+                        "domain_probe_score": round(probe_score, 4),
+                        "speech_centroid_score": round(speech_score, 4),
+                        "metadata_prior": round(metadata_prior, 4),
+                        "raw_final_score": round(raw_final, 4),
+                        "ema_final_score": round(ema_final, 4),
+                        "topic_keyword_hits": text_hits.get(item.domain_id, [])[:8],
+                        "has_centroid": embedding_raw.get(item.preset_id) is not None,
+                        "raw_embedding_cos": (
+                            round(float(embedding_raw[item.preset_id]), 4)
+                            if embedding_raw.get(item.preset_id) is not None
+                            else None
+                        ),
+                    },
+                )
+            )
+        out.sort(key=lambda score: (score.confidence, score.embedding_score, score.reference_score), reverse=True)
+        if len(out) >= 2:
+            gap = out[0].confidence - out[1].confidence
+            if gap < float(self.config.min_margin):
+                out[0].confidence = round(
+                    max(0.0, out[0].confidence - min(0.10, float(self.config.ambiguity_penalty))),
+                    4,
+                )
+        return out
+
+
 class LegacyKeywordTopicRouter:
     """Old deterministic keyword router, kept for explicit debug fallback."""
 
@@ -598,6 +890,35 @@ def _normalize_score_map(raw: Dict[str, Optional[float]]) -> Dict[str, float]:
         key: 0.0 if value is None else _clamp((float(value) - lo) / (hi - lo), 0.0, 1.0)
         for key, value in raw.items()
     }
+
+
+def _normalize_nonnegative_score_map(raw: Dict[str, Optional[float]]) -> Dict[str, float]:
+    values = [max(0.0, float(v)) for v in raw.values() if v is not None and math.isfinite(float(v))]
+    if not values:
+        return {key: 0.0 for key in raw}
+    hi = max(values)
+    if hi <= 1e-9:
+        return {key: 0.0 for key in raw}
+    return {
+        key: 0.0 if value is None else _clamp(max(0.0, float(value)) / hi, 0.0, 1.0)
+        for key, value in raw.items()
+    }
+
+
+def _probe_value(value: Any) -> float:
+    if isinstance(value, DomainProbeScore):
+        return max(float(value.top_score or 0.0), float(value.mean_topk_score or 0.0))
+    if isinstance(value, dict):
+        for key in ("top_score", "mean_topk_score", "score"):
+            try:
+                return float(value.get(key) or 0.0)
+            except (TypeError, ValueError):
+                continue
+        return 0.0
+    try:
+        return float(value or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _bounded_deque(items: Deque[Dict[str, Any]], *, maxlen: int) -> Deque[Dict[str, Any]]:

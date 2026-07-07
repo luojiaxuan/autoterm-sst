@@ -20,7 +20,8 @@ score(domain slice) =
 ```
 
 - 不是 ASR/source transcript topic classifier。
-- `auto_working` 当前只激活一个 domain-specific slice；不会 prepend common glossary。
+- probe 当时的 production code 只激活一个 domain-specific slice；新实现应改为
+  `common_terms + active_domain_core`。
 - switch guard 包括 warmup、45s update interval、min confidence、min margin、current-margin、cooldown、连续候选 window。
 
 这意味着如果当前 active slice 是 `nlp_core_10k`，retrieved-ref metadata 会自然偏向 NLP；跨域切换主要依赖 speech embedding 与各 domain centroid 的相似度。
@@ -98,7 +99,7 @@ This matches the user's intuition: routing should primarily follow the topic exp
 
 ## 下一版策略
 
-`auto_working_v2` should be domain-specific and window-topic-first:
+`auto_working_v2` should be common-base + domain-overlay and window-topic-first:
 
 ```text
 recent source/ASR/topic text window
@@ -106,8 +107,8 @@ recent source/ASR/topic text window
   -> optional per-domain probe retrieval score
   -> speech embedding centroid score as weak tie-breaker
   -> hysteresis / consecutive-window switch guard
-  -> activate exactly one domain-specific glossary slice
-  -> retrieve/rank prompt candidates from active slice
+  -> keep common_terms active and switch exactly one domain overlay
+  -> retrieve/rank prompt candidates from common_terms + active domain overlay
   -> surface exactly 10 prompt candidates
 ```
 
@@ -115,9 +116,9 @@ Recommended score:
 
 ```text
 score(domain) =
-    0.55 * text_topic_score
+    0.60 * text_topic_score
   + 0.25 * domain_probe_retrieval_score
-  + 0.15 * speech_centroid_score
+  + 0.10 * speech_centroid_score
   + 0.05 * metadata_prior
 ```
 
@@ -133,7 +134,7 @@ Recommended switch guard:
 
 ## Open implementation work
 
-- Add a runtime source for recent source/ASR/topic text. The current live pipeline does not expose English ASR/source transcript to the router.
-- Add a domain-probe retrieval path that queries small top-k from candidate domain indexes for routing only.
-- Reweight `AudioNativeActiveGlossaryRouter` or introduce `HybridWindowTopicRouter` with explicit signal diagnostics.
+- Add a real streaming ASR producer for `router_text`; the live pipeline can now accept the field.
+- Wire routing-only domain-probe retrieval into each routing tick; the plugin API now supports small top-k probes without changing the final active index.
+- Continue expanding `HybridWindowTopicRouter` diagnostics in end-to-end eval logs.
 - Add ACL->medicine routing eval using RASST medicine HF/local data and assert switch latency, false-switch rate, and active-slice candidate quality.

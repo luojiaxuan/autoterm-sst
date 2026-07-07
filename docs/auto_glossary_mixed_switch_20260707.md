@@ -2,22 +2,25 @@
 
 ## 结论
 
-当前 `auto_working` 路由在 `target_translation_text-window-router + domain-probe guard`
-设置下，可以在 ACL 5 个 talk 和 medicine 5 个 speech 组成的混合 playlist 中稳定切换
-`nlp_core_10k` / `medicine_core_10k`。固定 64 windows/item 和全窗口设置都通过。
+当前 `auto_working` 路由在 `target_translation_text-window-router + clean expected
+domain-probe guard` 设置下，可以在 ACL 5 个 talk 和 medicine 5 个 speech 组成的混合
+playlist 中按 3-window consistency 规则切换 `nlp_core_10k` / `medicine_core_10k`。
+固定 64 windows/item 和全窗口设置都通过。
 
 这次 benchmark 不使用 source transcript 或 ASR text。窗口文本来自 ACL 的中文 target
 segments 和 RASST medicine 的中文 reference，作为 generated target translation window
-的可复现实验代理。`probe_mode=expected` 表示 speech-domain probe guard 使用可控期望域
-证据；这验证 router state machine 和 target/probe 组合逻辑，不等价于完整 E2E
-Omni generation + real MaxSim probe replay。
+的可复现实验代理。`probe_mode=expected` 表示 speech-domain probe guard 使用可控 clean
+期望域证据；这验证 router state machine 和 target/probe 组合逻辑，不证明真实 speech
+domain probe 的域判别质量，也不等价于完整 E2E Omni generation + real MaxSim probe
+replay。`probe_mode=inverted/contested` 诊断会失败，用来确认 benchmark 能暴露错误或弱
+probe 下的切换问题。
 
 ## 代码与输出
 
-- Git ref: `b96b982 Add mixed-domain glossary switch benchmark`
-- Taurus checkout: `/home/jiaxuanluo/rasst-demo`
+- Git ref: `c62b523 Guard probe-only glossary routing evidence`
+- Taurus checkout: `/mnt/taurus/home/jiaxuanluo/rasst-demo`
 - Taurus output dir:
-  `/mnt/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_switch/20260707_b96b982`
+  `/mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_switch/20260707_c62b523`
 - 新脚本: `eval/streaming_sst/eval_mixed_domain_switch.py`
 - 本地/Taurus 测试: `python3 -m unittest test_mixed_domain_switch_eval test_hybrid_window_topic_router test_auto_glossary_switch_eval`
 
@@ -29,11 +32,18 @@ keyword hit，也会占用 `text_topic_weight=0.60`，从而把强 domain-probe 
 topic evidence 时才计入 text weight；泛化或无 topic hit 的 target 窗口不会压制
 speech/domain probe。
 
+同时补了 probe-only raw evidence guard：如果窗口文本存在但没有正 topic evidence，
+实际有效信号退化为 probe-only，则必须通过更严格的 raw probe floor，避免
+manifest/source 或 generated-target 泛化文本把弱 probe 归一化成高置信切换。
+
 新增回归测试：
 
 - `test_generated_target_generic_text_does_not_dilute_strong_probe`
+- `test_generic_manifest_text_with_contested_probe_does_not_false_switch`
+- `test_generic_generated_target_with_contested_probe_does_not_false_switch`
 - `test_alternating_generated_target_playlist_switches_with_expected_probe`
 - `test_random_playlist_counts_only_domain_transition_boundaries`
+- `test_inverted_probe_diagnostic_fails`
 
 ## 固定 64 Windows/Item 主结果
 
@@ -42,6 +52,8 @@ speech/domain probe。
 | alternating, expected probe | 640 | 9 | 9 | 3 | 0.9719 | 1.0000 | 0 | true |
 | random seed 20260707, expected probe | 640 | 7 | 7 | 3 | 0.9781 | 1.0000 | 0 | true |
 | alternating, no probe diagnostic | 640 | 9 | 0 | n/a | 0.5000 | 0.5024 | 0 | false |
+| alternating, inverted probe diagnostic | 640 | 9 | 10 | fail | 0.0766 | 0.0424 | 10 | false |
+| alternating, contested probe diagnostic | 640 | 9 | 7 | 13 | 0.8125 | 0.8434 | 0 | false |
 
 解释：
 
@@ -51,6 +63,8 @@ speech/domain probe。
   去掉 transition grace window 后，steady-state accuracy 是 1.0。
 - no-probe 对照失败是预期的：当前 deployable 策略要求 generated target switch 需要
   domain-probe guard，不允许仅靠 target text 单独切换。
+- inverted-probe 对照产生 10 次 wrong switches；contested-probe 对照最长 13 个窗口才切换，
+  说明这个 benchmark 可以暴露 probe 错误或 probe 过弱时的失败模式。
 
 ## 全窗口对照
 
@@ -62,7 +76,7 @@ speech/domain probe。
 ## 固定 64 命令
 
 ```bash
-cd /home/jiaxuanluo/rasst-demo
+cd /mnt/taurus/home/jiaxuanluo/rasst-demo
 
 python3 eval/streaming_sst/eval_mixed_domain_switch.py \
   --schedule alternating \
@@ -70,8 +84,8 @@ python3 eval/streaming_sst/eval_mixed_domain_switch.py \
   --router-text-source generated_target \
   --probe-mode expected \
   --max-switch-windows 3 \
-  --out-json /mnt/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_switch/20260707_b96b982/alternating_target64_expected_probe.json \
-  --out-md /mnt/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_switch/20260707_b96b982/alternating_target64_expected_probe.md
+  --out-json /mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_switch/20260707_c62b523/alternating_target64_expected_probe.json \
+  --out-md /mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_switch/20260707_c62b523/alternating_target64_expected_probe.md
 
 python3 eval/streaming_sst/eval_mixed_domain_switch.py \
   --schedule random \
@@ -80,8 +94,8 @@ python3 eval/streaming_sst/eval_mixed_domain_switch.py \
   --router-text-source generated_target \
   --probe-mode expected \
   --max-switch-windows 3 \
-  --out-json /mnt/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_switch/20260707_b96b982/random_seed20260707_target64_expected_probe.json \
-  --out-md /mnt/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_switch/20260707_b96b982/random_seed20260707_target64_expected_probe.md
+  --out-json /mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_switch/20260707_c62b523/random_seed20260707_target64_expected_probe.json \
+  --out-md /mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_switch/20260707_c62b523/random_seed20260707_target64_expected_probe.md
 ```
 
 ## 下一步

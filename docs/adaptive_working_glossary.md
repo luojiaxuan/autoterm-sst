@@ -71,9 +71,9 @@ active preset is `RASST_AUTO_GLOSSARY_DEFAULT` (`nlp_core_10k` by default).
 
 ## Routing Logic
 
-The default router is `RASST_ROUTER_MODE=embedding_refs`. It is not a trained
-topic classifier and it does not use ASR, source transcripts, generated target
-text, LLM classification, or manual glossary terms for routing.
+The current default router is `RASST_ROUTER_MODE=embedding_refs`. It is not a
+trained topic classifier and it does not use ASR, source transcripts, generated
+target text, LLM classification, or manual glossary terms for routing.
 
 The router combines two signals:
 
@@ -94,6 +94,31 @@ centroid = normalize(mean(normalize(text_embs), dim=0))
 Reference votes use metadata such as `active_glossary_preset`, `domain`, and
 `source_preset`; they do not infer topic from term strings like "patient" or
 "language model".
+
+This current implementation is not sufficient for robust cross-domain switching
+when a session moves from an ACL/NLP talk to a medicine talk. A 2026-07-07
+probe found that real medicine audio windows often remained closer to the NLP
+centroid than to the medicine centroid, while window-level source text/topic
+signals cleanly identified the medicine domain. See
+[`auto_glossary_routing_probe_20260707.md`](auto_glossary_routing_probe_20260707.md).
+
+The next routing version should therefore be window-topic-first when recent
+source/ASR/topic text is available:
+
+```text
+score(domain) =
+    0.55 * text_topic_score
+  + 0.25 * domain_probe_retrieval_score
+  + 0.15 * speech_centroid_score
+  + 0.05 * metadata_prior
+```
+
+When no source/ASR/topic text is available, the fallback should use
+small-top-k domain-probe retrieval plus weak centroid similarity. Current
+active-slice metadata should be treated as a small prior, not as a veto against
+a high-confidence text-topic switch. These routing probes must not change the
+prompt interface: the prompt still receives exactly 10 candidates from the
+selected active domain slice.
 
 Switch guards run in this order:
 

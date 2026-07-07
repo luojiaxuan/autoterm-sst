@@ -87,7 +87,9 @@ chunk's own translation cannot influence its own glossary retrieval. Controlled
 eval can still pass source transcript windows through `router_text` to isolate
 the router state machine, but those source-text numbers should not be reported
 as the deployed E2E path. Because generated target text can be biased by the
-current glossary, it uses a stricter default three-window consistency guard.
+current glossary, it uses a stricter default three-window consistency guard and
+requires routing-only speech-window probe evidence to agree with the target
+domain before a cross-domain switch can fire.
 End-to-end generated-target switch quality still needs a full streaming
 benchmark; current source-text switch artifacts are diagnostic upper bounds.
 
@@ -302,6 +304,9 @@ auto_working:
     min_consistent_windows_with_text: 2
     min_consistent_windows_generated_target: 3
     min_consistent_windows_audio_only: 3
+    generated_target_probe_min_top_score: 0.25
+    generated_target_probe_min_raw_margin: 0.01
+    generated_target_probe_min_positive_domains: 1
     enable_generated_target_text: true
     generated_target_window_chunks: 3
     generated_target_min_chars: 6

@@ -48,6 +48,9 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(config.router_audio_probe_min_top_score, 0.50)
         self.assertEqual(config.router_audio_probe_min_raw_margin, 0.08)
         self.assertEqual(config.router_audio_probe_min_positive_domains, 2)
+        self.assertEqual(config.router_generated_target_probe_min_top_score, 0.25)
+        self.assertEqual(config.router_generated_target_probe_min_raw_margin, 0.01)
+        self.assertEqual(config.router_generated_target_probe_min_positive_domains, 1)
         self.assertTrue(config.router_generated_target_enabled)
         self.assertEqual(config.router_generated_target_window_chunks, 3)
         self.assertEqual(config.router_generated_target_min_chars, 6)
@@ -197,7 +200,29 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(session.last_router_decision["evidence"]["router_text_source"], "none")
 
         agent._after_translation_tick(session, text="患者接受临床治疗。", references=[])
-        asyncio.run(agent._observe_active_glossary(session, RetrievalResult(references=[])))
+        probe_scores = {
+            "nlp": DomainProbeScore(
+                domain="nlp",
+                preset_id="nlp_core_10k",
+                top_score=0.08,
+                mean_topk_score=0.08,
+                top_terms=("nlp",),
+            ),
+            "medicine": DomainProbeScore(
+                domain="medicine",
+                preset_id="medicine_core_10k",
+                top_score=0.35,
+                mean_topk_score=0.35,
+                top_terms=("clinical",),
+            ),
+        }
+        asyncio.run(
+            agent._observe_active_glossary(
+                session,
+                RetrievalResult(references=[]),
+                domain_probe_scores=probe_scores,
+            )
+        )
 
         self.assertTrue(session.last_router_decision["evidence"]["has_router_text"])
         self.assertEqual(session.last_router_decision["evidence"]["router_text_source"], "generated_target")

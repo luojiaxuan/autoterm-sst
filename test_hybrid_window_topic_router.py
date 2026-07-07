@@ -64,6 +64,26 @@ def _router_all_domains(**overrides):
     )
 
 
+def _probe_for(target: str) -> dict[str, DomainProbeScore]:
+    scores = {
+        "nlp": 0.08,
+        "medicine": 0.08,
+        "finance": 0.08,
+        "legal": 0.08,
+    }
+    scores[target] = 0.35
+    return {
+        domain: DomainProbeScore(
+            domain,
+            f"{domain}_core_10k",
+            top_score=score,
+            mean_topk_score=score,
+            top_terms=(domain,),
+        )
+        for domain, score in scores.items()
+    }
+
+
 class HybridWindowTopicRouterTests(unittest.TestCase):
     def test_acl_window_topic_stays_on_nlp_without_medicine_false_switch(self) -> None:
         state = RouterSessionState("nlp_core_10k", "nlp", created_s=1.0)
@@ -124,6 +144,7 @@ class HybridWindowTopicRouterTests(unittest.TestCase):
             now_s=10.0,
             router_text=target_text,
             router_text_source="generated_target",
+            domain_probe_scores=_probe_for("medicine"),
         )
         second = router.observe(
             state,
@@ -132,6 +153,7 @@ class HybridWindowTopicRouterTests(unittest.TestCase):
             now_s=11.0,
             router_text=target_text,
             router_text_source="generated_target",
+            domain_probe_scores=_probe_for("medicine"),
         )
         third = router.observe(
             state,
@@ -140,6 +162,7 @@ class HybridWindowTopicRouterTests(unittest.TestCase):
             now_s=12.0,
             router_text=target_text,
             router_text_source="generated_target",
+            domain_probe_scores=_probe_for("medicine"),
         )
 
         self.assertEqual(first.action, "stay")
@@ -162,6 +185,7 @@ class HybridWindowTopicRouterTests(unittest.TestCase):
                 now_s=float(step),
                 router_text=target_text,
                 router_text_source="generated_target",
+                domain_probe_scores=_probe_for("finance"),
             )
             for step in (10, 11, 12)
         ]
@@ -184,6 +208,7 @@ class HybridWindowTopicRouterTests(unittest.TestCase):
                 now_s=float(step),
                 router_text=target_text,
                 router_text_source="generated_target",
+                domain_probe_scores=_probe_for("legal"),
             )
             for step in (10, 11, 12)
         ]
@@ -192,6 +217,28 @@ class HybridWindowTopicRouterTests(unittest.TestCase):
         self.assertEqual(decisions[1].action, "stay")
         self.assertEqual(decisions[2].action, "switch")
         self.assertEqual(decisions[2].target_domain_id, "legal")
+
+    def test_generated_target_requires_probe_floor_to_switch(self) -> None:
+        router = _router()
+        state = RouterSessionState("nlp_core_10k", "nlp", created_s=1.0)
+        target_text = "患者接受临床治疗，医生根据诊断和症状调整药物剂量。"
+
+        decisions = [
+            router.observe(
+                state,
+                None,
+                [],
+                now_s=float(step),
+                router_text=target_text,
+                router_text_source="generated_target",
+            )
+            for step in (10, 11, 12, 13)
+        ]
+
+        self.assertTrue(all(decision.action == "stay" for decision in decisions))
+        self.assertTrue(
+            all("generated_target_probe_evidence_insufficient" in decision.reason for decision in decisions)
+        )
 
     def test_generated_target_noisy_generic_chinese_does_not_switch_to_nlp(self) -> None:
         router = _router_all_domains()

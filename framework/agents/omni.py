@@ -303,6 +303,9 @@ class OmniConfig:
     router_audio_probe_min_top_score: float = 0.50
     router_audio_probe_min_raw_margin: float = 0.08
     router_audio_probe_min_positive_domains: int = 2
+    router_generated_target_probe_min_top_score: float = 0.25
+    router_generated_target_probe_min_raw_margin: float = 0.01
+    router_generated_target_probe_min_positive_domains: int = 1
     router_generated_target_enabled: bool = True
     router_generated_target_window_chunks: int = 3
     router_generated_target_min_chars: int = 6
@@ -436,6 +439,9 @@ class OmniConfig:
             router_audio_probe_min_top_score=_safe_float(routing_config.get("audio_probe_min_top_score"), 0.50),
             router_audio_probe_min_raw_margin=_safe_float(routing_config.get("audio_probe_min_raw_margin"), 0.08),
             router_audio_probe_min_positive_domains=_safe_int(routing_config.get("audio_probe_min_positive_domains"), 2),
+            router_generated_target_probe_min_top_score=_safe_float(routing_config.get("generated_target_probe_min_top_score"), 0.25),
+            router_generated_target_probe_min_raw_margin=_safe_float(routing_config.get("generated_target_probe_min_raw_margin"), 0.01),
+            router_generated_target_probe_min_positive_domains=_safe_int(routing_config.get("generated_target_probe_min_positive_domains"), 1),
             router_generated_target_enabled=_meta_bool(routing_config.get("enable_generated_target_text"), True),
             router_generated_target_window_chunks=_safe_int(routing_config.get("generated_target_window_chunks"), 3),
             router_generated_target_min_chars=_safe_int(routing_config.get("generated_target_min_chars"), 6),
@@ -580,6 +586,9 @@ class OmniAgent(Agent):
             audio_probe_min_top_score=self.config.router_audio_probe_min_top_score,
             audio_probe_min_raw_margin=self.config.router_audio_probe_min_raw_margin,
             audio_probe_min_positive_domains=self.config.router_audio_probe_min_positive_domains,
+            generated_target_probe_min_top_score=self.config.router_generated_target_probe_min_top_score,
+            generated_target_probe_min_raw_margin=self.config.router_generated_target_probe_min_raw_margin,
+            generated_target_probe_min_positive_domains=self.config.router_generated_target_probe_min_positive_domains,
         )
         router_cls = (
             HybridWindowTopicRouter
@@ -2312,6 +2321,9 @@ class OmniAgent(Agent):
                 "audio_probe_min_top_score": self.config.router_audio_probe_min_top_score,
                 "audio_probe_min_raw_margin": self.config.router_audio_probe_min_raw_margin,
                 "audio_probe_min_positive_domains": self.config.router_audio_probe_min_positive_domains,
+                "generated_target_probe_min_top_score": self.config.router_generated_target_probe_min_top_score,
+                "generated_target_probe_min_raw_margin": self.config.router_generated_target_probe_min_raw_margin,
+                "generated_target_probe_min_positive_domains": self.config.router_generated_target_probe_min_positive_domains,
                 "generated_target_enabled": self.config.router_generated_target_enabled,
                 "generated_target_window_chunks": self.config.router_generated_target_window_chunks,
                 "prompt_top_k": self.config.prompt_top_k,

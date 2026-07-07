@@ -114,6 +114,9 @@ class RouterConfig:
     audio_probe_min_top_score: float = 0.50
     audio_probe_min_raw_margin: float = 0.08
     audio_probe_min_positive_domains: int = 2
+    generated_target_probe_min_top_score: float = 0.25
+    generated_target_probe_min_raw_margin: float = 0.01
+    generated_target_probe_min_positive_domains: int = 1
 
 
 @dataclass
@@ -536,6 +539,11 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             target_domain=target_domain,
             target_preset=target_preset,
         )
+        generated_target_probe_guard = self._generated_target_probe_guard(
+            domain_probe_scores or {},
+            target_domain=target_domain,
+            target_preset=target_preset,
+        )
         reason = "hybrid_window_topic"
         action: Literal["stay", "switch", "fallback"] = "stay"
         guard_reason = ""
@@ -553,6 +561,7 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
                 key: round(float(value), 4) for key, value in session_state.ema_domain_scores.items()
             },
             "audio_probe_guard": audio_probe_guard,
+            "generated_target_probe_guard": generated_target_probe_guard,
         }
 
         unsupported_current = bool(
@@ -582,6 +591,8 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             guard_reason = "general_or_common"
         elif not self._slice_available(target_preset):
             guard_reason = "target_unavailable"
+        elif is_generated_target and not generated_target_probe_guard.get("ok", False):
+            guard_reason = "generated_target_probe_evidence_insufficient"
         elif not has_text and not has_probe:
             guard_reason = "audio_probe_required"
         elif not has_text and has_probe and not audio_probe_guard.get("ok", False):
@@ -648,12 +659,47 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             session_state.pending_preset_id = target_preset
         return decision
 
+    def _generated_target_probe_guard(
+        self,
+        domain_probe_scores: Dict[str, Any],
+        *,
+        target_domain: str,
+        target_preset: str,
+    ) -> Dict[str, Any]:
+        return self._probe_guard(
+            domain_probe_scores,
+            target_domain=target_domain,
+            target_preset=target_preset,
+            min_top_score=float(self.config.generated_target_probe_min_top_score),
+            min_raw_margin=float(self.config.generated_target_probe_min_raw_margin),
+            min_positive_domains=int(self.config.generated_target_probe_min_positive_domains),
+        )
+
     def _audio_probe_guard(
         self,
         domain_probe_scores: Dict[str, Any],
         *,
         target_domain: str,
         target_preset: str,
+    ) -> Dict[str, Any]:
+        return self._probe_guard(
+            domain_probe_scores,
+            target_domain=target_domain,
+            target_preset=target_preset,
+            min_top_score=float(self.config.audio_probe_min_top_score),
+            min_raw_margin=float(self.config.audio_probe_min_raw_margin),
+            min_positive_domains=int(self.config.audio_probe_min_positive_domains),
+        )
+
+    def _probe_guard(
+        self,
+        domain_probe_scores: Dict[str, Any],
+        *,
+        target_domain: str,
+        target_preset: str,
+        min_top_score: float,
+        min_raw_margin: float,
+        min_positive_domains: int,
     ) -> Dict[str, Any]:
         rows: List[Dict[str, Any]] = []
         for key, value in (domain_probe_scores or {}).items():
@@ -685,10 +731,10 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             or str(top["preset"]) == str(target_preset)
         )
         ok = bool(
-            len(positive) >= max(1, int(self.config.audio_probe_min_positive_domains))
+            len(positive) >= max(1, int(min_positive_domains))
             and top_matches_target
-            and float(top["score"]) >= float(self.config.audio_probe_min_top_score)
-            and raw_margin >= float(self.config.audio_probe_min_raw_margin)
+            and float(top["score"]) >= float(min_top_score)
+            and raw_margin >= float(min_raw_margin)
         )
         return {
             "ok": ok,
@@ -699,9 +745,9 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             "second_score": round(second_score, 4),
             "raw_margin": round(raw_margin, 4),
             "target_probe_score": round(float(target_row["score"]), 4),
-            "min_top_score": round(float(self.config.audio_probe_min_top_score), 4),
-            "min_raw_margin": round(float(self.config.audio_probe_min_raw_margin), 4),
-            "min_positive_domains": int(self.config.audio_probe_min_positive_domains),
+            "min_top_score": round(float(min_top_score), 4),
+            "min_raw_margin": round(float(min_raw_margin), 4),
+            "min_positive_domains": int(min_positive_domains),
         }
 
     def _score_hybrid(

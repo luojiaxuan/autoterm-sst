@@ -120,12 +120,19 @@ python3 eval/streaming_sst/eval_mixed_audio_switch.py \
   --out-json /mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_dryrun/alternating_audio_playlist.json
 ```
 
-Dry-run on Taurus at Git ref `57262e9` succeeded under
-`/mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_57262e9/`.
+Dry-run on Taurus at Git ref `441a15d` succeeded under
+`/mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_441a15d/`.
 The alternating and random playlists both contain 10 blocks and 16,848.115
 seconds of audio: 5 ACL talks and 5 medicine speeches. This is about 4.68 hours
 of audio before model generation overhead, so full E2E should be treated as a
 long run rather than a smoke test.
+
+A 20-second schema smoke against the existing Taurus `127.0.0.1:8011` server
+reached a partial event but failed fast because that server's partial metadata
+did not include `domain_probe_scores` or `router_text_source`. This is expected
+for the current invalid server state (`router_mode=embedding_refs`) and confirms
+the harness does not fabricate span-aligned metrics when required routing
+metadata is absent.
 
 When the demo server is live on `127.0.0.1:8011`, run a short real replay first:
 

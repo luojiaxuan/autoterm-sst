@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Router-only ACL/NLP <-> medicine auto-glossary switch evaluation."""
+"""Router-unit ACL/NLP <-> medicine auto-glossary switch diagnostic.
+
+This script isolates the HybridWindowTopicRouter state machine on fixture or
+source-text windows. It does not exercise the OmniAgent batch loop, live ASR,
+MaxSim domain-probe retrieval, index-preload timing, or production wall-clock
+cooldown. Treat its latency numbers as router-unit diagnostics, not end-to-end
+deployment latency.
+"""
 
 from __future__ import annotations
 

@@ -19,7 +19,9 @@ from framework.agents.term_memory.slice_registry import (
 )
 from framework.agents.term_memory.topic_router import (
     AudioNativeActiveGlossaryRouter,
+    DomainProbeScore,
     DomainSlice,
+    HybridWindowTopicRouter,
     RouterConfig,
     RouterSessionState,
 )
@@ -140,9 +142,12 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
             router_text_source="none",
             created_s=now - 100.0,
             router_state=RouterSessionState("nlp_core_10k", "nlp", created_s=now - 100.0),
+            last_domain_probe_raw_scores={},
             last_domain_probe_scores={},
             last_domain_probe_slices=[],
             last_domain_probe_s=None,
+            last_domain_probe_at_s=0.0,
+            last_domain_probe_cached=False,
             active_slice_presets=["common_10k", "nlp_core_10k"],
         )
 
@@ -154,9 +159,12 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(session.active_slice_presets, before)
         self.assertTrue(session.last_domain_probe_scores)
         self.assertTrue(session.last_domain_probe_slices)
+        self.assertTrue(session.last_domain_probe_raw_scores)
+        self.assertGreater(session.last_domain_probe_at_s, 0.0)
+        self.assertFalse(session.last_domain_probe_cached)
         self.assertTrue(all(item["role"] == "domain_probe" for item in session.last_domain_probe_slices))
 
-    def test_domain_probe_respects_router_update_gate(self) -> None:
+    def test_domain_probe_reuses_cached_scores_inside_update_gate(self) -> None:
         agent = OmniAgent()
         agent.config.mock = True
         agent.config.auto_glossary_warmup_sec = 0.0
@@ -164,6 +172,15 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         agent.config.auto_glossary_switch_cooldown_sec = 0.0
         agent.retrieval = MockRetrieval(target_lang="zh", top_k=10)
         now = time.perf_counter()
+        cached = {
+            "medicine": DomainProbeScore(
+                domain="medicine",
+                preset_id="medicine_core_10k",
+                top_score=0.95,
+                mean_topk_score=0.90,
+                top_terms=("oncology",),
+            )
+        }
         session = SimpleNamespace(
             auto_glossary_enabled=True,
             language_pair="English -> Chinese",
@@ -178,17 +195,77 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
                 created_s=now - 100.0,
                 last_decision_s=now,
             ),
-            last_domain_probe_scores={"old": {}},
-            last_domain_probe_slices=[{"preset_id": "old"}],
+            last_domain_probe_raw_scores=cached,
+            last_domain_probe_scores={},
+            last_domain_probe_slices=[],
             last_domain_probe_s=1.0,
+            last_domain_probe_at_s=now - 1.0,
+            last_domain_probe_cached=False,
         )
 
         scores = asyncio.run(agent._probe_domain_scores(session, end_sample=16000))
 
-        self.assertEqual(scores, {})
-        self.assertEqual(session.last_domain_probe_scores, {})
-        self.assertEqual(session.last_domain_probe_slices, [])
-        self.assertIsNone(session.last_domain_probe_s)
+        self.assertEqual(scores, cached)
+        self.assertIn("medicine", session.last_domain_probe_scores)
+        self.assertTrue(session.last_domain_probe_slices)
+        self.assertEqual(session.last_domain_probe_s, 1.0)
+        self.assertTrue(session.last_domain_probe_cached)
+
+    def test_domain_probe_request_uses_recent_audio_window(self) -> None:
+        agent = OmniAgent()
+        agent.config.rag_timeline_lookback_sec = 1.0
+        session = SimpleNamespace(
+            audio=[0.0] * 64000,
+            last_llm_samples=32000,
+            router_text_window="",
+            router_text_source="none",
+        )
+
+        request = agent._domain_probe_request(session, end_sample=64000)
+
+        self.assertEqual(len(request["audio_buffer"]), 48000)
+        self.assertEqual(request["current_start_sec"], 1.0)
+        self.assertEqual(request["current_end_sec"], 3.0)
+
+    def test_cached_probe_scores_can_confirm_audio_only_switch(self) -> None:
+        router = HybridWindowTopicRouter(
+            [
+                DomainSlice("nlp_core_10k", "nlp", centroid=[1.0, 0.0], index_path="mock://nlp"),
+                DomainSlice("medicine_core_10k", "medicine", centroid=[1.0, 0.0], index_path="mock://medicine"),
+            ],
+            RouterConfig(
+                warmup_sec=0.0,
+                update_interval_sec=0.0,
+                switch_cooldown_sec=0.0,
+                min_confidence=0.5,
+                min_margin=0.1,
+                min_current_margin=0.1,
+                min_consistent_windows_audio_only=2,
+                text_topic_weight=0.0,
+                domain_probe_weight=1.0,
+                speech_centroid_weight=0.0,
+                metadata_prior_weight=0.0,
+                fallback_preset_id="none",
+            ),
+        )
+        state = RouterSessionState("nlp_core_10k", "nlp", created_s=0.0)
+        probe = {
+            "medicine": DomainProbeScore(
+                domain="medicine",
+                preset_id="medicine_core_10k",
+                top_score=0.9,
+                mean_topk_score=0.8,
+                top_terms=("oncology",),
+            )
+        }
+
+        first = router.observe(state, None, [], now_s=1.0, domain_probe_scores=probe)
+        second = router.observe(state, None, [], now_s=2.0, domain_probe_scores=probe)
+
+        self.assertEqual(first.action, "stay")
+        self.assertIn("consistent_windows<2", first.reason)
+        self.assertEqual(second.action, "switch")
+        self.assertEqual(second.target_domain_id, "medicine")
 
     def test_identity_retention_metric_allows_acronyms_not_lowercase_phrases(self) -> None:
         gold = [("AI", ["AI"]), ("machine learning", ["machine learning"]), ("syntax", ["句法"])]

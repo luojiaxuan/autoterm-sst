@@ -480,9 +480,12 @@ class OmniSession:
     last_rescue_triggered: bool = False
     last_candidate_pool_count: int = 0
     last_prompt_reference_count: int = 0
+    last_domain_probe_raw_scores: Dict[str, DomainProbeScore] = field(default_factory=dict)
     last_domain_probe_scores: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     last_domain_probe_slices: List[Dict[str, Any]] = field(default_factory=list)
     last_domain_probe_s: Optional[float] = None
+    last_domain_probe_at_s: float = 0.0
+    last_domain_probe_cached: bool = False
     active_retrieval_slices: List[RetrievalSlice] = field(default_factory=list)
     pending_since_s: Optional[float] = None
     latency_multiplier: int = 2
@@ -807,14 +810,46 @@ class OmniAgent(Agent):
 
     def _domain_probe_request(self, session: "OmniSession", end_sample: int) -> Dict[str, Any]:
         end = max(0, min(int(end_sample), int(len(session.audio))))
+        current_start = max(0, min(int(session.last_llm_samples), end))
+        lookback_samples = max(
+            0,
+            int(round(float(self.config.rag_timeline_lookback_sec) * TARGET_SAMPLE_RATE)),
+        )
+        start = max(0, current_start - lookback_samples)
+        audio_buffer = session.audio[start:end]
         return {
-            "audio_buffer": session.audio[:end],
-            "current_start_sec": float(session.last_llm_samples) / TARGET_SAMPLE_RATE,
-            "current_end_sec": float(end) / TARGET_SAMPLE_RATE,
+            "audio_buffer": audio_buffer,
+            "current_start_sec": float(current_start - start) / TARGET_SAMPLE_RATE,
+            "current_end_sec": float(end - start) / TARGET_SAMPLE_RATE,
             "lookback_sec": float(self.config.rag_timeline_lookback_sec),
             "query_text": session.router_text_window,
             "router_text_source": session.router_text_source,
         }
+
+    def _clear_domain_probe_meta(self, session: "OmniSession") -> None:
+        session.last_domain_probe_raw_scores = {}
+        session.last_domain_probe_scores = {}
+        session.last_domain_probe_slices = []
+        session.last_domain_probe_s = None
+        session.last_domain_probe_at_s = 0.0
+        session.last_domain_probe_cached = False
+
+    def _cached_domain_probe_scores(
+        self,
+        session: "OmniSession",
+        candidates: Sequence[RetrievalSlice],
+    ) -> Dict[str, DomainProbeScore]:
+        cached = dict(getattr(session, "last_domain_probe_raw_scores", {}) or {})
+        if not cached:
+            return {}
+        allowed_domains = {str(item.domain) for item in candidates}
+        filtered = {domain: score for domain, score in cached.items() if str(domain) in allowed_domains}
+        if not filtered:
+            return {}
+        session.last_domain_probe_slices = [item.to_meta() for item in candidates]
+        session.last_domain_probe_scores = _domain_probe_scores_to_meta(filtered)
+        session.last_domain_probe_cached = True
+        return filtered
 
     async def _probe_domain_scores(
         self,
@@ -822,28 +857,15 @@ class OmniAgent(Agent):
         *,
         end_sample: int,
     ) -> Dict[str, DomainProbeScore]:
-        session.last_domain_probe_scores = {}
-        session.last_domain_probe_slices = []
-        session.last_domain_probe_s = None
         mode = (self.config.router_mode or "embedding_refs").strip().lower()
         if mode != "hybrid_window_topic" or not self.retrieval.enabled:
+            self._clear_domain_probe_meta(session)
             return {}
         now = time.perf_counter()
         if now - float(session.created_s) < float(self.config.auto_glossary_warmup_sec):
+            self._clear_domain_probe_meta(session)
             return {}
         state = session.router_state
-        if (
-            state is not None
-            and state.last_decision_s > 0.0
-            and now - float(state.last_decision_s) < float(self.config.auto_glossary_update_sec)
-        ):
-            return {}
-        if (
-            state is not None
-            and state.last_switch_s > 0.0
-            and now - float(state.last_switch_s) < float(self.config.auto_glossary_switch_cooldown_sec)
-        ):
-            return {}
 
         candidates: List[RetrievalSlice] = []
         for plan in self._domain_probe_slices(session):
@@ -853,7 +875,22 @@ class OmniAgent(Agent):
                 self._schedule_index_preload(plan.index_path)
         session.last_domain_probe_slices = [item.to_meta() for item in candidates]
         if not candidates:
+            self._clear_domain_probe_meta(session)
             return {}
+        last_probe_at = float(getattr(session, "last_domain_probe_at_s", 0.0) or 0.0)
+        update_gate = (
+            last_probe_at > 0.0
+            and now - last_probe_at < float(self.config.auto_glossary_update_sec)
+        )
+        cooldown_gate = (
+            state is not None
+            and state.last_switch_s > 0.0
+            and now - float(state.last_switch_s) < float(self.config.auto_glossary_switch_cooldown_sec)
+        )
+        if update_gate or cooldown_gate:
+            cached_scores = self._cached_domain_probe_scores(session, candidates)
+            if cached_scores:
+                return cached_scores
 
         t0 = time.perf_counter()
         scores = await self.retrieval.probe_domain_scores(
@@ -864,6 +901,9 @@ class OmniAgent(Agent):
             score_threshold=None,
         )
         session.last_domain_probe_s = time.perf_counter() - t0
+        session.last_domain_probe_at_s = now
+        session.last_domain_probe_cached = False
+        session.last_domain_probe_raw_scores = dict(scores)
         session.last_domain_probe_scores = _domain_probe_scores_to_meta(scores)
         return scores
 
@@ -1199,9 +1239,7 @@ class OmniAgent(Agent):
         session.last_query_embedding = None
         session.router_text_window = ""
         session.router_text_source = "none"
-        session.last_domain_probe_scores = {}
-        session.last_domain_probe_slices = []
-        session.last_domain_probe_s = None
+        self._clear_domain_probe_meta(session)
         if session.auto_glossary_enabled:
             try:
                 selection = self.active_glossary.initial_selection(
@@ -1683,6 +1721,7 @@ class OmniAgent(Agent):
                 if session.last_domain_probe_s is not None
                 else None
             ),
+            "domain_probe_cached": bool(session.last_domain_probe_cached),
             "domain_probe_scores": dict(session.last_domain_probe_scores),
             "domain_probe_slices": list(session.last_domain_probe_slices),
             "router_text_source": session.router_text_source,

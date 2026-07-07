@@ -324,7 +324,7 @@ and allows a single concurrent agent session per authtoken.
 | `scripts/smoke_p0_protocol.py` | client-side protocol/concurrency smoke test |
 | `scripts/term_memory/*.py` | open-memory pipeline (extract/filter/build working slices/build snapshot/publish manifest) |
 | `eval/streaming_sst/eval_auto_glossary.py` | adaptive glossary switch/latency/reference-volume eval |
-| `eval/streaming_sst/eval_auto_glossary_switch.py` | router-only ACL/NLP ↔ medicine switch regression |
+| `eval/streaming_sst/eval_auto_glossary_switch.py` | router-unit ACL/NLP ↔ medicine switch diagnostic |
 | `eval/streaming_sst/score_auto_glossary.py` | summarize adaptive glossary eval JSON as a table |
 | `eval/streaming_sst/sweep_term_memory.py` | term-memory scale sweep (retrieve p50/p95, refs/chunk) over the JSON WS |
 | `eval/streaming_sst/score_terms.py` | terminology accuracy plus regular/masked-term BLEU vs references |

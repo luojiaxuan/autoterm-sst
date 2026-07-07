@@ -68,6 +68,12 @@ Taurus source-text sanity run on 2026-07-07 passed with ACL->medicine latency 4
 windows and medicine->ACL latency 2 windows. The fixture unit test keeps the
 stricter two-window threshold for clean topic windows.
 
+`eval_auto_glossary_switch.py` is a router-unit/source-text diagnostic. It
+directly drives `HybridWindowTopicRouter`, disables wall-clock update/cooldown
+delays, and uses synthetic probe scores when `--with-probe` is set. These
+numbers validate the window-topic-first state machine; they are not an
+end-to-end live-ASR/Omni/MaxSim probe deployment-latency benchmark.
+
 ## Metrics
 
 | metric | source |

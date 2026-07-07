@@ -95,9 +95,12 @@ score(domain) =
 
 `text_topic_score` uses high-precision weighted keywords from
 `domain_taxonomy.py`. `domain_probe_retrieval_score` is a routing-only small
-top-k probe over ready candidate domain indexes; it is gated by the router
-warmup/update/cooldown schedule and uses raw top-k scores rather than the prompt
-retrieval score threshold. It must not change the prompt candidate budget.
+top-k probe over ready candidate domain indexes; fresh probe runs are gated by
+the router warmup/update/cooldown schedule and use raw top-k scores rather than
+the prompt retrieval score threshold. During the update/cooldown gate, the
+router reuses cached probe scores so the consistency-window state machine still
+sees stable probe evidence without rerunning MaxSim. It must not change the
+prompt candidate budget.
 `speech_centroid_score` is a weak tie-breaker based on offline domain centroids:
 
 ```text
@@ -166,8 +169,9 @@ Each `topic_router` metadata payload records the target score, current active
 slice score, target-current delta, candidate streak, top scored domains, and
 the guard that blocked or allowed a switch. These fields are the first place to
 inspect when a run appears to stay on a stale domain slice or switch too often.
-JSON events also include `domain_probe_scores`, `domain_probe_slices`, and
-`domain_probe_s` when routing-only domain probes run for that chunk.
+JSON events also include `domain_probe_scores`, `domain_probe_slices`,
+`domain_probe_cached`, and `domain_probe_s` when routing-only domain probes run
+or cached probe evidence is reused for that chunk.
 
 ## Non-Blocking Switching
 
@@ -313,7 +317,7 @@ not in this repo.
 
 ## Evaluation
 
-Routing/latency/switch metrics:
+Router-unit switch diagnostics:
 
 ```bash
 python eval/streaming_sst/eval_auto_glossary_switch.py \
@@ -329,6 +333,12 @@ The 2026-07-07 Taurus source-text run passed with ACL->medicine switch latency
 with generic webinar operator lines before the oncology topic appears, so the
 clean fixture regression remains stricter at 2 windows while the real-text run
 uses a 4-window threshold.
+
+This script directly drives `HybridWindowTopicRouter` on fixture/source-text
+windows with wall-clock update and switch cooldown set to zero. It is a
+router-unit diagnostic for the window-topic-first state machine, not an
+end-to-end proof of live ASR, Omni batch-loop timing, real MaxSim domain-probe
+quality, or production switch latency.
 
 End-to-end streaming metrics:
 

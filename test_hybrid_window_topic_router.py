@@ -84,6 +84,33 @@ class HybridWindowTopicRouterTests(unittest.TestCase):
         self.assertEqual(second.target_preset_id, "medicine_core_10k")
         self.assertGreaterEqual(second.confidence, 0.60)
 
+    def test_generated_target_chinese_topic_switches_after_two_windows(self) -> None:
+        router = _router()
+        state = RouterSessionState("nlp_core_10k", "nlp", created_s=1.0)
+        target_text = "患者接受临床治疗，医生根据诊断和症状调整药物剂量。"
+
+        first = router.observe(
+            state,
+            [1.0, 0.0],
+            [],
+            now_s=10.0,
+            router_text=target_text,
+            router_text_source="generated_target",
+        )
+        second = router.observe(
+            state,
+            [1.0, 0.0],
+            [],
+            now_s=11.0,
+            router_text=target_text,
+            router_text_source="generated_target",
+        )
+
+        self.assertEqual(first.action, "stay")
+        self.assertIn("consistent_windows<2", first.reason)
+        self.assertEqual(second.action, "switch")
+        self.assertEqual(second.target_domain_id, "medicine")
+
     def test_audio_only_probe_requires_three_consistent_windows(self) -> None:
         router = _router()
         state = RouterSessionState("nlp_core_10k", "nlp", created_s=1.0)
@@ -164,14 +191,14 @@ class HybridWindowTopicRouterTests(unittest.TestCase):
         refs = [{"active_glossary_preset": "nlp_core_10k", "score": 0.99}]
         text = "Diagnosis and treatment of diabetes patients in a clinical trial."
 
-        router.observe(state, [1.0, 0.0], refs, now_s=10.0, router_text=text, router_text_source="streaming_asr")
+        router.observe(state, [1.0, 0.0], refs, now_s=10.0, router_text=text, router_text_source="generated_target")
         decision = router.observe(
             state,
             [1.0, 0.0],
             refs,
             now_s=11.0,
             router_text=text,
-            router_text_source="streaming_asr",
+            router_text_source="generated_target",
         )
 
         self.assertEqual(decision.action, "switch")

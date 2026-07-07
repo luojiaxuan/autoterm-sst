@@ -1,10 +1,12 @@
 """Active-glossary routing for automatic terminology slices.
 
-The default router is window-topic-first: it combines recent source/ASR topic
-text with optional domain-probe retrieval, weak speech-centroid evidence, and a
-small retrieved-reference metadata prior. The older audio-native router remains
-available for explicit compatibility with the previous embedding/ref-metadata
-policy.
+The default router is window-topic-first, but the deployable E2E path does not
+depend on ASR text. It combines generated target-translation topic text when
+available, routing-only speech-window domain probes, weak speech-centroid
+evidence, and a small retrieved-reference metadata prior. Source transcript
+windows are supported only for controlled diagnostics. The older audio-native
+router remains available for explicit compatibility with the previous
+embedding/ref-metadata policy.
 
 The old keyword router remains available as ``LegacyKeywordTopicRouter`` for
 explicit debug fallback only.
@@ -468,7 +470,7 @@ class AudioNativeActiveGlossaryRouter:
 
 
 class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
-    """Route glossary overlays from recent window topic text first."""
+    """Route glossary overlays from E2E window topic evidence."""
 
     def observe(
         self,

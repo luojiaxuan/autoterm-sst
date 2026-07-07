@@ -36,7 +36,7 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(config.auto_glossary_switch_margin, 0.15)
         self.assertEqual(config.auto_glossary_current_margin, 0.10)
         self.assertEqual(config.auto_glossary_min_consistent_windows, 2)
-        self.assertEqual(config.auto_glossary_base_preset, "common_10k")
+        self.assertEqual(config.auto_glossary_base_preset, "none")
         self.assertEqual(config.auto_glossary_default_preset, "nlp_core_10k")
         self.assertEqual(config.router_mode, "hybrid_window_topic")
         self.assertEqual(config.router_domain_probe_top_k, 5)
@@ -45,6 +45,9 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(config.router_audio_probe_min_top_score, 0.50)
         self.assertEqual(config.router_audio_probe_min_raw_margin, 0.08)
         self.assertEqual(config.router_audio_probe_min_positive_domains, 2)
+        self.assertTrue(config.router_generated_target_enabled)
+        self.assertEqual(config.router_generated_target_window_chunks, 3)
+        self.assertEqual(config.router_generated_target_min_chars, 6)
         self.assertEqual(config.auto_glossary_switch_cooldown_sec, 90.0)
         self.assertEqual(config.auto_glossary_candidate_stale_sec, 120.0)
 
@@ -109,6 +112,54 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         session.last_router_decision = {"action": "fallback"}
         self.assertTrue(agent._should_rescue_retrieval(session, [{"term": "BERT"}]))
 
+    def test_generated_target_translation_updates_router_text_window(self) -> None:
+        agent = OmniAgent()
+        agent.config.router_generated_target_enabled = True
+        agent.config.router_generated_target_window_chunks = 2
+        agent.config.router_generated_target_min_chars = 4
+        session = SimpleNamespace(
+            auto_glossary_enabled=True,
+            router_text_window="",
+            router_text_source="none",
+            history=["这是一个语言模型。", "患者接受临床治疗。"],
+        )
+
+        agent._after_translation_tick(session, text="患者接受临床治疗。", references=[])
+
+        self.assertEqual(session.router_text_source, "generated_target")
+        self.assertIn("语言模型", session.router_text_window)
+        self.assertIn("临床治疗", session.router_text_window)
+
+    def test_generated_target_translation_uses_current_text_when_history_is_empty(self) -> None:
+        agent = OmniAgent()
+        agent.config.router_generated_target_enabled = True
+        agent.config.router_generated_target_min_chars = 4
+        session = SimpleNamespace(
+            auto_glossary_enabled=True,
+            router_text_window="",
+            router_text_source="none",
+            history=[],
+        )
+
+        agent._after_translation_tick(session, text="患者接受临床治疗。", references=[])
+
+        self.assertEqual(session.router_text_source, "generated_target")
+        self.assertEqual(session.router_text_window, "患者接受临床治疗。")
+
+    def test_generated_target_translation_does_not_override_external_router_text(self) -> None:
+        agent = OmniAgent()
+        session = SimpleNamespace(
+            auto_glossary_enabled=True,
+            router_text_window="external source text",
+            router_text_source="manifest_source",
+            history=["患者接受临床治疗。"],
+        )
+
+        agent._after_translation_tick(session, text="患者接受临床治疗。", references=[])
+
+        self.assertEqual(session.router_text_source, "manifest_source")
+        self.assertEqual(session.router_text_window, "external source text")
+
     def test_domain_probe_slices_are_domain_only_debug_inventory(self) -> None:
         agent = OmniAgent()
         agent.config.mock = True
@@ -128,7 +179,7 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(roles, {"domain_probe"})
         self.assertNotIn("common_10k", presets)
 
-    def test_auto_active_retrieval_uses_common_base_plus_domain_overlay(self) -> None:
+    def test_auto_active_retrieval_uses_domain_specific_slice_only(self) -> None:
         agent = OmniAgent()
         agent.config.mock = True
         session = SimpleNamespace(
@@ -144,9 +195,9 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
 
         slices = agent._active_retrieval_slices(session)
 
-        self.assertEqual([item.preset_id for item in slices], ["common_10k", "nlp_core_10k"])
-        self.assertEqual([item.role for item in slices], ["base", "domain"])
-        self.assertEqual(session.active_slice_presets, ["common_10k", "nlp_core_10k"])
+        self.assertEqual([item.preset_id for item in slices], ["nlp_core_10k"])
+        self.assertEqual([item.role for item in slices], ["domain"])
+        self.assertEqual(session.active_slice_presets, ["nlp_core_10k"])
 
     def test_domain_probe_populates_metadata_without_changing_active_inventory(self) -> None:
         agent = OmniAgent()
@@ -172,7 +223,7 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
             last_domain_probe_s=None,
             last_domain_probe_at_s=0.0,
             last_domain_probe_cached=False,
-            active_slice_presets=["common_10k", "nlp_core_10k"],
+            active_slice_presets=["nlp_core_10k"],
         )
 
         before = list(session.active_slice_presets)
@@ -263,7 +314,7 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         )
         with_text = SimpleNamespace(
             router_text_window="oncology surgery",
-            router_text_source="streaming_asr",
+            router_text_source="generated_target",
             latency_multiplier=2,
         )
 

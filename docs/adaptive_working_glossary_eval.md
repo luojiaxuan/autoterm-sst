@@ -78,9 +78,10 @@ the renormalized probe score can switch domains.
 `eval_auto_glossary_switch.py` is a router-unit/source-text diagnostic. It
 directly drives `HybridWindowTopicRouter`, disables wall-clock update/cooldown
 delays, and uses synthetic probe scores when `--with-probe` is set. These
-numbers validate the window-topic-first state machine; they are not an
-end-to-end live-ASR/Omni/MaxSim probe deployment-latency benchmark or evidence
-that audio-only routing should be used as the primary production signal.
+numbers validate the window-topic state machine and provide a source-text upper
+bound; they are not an end-to-end Omni/MaxSim deployment-latency benchmark.
+The deployable E2E path uses speech-window domain probes plus delayed generated
+target-translation text, not source transcripts or ASR text.
 
 ## Metrics
 

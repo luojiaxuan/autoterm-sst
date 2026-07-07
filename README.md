@@ -250,16 +250,17 @@ retrieves from it exactly like a glossary, with retrieved terms surfaced in the
 evidence panel and `term_memory` health.
 
 The default demo path is now **zero-setup adaptive working glossary**:
-`auto_working` keeps `common_terms` active as a base slice and switches one
-routed domain overlay such as `nlp_core_10k` or `medicine_core_10k`.
-The default `hybrid_window_topic` router is window-topic-first: controlled eval
-can feed source transcript windows through `router_text`, live deployments can
-feed streaming ASR text, and audio/probe-only routing remains a fallback. A
-small routing-only domain-probe retrieval pass can score candidate domain
-indexes without changing the active prompt inventory. The prompt interface is
-held constant: every streaming chunk receives exactly the fixed top-10 retrieved
-candidates, while larger 100k/500k/1M memories remain offline memory, rescue
-pools, and scale evidence. See
+`auto_working` starts from a domain-specific active slice such as `nlp_core_10k`
+and can switch to another domain slice such as `medicine_core_10k`.
+The default `hybrid_window_topic` router is E2E-window-first: live deployment
+uses routing-only speech-window domain probes plus the generated target
+translation window; source transcript windows are only a controlled
+diagnostic/eval input through `router_text`. A small routing-only domain-probe
+retrieval pass can score candidate domain indexes without changing the active
+prompt inventory. The prompt interface is held constant: every streaming chunk
+receives exactly the fixed top-10 retrieved candidates, while larger
+100k/500k/1M memories remain offline memory, rescue pools, and scale evidence.
+See
 [`docs/adaptive_working_glossary.md`](docs/adaptive_working_glossary.md). See
 [`docs/ai_glossary_sweep.md`](docs/ai_glossary_sweep.md) for the 2026-07-06
 ACL+AI glossary-size sweep and route policy update.

@@ -2,7 +2,7 @@
 
 本文记录 `auto_working` 从 ACL/NLP talk 切到 medicine talk 时的真实路由检查。结论先写在前面：旧版默认策略不是 window text/topic router，而是
 `speech_query_embedding + retrieved-ref metadata` router；在真实 ACL -> medicine probe 中，它没有成功切到 `medicine_core_10k`。当前实现已经改成
-`HybridWindowTopicRouter`：source/ASR window topic 是主信号，domain-probe retrieval 和 speech centroid 只作为辅助信号。
+`HybridWindowTopicRouter`：生产路径使用 speech-window domain probe 和 generated target translation window；source transcript window 只作为 controlled eval/diagnostic。
 
 ## 旧版实现问题
 
@@ -21,8 +21,8 @@ score(domain slice) =
 ```
 
 - 不是 ASR/source transcript topic classifier。
-- probe 当时的 production code 只激活一个 domain-specific slice；新实现应改为
-  `common_terms + active_domain_core`。
+- probe 当时的 production code 只激活一个 domain-specific slice；当前策略继续保持
+  domain-specific active inventory，不再默认 prepend common glossary。
 - switch guard 包括 warmup、45s update interval、min confidence、min margin、current-margin、cooldown、连续候选 window。
 
 这意味着如果当前 active slice 是 `nlp_core_10k`，retrieved-ref metadata 会自然偏向 NLP；跨域切换主要依赖 speech embedding 与各 domain centroid 的相似度。
@@ -96,20 +96,22 @@ Using segment-level RASST source text around each audio window and the current d
 | ACL | 13 | 7 | 0 | 6 |
 | Medicine | 17 | 0 | 17 | 0 |
 
-This matches the user's intuition: routing should primarily follow the topic expressed inside recent windows when source/ASR text is available.
+This validates source text as a diagnostic upper bound, but it is not the
+deployable E2E signal because the demo does not run a separate ASR path.
 
 ## 下一版策略
 
-`auto_working_v2` should be common-base + domain-overlay and window-topic-first:
+`auto_working_v2` should be domain-specific and E2E-window-topic-first:
 
 ```text
-recent source/ASR/topic text window
+speech-window domain probe
+  + delayed generated target translation window
   -> text topic score over domain taxonomy and domain glossary aliases
   -> optional per-domain probe retrieval score
   -> speech embedding centroid score as weak tie-breaker
   -> hysteresis / consecutive-window switch guard
-  -> keep common_terms active and switch exactly one domain overlay
-  -> retrieve/rank prompt candidates from common_terms + active domain overlay
+  -> switch exactly one active domain slice
+  -> retrieve/rank prompt candidates from the active domain slice
   -> surface exactly 10 prompt candidates
 ```
 
@@ -123,11 +125,11 @@ score(domain) =
   + 0.05 * metadata_prior
 ```
 
-When no source/ASR/topic text is available, route should fall back to domain-probe retrieval plus weak speech centroid, not rely on centroid alone.
+Before generated target text is available, route should fall back to domain-probe retrieval plus weak speech centroid, not rely on centroid alone.
 The fallback is intentionally conservative: audio-only probe switches require
 at least two positive probe-domain scores, a raw top score of at least `0.50`, a
 raw top-vs-second margin of at least `0.08`, and agreement between the top probe
-domain and the proposed target. Without source/ASR text and without domain-probe
+domain and the proposed target. Without generated target/source diagnostic text and without domain-probe
 evidence, centroid similarity alone is not allowed to switch the active domain.
 
 Recommended switch guard:
@@ -140,7 +142,7 @@ Recommended switch guard:
 
 ## Open implementation work
 
-- Add a real streaming ASR producer for `router_text`; the live pipeline can now accept the field.
+- Generated target-translation text is now written into `router_text` after translation ticks as `router_text_source=generated_target`. Source transcript remains a controlled eval input, not the production E2E route.
 - Routing-only domain-probe retrieval is now wired into Omni routing ticks for ready domain indexes. Fresh probe runs are gated by the router warmup/update/cooldown schedule, cached probe scores are reused during gate windows for router consistency, audio-only sessions refresh probes on the streaming window cadence instead of the full update interval, fresh probes reuse the main retrieval per-window speech embeddings when available, raw top-k probe scores are used rather than the prompt retrieval threshold, and `domain_probe_scores`, `domain_probe_slices`, `domain_probe_cached`, and `domain_probe_s` are recorded in JSON metadata without changing active prompt top-k.
-- `eval/streaming_sst/eval_auto_glossary_switch.py` now provides router-unit ACL/NLP <-> medicine switch diagnostics using source-text windows or built-in fixtures. The latest Taurus source-text output is staged at `/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/eval/auto_glossary_switch_router_only_20260707_final8.json`; it passes all four scenarios with zero false switches in ACL-only and medicine-only streams. The clean fixture + contested-probe regression passes the stricter 2-window text-path threshold at `/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/eval/auto_glossary_switch_fixture_probe_20260707_final8.json`. This is not an end-to-end live-ASR/Omni/MaxSim probe deployment-latency benchmark, and audio-only switching remains a guarded fallback rather than the main production signal.
-- Continue expanding end-to-end active-slice candidate-quality eval with real ASR-driven `router_text`.
+- `eval/streaming_sst/eval_auto_glossary_switch.py` now provides router-unit ACL/NLP <-> medicine switch diagnostics using source-text windows or built-in fixtures. The latest Taurus source-text output is staged at `/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/eval/auto_glossary_switch_router_only_20260707_final8.json`; it passes all four scenarios with zero false switches in ACL-only and medicine-only streams. The clean fixture + contested-probe regression passes the stricter 2-window text-path threshold at `/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/eval/auto_glossary_switch_fixture_probe_20260707_final8.json`. This is not an end-to-end Omni/MaxSim deployment-latency benchmark, and speech/probe-only switching remains a guarded fallback before generated target evidence arrives.
+- Continue expanding end-to-end active-slice candidate-quality eval with `router_text_source=generated_target` and speech-window domain probes.

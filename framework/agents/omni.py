@@ -175,14 +175,9 @@ def _preset_for_slice_id(slice_id: str) -> str:
 
 
 def _autoterm_base_preset(config: Dict[str, Any], default: str = "none") -> str:
-    base = _preset_for_slice_id(str(config.get("base_slice") or ""))
-    if base:
-        return base
-    slices = config.get("slices")
-    if isinstance(slices, dict):
-        for slice_id, meta in slices.items():
-            if isinstance(meta, dict) and str(meta.get("type") or "").strip().lower() == "base":
-                return _preset_for_slice_id(str(slice_id)) or default
+    if "base_slice" in config:
+        base = _preset_for_slice_id(str(config.get("base_slice") or ""))
+        return base or default
     return default
 
 
@@ -278,7 +273,7 @@ class OmniConfig:
     rag_timeline_lookback_sec: float = 1.92
 
     auto_glossary_enabled: bool = True
-    auto_glossary_base_preset: str = "common_10k"
+    auto_glossary_base_preset: str = "none"
     auto_glossary_default_preset: str = "nlp_core_10k"
     auto_glossary_presets: str = "nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k"
     auto_glossary_update_sec: float = 45.0
@@ -307,6 +302,9 @@ class OmniConfig:
     router_audio_probe_min_top_score: float = 0.50
     router_audio_probe_min_raw_margin: float = 0.08
     router_audio_probe_min_positive_domains: int = 2
+    router_generated_target_enabled: bool = True
+    router_generated_target_window_chunks: int = 3
+    router_generated_target_min_chars: int = 6
     prompt_top_k: int = PROMPT_K
     ui_top_k: int = PROMPT_K
     autoterm_broad_topk_per_slice: int = 50
@@ -324,7 +322,7 @@ class OmniConfig:
         retrieval_config = autoterm_config.get("retrieval") if isinstance(autoterm_config.get("retrieval"), dict) else {}
         prompt_k_default = _safe_int(retrieval_config.get("prompt_k", autoterm_config.get("prompt_k")), PROMPT_K)
         broad_topk_default = _safe_int(retrieval_config.get("broad_topk_per_slice"), 50)
-        base_preset_default = _autoterm_base_preset(autoterm_config, "common_10k")
+        base_preset_default = _autoterm_base_preset(autoterm_config, "none")
         initial_preset_default = _autoterm_initial_preset(autoterm_config, "nlp_core_10k")
         working_presets_default = _autoterm_working_presets(
             autoterm_config,
@@ -433,6 +431,9 @@ class OmniConfig:
             router_audio_probe_min_top_score=_safe_float(routing_config.get("audio_probe_min_top_score"), 0.50),
             router_audio_probe_min_raw_margin=_safe_float(routing_config.get("audio_probe_min_raw_margin"), 0.08),
             router_audio_probe_min_positive_domains=_safe_int(routing_config.get("audio_probe_min_positive_domains"), 2),
+            router_generated_target_enabled=_meta_bool(routing_config.get("enable_generated_target_text"), True),
+            router_generated_target_window_chunks=_safe_int(routing_config.get("generated_target_window_chunks"), 3),
+            router_generated_target_min_chars=_safe_int(routing_config.get("generated_target_min_chars"), 6),
             prompt_top_k=_env_int("RASST_PROMPT_TOP_K", prompt_k_default),
             ui_top_k=_env_int("RASST_UI_TOP_K", prompt_k_default),
             autoterm_broad_topk_per_slice=broad_topk_default,
@@ -1797,7 +1798,26 @@ class OmniAgent(Agent):
         text: str,
         references: Sequence[Dict[str, Any]],
     ) -> None:
-        return None
+        del references
+        if not session.auto_glossary_enabled:
+            return
+        if (self.config.router_mode or "").strip().lower() != "hybrid_window_topic":
+            return
+        if not bool(self.config.router_generated_target_enabled):
+            return
+        current_source = str(getattr(session, "router_text_source", "none") or "none")
+        if current_source not in {"none", "generated_target"}:
+            return
+        window = max(1, int(self.config.router_generated_target_window_chunks))
+        texts = [str(item).strip() for item in session.history[-window:] if str(item).strip()]
+        current_text = str(text or "").strip()
+        if current_text and (not texts or texts[-1] != current_text):
+            texts = (texts + [current_text])[-window:]
+        router_text = "\n".join(texts).strip()
+        if len(router_text) < max(1, int(self.config.router_generated_target_min_chars)):
+            return
+        session.router_text_window = router_text
+        session.router_text_source = "generated_target"
 
     async def _observe_active_glossary(
         self,
@@ -2285,6 +2305,8 @@ class OmniAgent(Agent):
                 "audio_probe_min_top_score": self.config.router_audio_probe_min_top_score,
                 "audio_probe_min_raw_margin": self.config.router_audio_probe_min_raw_margin,
                 "audio_probe_min_positive_domains": self.config.router_audio_probe_min_positive_domains,
+                "generated_target_enabled": self.config.router_generated_target_enabled,
+                "generated_target_window_chunks": self.config.router_generated_target_window_chunks,
                 "prompt_top_k": self.config.prompt_top_k,
                 "ui_top_k": self.config.ui_top_k,
             },

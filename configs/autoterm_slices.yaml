@@ -1,11 +1,11 @@
 auto_working:
   prompt_k: 10
-  base_slice: common_terms
+  base_slice: none
   initial_slice: nlp_core_10k
   slices:
     common_terms:
       path: /mnt/data2/jiaxuanluo/rasst-demo/runtime/term_memory/scale_aclgold_10000.json
-      type: base
+      type: diagnostic
       domain: general
       weight: 1.0
     nlp_core_10k:
@@ -56,6 +56,9 @@ auto_working:
     audio_probe_min_top_score: 0.50
     audio_probe_min_raw_margin: 0.08
     audio_probe_min_positive_domains: 2
+    enable_generated_target_text: true
+    generated_target_window_chunks: 3
+    generated_target_min_chars: 6
     update_sec: 5
     warmup_sec: 6
     switch_cooldown_sec: 90

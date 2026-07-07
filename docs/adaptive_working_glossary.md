@@ -3,8 +3,8 @@
 RASST-Demo maintains a large open terminology memory offline, but activates a
 fixed 10-candidate prompt list for each streaming session. The active inventory is
 selected automatically from recent window topic evidence. The automatic path now
-keeps a compact `common_terms` base slice active and switches one routed domain
-overlay at a time.
+keeps exactly one domain-specific slice active at a time; `common_terms` remains
+available as an optional/diagnostic preset, not as a default prompt inventory.
 
 ## Architecture
 
@@ -13,12 +13,11 @@ offline open memory
   -> working slices: nlp_core_10k / medicine_core_10k / finance_core_10k / legal_core_10k
   -> manifest: preset id -> terms.jsonl + maxsim index + domain metadata + centroid
   -> runtime session starts in auto_working
-  -> common_terms stays active as the base retrieval slice
   -> active preset starts as the configured domain-specific overlay
-  -> router observes recent source/ASR topic text, optional domain probes, speech embedding, and refs
-  -> HybridWindowTopicRouter scores window topic first
+  -> router observes speech-window domain probes, generated target text, weak speech embedding, and refs
+  -> HybridWindowTopicRouter scores E2E window topic evidence
   -> ActiveGlossaryManager preloads and atomically activates target index
-  -> future chunks retrieve from common_terms + active domain overlay
+  -> future chunks retrieve from the active domain slice
   -> prompt receives top 10 refs, UI receives top 10 refs + router metadata
 ```
 
@@ -34,8 +33,10 @@ concerns.
   labels, weighted high-precision topic keywords, and offline working-slice
   ranking helpers.
 - `framework/agents/term_memory/topic_router.py`: `HybridWindowTopicRouter`
-  routes from recent source/ASR topic text first, with domain-probe retrieval
-  and speech-centroid signals as secondary evidence. The older
+  routes from E2E window evidence: generated target-translation topic text when
+  available, routing-only speech-window domain probes, weak speech-centroid
+  evidence, and a small metadata prior. Source transcript windows are supported
+  only for controlled diagnostics. The older
   `AudioNativeActiveGlossaryRouter` remains available as `embedding_refs`; the
   old keyword router remains only as `RASST_ROUTER_MODE=legacy_keywords`.
 - `framework/agents/term_memory/active_glossary.py`: maps topic decisions to
@@ -58,8 +59,8 @@ Each `OmniSession` tracks:
 requested_glossary_preset   # user-facing mode, usually auto_working
 active_glossary_preset      # concrete retrieval preset, e.g. nlp_core_10k
 active_domain               # nlp / medicine / finance / legal
-router_text_window          # source/ASR/topic text for routing, if available
-router_text_source          # manifest_source / streaming_asr / generated_target / none
+router_text_window          # generated target text by default; source text only in eval
+router_text_source          # generated_target / manifest_source / streaming_asr / none
 topic_confidence
 last_topic_update_s
 topic_history
@@ -76,12 +77,15 @@ active preset is `RASST_AUTO_GLOSSARY_DEFAULT` (`nlp_core_10k` by default).
 
 ## Routing Logic
 
-The default router is `RASST_ROUTER_MODE=hybrid_window_topic`. It is a
-window-topic-first router: recent source-side text is the primary signal when
-available. In controlled eval this text can come from RASST source segments; in
-deployable live mode it should come from streaming ASR. Generated target text is
-only a weak diagnostic signal because it can be biased by the current glossary
-and model errors.
+The default router is `RASST_ROUTER_MODE=hybrid_window_topic`. It is an
+E2E-window-topic router: production does not require ASR text or source
+transcripts. Live sessions use routing-only speech-window domain probes and,
+after the first translation outputs, a generated target-translation text window.
+The generated target window is one routing tick behind the current chunk, so a
+chunk's own translation cannot influence its own glossary retrieval. Controlled
+eval can still pass source transcript windows through `router_text` to isolate
+the router state machine, but those source-text numbers should not be reported
+as the deployed E2E path.
 
 The router combines four signals:
 
@@ -94,15 +98,15 @@ score(domain) =
 ```
 
 The router renormalizes these weights over the signals available in the current
-window. For example, if no source/ASR topic text is available, the score is
-computed over domain-probe, speech-centroid, and metadata-prior evidence rather
-than being capped at `0.25 + 0.10 + 0.05`. Audio-only probe routing has an
-additional raw-evidence guard: the probe must score at least two positive
-candidate domains, the top raw probe score must be at least `0.50`, the top-vs-
-second raw margin must be at least `0.08`, and the top raw probe domain must
-match the proposed switch target. If no source/ASR text is available and no
-domain-probe evidence is available, centroid similarity alone cannot switch the
-active domain.
+window. Before generated target text is available, the score is computed over
+domain-probe, speech-centroid, and metadata-prior evidence rather than being
+capped at `0.25 + 0.10 + 0.05`. Speech/probe-only routing has an additional
+raw-evidence guard: the probe must score at least two positive candidate
+domains, the top raw probe score must be at least `0.50`, the top-vs-second raw
+margin must be at least `0.08`, and the top raw probe domain must match the
+proposed switch target. If no generated target/source diagnostic text is
+available and no domain-probe evidence is available, centroid similarity alone
+cannot switch the active domain.
 
 `text_topic_score` uses high-precision weighted keywords from
 `domain_taxonomy.py`. `domain_probe_retrieval_score` is a routing-only small
@@ -110,10 +114,11 @@ top-k probe over ready candidate domain indexes; fresh probe runs are gated by
 the router warmup/update/cooldown schedule and use raw top-k scores rather than
 the prompt retrieval score threshold. During the update/cooldown gate, the
 router reuses cached probe scores so the consistency-window state machine still
-sees stable probe evidence without rerunning MaxSim. When source/ASR topic text
-is available, fresh probes are refreshed on the normal router update interval;
-when no topic text is available, fresh probes refresh on the streaming window
-cadence so audio-only domain changes are not frozen for the full update
+sees stable probe evidence without rerunning MaxSim. When generated target or
+diagnostic router text is available, fresh probes are refreshed on the normal
+router update interval; when no topic text is available, fresh probes refresh
+on the streaming window cadence so audio-only domain changes are not frozen for
+the full update
 interval. Fresh probes reuse the per-window speech embeddings from the main
 retrieval pass when available, preserving the MaxSim-style max-over-window
 statistic; they only fall back to a separate audio encode when no query
@@ -132,15 +137,17 @@ The earlier `embedding_refs` implementation is not sufficient for robust cross-d
 when a session moves from an ACL/NLP talk to a medicine talk. A 2026-07-07
 probe found that real medicine audio windows often remained closer to the NLP
 centroid than to the medicine centroid, while window-level source text/topic
-signals cleanly identified the medicine domain. See
+signals cleanly identified the medicine domain. Source text is therefore useful
+as a diagnostic upper bound, while live E2E routing must rely on generated
+target text and speech-window domain probes. See
 [`auto_glossary_routing_probe_20260707.md`](auto_glossary_routing_probe_20260707.md).
 
-When no source/ASR/topic text is available, the fallback should use
+When no generated target or diagnostic topic text is available, the fallback should use
 small-top-k domain-probe retrieval plus weak centroid similarity. Current
 active-slice metadata should be treated as a small prior, not as a veto against
-a high-confidence text-topic switch. These routing probes must not change the
-prompt interface: the prompt still receives exactly 10 candidates retrieved
-from `common_terms + active_domain_overlay`.
+a high-confidence topic switch. These routing probes must not change the prompt
+interface: the prompt still receives exactly 10 candidates retrieved from the
+active domain slice.
 
 Switch guards run in this order:
 
@@ -256,7 +263,7 @@ The JSON WebSocket event contains:
       "margin": 0.19,
       "reason": "hybrid_window_topic",
       "evidence": {
-        "router_text_source": "streaming_asr",
+        "router_text_source": "generated_target",
         "current_score": 0.41,
         "target_score_delta": 0.32,
         "candidate_preset": "medicine_core_10k",
@@ -277,7 +284,7 @@ router. The current production defaults are:
 ```yaml
 auto_working:
   prompt_k: 10
-  base_slice: common_terms
+  base_slice: none
   initial_slice: nlp_core_10k
   routing:
     mode: hybrid_window_topic
@@ -290,6 +297,9 @@ auto_working:
     current_margin_threshold: 0.10
     min_consistent_windows_with_text: 2
     min_consistent_windows_audio_only: 3
+    enable_generated_target_text: true
+    generated_target_window_chunks: 3
+    generated_target_min_chars: 6
     production_update_sec: 30
     production_warmup_sec: 20
     production_cooldown_sec: 90
@@ -359,14 +369,15 @@ and the clean fixture regression with contested synthetic probe evidence passed
 the stricter 2-window text-path threshold at
 `/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/eval/auto_glossary_switch_fixture_probe_20260707_final8.json`.
 The audio-only probe path is covered by unit tests with both clean contested
-evidence and noisy small-margin false-switch evidence; it remains a fallback
-until real ASR-driven `router_text` is available.
+evidence and noisy small-margin false-switch evidence. Live E2E routing now
+adds generated target-translation text as `router_text_source=generated_target`
+after translation ticks; source text remains a diagnostic-only input.
 
 This script directly drives `HybridWindowTopicRouter` on fixture/source-text
 windows with wall-clock update and switch cooldown set to zero. It is a
-router-unit diagnostic for the window-topic-first state machine, not an
-end-to-end proof of live ASR, Omni batch-loop timing, real MaxSim domain-probe
-quality, or production switch latency.
+router-unit diagnostic for the window-topic state machine, not an end-to-end
+proof of Omni batch-loop timing, real MaxSim domain-probe quality, generated
+target feedback behavior, or production switch latency.
 
 End-to-end streaming metrics:
 
@@ -422,11 +433,10 @@ evidence, but the demo should select and rank candidates from an active
 inventory. The claim is:
 
 1. large open terminology memory can be maintained offline;
-2. the active domain overlay can be selected automatically from recent
-   source/ASR window-topic evidence, with routing-only domain probes and speech
-   centroids as secondary signals;
-3. the common base slice remains active while exactly one domain overlay is
-   switched at a time;
+2. the active domain slice can be selected automatically from speech-window
+   domain probes plus generated target-translation window topics, with source
+   transcript windows reserved for controlled diagnostics;
+3. exactly one domain slice is active at a time by default;
 4. fixed top-10 reranking reduces distractors relative to direct broad-memory
    prompting;
 5. users get terminology-aware streaming speech translation with zero setup.
@@ -434,12 +444,13 @@ inventory. The claim is:
 Use this paper wording:
 
 ```text
-RASST-Demo uses a window-topic-first automatic terminology router. For each
-streaming window, it estimates the current domain from recent source-side text
-when available, using source transcript in controlled eval or streaming ASR in
-deployment. It combines this with small top-k routing-only domain probes and a
-weak speech-centroid signal, then applies hysteresis over consecutive windows
-before switching the active domain overlay. The common-terms slice remains
-active across domains, while the prompt interface remains fixed: each chunk
-receives exactly 10 retrieved glossary candidates.
+RASST-Demo uses an E2E window-topic automatic terminology router. For each
+streaming window, it estimates the current domain from routing-only
+speech-window domain probes and, after translations are produced, a delayed
+generated target-translation text window. Source transcript windows are used
+only in controlled router diagnostics. The router combines these signals with a
+weak speech-centroid score and a small metadata prior, then applies hysteresis
+over consecutive windows before switching the active domain slice. The prompt
+interface remains fixed: each chunk receives exactly 10 retrieved glossary
+candidates from the active domain inventory.
 ```

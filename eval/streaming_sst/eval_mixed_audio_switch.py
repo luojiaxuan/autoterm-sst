@@ -14,7 +14,6 @@ import argparse
 import asyncio
 import json
 import random
-import statistics
 import sys
 import urllib.parse
 import urllib.request
@@ -91,13 +90,15 @@ def read_acl_audio_blocks(
         by_talk.setdefault(talk_id, []).append(wav_path)
 
     blocks: List[AudioBlock] = []
-    for talk_id, wavs in list(by_talk.items())[: max(0, int(limit_items))]:
+    for talk_id, wavs in by_talk.items():
         selected = list(wavs)
         if int(max_segs_per_talk) > 0:
             selected = selected[: int(max_segs_per_talk)]
         selected = [path for path in selected if Path(path).is_file()]
         if selected:
             blocks.append(AudioBlock(talk_id, "nlp", "acl", selected))
+        if len(blocks) >= max(0, int(limit_items)):
+            break
     return blocks
 
 
@@ -272,6 +273,8 @@ async def run_streaming_eval(
     feed_sleep: float,
     latency_multiplier: int,
     max_seconds_per_item: float = 0.0,
+    idle_timeout_sec: float = 60.0,
+    idle_timeouts_after_eof: int = 2,
 ) -> Dict[str, Any]:
     import websockets  # noqa: PLC0415 - optional dependency for CLI path only
 
@@ -284,6 +287,8 @@ async def run_streaming_eval(
             await ws.recv()
 
             async def feed() -> None:
+                # Server websocket input follows the existing eval_auto_glossary
+                # client convention: raw float32 PCM samples in [-1, 1).
                 for chunk in iter_pcm_chunks(blocks, chunk_samples=chunk_samples, max_seconds_per_item=max_seconds_per_item):
                     await ws.send(chunk.tobytes())
                     if float(feed_sleep) > 0:
@@ -291,49 +296,23 @@ async def run_streaming_eval(
                 await ws.send("EOF")
 
             feed_task = asyncio.create_task(feed())
-            idle = 0
-            while idle < 1:
+            idle_after_eof = 0
+            while True:
                 try:
-                    msg = await asyncio.wait_for(ws.recv(), timeout=60.0)
+                    msg = await asyncio.wait_for(ws.recv(), timeout=max(1.0, float(idle_timeout_sec)))
                 except asyncio.TimeoutError:
-                    idle += 1
+                    if feed_task.done():
+                        idle_after_eof += 1
+                        if idle_after_eof >= max(1, int(idle_timeouts_after_eof)):
+                            break
                     continue
                 event = json.loads(msg)
+                if str(event.get("type") or "").lower() in {"final", "done", "complete", "completed", "eof"}:
+                    break
                 if event.get("type") != "partial":
                     continue
                 events_seen += 1
-                meta = event.get("meta") or {}
-                cursor_samples = int(meta.get("cursor_samples") or (events_seen * chunk_samples))
-                expected = expected_domain_at(spans, cursor_samples)
-                topic = meta.get("topic") or {}
-                router = meta.get("topic_router") or {}
-                probe_scores = meta.get("domain_probe_scores") or {}
-                records.append(
-                    {
-                        "event_idx": events_seen,
-                        "cursor_samples": cursor_samples,
-                        "cursor_s": round(cursor_samples / TARGET_SAMPLE_RATE, 3),
-                        "expected_domain": expected,
-                        "active_domain": str(topic.get("active_domain") or ""),
-                        "active_preset": str(topic.get("active_glossary_preset") or ""),
-                        "switch_count": int(topic.get("switch_count") or 0),
-                        "router_action": str(router.get("action") or ""),
-                        "router_reason": str(router.get("reason") or ""),
-                        "router_target_domain": str(router.get("to_domain") or router.get("target_domain") or ""),
-                        "router_confidence": router.get("confidence"),
-                        "router_margin": router.get("margin"),
-                        "domain_probe_top_domain": domain_probe_top_domain(probe_scores),
-                        "domain_probe_scores": probe_scores,
-                        "router_text_source": str(meta.get("router_text_source") or ""),
-                        "router_text_chars": int(meta.get("router_text_chars") or 0),
-                        "prompt_reference_count": int(meta.get("prompt_reference_count") or 0),
-                        "fixed_prompt_k": int(meta.get("fixed_prompt_k") or 0),
-                        "candidate_pool_count": int(meta.get("candidate_pool_count") or 0),
-                        "retrieve_s": meta.get("retrieve_s"),
-                        "domain_probe_s": meta.get("domain_probe_s"),
-                        "text_preview": preview(str(event.get("text") or "")),
-                    }
-                )
+                records.append(extract_record(event, event_idx=events_seen, spans=spans))
             await feed_task
     finally:
         delete_session(base_url, session_id)
@@ -346,6 +325,73 @@ async def run_streaming_eval(
         },
         "records": records,
     }
+
+
+def extract_record(
+    event: Dict[str, Any],
+    *,
+    event_idx: int,
+    spans: Sequence[AudioBlockSpan],
+) -> Dict[str, Any]:
+    meta = event.get("meta")
+    if not isinstance(meta, dict):
+        raise RuntimeError("server partial event missing dict meta")
+    validate_partial_meta_schema(meta)
+    cursor_samples = int(meta["cursor_samples"])
+    expected = expected_domain_at(spans, cursor_samples)
+    topic = meta["topic"]
+    router = meta["topic_router"]
+    probe_scores = meta["domain_probe_scores"]
+    return {
+        "event_idx": int(event_idx),
+        "cursor_samples": cursor_samples,
+        "cursor_s": round(cursor_samples / TARGET_SAMPLE_RATE, 3),
+        "expected_domain": expected,
+        "active_domain": str(topic["active_domain"]),
+        "active_preset": str(topic["active_glossary_preset"]),
+        "switch_count": int(topic["switch_count"]),
+        "router_action": str(router.get("action") or ""),
+        "router_reason": str(router.get("reason") or ""),
+        "router_target_domain": str(router.get("to_domain") or ""),
+        "router_confidence": router.get("confidence"),
+        "router_margin": router.get("margin"),
+        "domain_probe_top_domain": domain_probe_top_domain(probe_scores),
+        "domain_probe_scores": probe_scores,
+        "router_text_source": str(meta["router_text_source"]),
+        "router_text_chars": int(meta.get("router_text_chars") or 0),
+        "prompt_reference_count": int(meta["prompt_reference_count"]),
+        "fixed_prompt_k": int(meta["fixed_prompt_k"]),
+        "candidate_pool_count": int(meta["candidate_pool_count"]),
+        "retrieve_s": meta.get("retrieve_s"),
+        "domain_probe_s": meta.get("domain_probe_s"),
+        "text_preview": preview(str(event.get("text") or "")),
+    }
+
+
+def validate_partial_meta_schema(meta: Dict[str, Any]) -> None:
+    required = (
+        "cursor_samples",
+        "topic",
+        "topic_router",
+        "domain_probe_scores",
+        "router_text_source",
+        "prompt_reference_count",
+        "fixed_prompt_k",
+        "candidate_pool_count",
+    )
+    missing = [key for key in required if key not in meta]
+    if missing:
+        raise RuntimeError(f"server partial meta missing required key(s): {', '.join(missing)}")
+    if not isinstance(meta["topic"], dict):
+        raise RuntimeError("server partial meta.topic must be a dict")
+    if not isinstance(meta["topic_router"], dict):
+        raise RuntimeError("server partial meta.topic_router must be a dict")
+    if not isinstance(meta["domain_probe_scores"], dict):
+        raise RuntimeError("server partial meta.domain_probe_scores must be a dict")
+    topic_required = ("active_domain", "active_glossary_preset", "switch_count")
+    topic_missing = [key for key in topic_required if key not in meta["topic"]]
+    if topic_missing:
+        raise RuntimeError(f"server partial meta.topic missing required key(s): {', '.join(topic_missing)}")
 
 
 def summarize_run(
@@ -571,6 +617,8 @@ def main() -> None:
     ap.add_argument("--base-segment-sec", type=float, default=0.96)
     ap.add_argument("--chunk", type=int, default=0)
     ap.add_argument("--feed-sleep", type=float, default=0.0)
+    ap.add_argument("--idle-timeout-sec", type=float, default=60.0)
+    ap.add_argument("--idle-timeouts-after-eof", type=int, default=2)
     ap.add_argument("--max-switch-events", type=int, default=3)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--out-json", default="")
@@ -620,6 +668,8 @@ def main() -> None:
                 feed_sleep=args.feed_sleep,
                 latency_multiplier=args.latency_multiplier,
                 max_seconds_per_item=args.max_seconds_per_item,
+                idle_timeout_sec=args.idle_timeout_sec,
+                idle_timeouts_after_eof=args.idle_timeouts_after_eof,
             )
         )
         payload["session"] = stream_payload["session"]

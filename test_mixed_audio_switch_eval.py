@@ -15,6 +15,7 @@ from eval.streaming_sst.eval_mixed_audio_switch import (
     build_schedule,
     build_spans,
     domain_transitions,
+    extract_record,
     expected_domain_at,
     read_acl_audio_blocks,
     read_medicine_audio_blocks,
@@ -61,6 +62,30 @@ class MixedAudioSwitchEvalTests(unittest.TestCase):
 
         self.assertEqual([item.item_id for item in schedule], ["acl_a", "medicine_404", "acl_b"])
         self.assertEqual([item.expected_domain for item in schedule], ["nlp", "medicine", "nlp"])
+
+    def test_acl_reader_filters_missing_wavs_before_limit(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            acl_root = root / "acl"
+            existing_a = acl_root / "seg" / "000.wav"
+            existing_b = acl_root / "seg" / "002.wav"
+            _write_wav(existing_a, TARGET_SAMPLE_RATE)
+            _write_wav(existing_b, TARGET_SAMPLE_RATE)
+            (acl_root / "segments.meta.jsonl").write_text(
+                "\n".join(
+                    [
+                        json.dumps({"talk": "missing_first", "seg_wav": str(acl_root / "seg" / "missing.wav")}),
+                        json.dumps({"talk": "acl_a", "seg_wav": str(existing_a)}),
+                        json.dumps({"talk": "acl_b", "seg_wav": str(existing_b)}),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            blocks = read_acl_audio_blocks(str(acl_root), limit_items=2)
+
+        self.assertEqual([block.item_id for block in blocks], ["acl_a", "acl_b"])
 
     def test_spans_and_expected_domain_lookup(self) -> None:
         blocks = [
@@ -130,6 +155,47 @@ class MixedAudioSwitchEvalTests(unittest.TestCase):
         self.assertTrue(summary["regression_pass"])
         self.assertEqual(summary["steady_state_mismatch_count"], 0)
         self.assertEqual(summary["probe_top_accuracy"], 1.0)
+
+    def test_extract_record_requires_cursor_samples_and_runtime_schema(self) -> None:
+        blocks = [AudioBlock("acl", "nlp", "acl", ["mock-a.wav"])]
+        with patch("eval.streaming_sst.eval_mixed_audio_switch.wav_num_frames", return_value=TARGET_SAMPLE_RATE):
+            spans = build_spans(blocks)
+        event = {
+            "type": "partial",
+            "text": "测试",
+            "meta": {
+                "cursor_samples": TARGET_SAMPLE_RATE,
+                "topic": {
+                    "active_domain": "nlp",
+                    "active_glossary_preset": "nlp_core_10k",
+                    "switch_count": 0,
+                },
+                "topic_router": {
+                    "action": "stay",
+                    "to_domain": "nlp",
+                    "confidence": 0.9,
+                    "margin": 0.5,
+                },
+                "domain_probe_scores": {
+                    "nlp": {"domain": "nlp", "top_score": 0.8, "mean_topk_score": 0.7}
+                },
+                "router_text_source": "generated_target",
+                "prompt_reference_count": 10,
+                "fixed_prompt_k": 10,
+                "candidate_pool_count": 50,
+            },
+        }
+
+        record = extract_record(event, event_idx=1, spans=spans)
+        self.assertEqual(record["cursor_samples"], TARGET_SAMPLE_RATE)
+        self.assertEqual(record["expected_domain"], "nlp")
+        self.assertEqual(record["domain_probe_top_domain"], "nlp")
+
+        bad = dict(event)
+        bad["meta"] = dict(event["meta"])
+        del bad["meta"]["cursor_samples"]
+        with self.assertRaisesRegex(RuntimeError, "cursor_samples"):
+            extract_record(bad, event_idx=1, spans=spans)
 
 
 if __name__ == "__main__":

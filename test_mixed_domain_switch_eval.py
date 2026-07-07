@@ -83,6 +83,18 @@ class MixedDomainSwitchEvalTests(unittest.TestCase):
         self.assertFalse(payload["summary"]["regression_pass"])
         self.assertEqual(payload["summary"]["switch_count"], 0)
 
+    def test_inverted_probe_diagnostic_fails(self) -> None:
+        acl, medicine = _blocks()
+        payload = evaluate_playlist(
+            build_schedule(acl[:1], medicine[:1], schedule="alternating"),
+            schedule_name="alternating",
+            router_text_source="generated_target",
+            probe_mode="inverted",
+        )
+
+        self.assertFalse(payload["summary"]["regression_pass"])
+        self.assertLess(payload["summary"]["steady_state_accuracy"], 1.0)
+
 
 if __name__ == "__main__":
     unittest.main()

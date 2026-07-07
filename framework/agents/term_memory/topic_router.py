@@ -532,6 +532,8 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
         text_source = str(router_text_source or "none")
         is_generated_target = text_source == "generated_target"
         has_text = bool((router_text or "").strip() and text_source != "none")
+        text_raw_for_guard, _ = topic_keyword_scores(router_text)
+        has_text_topic_signal = bool(has_text and any(float(value) > 0.0 for value in text_raw_for_guard.values()))
         has_probe = any(_probe_value(value) > 0.0 for value in (domain_probe_scores or {}).values())
         has_signal = bool(has_text or has_probe or query_vec or session_state.ema_query_embedding or session_state.recent_references)
         audio_probe_guard = self._audio_probe_guard(
@@ -550,6 +552,7 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
         evidence = {
             "router_text_source": text_source,
             "has_router_text": has_text,
+            "has_text_topic_signal": has_text_topic_signal,
             "has_domain_probe": has_probe,
             "has_query_embedding": bool(query_vec or session_state.ema_query_embedding),
             "recent_reference_count": len(session_state.recent_references),
@@ -593,6 +596,8 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             guard_reason = "target_unavailable"
         elif is_generated_target and not generated_target_probe_guard.get("ok", False):
             guard_reason = "generated_target_probe_evidence_insufficient"
+        elif has_probe and has_text and not has_text_topic_signal and not audio_probe_guard.get("ok", False):
+            guard_reason = "probe_only_evidence_insufficient"
         elif not has_text and not has_probe:
             guard_reason = "audio_probe_required"
         elif not has_text and has_probe and not audio_probe_guard.get("ok", False):

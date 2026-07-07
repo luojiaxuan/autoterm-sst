@@ -230,7 +230,7 @@ def evaluate_playlist(
                 now_s=float(global_window),
                 router_text=text,
                 router_text_source=router_text_source,
-                domain_probe_scores=probe_for_domain(block.expected_domain) if probe_mode == "expected" else {},
+                domain_probe_scores=probe_for_domain(block.expected_domain, mode=probe_mode) if probe_mode != "none" else {},
             )
             if decision.action == "switch":
                 switch_count += 1
@@ -292,22 +292,30 @@ def evaluate_playlist(
     }
 
 
-def probe_for_domain(domain: str) -> Dict[str, DomainProbeScore]:
+def probe_for_domain(domain: str, *, mode: str = "expected") -> Dict[str, DomainProbeScore]:
     target = str(domain or "nlp")
     other = "medicine" if target == "nlp" else "nlp"
+    target_score = 0.90
+    other_score = 0.35
+    if mode == "inverted":
+        target_score = 0.35
+        other_score = 0.90
+    elif mode == "contested":
+        target_score = 0.30
+        other_score = 0.28
     return {
         target: DomainProbeScore(
             domain=target,
             preset_id=f"{target}_core_10k",
-            top_score=0.35,
-            mean_topk_score=0.35,
+            top_score=target_score,
+            mean_topk_score=target_score,
             top_terms=(f"{target} probe",),
         ),
         other: DomainProbeScore(
             domain=other,
             preset_id=f"{other}_core_10k",
-            top_score=0.08,
-            mean_topk_score=0.08,
+            top_score=other_score,
+            mean_topk_score=other_score,
             top_terms=(f"{other} distractor",),
         ),
     }
@@ -518,7 +526,7 @@ def main() -> None:
     )
     ap.add_argument("--seed", type=int, default=20260707)
     ap.add_argument("--router-text-source", default="generated_target")
-    ap.add_argument("--probe-mode", choices=("expected", "none"), default="expected")
+    ap.add_argument("--probe-mode", choices=("expected", "none", "inverted", "contested"), default="expected")
     ap.add_argument("--initial-domain", choices=("first", "nlp", "medicine"), default="first")
     ap.add_argument("--max-switch-windows", type=int, default=3)
     ap.add_argument("--min-consistent-generated-target", type=int, default=3)

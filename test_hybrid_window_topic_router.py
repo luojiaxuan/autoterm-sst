@@ -66,12 +66,12 @@ def _router_all_domains(**overrides):
 
 def _probe_for(target: str) -> dict[str, DomainProbeScore]:
     scores = {
-        "nlp": 0.08,
-        "medicine": 0.08,
-        "finance": 0.08,
-        "legal": 0.08,
+        "nlp": 0.35,
+        "medicine": 0.35,
+        "finance": 0.35,
+        "legal": 0.35,
     }
-    scores[target] = 0.35
+    scores[target] = 0.90
     return {
         domain: DomainProbeScore(
             domain,
@@ -81,6 +81,25 @@ def _probe_for(target: str) -> dict[str, DomainProbeScore]:
             top_terms=(domain,),
         )
         for domain, score in scores.items()
+    }
+
+
+def _contested_probe(target: str, other: str, *, target_score: float, other_score: float) -> dict[str, DomainProbeScore]:
+    return {
+        target: DomainProbeScore(
+            target,
+            f"{target}_core_10k",
+            top_score=target_score,
+            mean_topk_score=target_score,
+            top_terms=(target,),
+        ),
+        other: DomainProbeScore(
+            other,
+            f"{other}_core_10k",
+            top_score=other_score,
+            mean_topk_score=other_score,
+            top_terms=(other,),
+        ),
     }
 
 
@@ -262,6 +281,60 @@ class HybridWindowTopicRouterTests(unittest.TestCase):
         self.assertEqual(decisions[1].action, "stay")
         self.assertEqual(decisions[2].action, "switch")
         self.assertEqual(decisions[2].target_domain_id, "medicine")
+
+    def test_generic_manifest_text_with_contested_probe_does_not_false_switch(self) -> None:
+        router = _router()
+        state = RouterSessionState("nlp_core_10k", "nlp", created_s=1.0)
+        generic_text = "This part describes the background and experimental setup."
+        weak_probe = _contested_probe(
+            "medicine",
+            "nlp",
+            target_score=0.30,
+            other_score=0.28,
+        )
+
+        decisions = [
+            router.observe(
+                state,
+                None,
+                [],
+                now_s=float(step),
+                router_text=generic_text,
+                router_text_source="manifest_source",
+                domain_probe_scores=weak_probe,
+            )
+            for step in (10, 11, 12)
+        ]
+
+        self.assertTrue(all(decision.action == "stay" for decision in decisions))
+        self.assertTrue(all("probe_only_evidence_insufficient" in decision.reason for decision in decisions))
+
+    def test_generic_generated_target_with_contested_probe_does_not_false_switch(self) -> None:
+        router = _router()
+        state = RouterSessionState("nlp_core_10k", "nlp", created_s=1.0)
+        generic_text = "这个部分主要介绍相关背景和实验设置。"
+        weak_probe = _contested_probe(
+            "medicine",
+            "nlp",
+            target_score=0.30,
+            other_score=0.28,
+        )
+
+        decisions = [
+            router.observe(
+                state,
+                None,
+                [],
+                now_s=float(step),
+                router_text=generic_text,
+                router_text_source="generated_target",
+                domain_probe_scores=weak_probe,
+            )
+            for step in (10, 11, 12)
+        ]
+
+        self.assertTrue(all(decision.action == "stay" for decision in decisions))
+        self.assertTrue(all("probe_only_evidence_insufficient" in decision.reason for decision in decisions))
 
     def test_generated_target_noisy_generic_chinese_does_not_switch_to_nlp(self) -> None:
         router = _router_all_domains()

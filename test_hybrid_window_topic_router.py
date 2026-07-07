@@ -240,6 +240,29 @@ class HybridWindowTopicRouterTests(unittest.TestCase):
             all("generated_target_probe_evidence_insufficient" in decision.reason for decision in decisions)
         )
 
+    def test_generated_target_generic_text_does_not_dilute_strong_probe(self) -> None:
+        router = _router()
+        state = RouterSessionState("nlp_core_10k", "nlp", created_s=1.0)
+        generic_target_text = "这个部分主要介绍相关背景和实验设置。"
+
+        decisions = [
+            router.observe(
+                state,
+                None,
+                [],
+                now_s=float(step),
+                router_text=generic_target_text,
+                router_text_source="generated_target",
+                domain_probe_scores=_probe_for("medicine"),
+            )
+            for step in (10, 11, 12)
+        ]
+
+        self.assertEqual(decisions[0].action, "stay")
+        self.assertEqual(decisions[1].action, "stay")
+        self.assertEqual(decisions[2].action, "switch")
+        self.assertEqual(decisions[2].target_domain_id, "medicine")
+
     def test_generated_target_noisy_generic_chinese_does_not_switch_to_nlp(self) -> None:
         router = _router_all_domains()
         state = RouterSessionState("medicine_core_10k", "medicine", created_s=1.0)

@@ -764,6 +764,7 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             {key: _probe_value(value) for key, value in domain_probe_scores.items()}
         )
         has_text = bool((router_text or "").strip() and str(router_text_source or "none") != "none")
+        has_text_topic_signal = any(float(value) > 0.0 for value in text_by_domain.values())
         has_probe = any(float(value) > 0.0 for value in probe_by_domain.values())
 
         ema = session_state.ema_query_embedding
@@ -779,7 +780,7 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
         has_embedding = any(value is not None for value in embedding_raw.values())
         has_reference = any(float(value) > 0.0 for value in reference_by_preset.values())
         active_weight_sum = (
-            (float(self.config.text_topic_weight) if has_text else 0.0)
+            (float(self.config.text_topic_weight) if has_text_topic_signal else 0.0)
             + (float(self.config.domain_probe_weight) if has_probe else 0.0)
             + (float(self.config.speech_centroid_weight) if has_embedding else 0.0)
             + (float(self.config.metadata_prior_weight) if has_reference else 0.0)
@@ -795,7 +796,7 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             speech_score = float(embedding_by_preset.get(item.preset_id, 0.0))
             metadata_prior = float(reference_by_preset.get(item.preset_id, 0.0))
             weighted = 0.0
-            if has_text:
+            if has_text_topic_signal:
                 weighted += float(self.config.text_topic_weight) * text_score
             if has_probe:
                 weighted += float(self.config.domain_probe_weight) * probe_score
@@ -806,7 +807,7 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             conf = weighted / active_weight_sum if active_weight_sum > 1e-9 else 0.0
             raw_final_by_preset[item.preset_id] = _clamp(conf, 0.0, 1.0)
 
-        alpha = float(self.config.text_ema_alpha if has_text else self.config.audio_ema_alpha)
+        alpha = float(self.config.text_ema_alpha if has_text_topic_signal else self.config.audio_ema_alpha)
         alpha = _clamp(alpha, 0.0, 0.999)
         if raw_final_by_preset:
             if not session_state.ema_domain_scores:
@@ -837,6 +838,7 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
                     evidence={
                         "term_count": item.term_count,
                         "router_text_source": router_text_source or "none",
+                        "has_text_topic_signal": has_text_topic_signal,
                         "text_topic_score": round(text_score, 4),
                         "domain_probe_score": round(probe_score, 4),
                         "speech_centroid_score": round(speech_score, 4),

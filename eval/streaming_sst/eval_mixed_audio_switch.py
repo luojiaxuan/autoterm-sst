@@ -72,6 +72,8 @@ def read_acl_audio_blocks(
     limit_items: int,
     max_segs_per_talk: int = 0,
 ) -> List[AudioBlock]:
+    if int(limit_items) <= 0:
+        return []
     root = Path(acl_root)
     meta_path = root / "segments.meta.jsonl"
     if not meta_path.is_file():
@@ -107,6 +109,8 @@ def read_medicine_audio_blocks(
     *,
     limit_items: int,
 ) -> List[AudioBlock]:
+    if int(limit_items) <= 0:
+        return []
     root = Path(audio_dir)
     if not root.is_dir():
         raise FileNotFoundError(f"medicine audio directory not found: {root}")

@@ -91,6 +91,26 @@ class MixedAudioSwitchEvalTests(unittest.TestCase):
 
         self.assertEqual([block.item_id for block in blocks], ["acl_a", "acl_b"])
 
+    def test_audio_block_readers_respect_zero_limit(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            acl_root = root / "acl"
+            acl_wav = acl_root / "seg" / "000.wav"
+            _write_wav(acl_wav, TARGET_SAMPLE_RATE)
+            (acl_root / "segments.meta.jsonl").write_text(
+                json.dumps({"talk": "acl_a", "seg_wav": str(acl_wav)}) + "\n",
+                encoding="utf-8",
+            )
+            med_dir = root / "medicine"
+            med_wav = med_dir / "sample_404_v2" / "404_v2.wav"
+            _write_wav(med_wav, TARGET_SAMPLE_RATE)
+
+            acl = read_acl_audio_blocks(str(acl_root), limit_items=0)
+            medicine = read_medicine_audio_blocks(str(med_dir), limit_items=0)
+
+        self.assertEqual(acl, [])
+        self.assertEqual(medicine, [])
+
     def test_spans_and_expected_domain_lookup(self) -> None:
         blocks = [
             AudioBlock("acl", "nlp", "acl", ["mock-a.wav"]),

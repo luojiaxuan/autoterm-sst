@@ -115,6 +115,8 @@ def initial_state_for(scenario: str) -> RouterSessionState:
 def probe_for(window: TextWindow) -> Dict[str, DomainProbeScore]:
     domain = window.expected_domain
     preset = f"{domain}_core_10k"
+    other_domain = "medicine" if domain == "nlp" else "nlp"
+    other_preset = f"{other_domain}_core_10k"
     return {
         domain: DomainProbeScore(
             domain=domain,
@@ -122,7 +124,14 @@ def probe_for(window: TextWindow) -> Dict[str, DomainProbeScore]:
             top_score=0.9,
             mean_topk_score=0.8,
             top_terms=(f"{domain} probe term",),
-        )
+        ),
+        other_domain: DomainProbeScore(
+            domain=other_domain,
+            preset_id=other_preset,
+            top_score=0.4,
+            mean_topk_score=0.35,
+            top_terms=(f"{other_domain} distractor probe term",),
+        ),
     }
 
 

@@ -42,6 +42,9 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(config.router_domain_probe_top_k, 5)
         self.assertEqual(config.router_min_consistent_windows_with_text, 2)
         self.assertEqual(config.router_min_consistent_windows_audio_only, 3)
+        self.assertEqual(config.router_audio_probe_min_top_score, 0.50)
+        self.assertEqual(config.router_audio_probe_min_raw_margin, 0.08)
+        self.assertEqual(config.router_audio_probe_min_positive_domains, 2)
         self.assertEqual(config.auto_glossary_switch_cooldown_sec, 90.0)
         self.assertEqual(config.auto_glossary_candidate_stale_sec, 120.0)
 
@@ -290,6 +293,13 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         )
         state = RouterSessionState("nlp_core_10k", "nlp", created_s=0.0)
         probe = {
+            "nlp": DomainProbeScore(
+                domain="nlp",
+                preset_id="nlp_core_10k",
+                top_score=0.4,
+                mean_topk_score=0.35,
+                top_terms=("language model",),
+            ),
             "medicine": DomainProbeScore(
                 domain="medicine",
                 preset_id="medicine_core_10k",

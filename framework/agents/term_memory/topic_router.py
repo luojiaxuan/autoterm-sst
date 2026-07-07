@@ -108,6 +108,9 @@ class RouterConfig:
     min_consistent_windows_audio_only: int = 3
     text_ema_alpha: float = 0.60
     audio_ema_alpha: float = 0.80
+    audio_probe_min_top_score: float = 0.50
+    audio_probe_min_raw_margin: float = 0.08
+    audio_probe_min_positive_domains: int = 2
 
 
 @dataclass
@@ -524,6 +527,11 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
         has_text = bool((router_text or "").strip() and text_source != "none")
         has_probe = any(_probe_value(value) > 0.0 for value in (domain_probe_scores or {}).values())
         has_signal = bool(has_text or has_probe or query_vec or session_state.ema_query_embedding or session_state.recent_references)
+        audio_probe_guard = self._audio_probe_guard(
+            domain_probe_scores or {},
+            target_domain=target_domain,
+            target_preset=target_preset,
+        )
         reason = "hybrid_window_topic"
         action: Literal["stay", "switch", "fallback"] = "stay"
         guard_reason = ""
@@ -540,6 +548,7 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             "ema_domain_scores": {
                 key: round(float(value), 4) for key, value in session_state.ema_domain_scores.items()
             },
+            "audio_probe_guard": audio_probe_guard,
         }
 
         unsupported_current = bool(
@@ -569,6 +578,8 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             guard_reason = "general_or_common"
         elif not self._slice_available(target_preset):
             guard_reason = "target_unavailable"
+        elif not has_text and has_probe and not audio_probe_guard.get("ok", False):
+            guard_reason = "audio_probe_evidence_insufficient"
         elif confidence < float(self.config.min_confidence):
             guard_reason = f"confidence<{float(self.config.min_confidence):.2f}"
         elif margin < float(self.config.min_margin):
@@ -626,6 +637,62 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
         if action == "switch":
             session_state.pending_preset_id = target_preset
         return decision
+
+    def _audio_probe_guard(
+        self,
+        domain_probe_scores: Dict[str, Any],
+        *,
+        target_domain: str,
+        target_preset: str,
+    ) -> Dict[str, Any]:
+        rows: List[Dict[str, Any]] = []
+        for key, value in (domain_probe_scores or {}).items():
+            score = _probe_value(value)
+            domain = str(getattr(value, "domain", "") or "").strip()
+            preset = str(getattr(value, "preset_id", "") or "").strip()
+            if isinstance(value, dict):
+                domain = str(value.get("domain") or domain).strip()
+                preset = str(value.get("preset_id") or preset).strip()
+            domain = domain or str(key)
+            preset = preset or str(key)
+            if not math.isfinite(float(score)):
+                score = 0.0
+            rows.append({"domain": domain, "preset": preset, "score": max(0.0, float(score))})
+        rows.sort(key=lambda item: float(item["score"]), reverse=True)
+        positive = [item for item in rows if float(item["score"]) > 0.0]
+        top = rows[0] if rows else {"domain": "", "preset": "", "score": 0.0}
+        second_score = float(rows[1]["score"]) if len(rows) > 1 else 0.0
+        raw_margin = max(0.0, float(top["score"]) - second_score)
+        target_row = next(
+            (
+                item for item in rows
+                if str(item["domain"]) == str(target_domain) or str(item["preset"]) == str(target_preset)
+            ),
+            {"domain": target_domain, "preset": target_preset, "score": 0.0},
+        )
+        top_matches_target = (
+            str(top["domain"]) == str(target_domain)
+            or str(top["preset"]) == str(target_preset)
+        )
+        ok = bool(
+            len(positive) >= max(1, int(self.config.audio_probe_min_positive_domains))
+            and top_matches_target
+            and float(top["score"]) >= float(self.config.audio_probe_min_top_score)
+            and raw_margin >= float(self.config.audio_probe_min_raw_margin)
+        )
+        return {
+            "ok": ok,
+            "positive_domains": len(positive),
+            "top_domain": str(top["domain"]),
+            "top_preset": str(top["preset"]),
+            "top_score": round(float(top["score"]), 4),
+            "second_score": round(second_score, 4),
+            "raw_margin": round(raw_margin, 4),
+            "target_probe_score": round(float(target_row["score"]), 4),
+            "min_top_score": round(float(self.config.audio_probe_min_top_score), 4),
+            "min_raw_margin": round(float(self.config.audio_probe_min_raw_margin), 4),
+            "min_positive_domains": int(self.config.audio_probe_min_positive_domains),
+        }
 
     def _score_hybrid(
         self,

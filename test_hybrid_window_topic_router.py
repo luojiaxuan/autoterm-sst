@@ -88,6 +88,13 @@ class HybridWindowTopicRouterTests(unittest.TestCase):
         router = _router()
         state = RouterSessionState("nlp_core_10k", "nlp", created_s=1.0)
         probe = {
+            "nlp": DomainProbeScore(
+                "nlp",
+                "nlp_core_10k",
+                top_score=0.4,
+                mean_topk_score=0.35,
+                top_terms=("language model",),
+            ),
             "medicine": DomainProbeScore(
                 "medicine",
                 "medicine_core_10k",
@@ -108,6 +115,35 @@ class HybridWindowTopicRouterTests(unittest.TestCase):
         self.assertEqual(third.action, "switch")
         self.assertEqual(third.target_domain_id, "medicine")
         self.assertGreaterEqual(third.confidence, 0.60)
+
+    def test_audio_only_contested_probe_does_not_false_switch_on_small_raw_margin(self) -> None:
+        router = _router()
+        state = RouterSessionState("nlp_core_10k", "nlp", created_s=1.0)
+        probe = {
+            "nlp": DomainProbeScore(
+                "nlp",
+                "nlp_core_10k",
+                top_score=0.50,
+                mean_topk_score=0.48,
+                top_terms=("language model",),
+            ),
+            "medicine": DomainProbeScore(
+                "medicine",
+                "medicine_core_10k",
+                top_score=0.53,
+                mean_topk_score=0.50,
+                top_terms=("clinical trial",),
+            ),
+        }
+
+        decisions = [
+            router.observe(state, None, [], now_s=float(step), domain_probe_scores=probe)
+            for step in (10, 11, 12, 13)
+        ]
+
+        self.assertTrue(all(decision.action == "stay" for decision in decisions))
+        self.assertTrue(all("audio_probe_evidence_insufficient" in decision.reason for decision in decisions))
+        self.assertEqual(state.active_domain_id, "nlp")
 
     def test_metadata_prior_does_not_veto_high_confidence_text_topic(self) -> None:
         router = _router()

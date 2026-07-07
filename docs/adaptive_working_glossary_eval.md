@@ -65,17 +65,22 @@ python eval/streaming_sst/score_auto_glossary.py \
 ```
 
 Taurus source-text sanity run on 2026-07-07 was rerun at
-`/mnt/data2/jiaxuanluo/rasst-demo/runtime/eval/auto_glossary_switch_router_only_20260707_final7.json`
+`/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/eval/auto_glossary_switch_router_only_20260707_final8.json`
 and passed all four router-unit scenarios. ACL-only and medicine-only had zero
 false switches. ACL->medicine passed within the 4-window threshold; the clean
-fixture regression with synthetic probe evidence passed the stricter 2-window
-threshold at `/tmp/auto_glossary_switch_fixture_probe_final7.json`.
+fixture regression with contested synthetic probe evidence passed the stricter
+2-window text-path threshold at
+`/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/eval/auto_glossary_switch_fixture_probe_20260707_final8.json`.
+The audio-only probe fallback is separately covered by unit tests that require
+raw probe top-score, raw margin, and at least two positive probe domains before
+the renormalized probe score can switch domains.
 
 `eval_auto_glossary_switch.py` is a router-unit/source-text diagnostic. It
 directly drives `HybridWindowTopicRouter`, disables wall-clock update/cooldown
 delays, and uses synthetic probe scores when `--with-probe` is set. These
 numbers validate the window-topic-first state machine; they are not an
-end-to-end live-ASR/Omni/MaxSim probe deployment-latency benchmark.
+end-to-end live-ASR/Omni/MaxSim probe deployment-latency benchmark or evidence
+that audio-only routing should be used as the primary production signal.
 
 ## Metrics
 

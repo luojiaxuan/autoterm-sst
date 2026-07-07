@@ -53,6 +53,9 @@ auto_working:
     min_consistent_windows: 2
     min_consistent_windows_with_text: 2
     min_consistent_windows_audio_only: 3
+    audio_probe_min_top_score: 0.50
+    audio_probe_min_raw_margin: 0.08
+    audio_probe_min_positive_domains: 2
     update_sec: 5
     warmup_sec: 6
     switch_cooldown_sec: 90

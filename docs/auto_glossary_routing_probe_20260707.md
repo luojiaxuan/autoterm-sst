@@ -42,12 +42,12 @@ score(domain slice) =
 
 Data/model/index:
 
-- ACL audio: `/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/acl6060/2022.acl-long.367.wav`
-- Medicine audio: `/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/medicine/sample_404_v2/404_v2.wav`
-- Medicine segment transcript: `/mnt/data2/jiaxuanluo/RASST/data/main_result/inputs/medicine_zh/medicine.source_text.en__medicine_404.txt`
+- ACL audio: `/mnt/taurus/data2/jiaxuanluo/RASST/data/main_result/audio/acl6060/2022.acl-long.367.wav`
+- Medicine audio: `/mnt/taurus/data2/jiaxuanluo/RASST/data/main_result/audio/medicine/sample_404_v2/404_v2.wav`
+- Medicine segment transcript: `/mnt/taurus/data2/jiaxuanluo/RASST/data/main_result/inputs/medicine_zh/medicine.source_text.en__medicine_404.txt`
 - Retriever checkpoint: `/home/jiaxuanluo/rasst-demo/checkpoints/retriever/rasst-hn1024.pt`
-- NLP index: `/mnt/data2/jiaxuanluo/rasst-demo/runtime/term_memory/indexes/wiki_nlp_ai_cs/en-zh/maxsim.pt`
-- Medicine index: `/mnt/data2/jiaxuanluo/rasst-demo/runtime/term_memory/indexes/wiki_medicine/en-zh/maxsim.pt`
+- NLP index: `/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/indexes/wiki_nlp_ai_cs/en-zh/maxsim.pt`
+- Medicine index: `/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/indexes/wiki_medicine/en-zh/maxsim.pt`
 
 Each retrieval observation used a real streaming shape: 1.92s current chunk plus 1.92s lookback, not sentence-level batching.
 
@@ -124,6 +124,10 @@ score(domain) =
 ```
 
 When no source/ASR/topic text is available, route should fall back to domain-probe retrieval plus weak speech centroid, not rely on centroid alone.
+The fallback is intentionally conservative: audio-only probe switches require
+at least two positive probe-domain scores, a raw top score of at least `0.50`, a
+raw top-vs-second margin of at least `0.08`, and agreement between the top probe
+domain and the proposed target.
 
 Recommended switch guard:
 
@@ -137,5 +141,5 @@ Recommended switch guard:
 
 - Add a real streaming ASR producer for `router_text`; the live pipeline can now accept the field.
 - Routing-only domain-probe retrieval is now wired into Omni routing ticks for ready domain indexes. Fresh probe runs are gated by the router warmup/update/cooldown schedule, cached probe scores are reused during gate windows for router consistency, audio-only sessions refresh probes on the streaming window cadence instead of the full update interval, fresh probes reuse the main retrieval per-window speech embeddings when available, raw top-k probe scores are used rather than the prompt retrieval threshold, and `domain_probe_scores`, `domain_probe_slices`, `domain_probe_cached`, and `domain_probe_s` are recorded in JSON metadata without changing active prompt top-k.
-- `eval/streaming_sst/eval_auto_glossary_switch.py` now provides router-unit ACL/NLP <-> medicine switch diagnostics using source-text windows or built-in fixtures. The latest Taurus source-text output is staged at `/mnt/data2/jiaxuanluo/rasst-demo/runtime/eval/auto_glossary_switch_router_only_20260707_final7.json`; it passes all four scenarios with zero false switches in ACL-only and medicine-only streams. The clean fixture + probe regression passes the stricter 2-window switch threshold at `/tmp/auto_glossary_switch_fixture_probe_final7.json`. This is not an end-to-end live-ASR/Omni/MaxSim probe deployment-latency benchmark.
+- `eval/streaming_sst/eval_auto_glossary_switch.py` now provides router-unit ACL/NLP <-> medicine switch diagnostics using source-text windows or built-in fixtures. The latest Taurus source-text output is staged at `/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/eval/auto_glossary_switch_router_only_20260707_final8.json`; it passes all four scenarios with zero false switches in ACL-only and medicine-only streams. The clean fixture + contested-probe regression passes the stricter 2-window text-path threshold at `/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/eval/auto_glossary_switch_fixture_probe_20260707_final8.json`. This is not an end-to-end live-ASR/Omni/MaxSim probe deployment-latency benchmark, and audio-only switching remains a guarded fallback rather than the main production signal.
 - Continue expanding end-to-end active-slice candidate-quality eval with real ASR-driven `router_text`.

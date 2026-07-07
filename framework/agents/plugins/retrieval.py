@@ -756,8 +756,9 @@ class MaxSimRetrievalPlugin(RetrievalPlugin):
                 request_idx = int(meta["request_idx"])
                 row_valid = valid_windows[row_idx]
                 if int(row_valid.sum().item()) > 0:
-                    valid_window_embs = window_embs[row_idx][row_valid].detach().cpu().float()
-                    outputs[request_idx].query_window_embeddings = valid_window_embs
+                    valid_window_embs = window_embs[row_idx][row_valid]
+                    if bool(requests[request_idx].get("return_query_window_embeddings")):
+                        outputs[request_idx].query_window_embeddings = valid_window_embs.detach().cpu().float()
                     pooled = valid_window_embs.mean(dim=0)
                     pooled = F.normalize(pooled, p=2, dim=-1).detach().cpu().float()
                     outputs[request_idx].query_embedding = pooled

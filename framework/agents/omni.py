@@ -304,6 +304,9 @@ class OmniConfig:
     router_domain_probe_top_k: int = 5
     router_min_consistent_windows_with_text: int = 2
     router_min_consistent_windows_audio_only: int = 3
+    router_audio_probe_min_top_score: float = 0.50
+    router_audio_probe_min_raw_margin: float = 0.08
+    router_audio_probe_min_positive_domains: int = 2
     prompt_top_k: int = PROMPT_K
     ui_top_k: int = PROMPT_K
     autoterm_broad_topk_per_slice: int = 50
@@ -427,6 +430,9 @@ class OmniConfig:
                 routing_config.get("min_consistent_windows_audio_only"),
                 3,
             ),
+            router_audio_probe_min_top_score=_safe_float(routing_config.get("audio_probe_min_top_score"), 0.50),
+            router_audio_probe_min_raw_margin=_safe_float(routing_config.get("audio_probe_min_raw_margin"), 0.08),
+            router_audio_probe_min_positive_domains=_safe_int(routing_config.get("audio_probe_min_positive_domains"), 2),
             prompt_top_k=_env_int("RASST_PROMPT_TOP_K", prompt_k_default),
             ui_top_k=_env_int("RASST_UI_TOP_K", prompt_k_default),
             autoterm_broad_topk_per_slice=broad_topk_default,
@@ -564,6 +570,9 @@ class OmniAgent(Agent):
             metadata_prior_weight=self.config.router_metadata_prior_weight,
             min_consistent_windows_with_text=self.config.router_min_consistent_windows_with_text,
             min_consistent_windows_audio_only=self.config.router_min_consistent_windows_audio_only,
+            audio_probe_min_top_score=self.config.router_audio_probe_min_top_score,
+            audio_probe_min_raw_margin=self.config.router_audio_probe_min_raw_margin,
+            audio_probe_min_positive_domains=self.config.router_audio_probe_min_positive_domains,
         )
         router_cls = (
             HybridWindowTopicRouter
@@ -1624,6 +1633,7 @@ class OmniAgent(Agent):
                     "current_start_sec": float(session.last_llm_samples) / TARGET_SAMPLE_RATE,
                     "current_end_sec": float(end_by_session[session.session_id]) / TARGET_SAMPLE_RATE,
                     "lookback_sec": float(self.config.rag_timeline_lookback_sec),
+                    "return_query_window_embeddings": bool(session.auto_glossary_enabled),
                 }
                 for _, session, _ in indexed_sessions
             ]
@@ -2272,6 +2282,9 @@ class OmniAgent(Agent):
                 "domain_probe_top_k": self.config.router_domain_probe_top_k,
                 "speech_centroid_weight": self.config.router_speech_centroid_weight,
                 "metadata_prior_weight": self.config.router_metadata_prior_weight,
+                "audio_probe_min_top_score": self.config.router_audio_probe_min_top_score,
+                "audio_probe_min_raw_margin": self.config.router_audio_probe_min_raw_margin,
+                "audio_probe_min_positive_domains": self.config.router_audio_probe_min_positive_domains,
                 "prompt_top_k": self.config.prompt_top_k,
                 "ui_top_k": self.config.ui_top_k,
             },

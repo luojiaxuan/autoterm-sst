@@ -96,7 +96,11 @@ score(domain) =
 The router renormalizes these weights over the signals available in the current
 window. For example, if no source/ASR topic text is available, the score is
 computed over domain-probe, speech-centroid, and metadata-prior evidence rather
-than being capped at `0.25 + 0.10 + 0.05`.
+than being capped at `0.25 + 0.10 + 0.05`. Audio-only probe routing has an
+additional raw-evidence guard: the probe must score at least two positive
+candidate domains, the top raw probe score must be at least `0.50`, the top-vs-
+second raw margin must be at least `0.08`, and the top raw probe domain must
+match the proposed switch target.
 
 `text_topic_score` uses high-precision weighted keywords from
 `domain_taxonomy.py`. `domain_probe_retrieval_score` is a routing-only small
@@ -143,6 +147,8 @@ Switch guards run in this order:
 - no switch if the target is already the active preset or domain;
 - no narrow switch to the general/common domain;
 - no switch until the target index is preloadable;
+- no audio-only probe switch unless raw probe evidence has enough top-score,
+  margin, and competing-domain support;
 - no switch unless confidence is above the threshold;
 - no switch unless the new domain beats the next best domain by a margin;
 - no switch unless the new domain also beats the current active slice by the
@@ -172,6 +178,9 @@ routing:
   min_consistent_windows: 2
   min_consistent_windows_with_text: 2
   min_consistent_windows_audio_only: 3
+  audio_probe_min_top_score: 0.50
+  audio_probe_min_raw_margin: 0.08
+  audio_probe_min_positive_domains: 2
   switch_cooldown_sec: 90
   candidate_stale_sec: 120
 ```
@@ -340,12 +349,15 @@ python eval/streaming_sst/eval_auto_glossary_switch.py \
 ```
 
 The 2026-07-07 Taurus source-text run was rerun at
-`/mnt/data2/jiaxuanluo/rasst-demo/runtime/eval/auto_glossary_switch_router_only_20260707_final7.json`
+`/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/eval/auto_glossary_switch_router_only_20260707_final8.json`
 and passed all four router-unit scenarios. The ACL-only and medicine-only cases
 had zero false switches; ACL->medicine switched within the 4-window threshold,
-and the clean fixture regression with synthetic probe evidence passed the
-stricter 2-window threshold at
-`/tmp/auto_glossary_switch_fixture_probe_final7.json`.
+and the clean fixture regression with contested synthetic probe evidence passed
+the stricter 2-window text-path threshold at
+`/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/eval/auto_glossary_switch_fixture_probe_20260707_final8.json`.
+The audio-only probe path is covered by unit tests with both clean contested
+evidence and noisy small-margin false-switch evidence; it remains a fallback
+until real ASR-driven `router_text` is available.
 
 This script directly drives `HybridWindowTopicRouter` on fixture/source-text
 windows with wall-clock update and switch cooldown set to zero. It is a

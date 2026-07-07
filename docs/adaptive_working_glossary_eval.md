@@ -97,6 +97,50 @@ that this benchmark can expose missing, wrong, or weak probe evidence. It is a
 state-machine/proxy validation, not proof of real MaxSim speech-probe domain
 discrimination.
 
+`eval/streaming_sst/eval_mixed_audio_switch.py` is the next harness for the real
+deployment path. It streams ACL/medicine audio blocks through one JSON WS
+session, records `meta.domain_probe_scores`, generated-target router text
+metadata, active glossary preset/domain, prompt candidate counts, switch
+latency, and steady-state domain accuracy against playlist spans. A dry-run can
+verify the 5+5 audio playlist without a server:
+
+```bash
+cd /mnt/taurus/home/jiaxuanluo/rasst-demo
+
+python3 eval/streaming_sst/eval_mixed_audio_switch.py \
+  --schedule alternating \
+  --dry-run \
+  --out-json /mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_dryrun/alternating_audio_playlist.json
+```
+
+When the demo server is live on `127.0.0.1:8011`, run a short real replay first:
+
+```bash
+python3 eval/streaming_sst/eval_mixed_audio_switch.py \
+  --base-url http://127.0.0.1:8011 \
+  --schedule alternating \
+  --preset auto_working \
+  --latency-multiplier 2 \
+  --max-seconds-per-item 60 \
+  --out-json /mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_realprobe/alternating_60s_auto_working.json \
+  --out-md /mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_realprobe/alternating_60s_auto_working.md
+```
+
+## Remaining AutoTerm Todos
+
+| status | item | note |
+|---|---|---|
+| done | Domain-specific `auto_working` without common base slice | Default route is among domain slices; common terms are diagnostic/backfill only. |
+| done | Fixed top-10 prompt candidate invariant | Covered by code/tests and previous benchmark docs. |
+| done | Target-text/probe state-machine proxy benchmark | ACL 5 + medicine 5 fixed-64 and full-window proxy runs passed under clean expected probe evidence. |
+| done | Router guards for generic generated text, weak probe, and centroid-only false switches | Covered by unit tests. |
+| in progress | Real mixed-audio harness | `eval_mixed_audio_switch.py` added; dry-run and server replay still need Taurus execution. |
+| pending | Real speech-window domain-probe replay result | Need live demo server/real MaxSim probe metadata, not expected/oracle probe. |
+| pending | Full E2E generated-target switch benchmark | Need actual model outputs and generated-target router windows over mixed ACL/medicine audio. |
+| pending | Mixed-domain BLEU / term_ACC / masked_term_BLEU | Need combined ACL+medicine references and medicine term gold/metric mapping. |
+| pending | Route threshold retuning from real probe failure modes | Depends on real probe/E2E results: clean vs contested vs wrong probe behavior. |
+| pending | Paper claim update | Current claim should stay limited to state-machine proxy until real E2E evidence exists. |
+
 ## Metrics
 
 | metric | source |

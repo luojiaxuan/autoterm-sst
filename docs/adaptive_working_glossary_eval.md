@@ -85,6 +85,16 @@ target-translation text, not source transcripts or ASR text. That path is wired
 in the runtime, but full generated-target E2E switch-quality benchmarking is
 still pending.
 
+Mixed ACL/medicine switch benchmark was added on 2026-07-07 in
+`docs/auto_glossary_mixed_switch_20260707.md`. It uses ACL 5 talks and medicine
+5 speeches, with target/reference text windows as generated-target proxies and
+controlled domain-probe evidence. Fixed 64 windows/item passed both alternating
+and random playlists: alternating had 9/9 transitions within 3 windows, random
+seed 20260707 had 7/7 transitions within 3 windows, both with steady-state
+domain accuracy 1.0 and zero wrong switches. The no-probe diagnostic failed as
+expected, confirming that the deployable policy requires domain-probe guard
+rather than target text alone.
+
 ## Metrics
 
 | metric | source |

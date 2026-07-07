@@ -309,6 +309,27 @@ class HybridWindowTopicRouterTests(unittest.TestCase):
         self.assertTrue(all(decision.action == "stay" for decision in decisions))
         self.assertTrue(all("probe_only_evidence_insufficient" in decision.reason for decision in decisions))
 
+    def test_generic_manifest_text_with_centroid_and_no_probe_does_not_false_switch(self) -> None:
+        router = _router()
+        state = RouterSessionState("nlp_core_10k", "nlp", created_s=1.0)
+        generic_text = "This part describes the background and experimental setup."
+
+        decisions = [
+            router.observe(
+                state,
+                [0.0, 1.0],
+                [],
+                now_s=float(step),
+                router_text=generic_text,
+                router_text_source="manifest_source",
+                domain_probe_scores={},
+            )
+            for step in (10, 11, 12)
+        ]
+
+        self.assertTrue(all(decision.action == "stay" for decision in decisions))
+        self.assertTrue(all("topic_text_or_probe_required" in decision.reason for decision in decisions))
+
     def test_generic_generated_target_with_contested_probe_does_not_false_switch(self) -> None:
         router = _router()
         state = RouterSessionState("nlp_core_10k", "nlp", created_s=1.0)

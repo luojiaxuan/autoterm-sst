@@ -596,6 +596,8 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             guard_reason = "target_unavailable"
         elif is_generated_target and not generated_target_probe_guard.get("ok", False):
             guard_reason = "generated_target_probe_evidence_insufficient"
+        elif has_text and not has_text_topic_signal and not has_probe:
+            guard_reason = "topic_text_or_probe_required"
         elif has_probe and has_text and not has_text_topic_signal and not audio_probe_guard.get("ok", False):
             guard_reason = "probe_only_evidence_insufficient"
         elif not has_text and not has_probe:

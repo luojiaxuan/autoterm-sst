@@ -2,10 +2,10 @@
 
 ## 结论
 
-当前 `auto_working` 路由在 `target_translation_text-window-router + clean expected
-domain-probe guard` 设置下，可以在 ACL 5 个 talk 和 medicine 5 个 speech 组成的混合
-playlist 中按 3-window consistency 规则切换 `nlp_core_10k` / `medicine_core_10k`。
-固定 64 windows/item 和全窗口设置都通过。
+这组结果只支持一个精确结论：在给定 clean expected domain-probe evidence 的情况下，
+`auto_working` 的 target_translation_text-window state machine 可以在 ACL 5 个 talk 和
+medicine 5 个 speech 组成的混合 playlist 中按 3-window consistency 规则切换
+`nlp_core_10k` / `medicine_core_10k`。固定 64 windows/item 和全窗口设置都通过。
 
 这次 benchmark 不使用 source transcript 或 ASR text。窗口文本来自 ACL 的中文 target
 segments 和 RASST medicine 的中文 reference，作为 generated target translation window
@@ -23,6 +23,15 @@ probe 下的切换问题。
   `/mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_switch/20260707_c62b523`
 - 新脚本: `eval/streaming_sst/eval_mixed_domain_switch.py`
 - 本地/Taurus 测试: `python3 -m unittest test_mixed_domain_switch_eval test_hybrid_window_topic_router test_auto_glossary_switch_eval`
+- 数据来源:
+  - ACL target/proxy windows:
+    `/mnt/taurus/data2/jiaxuanluo/rasst_eval/acl6060_zh_segments/segments.target`
+    + `segments.meta.jsonl`
+  - Medicine target/proxy windows:
+    `/mnt/taurus/data2/jiaxuanluo/RASST/data/main_result/inputs/medicine_zh/medicine.ref.zh__medicine_*.txt`
+
+输出放在 `/mnt/taurus/data1/...` 是因为本次运行前 Taurus `df -hT` 显示 data1 可用空间
+高于 data2；结果摘要已进入 Git docs，raw JSON/MD 仍是 Taurus staging artifact。
 
 ## Router 修正
 

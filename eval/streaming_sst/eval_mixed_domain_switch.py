@@ -102,7 +102,7 @@ def read_acl_blocks(
     if not meta_path.is_file():
         raise FileNotFoundError(f"ACL segment metadata not found: {meta_path}")
 
-    text_lines = _read_nonempty_lines(text_path)
+    text_lines = _read_text_lines(text_path)
     by_talk: "OrderedDict[str, List[str]]" = OrderedDict()
     for idx, raw in enumerate(meta_path.read_text(encoding="utf-8").splitlines()):
         if idx >= len(text_lines):
@@ -114,7 +114,9 @@ def read_acl_blocks(
         except json.JSONDecodeError:
             meta = {}
         talk_id = str(meta.get("talk") or meta.get("talk_id") or meta.get("id") or f"acl_{len(by_talk)}")
-        by_talk.setdefault(talk_id, []).append(text_lines[idx])
+        window_text = text_lines[idx].strip()
+        if window_text:
+            by_talk.setdefault(talk_id, []).append(window_text)
 
     blocks: List[PlaylistBlock] = []
     for talk_id, lines in list(by_talk.items())[: max(0, int(limit_items))]:
@@ -479,6 +481,10 @@ def _allowed_transition_windows(transitions: Sequence[Dict[str, Any]], max_switc
 
 def _read_nonempty_lines(path: Path) -> List[str]:
     return [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def _read_text_lines(path: Path) -> List[str]:
+    return path.read_text(encoding="utf-8").splitlines()
 
 
 def _limit_windows(lines: Sequence[str], windows_per_item: int) -> List[str]:

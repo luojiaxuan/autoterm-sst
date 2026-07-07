@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from eval.streaming_sst.eval_mixed_domain_switch import (
     PlaylistBlock,
     build_schedule,
     evaluate_playlist,
+    read_acl_blocks,
 )
 
 
@@ -94,6 +97,26 @@ class MixedDomainSwitchEvalTests(unittest.TestCase):
 
         self.assertFalse(payload["summary"]["regression_pass"])
         self.assertLess(payload["summary"]["steady_state_accuracy"], 1.0)
+
+    def test_acl_reader_preserves_meta_alignment_with_blank_text_lines(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "segments.target").write_text("第一条\n\n第三条\n", encoding="utf-8")
+            (root / "segments.source").write_text("one\n\nt hree\n", encoding="utf-8")
+            (root / "segments.meta.jsonl").write_text(
+                '{"talk":"talk_a"}\n{"talk":"talk_blank"}\n{"talk":"talk_c"}\n',
+                encoding="utf-8",
+            )
+
+            blocks = read_acl_blocks(
+                str(root),
+                limit_items=3,
+                windows_per_item=1,
+                text_field="target",
+            )
+
+        self.assertEqual([block.item_id for block in blocks], ["talk_a", "talk_c"])
+        self.assertEqual([list(block.windows) for block in blocks], [["第一条"], ["第三条"]])
 
 
 if __name__ == "__main__":

@@ -127,37 +127,54 @@ seconds of audio: 5 ACL talks and 5 medicine speeches. This is about 4.68 hours
 of audio before model generation overhead, so full E2E should be treated as a
 long run rather than a smoke test.
 
-A 20-second schema smoke against the existing Taurus `127.0.0.1:8011` server
-reached a partial event but failed fast because that server's partial metadata
-did not include `domain_probe_scores` or `router_text_source`. This is expected
-for the current invalid server state (`router_mode=embedding_refs`) and confirms
-the harness does not fabricate span-aligned metrics when required routing
-metadata is absent.
+A 20-second schema smoke against the old Taurus `127.0.0.1:8011` server reached
+a partial event but failed fast because that server's partial metadata did not
+include `domain_probe_scores` or `router_text_source`. This was expected for the
+invalid server state (`router_mode=embedding_refs`) and confirmed the harness
+does not fabricate span-aligned metrics when required routing metadata is absent.
 
-When the demo server is live on `127.0.0.1:8011`, run a short real replay first:
+The valid E2E server is now Taurus `127.0.0.1:8012`, launched with
+`router_mode=hybrid_window_topic`, manifest
+`auto_working_alias_20260619T204803Z`, and auto presets
+`nlp_core_10k,medicine_core_10k`. Use 1.92s real-time feeding and a real
+streaming switch tolerance:
 
 ```bash
 python3 eval/streaming_sst/eval_mixed_audio_switch.py \
-  --base-url http://127.0.0.1:8011 \
-  --schedule alternating \
+  --base-url http://127.0.0.1:8012 \
+  --acl-items 1 \
+  --medicine-items 1 \
+  --schedule acl_then_medicine \
   --preset auto_working \
   --latency-multiplier 2 \
-  --max-seconds-per-item 60 \
-  --out-json /mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_realprobe/alternating_60s_auto_working.json \
-  --out-md /mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_realprobe/alternating_60s_auto_working.md
+  --feed-sleep 1.92 \
+  --max-switch-seconds 30 \
+  --max-seconds-per-item 120 \
+  --out-json /mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_hybrid_8012/acl1_medicine1_120s_realtime_manifest_textfirst_8012.json \
+  --out-md /mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_hybrid_8012/acl1_medicine1_120s_realtime_manifest_textfirst_8012.md
 ```
 
 Current server/GPU status on 2026-07-07:
 
-- Taurus `127.0.0.1:8011` is healthy but not valid for this target eval:
-  `router_mode=embedding_refs`, active term-memory snapshot is the AI glossary
-  sweep, and it is not the `hybrid_window_topic` generated-target/probe path.
-- Taurus preflight selected only GPU4 as free; the running server owns GPUs
-  5/6/7 and other jobs occupy 0-3. This is not enough to start a separate TP2
-  Omni server plus RAG device.
-- Aries has `/` full and GPUs 0-5 already holding about 41-45GB each; only GPU7
-  is empty and GPU6 has partial memory use. Do not start a new long server there
-  without cleanup/coordination.
+- Taurus `127.0.0.1:8012` is the valid E2E probe server. It uses physical GPUs
+  4/5 for vLLM TP=2 and GPU6 for RAG/term retrieval. GPU7 is free, but not enough
+  for another TP2+RAG server.
+- Taurus GPUs 0-3 are occupied by another high-utilization job. Taurus data1 is
+  the current output staging disk for eval artifacts.
+- Aries has GPUs 4-7 free after cleanup, but `/` remains 100% full. The existing
+  vLLM container cannot see CUDA, the GPU-visible containers lack vLLM/librosa,
+  and host conda envs are missing or have CUDA/NCCL library mismatches. Do not
+  start a production benchmark server there until a clean `/mnt/data3` venv or
+  container is built.
+
+Short real E2E results under
+`/mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_hybrid_8012`:
+
+| run | result |
+|---|---|
+| ACL-only 80s | active domain stayed `nlp` for all 41 events; wrong switches 0; retrieval p95 86.97ms |
+| medicine-only 80s | switched from initial `nlp` to `medicine` at 59.52s; wrong switches 0 |
+| ACL 120s -> medicine 120s | switched to `medicine` 20.16s after boundary; wrong switches 0; steady-state accuracy 1.0 with `--max-switch-seconds 30`; retrieval p95 88.66ms |
 
 ## Remaining AutoTerm Todos
 
@@ -168,11 +185,11 @@ Current server/GPU status on 2026-07-07:
 | done | Target-text/probe state-machine proxy benchmark | ACL 5 + medicine 5 fixed-64 and full-window proxy runs passed under clean expected probe evidence. |
 | done | Router guards for generic generated text, weak probe, and centroid-only false switches | Covered by unit tests. |
 | done | Real mixed-audio harness | `eval_mixed_audio_switch.py` added and dry-run verified on Taurus. |
-| blocked | Real speech-window domain-probe replay result | Need a live server configured with `router_mode=hybrid_window_topic`; current Taurus server is `embedding_refs`. |
-| pending | Full E2E generated-target switch benchmark | Need actual model outputs and generated-target router windows over mixed ACL/medicine audio. |
+| done | Short real E2E generated-target switch probe | Taurus 8012 produced ACL-only, medicine-only, and ACL->medicine mixed results with zero wrong switches. |
+| pending | Full 5 ACL + 5 medicine E2E generated-target switch benchmark | Need long real-time run over the full 10-block playlist. |
 | pending | Mixed-domain BLEU / term_ACC / masked_term_BLEU | Need combined ACL+medicine references and medicine term gold/metric mapping. |
-| pending | Route threshold retuning from real probe failure modes | Depends on real probe/E2E results: clean vs contested vs wrong probe behavior. |
-| pending | Paper claim update | Current claim should stay limited to state-machine proxy until real E2E evidence exists. |
+| in progress | Route threshold retuning from real probe failure modes | Current tuning uses generated-target text first and `current_margin_threshold=0.30`; speech probe is noisy and should stay auxiliary. |
+| pending | Paper claim update | Claim can mention short real E2E probe, but full 5+5 and metric sweep are still pending. |
 
 ## Metrics
 

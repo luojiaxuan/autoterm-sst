@@ -22,6 +22,7 @@ from eval.streaming_sst.eval_mixed_audio_switch import (
     expected_domain_at,
     read_acl_audio_blocks,
     read_medicine_audio_blocks,
+    resolve_max_switch_events,
     run_streaming_eval,
     summarize_run,
 )
@@ -38,6 +39,12 @@ def _write_wav(path: Path, frames: int) -> None:
 
 
 class MixedAudioSwitchEvalTests(unittest.TestCase):
+    def test_resolve_max_switch_events_from_seconds(self) -> None:
+        chunk_samples = int(1.92 * TARGET_SAMPLE_RATE)
+
+        self.assertEqual(resolve_max_switch_events(3, 30.0, chunk_samples), 16)
+        self.assertEqual(resolve_max_switch_events(3, 0.0, chunk_samples), 3)
+
     def test_audio_block_readers_and_schedule(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

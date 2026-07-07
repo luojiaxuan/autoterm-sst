@@ -49,10 +49,10 @@ auto_working:
     metadata_prior_weight: 0.05
     domain_activate_threshold: 0.60
     domain_margin_threshold: 0.15
-    current_margin_threshold: 0.10
+    current_margin_threshold: 0.30
     min_consistent_windows: 2
     min_consistent_windows_with_text: 2
-    min_consistent_windows_generated_target: 3
+    min_consistent_windows_generated_target: 2
     min_consistent_windows_audio_only: 3
     audio_probe_min_top_score: 0.50
     audio_probe_min_raw_margin: 0.08
@@ -61,14 +61,14 @@ auto_working:
     generated_target_probe_min_raw_margin: 0.01
     generated_target_probe_min_positive_domains: 1
     enable_generated_target_text: true
-    generated_target_window_chunks: 3
+    generated_target_window_chunks: 12
     generated_target_min_chars: 6
     update_sec: 5
     warmup_sec: 6
     switch_cooldown_sec: 90
-    production_update_sec: 30
+    production_update_sec: 10
     production_warmup_sec: 20
-    production_cooldown_sec: 90
+    production_cooldown_sec: 30
     candidate_stale_sec: 120
     low_confidence_threshold: 0.35
   retrieval:

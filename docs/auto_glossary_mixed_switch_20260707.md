@@ -7,6 +7,14 @@
 medicine 5 个 speech 组成的混合 playlist 中按 3-window consistency 规则切换
 `nlp_core_10k` / `medicine_core_10k`。固定 64 windows/item 和全窗口设置都通过。
 
+2026-07-07 后续真实 E2E streaming probe 进一步验证了部署路径：Taurus
+`127.0.0.1:8012` 运行 `router_mode=hybrid_window_topic`，输入是真实
+ACL/medicine audio，chunk 为 `latency_multiplier=2` 对应的 1.92s float32 PCM
+window，不使用 ASR/source transcript。router text 来源是在线生成的 target
+translation window。短测结果显示 ACL-only 不误切，medicine-only 能从初始 NLP
+切到 medicine，ACL->medicine mixed run 能在 medicine 段开始后约 20.16s 切换到
+`medicine_core_10k`，且无 wrong switch。
+
 这次 benchmark 不使用 source transcript 或 ASR text。窗口文本来自 ACL 的中文 target
 segments 和 RASST medicine 的中文 reference，作为 generated target translation window
 的可复现实验代理。`probe_mode=expected` 表示 speech-domain probe guard 使用可控 clean
@@ -32,6 +40,21 @@ probe 下的切换问题。
 
 输出放在 `/mnt/taurus/data1/...` 是因为本次运行前 Taurus `df -hT` 显示 data1 可用空间
 高于 data2；结果摘要已进入 Git docs，raw JSON/MD 仍是 Taurus staging artifact。
+
+真实 E2E streaming probe 的输出目录：
+
+```text
+/mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_hybrid_8012
+```
+
+关键 artifacts：
+
+| artifact | status |
+|---|---|
+| `acl80s_realtime_manifest_textfirst_8012.json` | ACL-only 80s, pass, active domain 全程 `nlp` |
+| `medicine80s_realtime_manifest_textfirst_8012.json` | medicine-only 80s, 在 59.52s 切到 `medicine` |
+| `acl1_medicine1_120s_realtime_manifest_textfirst_8012.json` | ACL 120s + medicine 120s 原始 E2E run |
+| `acl1_medicine1_120s_realtime_manifest_textfirst_8012_switch30.json` | 同一原始记录按 30s real-streaming tolerance 重算 summary |
 
 ## Router 修正
 
@@ -81,6 +104,38 @@ manifest/source 或 generated-target 泛化文本把弱 probe 归一化成高置
 |---|---:|---:|---:|---:|---:|---:|---:|---|
 | alternating, expected probe | 1905 | 9 | 9 | 3 | 0.9906 | 1.0000 | 0 | true |
 | random seed 20260707, expected probe | 1905 | 7 | 7 | 3 | 0.9927 | 1.0000 | 0 | true |
+
+## 真实 E2E Streaming Probe
+
+服务器配置：
+
+```text
+host: Taurus
+base_url: http://127.0.0.1:8012
+router_mode: hybrid_window_topic
+manifest: auto_working_alias_20260619T204803Z
+auto presets: nlp_core_10k, medicine_core_10k
+prompt_k: 10
+chunk: 30720 samples = 1.92s
+router_text_source: generated_target
+```
+
+| run | audio | active domains | switch latency | wrong switches | steady-state accuracy | retrieval p95 |
+|---|---:|---|---:|---:|---:|---:|
+| ACL-only | 80s | `nlp`: 41 | n/a | 0 | 1.0000 | 86.97ms |
+| medicine-only | 80s | `nlp`: 24, `medicine`: 12 | 59.52s from session start | 0 | n/a | n/a |
+| ACL->medicine | 240s | `nlp`: 71, `medicine`: 52 | 20.16s after boundary | 0 | 1.0000 with 30s tolerance | 88.66ms |
+
+重要观察：
+
+- speech-window domain probe 仍然噪声很大：ACL->medicine run 中 probe top accuracy
+  只有 0.6071，medicine-only 80s 早期 probe top 也常偏 `nlp`。
+- 因此当前有效切换主要来自 generated target translation window 的 topic signal，
+  probe 是辅助/诊断信号，而不是硬性主路由。
+- 旧 `max_switch_events=3` 是 proxy smoke test 判据；真实 1.92s streaming 下只等价
+  5.76s，不适合评估 window-topic-first router。`eval_mixed_audio_switch.py` 现在支持
+  `--max-switch-seconds`，建议真实 E2E mixed run 使用 `--max-switch-seconds 30`，同时报告
+  实际 `latency_s`。
 
 ## 固定 64 命令
 

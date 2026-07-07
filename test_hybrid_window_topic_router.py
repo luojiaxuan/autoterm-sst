@@ -237,7 +237,7 @@ class HybridWindowTopicRouterTests(unittest.TestCase):
         self.assertEqual(decisions[2].action, "switch")
         self.assertEqual(decisions[2].target_domain_id, "legal")
 
-    def test_generated_target_requires_probe_floor_to_switch(self) -> None:
+    def test_generated_target_topic_text_can_switch_without_probe_floor(self) -> None:
         router = _router()
         state = RouterSessionState("nlp_core_10k", "nlp", created_s=1.0)
         target_text = "患者接受临床治疗，医生根据诊断和症状调整药物剂量。"
@@ -254,10 +254,10 @@ class HybridWindowTopicRouterTests(unittest.TestCase):
             for step in (10, 11, 12, 13)
         ]
 
-        self.assertTrue(all(decision.action == "stay" for decision in decisions))
-        self.assertTrue(
-            all("generated_target_probe_evidence_insufficient" in decision.reason for decision in decisions)
-        )
+        self.assertEqual(decisions[0].action, "stay")
+        self.assertEqual(decisions[1].action, "stay")
+        self.assertEqual(decisions[2].action, "switch")
+        self.assertEqual(decisions[2].target_domain_id, "medicine")
 
     def test_generated_target_generic_text_does_not_dilute_strong_probe(self) -> None:
         router = _router()

@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import math
 import random
 import sys
 import urllib.parse
@@ -188,6 +189,13 @@ def resolve_chunk_samples(chunk: int, base_segment_sec: float, latency_multiplie
         return int(chunk)
     lm = max(1, min(4, int(latency_multiplier)))
     return max(1, int(round(float(base_segment_sec) * lm * TARGET_SAMPLE_RATE)))
+
+
+def resolve_max_switch_events(max_switch_events: int, max_switch_seconds: float, chunk_samples: int) -> int:
+    if float(max_switch_seconds) > 0:
+        chunk_seconds = max(1e-9, int(chunk_samples) / TARGET_SAMPLE_RATE)
+        return max(1, int(math.ceil(float(max_switch_seconds) / chunk_seconds)))
+    return max(1, int(max_switch_events))
 
 
 def wav_num_frames(path: str) -> int:
@@ -635,6 +643,7 @@ def main() -> None:
     ap.add_argument("--idle-timeout-sec", type=float, default=60.0)
     ap.add_argument("--idle-timeouts-after-eof", type=int, default=2)
     ap.add_argument("--max-switch-events", type=int, default=3)
+    ap.add_argument("--max-switch-seconds", type=float, default=0.0)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--out-json", default="")
     ap.add_argument("--out-md", default="")
@@ -651,6 +660,7 @@ def main() -> None:
     if not blocks:
         raise SystemExit("no audio blocks found")
     chunk_samples = resolve_chunk_samples(args.chunk, args.base_segment_sec, args.latency_multiplier)
+    max_switch_events = resolve_max_switch_events(args.max_switch_events, args.max_switch_seconds, chunk_samples)
     spans = build_spans(blocks, max_seconds_per_item=args.max_seconds_per_item)
     payload: Dict[str, Any] = {
         "config": {
@@ -664,6 +674,8 @@ def main() -> None:
             "max_seconds_per_item": args.max_seconds_per_item,
             "max_acl_segs_per_talk": args.max_acl_segs_per_talk,
             "base_url": args.base_url,
+            "max_switch_events": max_switch_events,
+            "max_switch_seconds": args.max_switch_seconds,
         },
         "blocks": [block.__dict__ for block in blocks],
         "block_spans": [span.__dict__ for span in spans],
@@ -692,7 +704,7 @@ def main() -> None:
         payload["domain_transitions"] = domain_transitions(
             spans,
             payload["records"],
-            max_switch_events=args.max_switch_events,
+            max_switch_events=max_switch_events,
         )
         payload["summary"] = summarize_run(
             schedule_name=args.schedule,
@@ -700,7 +712,7 @@ def main() -> None:
             spans=spans,
             records=payload["records"],
             chunk_samples=chunk_samples,
-            max_switch_events=args.max_switch_events,
+            max_switch_events=max_switch_events,
         )
     else:
         payload["summary"] = {

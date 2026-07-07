@@ -15,6 +15,24 @@ that owns all of that internally.
 
 ---
 
+## Source of Truth / 源事实
+
+- Code and lightweight project records: GitHub
+  `git@github.com:luojiaxuan/rasst-demo.git`, active branch `framework`.
+- AutoTerm progress and eval summaries live in Git docs:
+  `docs/adaptive_working_glossary_eval.md`,
+  `docs/auto_glossary_mixed_switch_20260707.md`, and
+  `docs/auto_glossary_routing_probe_20260707.md`.
+- Current Taurus local staging for real E2E mixed-router outputs:
+  `/mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_hybrid_8012`.
+  These raw JSON/MD outputs are local staging artifacts, not reusable canonical
+  datasets yet.
+- Reusable datasets, generated glossaries/index bundles, and larger artifacts
+  should be uploaded to Hugging Face and recorded here with repo URLs and
+  revisions before being treated as canonical.
+
+---
+
 ## Highlights
 
 - **Thin framework, pluggable agents.** The core only does WebSocket/REST

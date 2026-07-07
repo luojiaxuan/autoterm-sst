@@ -594,7 +594,7 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             guard_reason = "general_or_common"
         elif not self._slice_available(target_preset):
             guard_reason = "target_unavailable"
-        elif is_generated_target and not generated_target_probe_guard.get("ok", False):
+        elif is_generated_target and not has_text_topic_signal and not generated_target_probe_guard.get("ok", False):
             guard_reason = "generated_target_probe_evidence_insufficient"
         elif has_text and not has_text_topic_signal and not has_probe:
             guard_reason = "topic_text_or_probe_required"

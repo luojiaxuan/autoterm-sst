@@ -90,6 +90,7 @@ logger = logging.getLogger(__name__)
 
 TARGET_SAMPLE_RATE = 16000
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+EMPTY_GLOSSARY_PRESETS = {"", "none", "no_glossary"}
 
 
 def _env_str(key: str, default: str) -> str:
@@ -115,6 +116,10 @@ def _env_bool(key: str, default: bool = False) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _is_empty_glossary_preset(preset: Any) -> bool:
+    return str(preset or "").strip().casefold() in EMPTY_GLOSSARY_PRESETS
 
 
 def _meta_bool(value: Any, default: bool) -> bool:
@@ -1697,7 +1702,7 @@ class OmniAgent(Agent):
                 source = str(item.get("source") or "")
                 if source in {"", "rag", "wikidata", "glossary"}:
                     item["source"] = f"auto:{item.get('source_slice') or item.get('source_preset') or session.active_glossary_preset}"
-            elif session.glossary_preset and session.glossary_preset != "none":
+            elif not _is_empty_glossary_preset(session.glossary_preset):
                 source = str(item.get("source") or "")
                 if source in {"", "rag", "wikidata", "glossary"}:
                     item["source"] = f"preset:{session.glossary_preset}"
@@ -1736,7 +1741,7 @@ class OmniAgent(Agent):
         annotated = self._annotate_references(session, references)
         should_force_fixed_k = bool(
             session.auto_glossary_enabled
-            or ((session.glossary_preset or "").strip() and (session.glossary_preset or "").strip() != "none")
+            or not _is_empty_glossary_preset(session.glossary_preset)
         )
         if should_force_fixed_k:
             prompt_refs = force_exactly_k_references(

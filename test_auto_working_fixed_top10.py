@@ -121,6 +121,27 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(prompt[0]["term"], "BERT")
         self.assertTrue(all(item.get("term") and item.get("translation") for item in prompt))
 
+    def test_fixed_glossary_preset_truncates_to_prompt_top_k(self) -> None:
+        agent = OmniAgent()
+        agent.config.prompt_top_k = 10
+        session = SimpleNamespace(
+            auto_glossary_enabled=False,
+            glossary_preset="nlp_core_10k",
+            active_glossary_preset="nlp_core_10k",
+            active_domain="nlp",
+            recent_references=deque(maxlen=16),
+        )
+        refs = [
+            {"term": f"term {idx}", "translation": f"译文{idx}", "score": 1.0 - idx * 0.01}
+            for idx in range(12)
+        ]
+
+        prompt = agent._prompt_references(session, refs)
+
+        self.assertEqual(len(prompt), 10)
+        self.assertEqual(prompt[0]["term"], "term 0")
+        self.assertEqual(prompt[-1]["term"], "term 9")
+
     def test_none_glossary_does_not_backfill_prompt_candidates(self) -> None:
         agent = OmniAgent()
         agent.config.prompt_top_k = 10
@@ -128,6 +149,21 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
             auto_glossary_enabled=False,
             glossary_preset="none",
             active_glossary_preset="none",
+            active_domain="general",
+            recent_references=deque(maxlen=16),
+        )
+
+        prompt = agent._prompt_references(session, [])
+
+        self.assertEqual(prompt, [])
+
+    def test_no_glossary_alias_does_not_backfill_prompt_candidates(self) -> None:
+        agent = OmniAgent()
+        agent.config.prompt_top_k = 10
+        session = SimpleNamespace(
+            auto_glossary_enabled=False,
+            glossary_preset="no_glossary",
+            active_glossary_preset="no_glossary",
             active_domain="general",
             recent_references=deque(maxlen=16),
         )

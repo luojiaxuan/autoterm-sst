@@ -254,14 +254,14 @@ def score_occurrences(payload: Dict[str, Any], gold: Sequence[GoldOccurrence]) -
     hit = 0
     by_domain: Dict[str, List[int]] = defaultdict(list)
     by_source: Dict[str, List[int]] = defaultdict(list)
-    by_type: Dict[tuple[str, str, str, tuple[str, ...]], List[int]] = defaultdict(list)
+    by_type: Dict[tuple[int, str, str, str, tuple[str, ...]], List[int]] = defaultdict(list)
     for occ in gold:
         output = outputs.get(occ.block_index, "")
         ok, variant, kind = classify_output_hit(occ.term, occ.variants, output)
         hit += int(ok)
         by_domain[occ.domain].append(int(ok))
         by_source[occ.source].append(int(ok))
-        by_type[(occ.domain, occ.source, occ.term, tuple(occ.variants))].append(int(ok))
+        by_type[(occ.block_index, occ.domain, occ.source, occ.term, tuple(occ.variants))].append(int(ok))
         traces.append(
             {
                 "domain": occ.domain,
@@ -295,7 +295,7 @@ def score_occurrences(payload: Dict[str, Any], gold: Sequence[GoldOccurrence]) -
                     {
                         key: type_hits
                         for key, type_hits in by_type.items()
-                        if key[0] == domain
+                        if key[1] == domain
                     }
                 ),
             }
@@ -310,7 +310,7 @@ def score_occurrences(payload: Dict[str, Any], gold: Sequence[GoldOccurrence]) -
                     {
                         key: type_hits
                         for key, type_hits in by_type.items()
-                        if key[1] == source
+                        if key[2] == source
                     }
                 ),
             }
@@ -320,7 +320,7 @@ def score_occurrences(payload: Dict[str, Any], gold: Sequence[GoldOccurrence]) -
     }
 
 
-def summarize_type_metrics(grouped: Dict[tuple[str, str, str, tuple[str, ...]], Sequence[int]]) -> Dict[str, Any]:
+def summarize_type_metrics(grouped: Dict[tuple[int, str, str, str, tuple[str, ...]], Sequence[int]]) -> Dict[str, Any]:
     total = len(grouped)
     hit_any = sum(1 for values in grouped.values() if any(values))
     hit_all = sum(1 for values in grouped.values() if values and all(values))
@@ -358,11 +358,16 @@ def write_markdown(payload: Dict[str, Any], out_path: str) -> None:
             medicine_type_acc = by_domain.get("medicine", {}).get("type_acc_any")
             medicine_type_hits = by_domain.get("medicine", {}).get("type_hits_any")
             medicine_type_total = by_domain.get("medicine", {}).get("unique_term_types")
+            medicine_type_cell = (
+                f"{medicine_type_hits}/{medicine_type_total}"
+                if medicine_type_hits is not None and medicine_type_total is not None
+                else ""
+            )
             metrics = row["metrics"]
             lines.append(
                 f"| {row['run']} | {metrics.get('term_acc')} | {metrics.get('hits')} | "
                 f"{metrics.get('gold_occurrences')} | {acl} | {medicine} | "
-                f"{medicine_type_acc} | {medicine_type_hits}/{medicine_type_total} |"
+                f"{medicine_type_acc} | {medicine_type_cell} |"
             )
         lines.append("")
     Path(out_path).write_text("\n".join(lines), encoding="utf-8")

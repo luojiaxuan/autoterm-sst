@@ -235,7 +235,9 @@ should not be used as prompt-channel attribution.
   才是严格 10/10。因此这组旧 fixed rows 只能说明 output term_ACC，不应作为
   fixed top-10 glossary-channel 对比。
 
-补充诊断表已经用同一批 JSON 重算，不重新跑模型：
+补充诊断表已经用同一批 pre-change JSON 重算，不重新跑模型；`type_acc_any`
+按 block-local unique term type 统计，避免同一 term 在不同 block 里 hit 一次就把全局
+type 全部算对：
 
 ```text
 /mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_termacc_4block/term_acc_compare_type_diagnostics.md
@@ -251,9 +253,10 @@ should not be used as prompt-channel attribution.
 | raw+medicine | auto_working | 0.9167 | 0.8333 | 5/6 |
 
 后续重新跑 fixed-vs-auto term_ACC 时必须使用修正后的 serving 代码：除 `none`
-baseline 外，fixed preset 和 auto preset 都强制 `fixed_prompt_k=10`。paper 表格里建议
-同时报告 occurrence term_ACC、unique-term/type term_ACC、PromptGoldRetrieved@10 和
-prompt shortfall，避免把模型自身常识翻译误读成 glossary channel 成功。
+或 `no_glossary` baseline 外，fixed preset 和 auto preset 都强制 `fixed_prompt_k=10`。
+paper 表格里建议同时报告 occurrence term_ACC、block-local unique-term/type term_ACC、
+PromptGoldRetrieved@10 和 prompt shortfall，避免把模型自身常识翻译误读成 glossary
+channel 成功。
 
 ## 固定 64 命令
 

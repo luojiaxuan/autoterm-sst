@@ -254,12 +254,14 @@ def score_occurrences(payload: Dict[str, Any], gold: Sequence[GoldOccurrence]) -
     hit = 0
     by_domain: Dict[str, List[int]] = defaultdict(list)
     by_source: Dict[str, List[int]] = defaultdict(list)
+    by_type: Dict[tuple[str, str, str, tuple[str, ...]], List[int]] = defaultdict(list)
     for occ in gold:
         output = outputs.get(occ.block_index, "")
         ok, variant, kind = classify_output_hit(occ.term, occ.variants, output)
         hit += int(ok)
         by_domain[occ.domain].append(int(ok))
         by_source[occ.source].append(int(ok))
+        by_type[(occ.domain, occ.source, occ.term, tuple(occ.variants))].append(int(ok))
         traces.append(
             {
                 "domain": occ.domain,
@@ -274,15 +276,28 @@ def score_occurrences(payload: Dict[str, Any], gold: Sequence[GoldOccurrence]) -
             }
         )
     total = len(gold)
+    type_metrics = summarize_type_metrics(by_type)
     return {
         "gold_occurrences": total,
         "hits": hit,
         "term_acc": round(hit / total, 4) if total else None,
+        "unique_term_types": type_metrics["unique_term_types"],
+        "type_hits_any": type_metrics["type_hits_any"],
+        "type_acc_any": type_metrics["type_acc_any"],
+        "type_hits_all": type_metrics["type_hits_all"],
+        "type_acc_all": type_metrics["type_acc_all"],
         "by_domain": {
             domain: {
                 "gold_occurrences": len(values),
                 "hits": sum(values),
                 "term_acc": round(sum(values) / len(values), 4) if values else None,
+                **summarize_type_metrics(
+                    {
+                        key: type_hits
+                        for key, type_hits in by_type.items()
+                        if key[0] == domain
+                    }
+                ),
             }
             for domain, values in sorted(by_domain.items())
         },
@@ -291,10 +306,30 @@ def score_occurrences(payload: Dict[str, Any], gold: Sequence[GoldOccurrence]) -
                 "gold_occurrences": len(values),
                 "hits": sum(values),
                 "term_acc": round(sum(values) / len(values), 4) if values else None,
+                **summarize_type_metrics(
+                    {
+                        key: type_hits
+                        for key, type_hits in by_type.items()
+                        if key[1] == source
+                    }
+                ),
             }
             for source, values in sorted(by_source.items())
         },
         "traces": traces,
+    }
+
+
+def summarize_type_metrics(grouped: Dict[tuple[str, str, str, tuple[str, ...]], Sequence[int]]) -> Dict[str, Any]:
+    total = len(grouped)
+    hit_any = sum(1 for values in grouped.values() if any(values))
+    hit_all = sum(1 for values in grouped.values() if values and all(values))
+    return {
+        "unique_term_types": total,
+        "type_hits_any": hit_any,
+        "type_acc_any": round(hit_any / total, 4) if total else None,
+        "type_hits_all": hit_all,
+        "type_acc_all": round(hit_all / total, 4) if total else None,
     }
 
 
@@ -308,15 +343,26 @@ def parse_run(raw: str) -> tuple[str, str]:
 def write_markdown(payload: Dict[str, Any], out_path: str) -> None:
     lines = ["# Mixed Audio Term Accuracy", ""]
     for gold_label, rows in payload["tables"].items():
-        lines.extend([f"## {gold_label}", "", "| run | term_acc | hits | gold | ACL acc | medicine acc |", "|---|---:|---:|---:|---:|---:|"])
+        lines.extend(
+            [
+                f"## {gold_label}",
+                "",
+                "| run | term_acc | hits | gold | ACL acc | medicine acc | medicine type_acc_any | medicine type hits |",
+                "|---|---:|---:|---:|---:|---:|---:|---:|",
+            ]
+        )
         for row in rows:
             by_domain = row["metrics"].get("by_domain") or {}
             acl = by_domain.get("nlp", {}).get("term_acc")
             medicine = by_domain.get("medicine", {}).get("term_acc")
+            medicine_type_acc = by_domain.get("medicine", {}).get("type_acc_any")
+            medicine_type_hits = by_domain.get("medicine", {}).get("type_hits_any")
+            medicine_type_total = by_domain.get("medicine", {}).get("unique_term_types")
             metrics = row["metrics"]
             lines.append(
                 f"| {row['run']} | {metrics.get('term_acc')} | {metrics.get('hits')} | "
-                f"{metrics.get('gold_occurrences')} | {acl} | {medicine} |"
+                f"{metrics.get('gold_occurrences')} | {acl} | {medicine} | "
+                f"{medicine_type_acc} | {medicine_type_hits}/{medicine_type_total} |"
             )
         lines.append("")
     Path(out_path).write_text("\n".join(lines), encoding="utf-8")

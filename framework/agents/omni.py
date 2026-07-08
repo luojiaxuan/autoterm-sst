@@ -1734,7 +1734,11 @@ class OmniAgent(Agent):
     ) -> List[Dict[str, Any]]:
         k = max(0, int(self.config.prompt_top_k))
         annotated = self._annotate_references(session, references)
-        if session.auto_glossary_enabled:
+        should_force_fixed_k = bool(
+            session.auto_glossary_enabled
+            or ((session.glossary_preset or "").strip() and (session.glossary_preset or "").strip() != "none")
+        )
+        if should_force_fixed_k:
             prompt_refs = force_exactly_k_references(
                 annotated,
                 k=k,

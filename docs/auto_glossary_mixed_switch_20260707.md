@@ -214,6 +214,47 @@ strong on medicine because term accuracy is output-centric and the base model ca
 recover common medicine terms without the active medicine slice; this table
 should not be used as prompt-channel attribution.
 
+### Fixed NLP 在 medicine 上看起来不差的原因
+
+2026-07-08 诊断显示，这个现象不是 NLP glossary 覆盖了 medicine gold。实际原因是：
+
+- 当前 4-block eval 的 medicine 分母很小：`medicine_404` 前 120s 没有 oracle term，
+  全部 medicine gold 都来自 `medicine_606` 前 120s，共 12 个 occurrence、6 个唯一 term。
+- 这 12 个 occurrence 被少数重复 term 主导：`rectal cancer` 出现 5 次，
+  `medical oncologist` 和 `Radiation Oncologist` 各出现 2 次。
+- `score_mixed_audio_terms.py` 的主指标是 output-centric occurrence term_ACC：
+  只要该 block 输出中出现 oracle target variant，该 block 内同一 term 的每个
+  occurrence 都计 hit。这会让 `rectal cancer -> 直肠癌` 这类重复 term 放大。
+- 实际 glossary 内容没有泄漏：`wiki_academic_zh.json` 不包含上述 6 个 medicine
+  gold terms；`wiki_medicine_zh.json` 也只覆盖其中一部分。
+- fixed medicine 反而较低，部分是 exact-string oracle 口径导致的。例如 medicine
+  glossary 中 `radiation oncologist` 对应 `放射肿瘤学家`，但 oracle 只接受
+  `放射肿瘤科医生`；fixed medicine 输出医学上合理的同义译法仍会被记 miss。
+- 旧 fixed preset serving 路径没有强制 prompt top-10：fixed NLP 在 `medicine_606`
+  block 平均只有 1.05 个 prompt refs，fixed medicine 平均 2.66 个；`auto_working`
+  才是严格 10/10。因此这组旧 fixed rows 只能说明 output term_ACC，不应作为
+  fixed top-10 glossary-channel 对比。
+
+补充诊断表已经用同一批 JSON 重算，不重新跑模型：
+
+```text
+/mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_termacc_4block/term_acc_compare_type_diagnostics.md
+```
+
+| denominator | run | medicine occurrence acc | medicine type_acc_any | medicine type hits |
+|---|---|---:|---:|---:|
+| technical+medicine | fixed_nlp | 0.9167 | 0.8333 | 5/6 |
+| technical+medicine | fixed_medicine | 0.6667 | 0.5000 | 3/6 |
+| technical+medicine | auto_working | 0.9167 | 0.8333 | 5/6 |
+| raw+medicine | fixed_nlp | 0.9167 | 0.8333 | 5/6 |
+| raw+medicine | fixed_medicine | 0.6667 | 0.5000 | 3/6 |
+| raw+medicine | auto_working | 0.9167 | 0.8333 | 5/6 |
+
+后续重新跑 fixed-vs-auto term_ACC 时必须使用修正后的 serving 代码：除 `none`
+baseline 外，fixed preset 和 auto preset 都强制 `fixed_prompt_k=10`。paper 表格里建议
+同时报告 occurrence term_ACC、unique-term/type term_ACC、PromptGoldRetrieved@10 和
+prompt shortfall，避免把模型自身常识翻译误读成 glossary channel 成功。
+
 ## 固定 64 命令
 
 ```bash

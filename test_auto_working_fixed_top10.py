@@ -104,6 +104,38 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertTrue(all(item.get("fallback_reason") == "fixed_prompt_k_domain_neutral_default" for item in prompt))
         self.assertTrue(all(item.get("source_preset") != "common_10k" for item in prompt))
 
+    def test_fixed_glossary_preset_also_forces_prompt_top10(self) -> None:
+        agent = OmniAgent()
+        agent.config.prompt_top_k = 10
+        session = SimpleNamespace(
+            auto_glossary_enabled=False,
+            glossary_preset="nlp_core_10k",
+            active_glossary_preset="nlp_core_10k",
+            active_domain="nlp",
+            recent_references=deque(maxlen=16),
+        )
+
+        prompt = agent._prompt_references(session, [{"term": "BERT", "translation": "BERT", "score": 0.9}])
+
+        self.assertEqual(len(prompt), 10)
+        self.assertEqual(prompt[0]["term"], "BERT")
+        self.assertTrue(all(item.get("term") and item.get("translation") for item in prompt))
+
+    def test_none_glossary_does_not_backfill_prompt_candidates(self) -> None:
+        agent = OmniAgent()
+        agent.config.prompt_top_k = 10
+        session = SimpleNamespace(
+            auto_glossary_enabled=False,
+            glossary_preset="none",
+            active_glossary_preset="none",
+            active_domain="general",
+            recent_references=deque(maxlen=16),
+        )
+
+        prompt = agent._prompt_references(session, [])
+
+        self.assertEqual(prompt, [])
+
     def test_rescue_requires_router_fallback_not_prompt_shortfall(self) -> None:
         agent = OmniAgent()
         session = SimpleNamespace(

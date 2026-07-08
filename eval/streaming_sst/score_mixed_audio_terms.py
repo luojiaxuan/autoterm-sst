@@ -16,9 +16,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from eval.streaming_sst.score_terms import compute_bleu_scores  # noqa: E402
+
 TARGET_SAMPLE_RATE = 16000
 DEFAULT_ACL_ROOT = "/mnt/taurus/data2/jiaxuanluo/rasst_eval/acl6060_zh_segments"
 DEFAULT_ACL_SOURCE_TEXT = "/mnt/taurus/data2/jiaxuanluo/RASST/data/main_result/inputs/acl_zh/source_text.txt"
+DEFAULT_ACL_REFERENCE_TEXT = "/mnt/taurus/data2/jiaxuanluo/RASST/data/main_result/inputs/acl_zh/ref.txt"
 DEFAULT_ACL_RAW_GLOSSARY = "/mnt/taurus/data2/jiaxuanluo/RASST/data/glossaries/acl6060_tagged_gt_raw_min_norm2.json"
 DEFAULT_ACL_TECHNICAL_GOLD = str(PROJECT_ROOT / "eval/streaming_sst/acl_gold_technical.json")
 DEFAULT_MEDICINE_ORACLE_DIR = "/mnt/taurus/data2/jiaxuanluo/RASST/data/main_result/inputs/medicine_zh"
@@ -131,6 +134,22 @@ def load_acl_meta(acl_root: str) -> Dict[str, Dict[str, Any]]:
 def selected_acl_source_text(block: Dict[str, Any], span: Dict[str, Any], *, acl_root: str, acl_source_text: str) -> str:
     by_wav = load_acl_meta(acl_root)
     source_lines = Path(acl_source_text).read_text(encoding="utf-8").splitlines()
+    return selected_acl_lines(block, span, by_wav=by_wav, lines=source_lines)
+
+
+def selected_acl_reference_text(block: Dict[str, Any], span: Dict[str, Any], *, acl_root: str, acl_reference_text: str) -> str:
+    by_wav = load_acl_meta(acl_root)
+    reference_lines = Path(acl_reference_text).read_text(encoding="utf-8").splitlines()
+    return selected_acl_lines(block, span, by_wav=by_wav, lines=reference_lines)
+
+
+def selected_acl_lines(
+    block: Dict[str, Any],
+    span: Dict[str, Any],
+    *,
+    by_wav: Dict[str, Dict[str, Any]],
+    lines: Sequence[str],
+) -> str:
     remaining = int(span["sample_count"])
     selected: List[str] = []
     for wav_path in block.get("wav_paths") or []:
@@ -140,8 +159,8 @@ def selected_acl_source_text(block: Dict[str, Any], span: Dict[str, Any], *, acl
         if not meta:
             continue
         idx = int(meta.get("index") or meta.get("orig_index") or 0)
-        if 0 <= idx < len(source_lines):
-            selected.append(source_lines[idx])
+        if 0 <= idx < len(lines):
+            selected.append(lines[idx])
         remaining -= int(round(float(meta.get("seg_duration") or meta.get("duration") or 0.0) * TARGET_SAMPLE_RATE))
     return "\n".join(selected)
 
@@ -198,6 +217,39 @@ def medicine_occurrences(block: Dict[str, Any], span: Dict[str, Any], *, oracle_
     return out
 
 
+def medicine_reference_text(block: Dict[str, Any], *, medicine_input_dir: str, target_lang: str) -> str:
+    medicine_id = str(block["item_id"]).removeprefix("medicine_")
+    ref_path = Path(medicine_input_dir) / f"medicine.ref.{target_lang}__medicine_{medicine_id}.txt"
+    return ref_path.read_text(encoding="utf-8")
+
+
+def build_reference_text(payload: Dict[str, Any], args: argparse.Namespace) -> str:
+    blocks = payload.get("blocks") or []
+    spans = payload.get("block_spans") or []
+    by_index = {int(span["block_index"]): span for span in spans}
+    references: List[str] = []
+    for block_index, block in enumerate(blocks, start=1):
+        span = by_index[block_index]
+        if block.get("corpus") == "acl":
+            references.append(
+                selected_acl_reference_text(
+                    block,
+                    span,
+                    acl_root=args.acl_root,
+                    acl_reference_text=args.acl_reference_text,
+                )
+            )
+        elif block.get("corpus") == "medicine":
+            references.append(
+                medicine_reference_text(
+                    block,
+                    medicine_input_dir=args.medicine_oracle_dir,
+                    target_lang=args.target_lang,
+                )
+            )
+    return "\n".join(item for item in references if item)
+
+
 def build_gold_sets(payload: Dict[str, Any], args: argparse.Namespace) -> Dict[str, List[GoldOccurrence]]:
     blocks = payload.get("blocks") or []
     spans = payload.get("block_spans") or []
@@ -246,6 +298,29 @@ def block_outputs(payload: Dict[str, Any]) -> Dict[int, str]:
                 out[int(span["block_index"])].append(str(record.get("text") or record.get("text_preview") or ""))
                 break
     return {idx: "".join(parts) for idx, parts in out.items()}
+
+
+def run_hypothesis_text(payload: Dict[str, Any]) -> str:
+    outputs = block_outputs(payload)
+    spans = sorted(payload.get("block_spans") or [], key=lambda item: int(item["block_index"]))
+    return "\n".join(outputs.get(int(span["block_index"]), "") for span in spans)
+
+
+def target_terms_from_occurrences(gold: Sequence[GoldOccurrence]) -> List[str]:
+    terms: List[str] = []
+    seen = set()
+    for occ in gold:
+        for variant in occ.variants:
+            term = normalise_space(variant)
+            if not term:
+                continue
+            key = term.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            terms.append(term)
+    terms.sort(key=lambda text: (len(text), text), reverse=True)
+    return terms
 
 
 def score_occurrences(payload: Dict[str, Any], gold: Sequence[GoldOccurrence]) -> Dict[str, Any]:
@@ -347,8 +422,8 @@ def write_markdown(payload: Dict[str, Any], out_path: str) -> None:
             [
                 f"## {gold_label}",
                 "",
-                "| run | term_acc | hits | gold | ACL acc | medicine acc | medicine type_acc_any | medicine type hits |",
-                "|---|---:|---:|---:|---:|---:|---:|---:|",
+                "| run | term_acc | hits | gold | ACL acc | medicine acc | medicine type_acc_any | medicine type hits | BLEU | masked_term_BLEU |",
+                "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
             ]
         )
         for row in rows:
@@ -367,7 +442,8 @@ def write_markdown(payload: Dict[str, Any], out_path: str) -> None:
             lines.append(
                 f"| {row['run']} | {metrics.get('term_acc')} | {metrics.get('hits')} | "
                 f"{metrics.get('gold_occurrences')} | {acl} | {medicine} | "
-                f"{medicine_type_acc} | {medicine_type_cell} |"
+                f"{medicine_type_acc} | {medicine_type_cell} | "
+                f"{metrics.get('bleu')} | {metrics.get('masked_terms_bleu')} |"
             )
         lines.append("")
     Path(out_path).write_text("\n".join(lines), encoding="utf-8")
@@ -378,24 +454,45 @@ def main() -> None:
     ap.add_argument("--run", action="append", required=True, help="LABEL=path/to/mixed_eval.json")
     ap.add_argument("--acl-root", default=DEFAULT_ACL_ROOT)
     ap.add_argument("--acl-source-text", default=DEFAULT_ACL_SOURCE_TEXT)
+    ap.add_argument("--acl-reference-text", default=DEFAULT_ACL_REFERENCE_TEXT)
     ap.add_argument("--acl-raw-glossary", default=DEFAULT_ACL_RAW_GLOSSARY)
     ap.add_argument("--acl-technical-gold", default=DEFAULT_ACL_TECHNICAL_GOLD)
     ap.add_argument("--medicine-oracle-dir", default=DEFAULT_MEDICINE_ORACLE_DIR)
     ap.add_argument("--target-lang", default="zh")
+    ap.add_argument("--sacrebleu-tokenizer", default="zh")
+    ap.add_argument("--skip-bleu", action="store_true")
     ap.add_argument("--out-json", default="")
     ap.add_argument("--out-md", default="")
     args = ap.parse_args()
 
     runs = [(label, json.load(open(path, encoding="utf-8")), path) for label, path in map(parse_run, args.run)]
     gold_sets = build_gold_sets(runs[0][1], args)
+    reference_text = "" if args.skip_bleu else build_reference_text(runs[0][1], args)
     tables: Dict[str, List[Dict[str, Any]]] = {}
     for gold_label, gold in gold_sets.items():
         rows: List[Dict[str, Any]] = []
         for label, payload, path in runs:
-            rows.append({"run": label, "path": path, "metrics": score_occurrences(payload, gold)})
+            metrics = score_occurrences(payload, gold)
+            if reference_text:
+                metrics.update(
+                    compute_bleu_scores(
+                        hypothesis=run_hypothesis_text(payload),
+                        reference=reference_text,
+                        target_terms=target_terms_from_occurrences(gold),
+                        sacrebleu_tokenizer=args.sacrebleu_tokenizer,
+                    )
+                )
+            rows.append({"run": label, "path": path, "metrics": metrics})
         tables[gold_label] = rows
 
     output = {
+        "reference_summary": {
+            "enabled": bool(reference_text),
+            "chars": len(reference_text),
+            "acl_reference_text": args.acl_reference_text,
+            "medicine_input_dir": args.medicine_oracle_dir,
+            "sacrebleu_tokenizer": args.sacrebleu_tokenizer,
+        },
         "gold_summary": {
             label: {
                 "gold_occurrences": len(gold),

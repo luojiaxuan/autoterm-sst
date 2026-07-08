@@ -229,6 +229,16 @@ class MixedAudioSwitchEvalTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "cursor_samples"):
             extract_record(bad, event_idx=1, spans=spans)
 
+        fixed_meta = dict(event["meta"])
+        del fixed_meta["topic_router"]
+        del fixed_meta["domain_probe_scores"]
+        fixed_event = dict(event)
+        fixed_event["meta"] = fixed_meta
+        fixed_record = extract_record(fixed_event, event_idx=1, spans=spans, require_router_meta=False)
+        self.assertEqual(fixed_record["router_target_domain"], "general")
+        with self.assertRaisesRegex(RuntimeError, "topic_router"):
+            extract_record(fixed_event, event_idx=1, spans=spans)
+
     def test_streaming_eval_drains_partials_after_processing_complete(self) -> None:
         blocks = [AudioBlock("acl", "nlp", "acl", ["mock-a.wav"])]
         spans = [

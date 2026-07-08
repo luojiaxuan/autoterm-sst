@@ -287,6 +287,7 @@ async def run_streaming_eval(
     max_seconds_per_item: float = 0.0,
     idle_timeout_sec: float = 60.0,
     idle_timeouts_after_eof: int = 2,
+    require_router_meta: bool = True,
 ) -> Dict[str, Any]:
     import websockets  # noqa: PLC0415 - optional dependency for CLI path only
 
@@ -327,7 +328,7 @@ async def run_streaming_eval(
                     continue
                 idle_after_eof = 0
                 events_seen += 1
-                records.append(extract_record(event, event_idx=events_seen, spans=spans))
+                records.append(extract_record(event, event_idx=events_seen, spans=spans, require_router_meta=require_router_meta))
             await feed_task
     finally:
         delete_session(base_url, session_id)
@@ -347,16 +348,17 @@ def extract_record(
     *,
     event_idx: int,
     spans: Sequence[AudioBlockSpan],
+    require_router_meta: bool = True,
 ) -> Dict[str, Any]:
     meta = event.get("meta")
     if not isinstance(meta, dict):
         raise RuntimeError("server partial event missing dict meta")
-    validate_partial_meta_schema(meta)
+    validate_partial_meta_schema(meta, require_router_meta=require_router_meta)
     cursor_samples = int(meta["cursor_samples"])
     expected = expected_domain_at(spans, cursor_samples)
     topic = meta["topic"]
-    router = meta["topic_router"]
-    probe_scores = meta["domain_probe_scores"]
+    router = meta.get("topic_router") or {}
+    probe_scores = meta.get("domain_probe_scores") or {}
     target_domain = str(router.get("to_domain") or "")
     if not target_domain:
         target_domain = domain_for_preset(str(router.get("to_preset") or ""))
@@ -382,29 +384,30 @@ def extract_record(
         "candidate_pool_count": int(meta["candidate_pool_count"]),
         "retrieve_s": meta.get("retrieve_s"),
         "domain_probe_s": meta.get("domain_probe_s"),
+        "text": strip_tags(str(event.get("text") or "")),
         "text_preview": preview(str(event.get("text") or "")),
     }
 
 
-def validate_partial_meta_schema(meta: Dict[str, Any]) -> None:
-    required = (
+def validate_partial_meta_schema(meta: Dict[str, Any], *, require_router_meta: bool = True) -> None:
+    required = [
         "cursor_samples",
         "topic",
-        "topic_router",
-        "domain_probe_scores",
         "router_text_source",
         "prompt_reference_count",
         "fixed_prompt_k",
         "candidate_pool_count",
-    )
+    ]
+    if require_router_meta:
+        required.extend(["topic_router", "domain_probe_scores"])
     missing = [key for key in required if key not in meta]
     if missing:
         raise RuntimeError(f"server partial meta missing required key(s): {', '.join(missing)}")
     if not isinstance(meta["topic"], dict):
         raise RuntimeError("server partial meta.topic must be a dict")
-    if not isinstance(meta["topic_router"], dict):
+    if require_router_meta and not isinstance(meta["topic_router"], dict):
         raise RuntimeError("server partial meta.topic_router must be a dict")
-    if not isinstance(meta["domain_probe_scores"], dict):
+    if require_router_meta and not isinstance(meta["domain_probe_scores"], dict):
         raise RuntimeError("server partial meta.domain_probe_scores must be a dict")
     topic_required = ("active_domain", "active_glossary_preset", "switch_count")
     topic_missing = [key for key in topic_required if key not in meta["topic"]]
@@ -614,6 +617,10 @@ def preview(text: str, limit: int = 120) -> str:
     return clean if len(clean) <= limit else clean[: limit - 1] + "..."
 
 
+def strip_tags(text: str) -> str:
+    return str(text or "").replace("<t>", "").replace("</t>", "")
+
+
 def _medicine_audio_sort_key(path: Path) -> Any:
     stem = path.stem[:-3] if path.stem.endswith("_v2") else path.stem
     return (len(stem), stem)
@@ -644,6 +651,7 @@ def main() -> None:
     ap.add_argument("--idle-timeouts-after-eof", type=int, default=2)
     ap.add_argument("--max-switch-events", type=int, default=3)
     ap.add_argument("--max-switch-seconds", type=float, default=0.0)
+    ap.add_argument("--allow-missing-router-meta", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--out-json", default="")
     ap.add_argument("--out-md", default="")
@@ -697,6 +705,7 @@ def main() -> None:
                 max_seconds_per_item=args.max_seconds_per_item,
                 idle_timeout_sec=args.idle_timeout_sec,
                 idle_timeouts_after_eof=args.idle_timeouts_after_eof,
+                require_router_meta=not args.allow_missing_router_meta,
             )
         )
         payload["session"] = stream_payload["session"]

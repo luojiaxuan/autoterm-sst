@@ -187,6 +187,33 @@ not a wrong switch: the medicine_606 opening is mostly speaker/session framing
 until the generated translation reaches explicit oncology terms such as
 `肿瘤内科医生` and `放射肿瘤科医生`.
 
+## Term Accuracy Comparison
+
+For paper-facing comparison, switch latency is less important than terminology
+accuracy under the same fixed prompt budget. The 4-block term accuracy run uses
+the same 480s audio and compares fixed glossary presets with `auto_working`:
+
+```text
+/mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_termacc_4block
+```
+
+| denominator | run | term_acc | hits/gold | ACL acc | medicine acc |
+|---|---|---:|---:|---:|---:|
+| technical+medicine | fixed_nlp | 0.8043 | 37/46 | 0.7647 | 0.9167 |
+| technical+medicine | fixed_medicine | 0.6957 | 32/46 | 0.7059 | 0.6667 |
+| technical+medicine | manual_fixed_by_domain | 0.7391 | 34/46 | 0.7647 | 0.6667 |
+| technical+medicine | auto_working | 0.7174 | 33/46 | 0.6471 | 0.9167 |
+| raw+medicine | fixed_nlp | 0.7297 | 54/74 | 0.6935 | 0.9167 |
+| raw+medicine | fixed_medicine | 0.6757 | 50/74 | 0.6774 | 0.6667 |
+| raw+medicine | manual_fixed_by_domain | 0.6892 | 51/74 | 0.6935 | 0.6667 |
+| raw+medicine | auto_working | 0.7162 | 53/74 | 0.6774 | 0.9167 |
+
+`manual_fixed_by_domain` is a composed diagnostic row: fixed NLP output for ACL
+blocks plus fixed medicine output for medicine blocks. The fixed NLP row remains
+strong on medicine because term accuracy is output-centric and the base model can
+recover common medicine terms without the active medicine slice; this table
+should not be used as prompt-channel attribution.
+
 ## 固定 64 命令
 
 ```bash

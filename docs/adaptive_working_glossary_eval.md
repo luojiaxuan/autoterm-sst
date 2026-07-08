@@ -190,6 +190,30 @@ event, retrieval p95 88.29ms, and transition latencies of 20.16s, 17.28s, and
 37.44s. The strict 30s tolerance fails only on the final medicine_606 switch;
 40s/45s tolerance passes on the same record.
 
+The more relevant 4-block terminology comparison is staged under
+`/mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_termacc_4block`.
+It compares fixed `nlp_core_10k`, fixed `medicine_core_10k`, a composed
+`manual_fixed_by_domain` row, and `auto_working` on the same 480s audio. The
+mixed scorer is `eval/streaming_sst/score_mixed_audio_terms.py`; it uses ACL
+source-filtered gold plus RASST hard medicine oracle term maps.
+
+| denominator | run | term_acc | hits/gold | ACL acc | medicine acc |
+|---|---|---:|---:|---:|---:|
+| technical+medicine | fixed_nlp | 0.8043 | 37/46 | 0.7647 | 0.9167 |
+| technical+medicine | fixed_medicine | 0.6957 | 32/46 | 0.7059 | 0.6667 |
+| technical+medicine | manual_fixed_by_domain | 0.7391 | 34/46 | 0.7647 | 0.6667 |
+| technical+medicine | auto_working | 0.7174 | 33/46 | 0.6471 | 0.9167 |
+| raw+medicine | fixed_nlp | 0.7297 | 54/74 | 0.6935 | 0.9167 |
+| raw+medicine | fixed_medicine | 0.6757 | 50/74 | 0.6774 | 0.6667 |
+| raw+medicine | manual_fixed_by_domain | 0.6892 | 51/74 | 0.6935 | 0.6667 |
+| raw+medicine | auto_working | 0.7162 | 53/74 | 0.6774 | 0.9167 |
+
+Important caveat: this is output-centric term accuracy, not prompt-channel
+attribution. Fixed `nlp_core_10k` still hits 11/12 medicine oracle occurrences,
+so the base model can recover many medicine terms without the active medicine
+slice. On this small sample, `auto_working` matches the best medicine accuracy
+but loses ACL technical hits versus fixed `nlp_core_10k`.
+
 ## Remaining AutoTerm Todos
 
 | status | item | note |
@@ -201,7 +225,7 @@ event, retrieval p95 88.29ms, and transition latencies of 20.16s, 17.28s, and
 | done | Real mixed-audio harness | `eval_mixed_audio_switch.py` added and dry-run verified on Taurus. |
 | done | Short real E2E generated-target switch probe | Taurus 8012 produced ACL-only, medicine-only, and ACL->medicine mixed results with zero wrong switches. |
 | done | 4-block E2E generated-target switch benchmark | ACL -> medicine -> ACL -> medicine, 3/3 correct switches, 0 wrong switches; final switch latency 37.44s exceeds strict 30s tolerance. |
-| pending | Mixed-domain BLEU / term_ACC / masked_term_BLEU | Need combined ACL+medicine references and medicine term gold/metric mapping. |
+| done | 4-block mixed-domain term_ACC comparison | Fixed glossary vs `auto_working` table added; BLEU/masked BLEU still pending. |
 | in progress | Route threshold retuning from real probe failure modes | Current tuning uses generated-target text first and `current_margin_threshold=0.30`; speech probe is noisy and should stay auxiliary. |
 | pending | Paper claim update | Claim can mention short real E2E probe, but full 5+5 and metric sweep are still pending. |
 

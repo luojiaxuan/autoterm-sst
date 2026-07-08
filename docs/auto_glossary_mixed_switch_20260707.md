@@ -291,6 +291,10 @@ Gold denominator:
 | technical+medicine | 298 | 100 | 198 |
 | raw+medicine | 382 | 184 | 198 |
 
+下面的 term_acc 是 output-centric：只说明最终输出是否命中术语变体，不能单独证明
+glossary channel 有贡献。尤其是当前 `medicine_core_10k` 覆盖不足，medicine 行必须和
+后面的 inventory coverage 诊断一起解读。
+
 主结果：
 
 | denominator | run | term_acc | hits/gold | ACL acc | medicine acc | medicine type_acc_any | BLEU | masked_term_BLEU |
@@ -309,6 +313,10 @@ Runtime/router diagnostics:
 | fixed_nlp_core_10k | 2081 | `nlp`: 2081 | min 0, max 10 | 79.66 / 99.62ms |
 | fixed_medicine_core_10k | 2074 | `medicine`: 2074 | min 0, max 10 | 80.78 / 98.25ms |
 | auto_working | 2081 | `nlp`: 677, `medicine`: 1404 | min 0, max 10 | 83.80 / 101.34ms |
+
+`auto_working` 的 `router_text_source` 是 `generated_target`: 2081/2081。固定
+glossary rows 不启用 router，所以 `router_text_source=none`。这说明本次切换证据来自
+E2E 已生成的 target translation window，而不是 source transcript/ASR。
 
 `auto_working` 切换是成功的：
 

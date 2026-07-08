@@ -218,7 +218,9 @@ The 480s run is now superseded for metric interpretation by the longer
 ACL -> medicine_606 -> ACL real-time run in
 `docs/auto_glossary_mixed_switch_20260707.md`, which uses 4142.4s of audio and
 382 raw+medicine gold occurrences. It confirms the router switches correctly
-but also shows the current broad `wiki_medicine` slice has only 1/54 exact
+using `generated_target` as `router_text_source` for 2081/2081 records, not
+source transcript/ASR, but also shows the current broad `wiki_medicine` slice
+has only 1/54 exact
 coverage on `medicine_606` unique gold terms, so fixed NLP looking competitive
 on medicine is mostly base-model recovery rather than useful glossary evidence.
 

@@ -21,6 +21,7 @@ import asyncio
 import json
 import logging
 import os
+import tempfile
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -457,7 +458,19 @@ class OmniConfig:
             autoterm_candidate_score_threshold=autoterm_score_threshold_default,
             autoterm_enable_open_rescue=_meta_bool(retrieval_config.get("use_open_wiki_rescue"), _meta_bool(routing_config.get("enable_fallback"), True)),
             max_imported_glossary_terms=_env_int("RASST_MAX_IMPORTED_GLOSSARY_TERMS", 10000),
-            tmp_dir=_env_str("RASST_TMP_DIR", f"/dev/shm/rasst_omni_{os.getpid()}"),
+            # /dev/shm is Linux-only; fall back to the platform tmp dir so mock
+            # mode also runs on macOS/Windows checkouts.
+            tmp_dir=_env_str(
+                "RASST_TMP_DIR",
+                str(
+                    (
+                        Path("/dev/shm")
+                        if os.path.isdir("/dev/shm") and os.access("/dev/shm", os.W_OK)
+                        else Path(tempfile.gettempdir())
+                    )
+                    / f"rasst_omni_{os.getpid()}"
+                ),
+            ),
         )
 
 

@@ -1687,6 +1687,96 @@
             }
         }
 
+        // ---- Backend availability banner (graceful degradation notice) ----
+        // When the tunnel/page is reachable but the model backend is down (or
+        // the server runs in mock mode), show a friendly banner pointing
+        // visitors at the demo video and the repository instead of letting
+        // them hit raw session errors.
+        const DEMO_FALLBACK_LINKS = {
+            repo: 'https://github.com/luojiaxuan/rasst-demo/tree/framework',
+            // TODO(submission): replace with the final screencast URL.
+            video: 'https://github.com/luojiaxuan/rasst-demo/tree/framework#demo'
+        };
+        let backendBannerEl = null;
+        let backendBannerDismissed = false;
+        function showBackendBanner(kind, messageHtml) {
+            if (backendBannerDismissed) return;
+            if (!backendBannerEl) {
+                backendBannerEl = document.createElement('div');
+                backendBannerEl.id = 'backendBanner';
+                backendBannerEl.style.cssText =
+                    'position:fixed;top:0;left:0;right:0;z-index:99999;' +
+                    'padding:10px 48px 10px 16px;text-align:center;' +
+                    'font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;' +
+                    'color:#fff;';
+                const close = document.createElement('button');
+                close.textContent = '×';
+                close.setAttribute('aria-label', 'Dismiss');
+                close.style.cssText =
+                    'position:absolute;right:12px;top:6px;border:none;background:none;' +
+                    'color:#fff;font-size:18px;cursor:pointer;line-height:1;';
+                close.addEventListener('click', () => {
+                    backendBannerDismissed = true;
+                    backendBannerEl.style.display = 'none';
+                });
+                const msg = document.createElement('span');
+                msg.id = 'backendBannerMsg';
+                backendBannerEl.appendChild(msg);
+                backendBannerEl.appendChild(close);
+                document.body.appendChild(backendBannerEl);
+            }
+            backendBannerEl.style.background =
+                kind === 'offline' ? 'rgba(153,27,27,0.96)' : 'rgba(30,58,95,0.96)';
+            backendBannerEl.querySelector('#backendBannerMsg').innerHTML = messageHtml;
+            backendBannerEl.style.display = 'block';
+        }
+        function hideBackendBanner() {
+            if (backendBannerEl) backendBannerEl.style.display = 'none';
+        }
+        function backendBannerLink(kind, label) {
+            const href = DEMO_FALLBACK_LINKS[kind];
+            return `<a style="color:#fff;text-decoration:underline;font-weight:600;" ` +
+                `href="${href}" target="_blank" rel="noopener">${label}</a>`;
+        }
+        async function checkBackendAvailability() {
+            let health = null;
+            try {
+                const response = await fetch('/health', { cache: 'no-store' });
+                if (response.ok) health = await response.json();
+            } catch (e) { /* server unreachable */ }
+            if (!health) {
+                showBackendBanner('offline',
+                    '⚠️ The demo server is not responding right now. Watch the ' +
+                    backendBannerLink('video', 'demo video') +
+                    ' or run the demo locally in mock mode from ' +
+                    backendBannerLink('repo', 'GitHub') + '.');
+                return;
+            }
+            const agents = health.agent_health || {};
+            const names = Object.keys(agents);
+            const allAgentsDown = names.length > 0 &&
+                names.every(n => agents[n] && agents[n].status === 'error');
+            if (allAgentsDown) {
+                showBackendBanner('offline',
+                    '⚠️ The live GPU model backend is currently offline, so ' +
+                    'translation sessions will not run. Watch the ' +
+                    backendBannerLink('video', 'demo video') +
+                    ' or run the demo locally in mock mode from ' +
+                    backendBannerLink('repo', 'GitHub') + '.');
+            } else if (health.mock_mode === true) {
+                showBackendBanner('mock',
+                    'ℹ️ This instance is running in mock mode (no GPU model): ' +
+                    'translations are deterministic placeholders that demonstrate the ' +
+                    'full protocol and live evidence panel. See the ' +
+                    backendBannerLink('video', 'demo video') +
+                    ' for live GPU output; source on ' +
+                    backendBannerLink('repo', 'GitHub') + '.');
+            } else {
+                hideBackendBanner();
+            }
+        }
+        setInterval(checkBackendAvailability, 60000);
+
         window.shouldSendMicrophoneChunk = shouldSendMicrophoneChunk;
         window.sendAudioChunk = sendAudioChunk;
 
@@ -4644,6 +4734,7 @@
                 ensureClientId();
                 loadServerConfig();
                 refreshTermMemoryStatus();
+                checkBackendAvailability();
 
                 // 只在非Electron环境下初始化面板拖拽
                 if (!isElectron) {

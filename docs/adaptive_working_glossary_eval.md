@@ -238,7 +238,7 @@ on medicine is mostly base-model recovery rather than useful glossary evidence.
 | done | 4-block mixed-domain term_ACC comparison | Fixed glossary vs `auto_working` table added for early diagnosis. |
 | done | Long ACL -> medicine_606 -> ACL real-time comparison | Fixed NLP, fixed medicine, and `auto_working` evaluated with term_ACC, BLEU, and masked_term_BLEU. |
 | in progress | Route threshold retuning from real probe failure modes | Current tuning uses generated-target text first and `current_margin_threshold=0.30`; speech probe is noisy and should stay auxiliary. |
-| pending | Medicine slice quality fix | Add/evaluate an eval-only `medicine_hardraw_oracle` and then build a curated medicine slice; current broad `wiki_medicine` is not benchmark-aligned. |
+| in progress | Medicine slice quality fix | Union-ready GT + builder landed 2026-07-08: `scripts/term_memory/build_gt_union_gs_glossary.py`, HF `glossaries/hard_medicine_gt_raw_unique212.json` (revision `204ba141`). Remaining: build `medicine_hardraw_gt_union_gs10000` with the gemini wiki filler, index it, register `medicine_hardraw_gs10k` + eval-only `medicine_hardraw_oracle`, rerun the 3-talk comparison. |
 | pending | Paper claim update | Claim can mention long real E2E routing, but should not claim current `medicine_core_10k` improves medicine term_ACC until the slice-quality issue is fixed. |
 
 ## Metrics

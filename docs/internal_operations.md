@@ -18,6 +18,11 @@ paths refer to lab machines and are meaningless outside the group.
 - Reusable datasets, generated glossaries/index bundles, and larger artifacts
   should be uploaded to Hugging Face and recorded here with repo URLs and
   revisions before being treated as canonical.
+- Canonical eval data on HF: `gavinlaw/rasst-main-result-data`
+  (audio, per-talk inputs, gold glossaries). `glossaries/README.md` there
+  documents the fixed-denominator `gs` union recipe; the union-ready compact
+  medicine GT is `glossaries/hard_medicine_gt_raw_unique212.json`
+  (added in revision `204ba141`, 2026-07-08).
 
 ## Cluster paths and environments
 

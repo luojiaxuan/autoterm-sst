@@ -214,20 +214,30 @@ so the base model can recover many medicine terms without the active medicine
 slice. On this small sample, `auto_working` matches the best medicine accuracy
 but loses ACL technical hits versus fixed `nlp_core_10k`.
 
+The 480s run is now superseded for metric interpretation by the longer
+ACL -> medicine_606 -> ACL real-time run in
+`docs/auto_glossary_mixed_switch_20260707.md`, which uses 4142.4s of audio and
+382 raw+medicine gold occurrences. It confirms the router switches correctly
+but also shows the current broad `wiki_medicine` slice has only 1/54 exact
+coverage on `medicine_606` unique gold terms, so fixed NLP looking competitive
+on medicine is mostly base-model recovery rather than useful glossary evidence.
+
 ## Remaining AutoTerm Todos
 
 | status | item | note |
 |---|---|---|
-| done | Domain-specific `auto_working` without common base slice | Default route is among domain slices; common terms are diagnostic/backfill only. |
+| done | Domain-specific `auto_working` without common base slice | Default route is among domain slices; common terms are diagnostic only, not a default prompt inventory. |
 | done | Top-10 retrieval cap with score-filtered prompt refs | Runtime retrieves up to 10 candidates and does not backfill after filtering. |
 | done | Target-text/probe state-machine proxy benchmark | ACL 5 + medicine 5 fixed-64 and full-window proxy runs passed under clean expected probe evidence. |
 | done | Router guards for generic generated text, weak probe, and centroid-only false switches | Covered by unit tests. |
 | done | Real mixed-audio harness | `eval_mixed_audio_switch.py` added and dry-run verified on Taurus. |
 | done | Short real E2E generated-target switch probe | Taurus 8012 produced ACL-only, medicine-only, and ACL->medicine mixed results with zero wrong switches. |
 | done | 4-block E2E generated-target switch benchmark | ACL -> medicine -> ACL -> medicine, 3/3 correct switches, 0 wrong switches; final switch latency 37.44s exceeds strict 30s tolerance. |
-| done | 4-block mixed-domain term_ACC comparison | Fixed glossary vs `auto_working` table added; BLEU/masked BLEU still pending. |
+| done | 4-block mixed-domain term_ACC comparison | Fixed glossary vs `auto_working` table added for early diagnosis. |
+| done | Long ACL -> medicine_606 -> ACL real-time comparison | Fixed NLP, fixed medicine, and `auto_working` evaluated with term_ACC, BLEU, and masked_term_BLEU. |
 | in progress | Route threshold retuning from real probe failure modes | Current tuning uses generated-target text first and `current_margin_threshold=0.30`; speech probe is noisy and should stay auxiliary. |
-| pending | Paper claim update | Claim can mention short real E2E probe, but full 5+5 and metric sweep are still pending. |
+| pending | Medicine slice quality fix | Add/evaluate an eval-only `medicine_hardraw_oracle` and then build a curated medicine slice; current broad `wiki_medicine` is not benchmark-aligned. |
+| pending | Paper claim update | Claim can mention long real E2E routing, but should not claim current `medicine_core_10k` improves medicine term_ACC until the slice-quality issue is fixed. |
 
 ## Metrics
 

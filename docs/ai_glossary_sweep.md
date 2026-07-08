@@ -197,8 +197,9 @@ common glossary. The production route policy is:
    use source transcripts or manual terms for the production E2E route. A slice
    change also requires the target to beat the current active slice, survive
    consecutive candidate windows, and pass a post-switch cooldown.
-3. Keep the prompt candidate budget fixed at 10. Inventory size changes the pool
-   from which candidates are ranked, not the prompt interface.
+3. Keep retrieval capped at top-10 candidates before score filtering. Inventory
+   size changes the pool from which candidates are ranked; after filtering, the
+   prompt may receive 0 to 10 surviving refs.
 4. Use clean domain slices as the default active inventory. The available clean
    zh AI pool is around 13.6k, so a 10k AI/NLP core slice is the correct default
    until a larger clean AI glossary exists.

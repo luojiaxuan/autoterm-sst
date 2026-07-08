@@ -19,7 +19,7 @@ offline open memory
   -> HybridWindowTopicRouter scores E2E window topic evidence
   -> ActiveGlossaryManager preloads and atomically activates target index
   -> future chunks retrieve from the active domain slice
-  -> prompt receives top 10 refs, UI receives top 10 refs + router metadata
+  -> retrieve up to top-10 refs, then score-filter survivors for prompt/UI metadata
 ```
 
 The framework boundary stays unchanged. `framework/app.py` and

@@ -260,6 +260,112 @@ occurrence term_ACC、block-local unique-term/type term_ACC、PromptGoldRetrieve
 surviving prompt refs/chunk 和 prompt shortfall，避免把模型自身常识翻译误读成
 glossary channel 成功。
 
+## 2026-07-08 长流式 ACL -> medicine_606 -> ACL 结果
+
+这次重新跑了真实 E2E streaming，而不是 120s smoke。playlist 是：
+
+| block | item | domain | seconds |
+|---:|---|---|---:|
+| 1 | `2022.acl-long.268` | nlp | 687.2 |
+| 2 | `medicine_606` | medicine | 2842.8 |
+| 3 | `2022.acl-long.367` | nlp | 612.3 |
+
+总音频 4142.4s，按 `latency_multiplier=2` 以 1.92s float32 PCM chunk 实时发送。
+输出目录：
+
+```text
+/mnt/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260708_acl_med_acl_long
+```
+
+Git refs:
+
+- `83fe359`: runtime 改为 top-10 cap 后按分数过滤，不再回填到固定 10 个 prompt refs。
+- `c7d0b6f`: 修复 Taurus 上 RASST MaxSim retriever import path，8012 health 恢复为 RAG ready。
+- `e7803b8`: mixed audio runner 支持 `--medicine-ids 606`，避免默认选到术语很少的 `medicine_404`。
+- `5bb37ed`: mixed scorer 增加 BLEU / masked_term_BLEU。
+
+Gold denominator:
+
+| denominator | gold occurrences | ACL | medicine |
+|---|---:|---:|---:|
+| technical+medicine | 298 | 100 | 198 |
+| raw+medicine | 382 | 184 | 198 |
+
+主结果：
+
+| denominator | run | term_acc | hits/gold | ACL acc | medicine acc | medicine type_acc_any | BLEU | masked_term_BLEU |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| technical+medicine | fixed_nlp_core_10k | 0.7785 | 232/298 | 0.8400 | 0.7475 | 26/54 | 52.2587 | 49.1001 |
+| technical+medicine | fixed_medicine_core_10k | 0.7617 | 227/298 | 0.8200 | 0.7323 | 24/54 | 52.0972 | 48.8884 |
+| technical+medicine | auto_working | 0.7550 | 225/298 | 0.8200 | 0.7222 | 23/54 | 52.3029 | 49.0325 |
+| raw+medicine | fixed_nlp_core_10k | 0.7801 | 298/382 | 0.8152 | 0.7475 | 26/54 | 52.2587 | 48.1131 |
+| raw+medicine | fixed_medicine_core_10k | 0.7723 | 295/382 | 0.8152 | 0.7323 | 24/54 | 52.0972 | 47.8451 |
+| raw+medicine | auto_working | 0.7644 | 292/382 | 0.8098 | 0.7222 | 23/54 | 52.3029 | 48.1523 |
+
+Runtime/router diagnostics:
+
+| run | events | active domains | prompt refs | retrieval p50/p95 |
+|---|---:|---|---|---:|
+| fixed_nlp_core_10k | 2081 | `nlp`: 2081 | min 0, max 10 | 79.66 / 99.62ms |
+| fixed_medicine_core_10k | 2074 | `medicine`: 2074 | min 0, max 10 | 80.78 / 98.25ms |
+| auto_working | 2081 | `nlp`: 677, `medicine`: 1404 | min 0, max 10 | 83.80 / 101.34ms |
+
+`auto_working` 切换是成功的：
+
+| transition | boundary_s | first target active | latency |
+|---|---:|---:|---:|
+| ACL -> medicine_606 | 687.243 | 727.680 | 40.437s |
+| medicine_606 -> ACL | 3530.062 | 3552.000 | 21.938s |
+
+`auto_working` 的 active-domain accuracy 是 0.9861，去掉 transition grace 后
+steady-state accuracy 是 1.0，wrong switch 为 0。也就是说当前问题不是 router
+没有切到 medicine，而是切到当前 `medicine_core_10k` 后没有提高 medicine term_acc。
+
+### 为什么 fixed NLP 在 medicine 上也不差
+
+这次长流式结果确认：fixed NLP 的 medicine acc 高不是因为 NLP glossary 覆盖了
+medicine gold，也不是因为分母太小。
+
+1. `medicine_606` 的 medicine denominator 足够大：198 occurrences、54 unique term
+   types。
+2. runtime prompt refs 不是固定 10。fixed NLP 在 medicine 段平均只有 1.069 个 prompt
+   refs，733/1413 个 medicine events 是 0 refs；fixed medicine/auto 在 medicine 段平均
+   约 2.3 refs。因此 fixed NLP 的 medicine term_acc 更接近模型自身翻译能力。
+3. 当前 runtime `medicine_core_10k` 不是 benchmark hard medicine glossary，而是 broad
+   `wiki_medicine` slice。对 `medicine_606` 54 个 unique gold terms 的 exact inventory
+   coverage：
+
+| inventory | size | exact coverage |
+|---|---:|---:|
+| `nlp_core_10k` / `wiki_academic` | 18994 | 1/54 |
+| `medicine_core_10k` / `wiki_medicine` | 23713 | 1/54 |
+| `common_10k` | 10000 | 0/54 |
+| RASST hard medicine glossary | 212 | contains the checked hard terms |
+
+4. fixed NLP 比 fixed medicine 多出的 medicine hits 只有 3 个 occurrence：
+   `T2 N1` 两次、`short-course of chemo-radiotherapy` 一次。fixed NLP 比 auto 多出的
+   medicine hits 是 7 个 occurrence；auto 反过来多命中 `FOLFIRINOX` 两次。差异主要是
+   输出措辞/retention 的小波动，不是 glossary channel 的大收益。
+5. 三组共同 miss 高度重合，集中在 `long-term outcomes`, `Gy`,
+   `Radiation Oncologist`, `medical oncologist`, `total neoadjuvant`,
+   `T3 tumours`, `Locoregional recurrence`, `target volume` 等术语。
+
+结论：当前 `medicine_core_10k` 不应被解释成 medicine benchmark coverage slice。它是
+broad wiki medicine inventory，和 RASST hard medicine gold 的 overlap 很低。若 paper
+需要证明 domain-specific glossary 的上界，应该增加一个 eval-only
+`medicine_hardraw_oracle` preset，使用现有 hard medicine index：
+
+```text
+/mnt/taurus/data2/jiaxuanluo/RASST/outputs/main_result_eval/20260527T071109Z/index_cache/medicine_hardraw__zh__lm2/maxsim_hard_medicine_glossary_raw_llm_judge_manual_zh21_6d02fb5133b93f6d_tr128_ta256.pt
+```
+
+真正的 auto route 逻辑应区分：
+
+- real broad domain slice: `medicine_core_10k` / `wiki_medicine`
+- eval-only oracle slice: `medicine_hardraw_oracle`
+- future curated domain slice: 从 RASST hard medicine、UMLS/MeSH/clinical trial
+  terminology 等构建的 compact medicine benchmark-aligned slice
+
 ## 固定 64 命令
 
 ```bash

@@ -55,11 +55,12 @@ router, or UI.
 \paragraph{Streaming agent.}
 For each audio chunk, the OmniAgent can run MaxSim terminology retrieval over
 the active slices, build a \texttt{term\_map}, and call the in-process vLLM
-backend. In \texttt{auto\_working}, the PromptBuilder receives exactly 10
-ranked glossary candidates, matching the fixed-candidate RASST-style interface.
+backend. In \texttt{auto\_working}, the retriever returns up to 10 ranked
+glossary candidates and filters low-confidence matches before the PromptBuilder
+constructs the prompt.
 The agent emits partial translations plus structured metadata, including
-retrieved terms, retrieval latency, active slices, fixed-budget invariant
-checks, and router decisions.
+retrieved terms, retrieval latency, active slices, prompt-reference counts, and
+router decisions.
 
 \paragraph{Evidence protocol.}
 The default WebSocket output remains plain text for backward compatibility. A

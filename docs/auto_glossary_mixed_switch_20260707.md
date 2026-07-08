@@ -190,7 +190,7 @@ until the generated translation reaches explicit oncology terms such as
 ## Term Accuracy Comparison
 
 For paper-facing comparison, switch latency is less important than terminology
-accuracy under the same fixed prompt budget. The 4-block term accuracy run uses
+accuracy under the same retrieval cap. The 4-block term accuracy run uses
 the same 480s audio and compares fixed glossary presets with `auto_working`:
 
 ```text
@@ -230,10 +230,11 @@ should not be used as prompt-channel attribution.
 - fixed medicine 反而较低，部分是 exact-string oracle 口径导致的。例如 medicine
   glossary 中 `radiation oncologist` 对应 `放射肿瘤学家`，但 oracle 只接受
   `放射肿瘤科医生`；fixed medicine 输出医学上合理的同义译法仍会被记 miss。
-- 旧 fixed preset serving 路径没有强制 prompt top-10：fixed NLP 在 `medicine_606`
-  block 平均只有 1.05 个 prompt refs，fixed medicine 平均 2.66 个；`auto_working`
-  才是严格 10/10。因此这组旧 fixed rows 只能说明 output term_ACC，不应作为
-  fixed top-10 glossary-channel 对比。
+- 旧 fixed preset serving 路径和 `auto_working` 的 retrieval 设置不一致：
+  fixed NLP 在 `medicine_606` block 平均只有 1.05 个 prompt refs，fixed medicine
+  平均 2.66 个；旧 `auto_working` 当时会回填到 10。按最新口径，所有 preset 都应
+  先召回 top-10，再按分数过滤，过滤后有多少 prompt refs 就给多少。因此这组旧
+  fixed rows 只能说明 output term_ACC，不应作为 glossary-channel 对比。
 
 补充诊断表已经用同一批 pre-change JSON 重算，不重新跑模型；`type_acc_any`
 按 block-local unique term type 统计，避免同一 term 在不同 block 里 hit 一次就把全局
@@ -252,11 +253,12 @@ type 全部算对：
 | raw+medicine | fixed_medicine | 0.6667 | 0.5000 | 3/6 |
 | raw+medicine | auto_working | 0.9167 | 0.8333 | 5/6 |
 
-后续重新跑 fixed-vs-auto term_ACC 时必须使用修正后的 serving 代码：除 `none`
-或 `no_glossary` baseline 外，fixed preset 和 auto preset 都强制 `fixed_prompt_k=10`。
-paper 表格里建议同时报告 occurrence term_ACC、block-local unique-term/type term_ACC、
-PromptGoldRetrieved@10 和 prompt shortfall，避免把模型自身常识翻译误读成 glossary
-channel 成功。
+后续重新跑 fixed-vs-auto term_ACC 时必须使用修正后的 serving 代码：fixed preset 和
+auto preset 都只召回 top-10，并在分数过滤后保留实际 surviving prompt refs；`none`
+或 `no_glossary` baseline 仍没有 glossary refs。paper 表格里建议同时报告
+occurrence term_ACC、block-local unique-term/type term_ACC、PromptGoldRetrieved@10、
+surviving prompt refs/chunk 和 prompt shortfall，避免把模型自身常识翻译误读成
+glossary channel 成功。
 
 ## 固定 64 命令
 

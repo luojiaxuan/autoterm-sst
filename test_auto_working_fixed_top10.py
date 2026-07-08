@@ -14,7 +14,6 @@ from framework.agents.omni import OmniAgent, OmniConfig
 from framework.agents.plugins.backends import get_template
 from framework.agents.plugins.retrieval import MockRetrieval, RetrievalResult
 from framework.agents.term_memory.slice_registry import (
-    force_exactly_k_references,
     rank_references,
     slice_id_for_preset,
     slice_role_for_preset,
@@ -36,14 +35,14 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
 
         self.assertEqual(config.auto_glossary_min_conf, 0.60)
         self.assertEqual(config.auto_glossary_switch_margin, 0.15)
-        self.assertEqual(config.auto_glossary_current_margin, 0.10)
+        self.assertEqual(config.auto_glossary_current_margin, 0.30)
         self.assertEqual(config.auto_glossary_min_consistent_windows, 2)
         self.assertEqual(config.auto_glossary_base_preset, "none")
         self.assertEqual(config.auto_glossary_default_preset, "nlp_core_10k")
         self.assertEqual(config.router_mode, "hybrid_window_topic")
         self.assertEqual(config.router_domain_probe_top_k, 5)
         self.assertEqual(config.router_min_consistent_windows_with_text, 2)
-        self.assertEqual(config.router_min_consistent_windows_generated_target, 3)
+        self.assertEqual(config.router_min_consistent_windows_generated_target, 2)
         self.assertEqual(config.router_min_consistent_windows_audio_only, 3)
         self.assertEqual(config.router_audio_probe_min_top_score, 0.50)
         self.assertEqual(config.router_audio_probe_min_raw_margin, 0.08)
@@ -52,10 +51,12 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(config.router_generated_target_probe_min_raw_margin, 0.01)
         self.assertEqual(config.router_generated_target_probe_min_positive_domains, 1)
         self.assertTrue(config.router_generated_target_enabled)
-        self.assertEqual(config.router_generated_target_window_chunks, 3)
+        self.assertEqual(config.router_generated_target_window_chunks, 12)
         self.assertEqual(config.router_generated_target_min_chars, 6)
-        self.assertEqual(config.auto_glossary_switch_cooldown_sec, 90.0)
+        self.assertEqual(config.auto_glossary_switch_cooldown_sec, 30.0)
         self.assertEqual(config.auto_glossary_candidate_stale_sec, 120.0)
+        self.assertEqual(config.autoterm_topk_per_slice, 10)
+        self.assertEqual(config.autoterm_candidate_score_threshold, 0.78)
 
     def test_common_preset_maps_to_common_terms_slice(self) -> None:
         self.assertEqual(slice_id_for_preset("common_10k"), "common_terms")
@@ -63,7 +64,7 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(slice_role_for_preset("nlp_core_10k"), "domain")
         self.assertEqual(slice_role_for_preset("open_wiki_100k"), "rescue")
 
-    def test_rank_and_force_exactly_k_dedupes_then_backfills(self) -> None:
+    def test_rank_references_dedupes_candidates(self) -> None:
         candidates = [
             {"term": "model", "translation": "模型", "score": 0.99, "source_slice_role": "domain"},
             {"term": "BERT", "translation": "BERT", "score": 0.80, "source_slice_role": "base"},
@@ -71,40 +72,12 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
             {"term": "neural machine translation", "translation": "神经机器翻译", "score": 0.65, "source_slice_role": "domain"},
         ]
         ranked = rank_references(candidates, active_domain="nlp")
-        prompt = force_exactly_k_references(
-            ranked,
-            k=3,
-            backfill=[{"term": "fallback", "translation": "回填", "score": 0.1}],
-        )
-        self.assertEqual(len(prompt), 3)
-        self.assertEqual(len({item["term"].lower() for item in prompt}), 3)
-        self.assertIn("BERT", {item["term"] for item in prompt})
 
-    def test_force_exactly_k_uses_nlp_domain_defaults_when_pool_is_short(self) -> None:
-        ranked = rank_references([{"term": "BERT", "translation": "BERT", "score": 0.9}])
-        prompt = force_exactly_k_references(ranked, k=10, backfill=[], active_domain="nlp")
+        self.assertEqual(len(ranked), 3)
+        self.assertEqual(len({item["term"].lower() for item in ranked}), 3)
+        self.assertIn("BERT", {item["term"] for item in ranked})
 
-        self.assertEqual(len(prompt), 10)
-        self.assertEqual(len({item["term"].lower() for item in prompt}), 10)
-        self.assertTrue(all(item.get("term") and item.get("translation") for item in prompt))
-        self.assertEqual(prompt[0]["term"], "BERT")
-        self.assertTrue(all(item.get("source_slice_role") != "base" for item in prompt[1:]))
-        self.assertTrue(all(item.get("source_domain") == "nlp" for item in prompt[1:]))
-
-    def test_force_exactly_k_uses_neutral_defaults_outside_nlp(self) -> None:
-        prompt = force_exactly_k_references([], k=10, backfill=[], active_domain="medicine")
-        terms = {item["term"] for item in prompt}
-
-        self.assertEqual(len(prompt), 10)
-        self.assertNotIn("BERT", terms)
-        self.assertNotIn("Transformer", terms)
-        self.assertNotIn("named entity recognition", terms)
-        self.assertTrue(all(item.get("term") and item.get("translation") for item in prompt))
-        self.assertTrue(all(item.get("source_domain") == "medicine" for item in prompt))
-        self.assertTrue(all(item.get("fallback_reason") == "fixed_prompt_k_domain_neutral_default" for item in prompt))
-        self.assertTrue(all(item.get("source_preset") != "common_10k" for item in prompt))
-
-    def test_fixed_glossary_preset_also_forces_prompt_top10(self) -> None:
+    def test_fixed_glossary_preset_does_not_backfill_after_filtering(self) -> None:
         agent = OmniAgent()
         agent.config.prompt_top_k = 10
         session = SimpleNamespace(
@@ -117,9 +90,8 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
 
         prompt = agent._prompt_references(session, [{"term": "BERT", "translation": "BERT", "score": 0.9}])
 
-        self.assertEqual(len(prompt), 10)
+        self.assertEqual(len(prompt), 1)
         self.assertEqual(prompt[0]["term"], "BERT")
-        self.assertTrue(all(item.get("term") and item.get("translation") for item in prompt))
 
     def test_fixed_glossary_preset_truncates_to_prompt_top_k(self) -> None:
         agent = OmniAgent()
@@ -141,6 +113,22 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(len(prompt), 10)
         self.assertEqual(prompt[0]["term"], "term 0")
         self.assertEqual(prompt[-1]["term"], "term 9")
+
+    def test_auto_glossary_preset_does_not_backfill_after_filtering(self) -> None:
+        agent = OmniAgent()
+        agent.config.prompt_top_k = 10
+        session = SimpleNamespace(
+            auto_glossary_enabled=True,
+            glossary_preset="nlp_core_10k",
+            active_glossary_preset="nlp_core_10k",
+            active_domain="nlp",
+            recent_references=deque(maxlen=16),
+        )
+
+        prompt = agent._prompt_references(session, [{"term": "BERT", "translation": "BERT", "score": 0.9}])
+
+        self.assertEqual(len(prompt), 1)
+        self.assertEqual(prompt[0]["term"], "BERT")
 
     def test_none_glossary_does_not_backfill_prompt_candidates(self) -> None:
         agent = OmniAgent()

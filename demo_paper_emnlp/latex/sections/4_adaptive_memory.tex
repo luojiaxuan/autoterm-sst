@@ -4,9 +4,10 @@
 AutoTerm-SST separates terminology inventory from the prompt interface. The
 \emph{open memory} is a large offline resource derived from Wikidata/Wikipedia
 and curated glossaries, stored as manifest-driven snapshots with precomputed
-MaxSim indexes. The online system keeps the prompt budget fixed at 10 glossary
-candidates per chunk. The automatic strategy controls which inventory slices are
-active and how candidates are ranked into that fixed list.
+MaxSim indexes. The online system first retrieves at most 10 glossary
+candidates per chunk from the active inventory, then filters low-confidence
+matches before constructing the prompt. The automatic strategy controls which
+inventory slices are active and how candidates are ranked before filtering.
 
 \paragraph{Open memory snapshots.}
 Each snapshot maps a preset id to term files, metadata, and a MaxSim index. The
@@ -42,17 +43,19 @@ when evidence is strong. Cold index loads are non-blocking: the agent preloads a
 target index in the background and activates it only after the retrieval plugin
 reports that the index is ready.
 
-\paragraph{Fixed prompt candidates.}
-The automatic mode retrieves a broad candidate pool from active slices, optionally
-adds \texttt{open\_wiki\_100k} under low-confidence fallback conditions, deduplicates
-by canonical source term, and reranks candidates into a fixed prompt list:
+\paragraph{Capped prompt candidates.}
+The automatic mode retrieves candidates from active slices, optionally adds
+\texttt{open\_wiki\_100k} under low-confidence fallback conditions, deduplicates
+by canonical source term, and caps retrieval at:
 \begin{center}
 \small
 \texttt{PROMPT\_K}=10
 \end{center}
-Thus slice size affects the candidate inventory, not the number of glossary
-entries shown to the model. Larger inventories improve coverage but make ranking
+The prompt may receive fewer than 10 candidates after score filtering; the
+system does not insert filler terms to reach the cap. Thus slice size affects
+the candidate inventory and the difficulty of placing relevant terms inside the
+top-10 retrieval cap. Larger inventories improve coverage but make ranking
 harder; narrower inventories reduce distractors but may miss domain-specific
-terms. The live evidence metadata records active slices, candidate-pool size, the
-fixed top-10 budget check, fallback events, and retrieval-quality metrics such as
+terms. The live evidence metadata records active slices, candidate-pool size,
+prompt-reference count, fallback events, and retrieval-quality metrics such as
 prompt gold retrieval and precision.

@@ -770,6 +770,13 @@ class MaxSimRetrievalPlugin(RetrievalPlugin):
                 n = min(int(k), int(finite.sum().item()))
                 masked_scores = row_scores.masked_fill(~finite, -float("inf"))
                 top_sco, top_idx = torch.topk(masked_scores, k=n, largest=True, sorted=True)
+                score_threshold = getattr(self.retriever, "score_threshold", None)
+                if score_threshold is not None:
+                    keep = top_sco >= float(score_threshold)
+                    if int(keep.sum().item()) == 0:
+                        continue
+                    top_sco = top_sco[keep]
+                    top_idx = top_idx[keep]
                 top_win = best_window_idx[row_idx].gather(0, top_idx)
                 top_start = abs_starts[row_idx].gather(0, top_win)
                 top_end = abs_ends[row_idx].gather(0, top_win)

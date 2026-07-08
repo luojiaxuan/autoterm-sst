@@ -77,10 +77,10 @@ we have a clean 100k zh AI glossary locally.
 - Presets: `acl_tagged_raw`, `acl_ai_translated_plus10k`, `acl_ai_broad_plus10k`,
   `acl_ai_broad_plus50k`, `acl_ai_broad_plus100k`.
 - Latency multipliers: `2` and `1`.
-- The manual-preset sweep logs references surfaced under the fixed top-10 cap;
+- The manual-preset sweep logs references surfaced under the top-10 retrieval cap;
   `refs/chunk` can be below 10 because chunks without confident retrieved terms
   do not force filler refs in this harness. This benchmark is a scale/relevance
-  sweep, not the unit test for the auto mode's exact-10 backfill invariant.
+  sweep, not a fixed-size prompt-candidate invariant.
 
 ## Dual Gold Denominator Audit
 

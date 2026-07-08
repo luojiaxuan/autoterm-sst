@@ -68,7 +68,6 @@ from framework.agents.term_memory.slice_registry import (
     PROMPT_K,
     RetrievalSlice,
     domain_for_slice_preset,
-    force_exactly_k_references,
     rank_references as rank_autoterm_references,
     slice_id_for_preset,
     slice_role_for_preset,
@@ -316,9 +315,9 @@ class OmniConfig:
     router_generated_target_min_chars: int = 6
     prompt_top_k: int = PROMPT_K
     ui_top_k: int = PROMPT_K
-    autoterm_broad_topk_per_slice: int = 50
+    autoterm_topk_per_slice: int = PROMPT_K
     autoterm_rescue_preset: str = "open_wiki_100k"
-    autoterm_candidate_score_threshold: float = 0.0
+    autoterm_candidate_score_threshold: float = 0.78
     autoterm_enable_open_rescue: bool = True
 
     max_imported_glossary_terms: int = 10000
@@ -330,7 +329,8 @@ class OmniConfig:
         routing_config = autoterm_config.get("routing") if isinstance(autoterm_config.get("routing"), dict) else {}
         retrieval_config = autoterm_config.get("retrieval") if isinstance(autoterm_config.get("retrieval"), dict) else {}
         prompt_k_default = _safe_int(retrieval_config.get("prompt_k", autoterm_config.get("prompt_k")), PROMPT_K)
-        broad_topk_default = _safe_int(retrieval_config.get("broad_topk_per_slice"), 50)
+        retrieval_topk_default = _safe_int(retrieval_config.get("topk_per_slice", retrieval_config.get("broad_topk_per_slice")), prompt_k_default)
+        autoterm_score_threshold_default = _safe_float(retrieval_config.get("candidate_score_threshold"), 0.78)
         base_preset_default = _autoterm_base_preset(autoterm_config, "none")
         initial_preset_default = _autoterm_initial_preset(autoterm_config, "nlp_core_10k")
         working_presets_default = _autoterm_working_presets(
@@ -452,8 +452,9 @@ class OmniConfig:
             router_generated_target_min_chars=_safe_int(routing_config.get("generated_target_min_chars"), 6),
             prompt_top_k=_env_int("RASST_PROMPT_TOP_K", prompt_k_default),
             ui_top_k=_env_int("RASST_UI_TOP_K", prompt_k_default),
-            autoterm_broad_topk_per_slice=broad_topk_default,
+            autoterm_topk_per_slice=retrieval_topk_default,
             autoterm_rescue_preset=rescue_preset_default,
+            autoterm_candidate_score_threshold=autoterm_score_threshold_default,
             autoterm_enable_open_rescue=_meta_bool(retrieval_config.get("use_open_wiki_rescue"), _meta_bool(routing_config.get("enable_fallback"), True)),
             max_imported_glossary_terms=_env_int("RASST_MAX_IMPORTED_GLOSSARY_TERMS", 10000),
             tmp_dir=_env_str("RASST_TMP_DIR", f"/dev/shm/rasst_omni_{os.getpid()}"),
@@ -975,11 +976,7 @@ class OmniAgent(Agent):
 
     def _retrieval_top_k_for(self, session: "OmniSession") -> int:
         if session.auto_glossary_enabled:
-            return max(
-                int(self.config.autoterm_broad_topk_per_slice),
-                int(self.config.prompt_top_k),
-                int(self.config.ui_top_k),
-            )
+            return max(int(self.config.autoterm_topk_per_slice), int(self.config.prompt_top_k), int(self.config.ui_top_k))
         return max(int(self.config.rag_top_k), int(self.config.prompt_top_k), int(self.config.ui_top_k))
 
     def _retrieval_score_threshold_for(self, session: "OmniSession") -> Optional[float]:
@@ -1739,19 +1736,7 @@ class OmniAgent(Agent):
     ) -> List[Dict[str, Any]]:
         k = max(0, int(self.config.prompt_top_k))
         annotated = self._annotate_references(session, references)
-        should_force_fixed_k = bool(
-            session.auto_glossary_enabled
-            or not _is_empty_glossary_preset(session.glossary_preset)
-        )
-        if should_force_fixed_k:
-            prompt_refs = force_exactly_k_references(
-                annotated,
-                k=k,
-                backfill=list(session.recent_references),
-                active_domain=session.active_domain,
-            )
-        else:
-            prompt_refs = annotated[:k]
+        prompt_refs = annotated[:k]
         session.last_prompt_reference_count = len(prompt_refs)
         return prompt_refs
 

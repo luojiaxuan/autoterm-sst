@@ -112,7 +112,7 @@ speech-window domain probe
   -> hysteresis / consecutive-window switch guard
   -> switch exactly one active domain slice
   -> retrieve/rank prompt candidates from the active domain slice
-  -> surface exactly 10 prompt candidates
+  -> surface up to 10 candidates after score filtering
 ```
 
 Recommended score:
@@ -144,7 +144,7 @@ Recommended switch guard:
 - Use `min_consistent_windows = 3` when only audio/probe signals are available.
 - Keep cooldown to prevent ping-pong.
 - Do not let current active-slice metadata vote veto a high-confidence text-topic switch; treat it as a small prior only.
-- Probe retrieval must not change the prompt budget. It only scores candidate domains; prompt still receives exactly 10 candidates from the selected active slice.
+- Probe retrieval must not change the prompt retrieval cap. It only scores candidate domains; prompt candidates still come from the selected active slice and may be fewer than 10 after filtering.
 
 ## Open implementation work
 

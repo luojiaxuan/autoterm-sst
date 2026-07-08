@@ -72,8 +72,9 @@ auto_working:
     candidate_stale_sec: 120
     low_confidence_threshold: 0.35
   retrieval:
-    broad_topk_per_slice: 50
+    topk_per_slice: 10
     prompt_k: 10
+    candidate_score_threshold: 0.78
     use_lexical_match: true
     use_acronym_match: true
     use_domain_prior: true

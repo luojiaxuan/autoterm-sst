@@ -5,7 +5,7 @@ AutoTerm-SST is a live terminology-aware SST system, not a new foundation model
 or a learned topic classifier. The current live GPU demo focuses on
 English-to-Chinese; adding more target languages requires translated term files,
 MaxSim indexes, and prompt templates. Large open memories improve coverage but
-can reduce retrieval precision under a fixed 10-candidate prompt budget, which
+can reduce retrieval precision under a 10-candidate retrieval cap, which
 is why the system routes directly among domain-specific active slices and uses
 broad open memory only as a fallback candidate pool. The
 audio-native router is intentionally conservative and may stay on the
@@ -16,8 +16,8 @@ artifacts; mock mode supports UI and protocol testing without those weights.
 
 We presented AutoTerm-SST, a zero-setup terminology-memory workbench for streaming
 speech translation. The key design is to maintain broad terminology resources
-offline while selecting active inventory slices and ranking exactly 10 prompt
-candidates online using speech-side retrieval evidence. The demo exposes the resulting evidence, glossary state,
+offline while selecting active inventory slices and ranking candidates into a
+small top-10 retrieval cap using speech-side retrieval evidence. The demo exposes the resulting evidence, glossary state,
 router decision, and latency to users in real time. Our current evaluation shows
 that zero-setup active-inventory selection can improve terminology recall on a
 term-dense smoke talk while warm retrieval remains efficient even for large

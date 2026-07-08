@@ -1,7 +1,8 @@
 # Domain-Specific Adaptive Working Glossary
 
 RASST-Demo maintains a large open terminology memory offline, but activates a
-fixed 10-candidate prompt list for each streaming session. The active inventory is
+domain-specific retrieval inventory for each streaming session. Each chunk
+retrieves at most 10 candidates and keeps only score-filtered survivors. The active inventory is
 selected automatically from recent window topic evidence. The automatic path now
 keeps exactly one domain-specific slice active at a time; `common_terms` remains
 available as an optional/diagnostic preset, not as a default prompt inventory.
@@ -152,8 +153,8 @@ When no generated target or diagnostic topic text is available, the fallback sho
 small-top-k domain-probe retrieval plus weak centroid similarity. Current
 active-slice metadata should be treated as a small prior, not as a veto against
 a high-confidence topic switch. These routing probes must not change the prompt
-interface: the prompt still receives exactly 10 candidates retrieved from the
-active domain slice.
+retrieval path: prompt candidates still come from the active domain slice, with
+at most 10 retrieved candidates before score filtering.
 
 Switch guards run in this order:
 
@@ -245,8 +246,8 @@ The JSON WebSocket event contains:
   "text": "...",
   "meta": {
     "references": [{"term": "...", "translation": "...", "source": "auto:nlp_core_10k"}],
-    "prompt_reference_count": 10,
-    "ui_reference_count": 10,
+    "prompt_reference_count": 6,
+    "ui_reference_count": 6,
     "domain_probe_scores": {
       "medicine": {
         "preset_id": "medicine_core_10k",
@@ -437,7 +438,7 @@ python eval/streaming_sst/score_auto_glossary.py \
 
 ## Paper Framing
 
-The runtime budget is the fixed top-10 prompt list, not the full domain
+The runtime budget is the top-10 retrieval cap, not the full domain
 universe. 100k/500k/1M memories remain useful as offline memory and scale
 evidence, but the demo should select and rank candidates from an active
 inventory. The claim is:
@@ -447,7 +448,7 @@ inventory. The claim is:
    domain probes plus generated target-translation window topics, with source
    transcript windows reserved for controlled diagnostics;
 3. exactly one domain slice is active at a time by default;
-4. fixed top-10 reranking reduces distractors relative to direct broad-memory
+4. top-10 capped reranking plus score filtering reduces distractors relative to direct broad-memory
    prompting;
 5. users get terminology-aware streaming speech translation with zero setup.
 
@@ -461,7 +462,7 @@ generated target-translation text window. Source transcript windows are used
 only in controlled router diagnostics. The router combines these signals with a
 weak speech-centroid score and a small metadata prior, then applies hysteresis
 over consecutive windows before switching the active domain slice. The prompt
-interface remains fixed: each chunk receives exactly 10 retrieved glossary
-candidates from the active domain inventory. Full E2E generated-target switch
-quality remains a pending benchmark.
+interface remains capped: each chunk retrieves at most 10 glossary candidates
+from the active domain inventory, then filters low-confidence matches before
+prompting. Full E2E generated-target switch quality remains a pending benchmark.
 ```

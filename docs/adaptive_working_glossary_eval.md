@@ -185,8 +185,8 @@ question. The replacement run is a 4-block playlist under
 ACL 120s -> medicine 120s -> ACL 120s -> medicine 120s
 ```
 
-It produced 3/3 correct switches, 0 wrong switches, fixed prompt_k=10 on every
-event, retrieval p95 88.29ms, and transition latencies of 20.16s, 17.28s, and
+It produced 3/3 correct switches, 0 wrong switches, retrieval p95 88.29ms, and
+transition latencies of 20.16s, 17.28s, and
 37.44s. The strict 30s tolerance fails only on the final medicine_606 switch;
 40s/45s tolerance passes on the same record.
 
@@ -219,7 +219,7 @@ but loses ACL technical hits versus fixed `nlp_core_10k`.
 | status | item | note |
 |---|---|---|
 | done | Domain-specific `auto_working` without common base slice | Default route is among domain slices; common terms are diagnostic/backfill only. |
-| done | Fixed top-10 prompt candidate invariant | Covered by code/tests and previous benchmark docs. |
+| done | Top-10 retrieval cap with score-filtered prompt refs | Runtime retrieves up to 10 candidates and does not backfill after filtering. |
 | done | Target-text/probe state-machine proxy benchmark | ACL 5 + medicine 5 fixed-64 and full-window proxy runs passed under clean expected probe evidence. |
 | done | Router guards for generic generated text, weak probe, and centroid-only false switches | Covered by unit tests. |
 | done | Real mixed-audio harness | `eval_mixed_audio_switch.py` added and dry-run verified on Taurus. |
@@ -239,8 +239,8 @@ but loses ACL technical hits versus fixed `nlp_core_10k`.
 | masked-term BLEU | `score_terms.py --reference-text ...`; removes target-side glossary translations from hyp/ref before sacreBLEU |
 | reference precision | existing ACL tagged precision harness or postprocess refs vs gold |
 | refs/chunk | `eval_auto_glossary.py` JSON metadata |
-| fixed prompt refs/chunk | `prompt_reference_count` metadata; invariant/debug only, not retrieval-quality evidence |
-| prompt shortfall chunks | invariant/debug only; should be zero for fixed-budget auto mode |
+| surviving prompt refs/chunk | `prompt_reference_count` metadata after score filtering |
+| prompt shortfall chunks | chunks where fewer than the top-10 retrieval cap survived filtering |
 | retrieval p50/p95 | `retrieve_s` metadata |
 | switch count | `meta.topic.switch_count` |
 | router action/reason | `meta.topic_router.action` / `meta.topic_router.reason` |

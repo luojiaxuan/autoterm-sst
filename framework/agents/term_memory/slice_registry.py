@@ -1,4 +1,4 @@
-"""AutoTerm-SST slice roles, retrieval plans, and fixed top-k helpers."""
+"""AutoTerm-SST slice roles, retrieval plans, and candidate ranking helpers."""
 
 from __future__ import annotations
 
@@ -30,54 +30,6 @@ _GENERIC_UNIGRAMS = {
     "training",
 }
 _ACRONYM_RE = re.compile(r"^[A-Z][A-Z0-9.+&/-]{1,}$")
-
-_DEFAULT_NLP_COMMON_BACKFILL_TERMS = (
-    ("AI", "AI"),
-    ("NLP", "自然语言处理"),
-    ("machine learning", "机器学习"),
-    ("deep learning", "深度学习"),
-    ("language model", "语言模型"),
-    ("neural network", "神经网络"),
-    ("dataset", "数据集"),
-    ("benchmark", "基准测试"),
-    ("algorithm", "算法"),
-    ("speech recognition", "语音识别"),
-    ("speech translation", "语音翻译"),
-    ("machine translation", "机器翻译"),
-    ("named entity recognition", "命名实体识别"),
-    ("information retrieval", "信息检索"),
-    ("question answering", "问答"),
-    ("reinforcement learning", "强化学习"),
-    ("Transformer", "Transformer"),
-    ("BERT", "BERT"),
-    ("evaluation metric", "评测指标"),
-    ("training data", "训练数据"),
-)
-
-_DEFAULT_DOMAIN_NEUTRAL_BACKFILL_TERMS = (
-    ("term", "术语"),
-    ("concept", "概念"),
-    ("entity", "实体"),
-    ("method", "方法"),
-    ("data", "数据"),
-    ("result", "结果"),
-    ("system", "系统"),
-    ("analysis", "分析"),
-    ("model", "模型"),
-    ("process", "过程"),
-    ("evaluation", "评估"),
-    ("evidence", "证据"),
-    ("measurement", "测量"),
-    ("condition", "条件"),
-    ("factor", "因素"),
-    ("group", "组"),
-    ("sample", "样本"),
-    ("case study", "案例研究"),
-    ("decision", "决策"),
-    ("report", "报告"),
-)
-
-_NLP_BACKFILL_DOMAINS = {"nlp"}
 
 
 @dataclass(frozen=True)
@@ -125,7 +77,7 @@ def slice_role_for_preset(preset_id: str) -> str:
 def slice_weight_for_role(role: str) -> float:
     if role == "base":
         return 1.0
-    if role in {"domain", "domain_probe", "domain_backfill"}:
+    if role in {"domain", "domain_probe"}:
         return 0.8
     if role == "rescue":
         return 0.4
@@ -233,66 +185,6 @@ def rank_references(references: Sequence[Dict[str, Any]], *, active_domain: str 
         item["rerank_score"] = reference_rerank_score(item, active_domain=active_domain)
         ranked.append(item)
     return sorted(ranked, key=lambda item: float(item.get("rerank_score") or 0.0), reverse=True)
-
-
-def default_common_backfill_references(
-    k: int = PROMPT_K,
-    *,
-    active_domain: str = GENERAL_DOMAIN,
-) -> List[Dict[str, Any]]:
-    limit = max(0, int(k))
-    domain = str(active_domain or GENERAL_DOMAIN).strip().casefold()
-    use_nlp_common = domain in _NLP_BACKFILL_DOMAINS
-    terms = _DEFAULT_NLP_COMMON_BACKFILL_TERMS if use_nlp_common else _DEFAULT_DOMAIN_NEUTRAL_BACKFILL_TERMS
-    fallback_reason = "fixed_prompt_k_nlp_domain_default" if use_nlp_common else "fixed_prompt_k_domain_neutral_default"
-    source_preset = f"{domain}_domain_backfill" if domain != GENERAL_DOMAIN else "domain_neutral_backfill"
-    source_slice_id = f"{domain}_domain_backfill" if domain != GENERAL_DOMAIN else "domain_neutral_backfill"
-    refs: List[Dict[str, Any]] = []
-    for term, translation in terms[:limit]:
-        refs.append(
-            {
-                "term": term,
-                "translation": translation,
-                "target_translations": {"zh": translation},
-                "canonical_source": term,
-                "source": "fixed_prompt_k_domain_backfill",
-                "source_preset": source_preset,
-                "source_slice_id": source_slice_id,
-                "source_slice_role": "domain_backfill",
-                "source_domain": domain,
-                "score": -100.0,
-                "dense_score": -100.0,
-                "rerank_score": -100.0,
-                "fallback_reason": fallback_reason,
-            }
-        )
-    return refs
-
-
-def force_exactly_k_references(
-    ranked: Sequence[Dict[str, Any]],
-    *,
-    k: int = PROMPT_K,
-    backfill: Sequence[Dict[str, Any]] = (),
-    active_domain: str = GENERAL_DOMAIN,
-) -> List[Dict[str, Any]]:
-    limit = max(0, int(k))
-    if limit == 0:
-        return []
-    merged = dedupe_references(list(ranked or []) + list(backfill or []))
-    merged = sorted(
-        merged,
-        key=lambda item: float(item.get("rerank_score", item.get("score", 0.0)) or 0.0),
-        reverse=True,
-    )
-    if len(merged) < limit:
-        merged = dedupe_references(merged + default_common_backfill_references(limit, active_domain=active_domain))
-        merged = sorted(
-            merged,
-            key=lambda item: float(item.get("rerank_score", item.get("score", 0.0)) or 0.0),
-            reverse=True,
-        )
-    return merged[:limit]
 
 
 def domain_for_slice_preset(preset_id: str) -> str:

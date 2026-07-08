@@ -3,7 +3,7 @@
 
 \paragraph{Setup.}
 We evaluate the terminology-memory behavior of the live AutoTerm-SST framework
-on Taurus A6000 GPUs. The RASST agent runs Qwen3-Omni with in-process vLLM
+on A6000 GPUs. The RASST agent runs Qwen3-Omni with in-process vLLM
 tensor parallelism over two GPUs and a MaxSim retriever on a third GPU. Audio is
 from ACL6060 English-to-Chinese prepared segments. Unless otherwise stated,
 results use the framework JSON WebSocket protocol, which exposes translated
@@ -20,14 +20,13 @@ only as a non-terminology sanity check, not as the primary glossary metric. For
 runtime, we report retrieved references per partial chunk and retrieval latency
 percentiles. For routing, we report switch latency, wrong switches, and
 steady-state active-domain accuracy after transition grace windows. A separate
-SimulEval-compatible stress run measures end-to-end streaming quality/latency
-for the base streaming system \citep{ma2020simuleval}; the glossary table
-should be read as terminology and retrieval evidence, not as a replacement for
-token-delay StreamLAAL.
+SimulEval-compatible stress run \citep{ma2020simuleval} measures end-to-end
+streaming quality/latency; the glossary tables are terminology and retrieval
+evidence, not a replacement for token-delay StreamLAAL.
 
 \begin{figure*}[t]
   \centering
-  \includegraphics[width=0.92\textwidth]{routing_timeline_4block.png}
+  \includegraphics[width=0.80\textwidth]{routing_timeline_4block.png}
   \caption{Mixed-domain routing probe on a 480s real E2E streaming playlist
   with ACL, medicine, ACL, and medicine blocks. The automatic active glossary
   switches after each true domain boundary with no wrong switches; the final
@@ -62,16 +61,20 @@ injecting fewer references than the broad 100k memory.}
 Table~\ref{tab:quality} compares four user-facing settings. Broad open memory is
 zero-effort, but it retrieves more low-precision candidates without improving
 term accuracy on this slice. The adaptive working glossary keeps the same zero
-user effort while selecting candidates from the configured domain-specific
+user effort while selecting candidates from the domain-specific
 active inventory; it recovers eight of nine gold terms and reduces retrieval p95
 relative to the broad 100k memory. The curated
 ACL glossary has the best masked BLEU and lowest retrieval latency, but it
-requires a manually curated domain glossary. Importantly, this short smoke clip
-does not demonstrate a domain switch: the \texttt{auto\_working} run stays on
-the configured initial domain slice because the router's confidence and interval
-guards do not activate another domain slice. We therefore frame Table~\ref{tab:quality} as
-evidence for compact zero-setup working memory, while the interface exposes
-switch decisions and guard reasons for longer or clearer-domain sessions.
+requires a manually curated domain glossary. Two caveats apply. First, the gold
+set is deliberately small, so we read Table~\ref{tab:quality} as smoke evidence;
+a five-talk streaming sweep against a 142-term technical gold set shows the same
+scale pattern, with term accuracy stable at 0.965--0.979 while retrieval
+precision falls from 0.48 (curated) to 0.14 (100k) as the inventory grows
+(Appendix~\ref{app:sweep}).
+Second, this short clip does not exercise a domain switch: the
+\texttt{auto\_working} run stays on the configured initial slice because the
+router's confidence and interval guards do not fire; routing is evaluated
+separately below.
 
 \begin{table}[t]
 \centering
@@ -94,9 +97,9 @@ outside the streaming batch path.}
 \end{table}
 
 \paragraph{Scale and prompt noise.}
-Table~\ref{tab:scale} shows that warm MaxSim retrieval remains near 60--105 ms
-p95 from curated glossaries to million-term memories. The bottleneck is not
-per-chunk exact retrieval; it is cold index loading and reference noise. As
+Table~\ref{tab:scale} shows that warm MaxSim retrieval stays near 60--105 ms
+(p50--p95) from curated glossaries to million-term memories. The bottleneck is
+not per-chunk exact retrieval; it is cold index loading and reference noise. As
 memories grow, refs/chunk increases, so the prompt receives more distractor
 terms even when useful terms remain retrievable. This supports the central
 design choice: keep the live active glossary compact and treat large open memory
@@ -111,12 +114,21 @@ occur 20.16s and 17.28s after the domain boundary; the final switch occurs
 general session framing before clear oncology terms. The run keeps the top-10
 prompt invariant, reaches 88.29 ms retrieval p95, and obtains 0.9947
 steady-state active-domain accuracy under the 30s transition-tolerance view.
+A medicine-only session started from the default NLP slice recovers by
+switching to the medicine slice 59.5s into the session with zero wrong
+switches, so the initial slice is a warm start rather than a hidden oracle.
+The speech-window probe alone is noisy (0.52 top-1 domain accuracy on this
+probe), so generated-target topic evidence leads routing and the probe acts as
+a confirmation guard. A complementary state-machine benchmark over 640-window
+alternating and random ACL/medicine playlists with controlled probe evidence
+passes all 16 domain transitions with zero wrong switches, while inverted- and
+contested-probe diagnostics fail as designed.
 
 \paragraph{Concurrent streaming.}
 In a separate SimulEval-compatible 32-session stress run, the framework produced
 BLEU 47.38, StreamLAAL 2264 ms, and StreamLAAL-CA 2265 ms over ACL6060 with a
-merged \texttt{instances.log}. This result validates the streaming transport and
-agent serving path under concurrent use. It is not a glossary ablation, so we do
-not mix it into Table~\ref{tab:quality}; instead, it provides system evidence
-that the demo can sustain multi-session streaming while the terminology
-evaluation isolates active-memory behavior.
+merged \texttt{instances.log}. This validates the streaming transport and agent
+serving path under concurrent use; it is not a glossary ablation, so we keep it
+out of Table~\ref{tab:quality} and read it as system evidence that the demo
+sustains multi-session streaming while the terminology evaluation isolates
+active-memory behavior.

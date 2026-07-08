@@ -48,3 +48,9 @@ checkpoints/
 .vscode/
 *.swp
 *.swo
+
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.synctex.gz

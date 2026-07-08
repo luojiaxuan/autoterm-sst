@@ -10,7 +10,7 @@ retrieval, batching, KV cache, or glossary construction.
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.96\textwidth]{autoterm_architecture.png}
+\includegraphics[width=0.80\textwidth]{autoterm_architecture.png}
 \caption{AutoTerm-SST separates transport/session logic from model-specific
 agent logic. Retrieval, active glossary routing, prompting, and vLLM generation
 all live inside the agent boundary, while the framework exposes a stable
@@ -21,13 +21,12 @@ REST/WebSocket protocol and JSON evidence stream to the UI.}
 \paragraph{Agent contract.}
 Agents implement a small contract: \texttt{open\_session},
 \texttt{submit\_audio}, \texttt{on\_control}, \texttt{close\_session},
-\texttt{describe}, and \texttt{health}. This lets the same UI and wire protocol
+\texttt{describe}, and \texttt{health}. The same UI and wire protocol
 serve a deterministic mock agent for development, a legacy InfiniSST scheduler
-agent, or the RASST/Qwen3-Omni agent used in the live GPU demo.
-The agent boundary is backend-agnostic: the current live demo uses in-process
-vLLM \citep{kwon2023efficient}, while the same protocol can connect to external
-SGLang-compatible serving backends without changing the terminology memory,
-router, or UI.
+agent, or the RASST/Qwen3-Omni agent used in the live GPU demo. The boundary is
+backend-agnostic: the live demo uses in-process vLLM \citep{kwon2023efficient},
+and the same protocol can serve external SGLang-compatible backends without
+changing the terminology memory, router, or UI.
 
 \paragraph{Streaming agent.}
 For each audio chunk, the OmniAgent can run MaxSim terminology retrieval over

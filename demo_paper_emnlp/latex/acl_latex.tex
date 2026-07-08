@@ -44,7 +44,7 @@
 
 % If the title and author information does not fit in the area allocated, uncomment the following
 %
-\setlength\titlebox{6cm}
+\setlength\titlebox{5cm}
 %
 % and set <dim> to something 5cm or larger.
 
@@ -74,10 +74,16 @@
 \input{latex/sections/6_evaluation}
 \input{latex/sections/7_limitations_conclusion}
 
-\section*{Acknowledgments}
-
-We thank the open-source communities behind PyTorch, vLLM, FastAPI, and Qwen for their foundational contributions. We also thank the University of California, Santa Barbara for computational resources used in the live GPU evaluation.
+% Acknowledgments are omitted in the submission version to respect the 6-page
+% limit; restore for camera-ready (which allows one extra page).
+% \section*{Acknowledgments}
+% We thank the open-source communities behind PyTorch, vLLM, FastAPI, and Qwen
+% for their foundational contributions. We also thank the University of
+% California, Santa Barbara for computational resources used in the live GPU
+% evaluation.
 
 \bibliography{custom}
+
+\input{latex/sections/8_appendix}
 
 \end{document}

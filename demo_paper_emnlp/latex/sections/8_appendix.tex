@@ -1,0 +1,131 @@
+\appendix
+
+\section{Router Configuration and Guards}
+\label{app:router}
+
+Table~\ref{tab:router-config} lists the default production configuration of
+the hybrid active-glossary router as released in
+\texttt{configs/autoterm\_slices.yaml}; environment variables can override
+individual values per deployment. Guards are evaluated in order: warmup,
+update interval, target-equals-active, index readiness, probe floors,
+confidence, top-vs-runner-up margin, target-vs-current margin, post-switch
+cooldown, and consecutive-window consistency. Uncertain windows keep the
+current slice. The 640-window state-machine benchmark in
+Section~\ref{sec:evaluation} ran under the stricter three-window
+generated-target consistency setting; the released default was subsequently
+retuned to two windows with a raised target-vs-current margin (0.30) based on
+observed real-probe failure modes.
+
+\begin{table}[ht]
+\centering
+\small
+\begin{tabular}{lr}
+\toprule
+Parameter & Default \\
+\midrule
+\multicolumn{2}{l}{\emph{Signal weights (renormalized per window)}} \\
+\quad generated-target topic \(\lambda_t\) & 0.60 \\
+\quad speech-window domain probe \(\lambda_p\) & 0.25 \\
+\quad speech centroid \(\lambda_c\) & 0.10 \\
+\quad reference metadata \(\lambda_m\) & 0.05 \\
+\midrule
+\multicolumn{2}{l}{\emph{Switch thresholds}} \\
+\quad activation confidence & 0.60 \\
+\quad top-vs-runner-up margin & 0.15 \\
+\quad target-vs-current margin & 0.30 \\
+\quad consistent windows (text / gen.\ target / audio) & 2 / 2 / 3 \\
+\midrule
+\multicolumn{2}{l}{\emph{Audio-probe-only raw floors}} \\
+\quad min top probe score / raw margin & 0.50 / 0.08 \\
+\quad min positive probe domains & 2 \\
+\midrule
+\multicolumn{2}{l}{\emph{Schedule (production)}} \\
+\quad warmup / update / cooldown & 20s / 10s / 30s \\
+\quad candidate staleness reset & 120s \\
+\midrule
+\multicolumn{2}{l}{\emph{Retrieval}} \\
+\quad retrieval cap \texttt{PROMPT\_K} & 10 \\
+\quad candidate score threshold & 0.78 \\
+\bottomrule
+\end{tabular}
+\caption{Default hybrid router configuration. Active inventory slices are
+typed: four domain slices (NLP, medicine, finance, legal; 10k terms each), a
+100k open-memory rescue pool, a curated 238-term oracle (evaluation only), and
+a diagnostic common-terms slice.}
+\label{tab:router-config}
+\end{table}
+
+\section{Glossary-Scale Streaming Sweep}
+\label{app:sweep}
+
+Table~\ref{tab:sweep} reports the five-talk streaming sweep referenced in
+Section~\ref{sec:evaluation}: five concatenated ACL 60-60 talks (3{,}442s of
+audio) streamed through the live JSON WebSocket at latency multiplier 2, scored
+against a curated 142-term technical gold set. Each inventory always contains
+the full 238-entry curated ACL glossary; larger rows add Wikidata-mined AI/CS
+candidates as distractors. These are manual-preset runs isolating inventory
+scale (not \texttt{auto\_working} runs). Output term accuracy, BLEU, and
+masked BLEU stay within a narrow band up to 100k terms, while retrieval
+precision collapses --- the prompt channel fills with distractors long before
+output quality visibly degrades, motivating compact routed active slices.
+
+\begin{table}[ht]
+\centering
+\scriptsize
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lrrrrrrr}
+\toprule
+Inventory & Terms & Term acc. & BLEU & M-BLEU & Gold@10 & Prec@10 & Refs \\
+\midrule
+Curated ACL & 238 & 0.972 & 58.27 & 53.10 & 0.972 & 0.480 & 1.53 \\
++AI transl.\ 10k & 10{,}238 & 0.965 & 58.72 & 53.35 & 0.972 & 0.234 & 3.09 \\
++AI broad 10k & 10{,}238 & 0.972 & 58.38 & 52.75 & 0.979 & 0.367 & 2.00 \\
++AI broad 50k & 50{,}238 & 0.979 & 58.65 & 53.24 & 0.979 & 0.196 & 3.64 \\
++AI broad 100k & 100{,}238 & 0.965 & 58.83 & 53.32 & 0.979 & 0.137 & 5.03 \\
+\bottomrule
+\end{tabular}}
+\caption{Five-talk streaming sweep (latency multiplier 2) against the 142-term
+technical gold set. Gold@10 is the fraction of gold terms surfaced within the
+top-10 retrieval cap; Prec@10 is retrieval precision; Refs is surviving prompt
+references per chunk. At latency multiplier 1 the same pattern holds (term
+accuracy 0.944--0.958; precision 0.479 \(\rightarrow\) 0.133).}
+\label{tab:sweep}
+\end{table}
+
+\section{JSON Evidence Event}
+\label{app:json}
+
+An abridged \texttt{partial} event from the structured WebSocket protocol
+(\texttt{?event\_format=json}), showing the evidence rendered by the live
+panel: retrieved references, routing-only domain-probe scores, adaptive topic
+state, and the router decision with its guard evidence.
+
+{\small
+\begin{verbatim}
+{"type": "partial", "text": "...",
+ "meta": {
+  "references": [{"term": "...",
+    "translation": "...",
+    "source": "auto:nlp_core_10k"}],
+  "prompt_reference_count": 6,
+  "retrieve_s": 0.081,
+  "domain_probe_scores": {"medicine": {
+    "preset_id": "medicine_core_10k",
+    "top_score": 0.84,
+    "top_terms": ["clinical trial",
+                  "patient"]}},
+  "topic": {"active_domain": "medicine",
+    "confidence": 0.73,
+    "active_glossary_preset":
+      "medicine_core_10k",
+    "switch_count": 1},
+  "topic_router": {"action": "switch",
+    "from_preset": "nlp_core_10k",
+    "to_preset": "medicine_core_10k",
+    "confidence": 0.73, "margin": 0.19,
+    "evidence": {
+      "router_text_source":
+        "generated_target",
+      "candidate_streak": 2}}}}
+\end{verbatim}
+}

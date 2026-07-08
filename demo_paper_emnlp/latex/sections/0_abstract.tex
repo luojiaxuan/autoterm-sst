@@ -1,23 +1,21 @@
 \begin{abstract}
 We present AutoTerm-SST, an interactive system for terminology-aware streaming
-speech translation. Live domain talks often contain rare entities, technical
-terms, and rapidly changing vocabulary, yet requiring users to prepare a
-glossary before a session creates substantial friction. AutoTerm-SST addresses
-this problem with a zero-setup adaptive terminology memory: every streaming
-chunk receives a fixed list of 10 glossary candidates, while the automatic mode
-controls which terminology slices are active and how candidates are ranked into
-that fixed budget. A training-free router combines generated target-translation
-topic evidence, speech-window domain probes, speech-centroid evidence, and
-retrieved-term metadata, without running a separate ASR or source-transcript
-classifier in the production path. It selects directly among domain-specific
-terminology slices when confidence guards are satisfied. The demo exposes
-translations together with retrieved terms, active slices, router decisions, and
-retrieval latency in a live evidence panel.
+speech translation. Live domain talks are dense in rare entities and technical
+terms, yet requiring users to prepare a glossary before a session creates
+substantial friction. AutoTerm-SST removes this setup step with an adaptive
+terminology memory: each streaming chunk retrieves at most 10 glossary
+candidates from a compact active inventory, and a training-free router decides
+which domain-specific terminology slice is active. The router combines
+generated target-translation topic evidence, speech-window domain probes,
+speech-centroid evidence, and retrieved-term metadata, without running a
+separate ASR or source-transcript classifier in the production path. The demo
+exposes retrieved terms, active slices, router decisions, and retrieval
+latency in a live evidence panel.
 In a terminology smoke evaluation, the zero-setup working glossary recovers
-eight of nine gold terms while using a lower-noise active inventory than a broad
-100k open memory; separate scale probes show warm MaxSim retrieval remains
-within about 60--105 ms p95 up to million-term memories. A mixed-domain routing
-probe shows the active glossary following ACL/medicine domain transitions with
-no wrong switches. AutoTerm-SST is released as a pluggable RASST-Demo framework
-with mock and live GPU modes.
+eight of nine gold terms while injecting fewer, less noisy references than a
+broad 100k open memory; scale probes show warm MaxSim retrieval stays near
+60--105 ms (p50--p95) up to million-term memories, and a mixed-domain routing
+probe follows ACL/medicine domain transitions with no wrong switches.
+AutoTerm-SST is released as a pluggable RASST-Demo framework with mock and
+live GPU modes.
 \end{abstract}

@@ -38,7 +38,9 @@ domain probe, \(q_{\mathrm{speech}}\) is the pooled speech query embedding,
 \(c_d\) is a domain centroid built offline from a slice's MaxSim text
 embeddings, and reference votes come from metadata such as source preset and
 domain. The default weights are \(\lambda_t=0.60\), \(\lambda_p=0.25\),
-\(\lambda_c=0.10\), and \(\lambda_m=0.05\). The older
+\(\lambda_c=0.10\), and \(\lambda_m=0.05\); weights are renormalized over the
+signals available in a window, so routing already works before the first
+translations are generated. The older
 \texttt{embedding\_refs} router remains available as a compatibility policy.
 
 \paragraph{Conservative switching.}
@@ -46,24 +48,19 @@ The router is a policy for selecting active domain slices, not an open-world
 topic detector. It switches only after warmup, minimum update interval,
 confidence threshold, top-vs-runner-up margin, repeated consistent windows,
 domain-probe guards, and target index readiness. Generated target text requires
-three consistent windows by default; audio/probe-only switching is allowed only
-under stricter raw probe floors. Generic generated target text without positive
+multiple consecutive consistent windows; audio/probe-only switching is allowed
+only under stricter raw probe floors (Appendix~\ref{app:router}). Generic generated target text without positive
 topic evidence cannot dilute a strong probe or convert a weak probe into a
-high-confidence switch. The active preset starts from the configured
-domain-specific initial slice and switches directly to another domain slice only
-when evidence is strong. Cold index loads are non-blocking: the agent preloads a
+high-confidence switch. Cold index loads are non-blocking: the agent preloads a
 target index in the background and activates it only after the retrieval plugin
 reports that the index is ready.
 
 \paragraph{Capped prompt candidates.}
 The automatic mode retrieves candidates from active slices, optionally adds
-\texttt{open\_wiki\_100k} under low-confidence fallback conditions, deduplicates
-by canonical source term, and caps retrieval at:
-\begin{center}
-\small
-\texttt{PROMPT\_K}=10
-\end{center}
-The prompt may receive fewer than 10 candidates after score filtering; the
+\texttt{open\_wiki\_100k} under low-confidence fallback conditions,
+deduplicates by canonical source term, and caps retrieval at
+\(\texttt{PROMPT\_K}=10\). The prompt may receive fewer than 10 candidates
+after score filtering; the
 system does not insert filler terms to reach the cap. Thus slice size affects
 the candidate inventory and the difficulty of placing relevant terms inside the
 top-10 retrieval cap. Larger inventories improve coverage but make ranking

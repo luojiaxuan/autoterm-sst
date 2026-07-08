@@ -7,14 +7,16 @@ glossaries, and developers testing new speech translation agents behind a
 stable protocol. The same interface can run in mock mode without a GPU or in
 live GPU mode with Qwen3-Omni and MaxSim retrieval.
 
-\begin{figure}[t]
+\begin{figure*}[t]
   \centering
-  \includegraphics[width=\columnwidth]{ui_evidence_panel.png}
-  \caption{AutoTerm-SST web UI. The live view shows translated text, retrieved
-  term evidence, active glossary status, router confidence, active term count,
-  and retrieval/generation latency.}
+  \includegraphics[width=0.92\textwidth]{ui_evidence_panel.png}
+  \caption{AutoTerm-SST web UI with live terminology evidence. The same
+  interface controls model, latency, and terminology mode while rendering
+  translated text, retrieved term evidence, active glossary status, router
+  confidence, active term count, and retrieval/generation latency from the JSON
+  WebSocket metadata.}
   \label{fig:ui}
-\end{figure}
+\end{figure*}
 
 \paragraph{Live controls.}
 Users choose a model agent, language pair, latency multiplier, and terminology

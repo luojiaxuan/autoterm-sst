@@ -8,38 +8,15 @@ session lifecycle, and routes each session to an agent selected by
 \texttt{agent\_type}. The framework does not know about model prompts,
 retrieval, batching, KV cache, or glossary construction.
 
-\begin{figure}[t]
+\begin{figure*}[t]
 \centering
-\fbox{\begin{minipage}{0.96\columnwidth}
-\centering
-\textbf{Client} \(\rightarrow\)
-\textbf{Thin Framework} \(\rightarrow\)
-\textbf{Agent Boundary}
-
-\vspace{0.4em}
-\begin{tabular}{p{0.27\columnwidth}p{0.30\columnwidth}p{0.27\columnwidth}}
-\centering Web / Electron &
-\centering REST, WebSocket, session routing &
-\centering OmniAgent / mock
-\tabularnewline
-\end{tabular}
-
-\vspace{0.6em}
-\hrule
-\vspace{0.6em}
-\textbf{Inside OmniAgent:}
-audio buffer + micro-batcher \(\rightarrow\)
-retrieval plugin \(\rightarrow\)
-audio-native router \(\rightarrow\)
-PromptBuilder \(\rightarrow\)
-Qwen3-Omni/vLLM backend
-
-\vspace{0.4em}
-\textbf{Output:} translation text + retrieved terms + active glossary metadata
-\end{minipage}}
-\caption{AutoTerm-SST separates transport/session logic from model-specific agent logic. Retrieval, active glossary routing, prompting, and vLLM generation all live inside the agent boundary.}
+\includegraphics[width=0.96\textwidth]{autoterm_architecture.png}
+\caption{AutoTerm-SST separates transport/session logic from model-specific
+agent logic. Retrieval, active glossary routing, prompting, and vLLM generation
+all live inside the agent boundary, while the framework exposes a stable
+REST/WebSocket protocol and JSON evidence stream to the UI.}
 \label{fig:architecture}
-\end{figure}
+\end{figure*}
 
 \paragraph{Agent contract.}
 Agents implement a small contract: \texttt{open\_session},
@@ -54,9 +31,10 @@ router, or UI.
 
 \paragraph{Streaming agent.}
 For each audio chunk, the OmniAgent can run MaxSim terminology retrieval over
-the active slices, build a \texttt{term\_map}, and call the in-process vLLM
-backend. In \texttt{auto\_working}, the retriever returns up to 10 ranked
-glossary candidates and filters low-confidence matches before the PromptBuilder
+the active slices, run the hybrid active-slice router, build a
+\texttt{term\_map}, and call the in-process vLLM backend. In
+\texttt{auto\_working}, the retriever returns up to 10 ranked glossary
+candidates and filters low-confidence matches before the PromptBuilder
 constructs the prompt.
 The agent emits partial translations plus structured metadata, including
 retrieved terms, retrieval latency, active slices, prompt-reference counts, and

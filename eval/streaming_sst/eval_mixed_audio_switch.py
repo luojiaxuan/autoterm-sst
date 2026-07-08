@@ -109,6 +109,7 @@ def read_medicine_audio_blocks(
     audio_dir: str,
     *,
     limit_items: int,
+    medicine_ids: Optional[Sequence[str]] = None,
 ) -> List[AudioBlock]:
     if int(limit_items) <= 0:
         return []
@@ -116,6 +117,25 @@ def read_medicine_audio_blocks(
     if not root.is_dir():
         raise FileNotFoundError(f"medicine audio directory not found: {root}")
     paths = sorted(root.glob("sample_*_v2/*_v2.wav"), key=lambda path: _medicine_audio_sort_key(path))
+    by_id: Dict[str, Path] = {}
+    for path in paths:
+        medicine_id = path.stem[:-3] if path.stem.endswith("_v2") else path.stem
+        by_id[medicine_id] = path
+    if medicine_ids:
+        selected_paths: List[Path] = []
+        missing: List[str] = []
+        for raw_id in medicine_ids:
+            medicine_id = str(raw_id).strip().removeprefix("medicine_")
+            if not medicine_id:
+                continue
+            path = by_id.get(medicine_id)
+            if path is None:
+                missing.append(medicine_id)
+            else:
+                selected_paths.append(path)
+        if missing:
+            raise FileNotFoundError(f"medicine audio id(s) not found: {', '.join(missing)}")
+        paths = selected_paths
     blocks: List[AudioBlock] = []
     for path in paths[: max(0, int(limit_items))]:
         medicine_id = path.stem[:-3] if path.stem.endswith("_v2") else path.stem
@@ -633,6 +653,7 @@ def main() -> None:
     ap.add_argument("--medicine-audio-dir", default=DEFAULT_MEDICINE_AUDIO_DIR)
     ap.add_argument("--acl-items", type=int, default=5)
     ap.add_argument("--medicine-items", type=int, default=5)
+    ap.add_argument("--medicine-ids", default="")
     ap.add_argument("--max-acl-segs-per-talk", type=int, default=0)
     ap.add_argument("--max-seconds-per-item", type=float, default=0.0)
     ap.add_argument(
@@ -663,7 +684,13 @@ def main() -> None:
         limit_items=args.acl_items,
         max_segs_per_talk=args.max_acl_segs_per_talk,
     )
-    medicine_blocks = read_medicine_audio_blocks(args.medicine_audio_dir, limit_items=args.medicine_items)
+    medicine_ids = [item.strip() for item in str(args.medicine_ids or "").split(",") if item.strip()]
+    medicine_limit = len(medicine_ids) if medicine_ids else args.medicine_items
+    medicine_blocks = read_medicine_audio_blocks(
+        args.medicine_audio_dir,
+        limit_items=medicine_limit,
+        medicine_ids=medicine_ids,
+    )
     blocks = build_schedule(acl_blocks, medicine_blocks, schedule=args.schedule, seed=args.seed)
     if not blocks:
         raise SystemExit("no audio blocks found")
@@ -681,6 +708,7 @@ def main() -> None:
             "chunk_seconds": round(chunk_samples / TARGET_SAMPLE_RATE, 3),
             "max_seconds_per_item": args.max_seconds_per_item,
             "max_acl_segs_per_talk": args.max_acl_segs_per_talk,
+            "medicine_ids": medicine_ids,
             "base_url": args.base_url,
             "max_switch_events": max_switch_events,
             "max_switch_seconds": args.max_switch_seconds,

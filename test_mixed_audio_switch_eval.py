@@ -74,6 +74,26 @@ class MixedAudioSwitchEvalTests(unittest.TestCase):
         self.assertEqual([item.item_id for item in schedule], ["acl_a", "medicine_404", "acl_b"])
         self.assertEqual([item.expected_domain for item in schedule], ["nlp", "medicine", "nlp"])
 
+    def test_medicine_reader_can_select_ids(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            med_dir = root / "medicine"
+            med_wav_404 = med_dir / "sample_404_v2" / "404_v2.wav"
+            med_wav_606 = med_dir / "sample_606_v2" / "606_v2.wav"
+            _write_wav(med_wav_404, TARGET_SAMPLE_RATE)
+            _write_wav(med_wav_606, TARGET_SAMPLE_RATE)
+
+            blocks = read_medicine_audio_blocks(
+                str(med_dir),
+                limit_items=2,
+                medicine_ids=["606", "medicine_404"],
+            )
+
+            with self.assertRaisesRegex(FileNotFoundError, "999"):
+                read_medicine_audio_blocks(str(med_dir), limit_items=1, medicine_ids=["999"])
+
+        self.assertEqual([item.item_id for item in blocks], ["medicine_606", "medicine_404"])
+
     def test_acl_reader_filters_missing_wavs_before_limit(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

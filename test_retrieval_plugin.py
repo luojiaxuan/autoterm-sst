@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import sys
+import tempfile
 import unittest
+from pathlib import Path
 
 import torch
 
+from framework.agents.plugins import retrieval as retrieval_module
 from framework.agents.plugins.retrieval import MaxSimRetrievalPlugin, RetrievalResult
 
 
@@ -13,6 +17,41 @@ class DummyRetriever:
 
 
 class MaxSimRetrievalPluginTests(unittest.IsolatedAsyncioTestCase):
+    def test_add_rasst_paths_extends_cached_agents_namespace(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo_root = root / "repo"
+            repo_agents = repo_root / "agents"
+            rasst_code_root = root / "rasst" / "code" / "rasst"
+            eval_root = rasst_code_root / "eval"
+            eval_agents = eval_root / "agents"
+            repo_agents.mkdir(parents=True)
+            eval_agents.mkdir(parents=True)
+            (eval_agents / "__init__.py").write_text("", encoding="utf-8")
+
+            old_code_root = retrieval_module.RASST_CODE_ROOT
+            old_eval_root = retrieval_module.RASST_EVAL_ROOT
+            old_sys_path = list(sys.path)
+            old_agents = sys.modules.pop("agents", None)
+            try:
+                sys.path.insert(0, str(repo_root))
+                import agents  # noqa: WPS433
+
+                self.assertIn(str(repo_agents), list(agents.__path__))
+
+                retrieval_module.RASST_CODE_ROOT = rasst_code_root
+                retrieval_module.RASST_EVAL_ROOT = eval_root
+                retrieval_module.add_rasst_paths()
+
+                self.assertIn(str(eval_agents), list(agents.__path__))
+            finally:
+                retrieval_module.RASST_CODE_ROOT = old_code_root
+                retrieval_module.RASST_EVAL_ROOT = old_eval_root
+                sys.path[:] = old_sys_path
+                sys.modules.pop("agents", None)
+                if old_agents is not None:
+                    sys.modules["agents"] = old_agents
+
     async def test_retrieve_with_metadata_restores_none_score_threshold(self) -> None:
         plugin = MaxSimRetrievalPlugin(model_path="dummy", index_path="dummy")
         plugin.retriever = DummyRetriever()

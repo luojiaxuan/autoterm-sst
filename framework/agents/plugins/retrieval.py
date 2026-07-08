@@ -37,6 +37,15 @@ def add_rasst_paths() -> None:
         text = str(path)
         if text not in sys.path:
             sys.path.insert(0, text)
+    agents_pkg = sys.modules.get("agents")
+    agents_dir = str(RASST_EVAL_ROOT / "agents")
+    if agents_pkg is not None and hasattr(agents_pkg, "__path__"):
+        agents_path = agents_pkg.__path__
+        if agents_dir not in agents_path:
+            try:
+                agents_path.append(agents_dir)
+            except AttributeError:
+                agents_pkg.__path__ = list(agents_path) + [agents_dir]
 
 
 class RetrievalPlugin:

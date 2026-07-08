@@ -61,10 +61,11 @@ The automatic mode retrieves candidates from active slices, optionally adds
 deduplicates by canonical source term, and caps retrieval at
 \(\texttt{PROMPT\_K}=10\). The prompt may receive fewer than 10 candidates
 after score filtering; the
-system does not insert filler terms to reach the cap. Thus slice size affects
-the candidate inventory and the difficulty of placing relevant terms inside the
-top-10 retrieval cap. Larger inventories improve coverage but make ranking
-harder; narrower inventories reduce distractors but may miss domain-specific
-terms. The live evidence metadata records active slices, candidate-pool size,
-prompt-reference count, fallback events, and retrieval-quality metrics such as
-prompt gold retrieval and precision.
+system does not insert filler terms to reach the cap. Thus slice size trades
+coverage against ranking difficulty inside the top-10 retrieval cap: the 10k
+slice size reflects the clean bilingual terminology available per domain from
+our mining rather than a system limit, and broader inventories remain
+available as fallback pools and scale diagnostics
+(Appendix~\ref{app:sweep}). The live evidence metadata records active slices,
+candidate-pool size, prompt-reference counts, fallback events, and
+retrieval-quality metrics.

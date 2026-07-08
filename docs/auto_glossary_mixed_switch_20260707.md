@@ -394,21 +394,26 @@ union 进 fixed 10k inventory，否则 glossary channel 无法被测量。
 - GT 验证（用 HF 副本核对）：212 条全有 zh、无 normalized 重复；per-talk unique
   terms 404:20 / 545006:20 / 596001:49 / 605000:66 / 606:60；`medicine_606`
   oracle 的 54 个 unique terms 100% 被 GT 覆盖（对照 broad slice 的 1/54）。
-- 集群侧待办（filler 池只在 gemini/taurus）：
+- **Union 已于 2026-07-08 在 taurus 构建并验证**（builder 跑在
+  `c216e0f`，seed 1215）：
 
-```bash
-python scripts/term_memory/build_gt_union_gs_glossary.py \
-  --gt glossaries/hard_medicine_gt_raw_unique212.json \
-  --filler <gemini>/documents/code/data_pre/glossary_scale/wiki_glossary_medicine_enriched.json \
-  --size 10000 --target-lang zh --seed 1215 \
-  --out medicine_hardraw_gt_union_gs10000.json
+```text
+taurus: /mnt/data2/jiaxuanluo/rasst-demo/runtime/term_memory/glossaries/medicine_hardraw_gt_union_gs10000.json
+GT: gemini .../zh/__medicine_inputs__/lists/hard_medicine_raw__medicine5.json (212)
+filler: runtime glossaries/wiki_medicine_zh.json (23,713 pool; 12 GT collisions skipped; 9,788 used)
 ```
 
-  然后：union JSON + report 回传 HF `glossaries/`；build MaxSim index；注册
-  preset `medicine_hardraw_gs10k`（union inventory）和 eval-only
-  `medicine_hardraw_oracle`（212 GT only）；重跑 3-talk 长流式对比
-  fixed_nlp / fixed_medicine(union) / auto_working，并同时报告
-  PromptGoldRetrieved@10 与 surviving prompt refs。
+  独立复核：exactly 10,000 条、GT 212 条 byte-identical 且在最前、无 normalized
+  重复、全部有 zh、`medicine_606` oracle coverage **54/54**（broad slice 时代是
+  1/54）。sources 分布：`medicine_hard_llm_judge_manual: 212` +
+  `wikidata: 9788`。选 `wiki_medicine_zh` 而不是 ESO translated 池做 filler，
+  是为了与 ACL `gs` 配方严格对称：distractor 全部来自 wiki，不再混入其他
+  talk-derived terms。union + report 已回传 HF（revision `365c84ba`）。
+- 剩余步骤：build MaxSim index（GPU）；注册 preset
+  `medicine_hardraw_gs10k`（union inventory）和 eval-only
+  `medicine_hardraw_oracle`（212 GT only，可直接用现成 hard medicine index）；
+  重跑 3-talk 长流式对比 fixed_nlp / fixed_medicine(union) / auto_working，
+  同时报告 PromptGoldRetrieved@10 与 surviving prompt refs。
 
 ## 固定 64 命令
 

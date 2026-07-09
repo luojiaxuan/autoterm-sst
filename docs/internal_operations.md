@@ -6,7 +6,7 @@ paths refer to lab machines and are meaningless outside the group.
 ## Source of truth
 
 - Code and lightweight project records: GitHub
-  `git@github.com:luojiaxuan/rasst-demo.git`, active branch `framework`.
+  `git@github.com:luojiaxuan/autoterm-sst.git`, branch `main` (renamed from rasst-demo/framework on 2026-07-09).
 - AutoTerm progress and eval summaries live in Git docs:
   `docs/adaptive_working_glossary_eval.md`,
   `docs/auto_glossary_mixed_switch_20260707.md`, and

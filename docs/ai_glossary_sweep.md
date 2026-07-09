@@ -12,7 +12,7 @@ ratio, not a replacement for a real raw238 `term_ACC`.
 
 ## Source Of Truth And Artifact Status
 
-- Code repo: `git@github.com:luojiaxuan/rasst-demo.git`, branch `framework`.
+- Code repo: `git@github.com:luojiaxuan/autoterm-sst.git`, branch `main`.
 - Run root: `/mnt/data1/jiaxuanluo/rasst_eval/ai_glossary_sweep/strict_longaudio_sweep_20260706T110618Z`.
 - Rows JSON: `/mnt/data1/jiaxuanluo/rasst_eval/ai_glossary_sweep/strict_longaudio_sweep_20260706T110618Z/json_ws/strict_streaming_longaudio_rows.json`.
 - Summary table: `/mnt/data1/jiaxuanluo/rasst_eval/ai_glossary_sweep/strict_longaudio_sweep_20260706T110618Z/json_ws/strict_streaming_longaudio_summary.md`.

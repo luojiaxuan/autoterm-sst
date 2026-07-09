@@ -430,6 +430,45 @@ manifests/auto_working_medicine_hardraw_20260708.json
   fixed_medicine(`medicine_hardraw_gs10k`) / `medicine_hardraw_oracle` /
   auto_working，同时报告 PromptGoldRetrieved@10 与 surviving prompt refs。
 
+### 截断 3-talk union 复跑结果 (2026-07-09)
+
+Server: aries GPU 5/6 (vLLM TP2) + GPU 7 (RAG)，port 8013，manifest
+`eval_medicine_union_20260708.json`（`medicine_core_10k` 内容 = hardraw union，
+因为 `DOMAIN_TO_PRESET` 硬编码 medicine->medicine_core_10k，preset_meta 有
+override 说明）。Playlist：alternating ACL 600s -> medicine_606 600s -> ACL
+600s（每 talk 截断 10 分钟），lm=2、chunk 1.92s、real-time feed、
+`--max-switch-seconds 60`。输出：
+`/mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260708_union_truncated_8013`。
+
+technical+medicine 口径（gold 143；medicine 23 unique types）：
+
+| run | term_acc | ACL acc | medicine acc | med type_acc | BLEU | masked |
+|---|---:|---:|---:|---:|---:|---:|
+| none | 0.7692 | 0.8061 | 0.6889 | 0.391 (9/23) | 23.14 | 20.96 |
+| fixed_nlp | 0.7273 | 0.7449 | 0.6889 | 0.391 (9/23) | 23.52 | 21.62 |
+| fixed_medicine_union | 0.8252 | 0.7755 | 0.9333 | 0.870 (20/23) | 22.92 | 20.29 |
+| auto_working | 0.8112 | 0.7449 | **0.9556** | **0.913 (21/23)** | 23.07 | 20.31 |
+| oracle_medicine_hardraw | 0.8112 | 0.7755 | 0.8889 | 0.783 (18/23) | 22.94 | 20.59 |
+
+路由（auto_working）：2/2 transitions、**0 wrong switches**、steady-state
+accuracy **1.0**、切换延迟 35.52s (nlp->med) / 24.96s (med->nlp)、retrieval
+p95 114.7ms、probe top accuracy 0.678。
+
+结论：
+
+1. **union 修复直接可测**：medicine type_acc 从 none/fixed_nlp 的 9/23 提到
+   auto 的 21/23；medicine occurrence acc 0.689 -> 0.956（+26.7pp）。glossary
+   channel 归因成立（gold coverage 54/54 vs 旧 broad slice 1/54）。
+2. auto 与 fixed_medicine_union 差距 1.4pp（0.8112 vs 0.8252），来自切换延迟
+   窗口；auto 在 medicine 段反而略高于 fixed union 和 oracle。
+3. BLEU / masked BLEU 五组打平（22.9–23.5），glossary 注入不伤流畅度。
+4. 注意 ACL 侧：none 的 ACL acc (0.806) 高于 fixed_nlp (0.745)——当前
+   `nlp_core_10k`（wiki_academic）对 ACL gold 覆盖不足且引入干扰。**10-talk
+   最终 run 建议 nlp 侧同样换成 `acl_tagged_gs10k` union**，两域对称的
+   fixed-denominator 配方。
+5. oracle (212-only) 在 medicine 段低于 union——极小 inventory 下 score
+   filtering 行为不同，小样本不过度解读。
+
 ## 固定 64 命令
 
 ```bash

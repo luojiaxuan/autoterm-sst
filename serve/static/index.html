@@ -3582,6 +3582,8 @@
                 }
                 sessionId = data.session_id;
                 sessionLanguagePair = languagePair.value;
+                // re-assert the UI-selected terminology mode on the new session
+                setTimeout(() => { try { confirmGlossarySelection(); } catch (e) {} }, 50);
                 localStorage.setItem('translationSessionId_' + clientId, sessionId);
                 startPinging();
                 const currentManualText = glossaryText ? glossaryText.value : '';

@@ -123,7 +123,9 @@ def create_app(router: AgentRouter) -> FastAPI:
     async def read_index():  # noqa: ANN202
         index = STATIC_DIR / "index.html"
         if index.is_file():
-            return FileResponse(index)
+            # Single-page demo UI: force revalidation so UI updates show up on
+            # a normal refresh instead of being heuristically cached.
+            return FileResponse(index, headers={"Cache-Control": "no-cache"})
         raise HTTPException(status_code=404, detail="index.html not found")
 
     @app.get("/config")

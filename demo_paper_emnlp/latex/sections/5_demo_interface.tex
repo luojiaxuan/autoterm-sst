@@ -2,14 +2,14 @@
 \label{sec:demo-interface}
 
 The demo is designed for three audiences: researchers inspecting terminology
-errors in streaming SST, lecture or conference users who do not want to prepare
-glossaries, and developers testing new speech translation agents behind a
+errors in streaming SST, lecture or conference participants who do not want to
+prepare glossaries, and developers testing new speech translation agents behind a
 stable protocol. The same interface can run in mock mode without a GPU or in
 live GPU mode with Qwen3-Omni and MaxSim retrieval.
 
 \begin{figure*}[t]
   \centering
-  \includegraphics[width=0.80\textwidth]{ui_evidence_panel.png}
+  \includegraphics[width=0.76\textwidth]{ui_evidence_panel.png}
   \caption{AutoTerm-SST web UI with live terminology evidence. The same
   interface controls model, latency, and terminology mode while rendering
   translated text, retrieved term evidence, active glossary status, router
@@ -21,9 +21,10 @@ live GPU mode with Qwen3-Omni and MaxSim retrieval.
 \paragraph{Live controls.}
 Users choose a model agent, language pair, latency multiplier, and terminology
 mode. In \texttt{auto\_working} mode, the session starts from a configured
-domain-specific slice and may switch to another routed domain slice; every
-chunk keeps the same capped top-10 prompt interface. Manual presets and ad-hoc term overrides remain available as an advanced
-option; they inject into the prompt but never bias the router.
+default slice without requiring the user to identify the domain, and it may
+switch to another domain slice; every chunk uses the same top-10 prompt cap.
+Manual presets and ad-hoc term overrides remain available as advanced options;
+they affect the prompt but do not bias the router.
 
 \paragraph{Evidence panel.}
 For each partial translation, the UI renders the latest non-empty retrieved
@@ -35,20 +36,20 @@ visible rather than hidden inside the model prompt.
 
 \paragraph{Packaging.}
 The repository includes a mock-friendly launcher for UI/protocol development
-and a GPU launcher for the real RASST agent. The mock mode exercises the
+and a GPU launcher for the live AutoTerm-SST agent built on RASST. Mock mode exercises the
 same REST/WebSocket flow and JSON evidence protocol, enabling reviewers to test
 the demo without model weights or GPUs. The live demo additionally uses a
-resident vLLM process, a dedicated retriever GPU, and an optional public tunnel.
+resident vLLM engine, a dedicated retriever GPU, and an optional public tunnel.
 
 \paragraph{Availability and licensing.}
 The demo code is released under the MIT license on the
 \href{https://github.com/luojiaxuan/autoterm-sst}{GitHub
-repository}, which is also the downloadable demo package: a source checkout in mock
-mode starts the same UI and protocol without GPUs. Live Qwen3-Omni mode
+repository}. A source checkout is the downloadable package; in mock mode, it
+starts the same UI and protocol without GPUs. Live Qwen3-Omni mode
 requires A6000-class GPUs and the external RASST retriever checkpoint; model
 weights and Wikidata/Wikipedia-derived terminology resources retain their
-upstream licenses. A screencast video and a hosted live demo endpoint accompany
-this submission.\footnote{Video and live demo:
+upstream licenses. Screencast and hosted-demo links are maintained on the
+repository demo page.\footnote{Video and live demo:
 \url{https://github.com/luojiaxuan/autoterm-sst\#demo}.
 % TODO(submission): replace with the final screencast URL and the hosted
 % live-demo URL before submitting; the CFP desk-rejects without them.

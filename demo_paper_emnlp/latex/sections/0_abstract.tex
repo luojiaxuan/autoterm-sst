@@ -1,21 +1,22 @@
 \begin{abstract}
 We present AutoTerm-SST, an interactive system for terminology-aware streaming
-speech translation. Live domain talks are dense in rare entities and technical
+speech translation. Live domain talks contain rare entities and technical
 terms, yet requiring users to prepare a glossary before a session creates
-substantial friction. AutoTerm-SST removes this setup step with an adaptive
-terminology memory: each streaming chunk retrieves at most 10 glossary
-candidates from a compact active inventory, and a training-free router decides
-which domain-specific terminology slice is active. The router combines
+substantial friction. AutoTerm-SST removes this per-session glossary-setup step
+by routing among domain slices built offline: each streaming chunk injects at
+most 10 score-filtered glossary references into the prompt, normally drawn from
+a compact active slice, and a training-free router selects the active domain.
+The router combines
 generated target-translation topic evidence, speech-window domain probes,
 speech-centroid evidence, and retrieved-term metadata, without running a
 separate ASR or source-transcript classifier in the production path. The demo
 exposes retrieved terms, active slices, router decisions, and retrieval
 latency in a live evidence panel.
-In a terminology smoke evaluation, the zero-setup working glossary recovers
-eight of nine gold terms while injecting fewer, less noisy references than a
-broad 100k open memory; scale probes show warm MaxSim retrieval stays near
-60--105 ms (p50--p95) up to million-term memories, and a mixed-domain routing
-probe follows ACL/medicine domain transitions with no wrong switches.
-AutoTerm-SST is released as a pluggable RASST-Demo framework with mock and
-live GPU modes.
+In a terminology smoke evaluation, automatic mode recovers
+eight of nine gold terms while injecting fewer references than a broad 100k
+open memory; scale probes show warm MaxSim retrieval stays near
+60--105 ms (p50--p95) for memories of up to one million terms, and a
+mixed-domain routing probe tracks all three ACL/medicine transitions without a
+wrong switch. The released implementation supports both mock and live-GPU
+modes.
 \end{abstract}

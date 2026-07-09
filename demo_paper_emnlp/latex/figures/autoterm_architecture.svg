@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="760" viewBox="0 0 1800 760" role="img" aria-labelledby="title desc">
+  <title id="title">AutoTerm-SST architecture</title>
+  <desc id="desc">An editable vector overview with an online current-chunk translation path, a next-chunk AutoTerm routing loop, and offline terminology resource preparation.</desc>
+  <defs>
+    <marker id="arrow-ink" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,4 L0,8 Z" fill="#344054"/>
+    </marker>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,4 L0,8 Z" fill="#247BA0"/>
+    </marker>
+    <marker id="arrow-orange" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,4 L0,8 Z" fill="#C56A2D"/>
+    </marker>
+    <marker id="arrow-purple" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,4 L0,8 Z" fill="#7651A8"/>
+    </marker>
+    <style>
+      text { font-family: "Helvetica Neue", Arial, sans-serif; fill: #1D2939; }
+      .panel-title { font-size: 32px; font-weight: 700; }
+      .boundary-title { font-size: 26px; font-weight: 600; fill: #667085; letter-spacing: 0.3px; }
+      .box-title { font-size: 30px; font-weight: 700; }
+      .body { font-size: 26px; }
+      .small { font-size: 26px; fill: #475467; }
+      .tiny { font-size: 22px; fill: #667085; }
+      .chip { font-size: 24px; font-weight: 600; }
+      .step { font-size: 20px; font-weight: 700; fill: #FFFFFF; }
+      .agent-boundary { fill: #FFFFFF; stroke: #98A2B3; stroke-width: 2.2; stroke-dasharray: 9 7; rx: 16; }
+      .autoterm-boundary { fill: #FBF9FE; stroke: #B9A4D5; stroke-width: 2; rx: 14; }
+      .box { fill: #FFFFFF; stroke: #475467; stroke-width: 2.2; rx: 10; }
+      .blue-box { fill: #F4FAFD; stroke: #247BA0; stroke-width: 2.2; rx: 10; }
+      .purple-box { fill: #F7F2FB; stroke: #7651A8; stroke-width: 2.2; rx: 10; }
+      .orange-box { fill: #FFF8F2; stroke: #C56A2D; stroke-width: 2.2; rx: 10; }
+      .green-box { fill: #F1F8F5; stroke: #3D876D; stroke-width: 2.2; rx: 10; }
+      .main-line { fill: none; stroke: #344054; stroke-width: 3; marker-end: url(#arrow-ink); }
+      .audio-line { fill: none; stroke: #247BA0; stroke-width: 3; marker-end: url(#arrow-blue); }
+      .route-line { fill: none; stroke: #C56A2D; stroke-width: 2.8; stroke-dasharray: 9 7; marker-end: url(#arrow-orange); }
+      .future-line { fill: none; stroke: #7651A8; stroke-width: 3; stroke-dasharray: 3 7; marker-end: url(#arrow-purple); }
+      .offline-branch { fill: none; stroke: #667085; stroke-width: 2.5; stroke-dasharray: 8 6; marker-end: url(#arrow-ink); }
+      .thin-line { fill: none; stroke: #98A2B3; stroke-width: 2; }
+    </style>
+  </defs>
+
+  <rect width="1800" height="760" fill="#FFFFFF"/>
+  <text x="24" y="32" class="panel-title">(a) Online AutoTerm-SST: current-chunk translation, next-chunk adaptation</text>
+
+  <rect x="255" y="48" width="1240" height="492" class="agent-boundary"/>
+  <text x="282" y="78" class="boundary-title">AUTOTERM-SST LIVE AGENT</text>
+  <rect x="285" y="92" width="860" height="405" class="autoterm-boundary"/>
+  <text x="308" y="123" class="boundary-title" fill="#7651A8">ADAPTIVE TERMINOLOGY LAYER</text>
+
+  <path d="M235 166 H265 V138 H1328 V145" class="audio-line"/>
+  <path d="M680 138 V155" class="audio-line"/>
+  <rect x="854" y="122" width="164" height="28" rx="14" fill="#FFFFFF"/>
+  <text x="936" y="145" class="small" text-anchor="middle" fill="#247BA0">audio x_t</text>
+
+  <path d="M520 231 H555" class="main-line"/>
+  <path d="M805 231 H840" class="main-line"/>
+  <path d="M1075 231 H1190" class="main-line"/>
+  <path d="M1465 231 H1515" class="main-line"/>
+  <text x="1131" y="217" class="small" text-anchor="middle">term_map_t</text>
+
+  <path d="M680 320 V355" class="route-line"/>
+  <path d="M235 338 H520 V426 H550" class="route-line"/>
+  <path d="M1328 320 V338 H846 V355" class="route-line"/>
+  <rect x="273" y="320" width="236" height="29" rx="14" fill="#FFFFFF"/>
+  <text x="391" y="343" class="small" text-anchor="middle" fill="#A65321">all-domain probes</text>
+  <rect x="690" y="320" width="232" height="29" rx="14" fill="#FFFFFF"/>
+  <text x="806" y="343" class="small" text-anchor="middle" fill="#A65321">q_t + ref metadata</text>
+  <rect x="1110" y="320" width="240" height="29" rx="14" fill="#FFFFFF"/>
+  <text x="1230" y="343" class="small" text-anchor="middle" fill="#A65321">target history y_&lt;t</text>
+  <path d="M885 426 H925" class="route-line"/>
+  <path d="M1020 495 V518 H510 V320" class="future-line"/>
+  <rect x="516" y="503" width="402" height="28" rx="14" fill="#FFFFFF"/>
+  <text x="717" y="523" class="small" text-anchor="middle" fill="#7651A8">activate M[d_(t+1)] for later chunks</text>
+
+  <g id="stream-input">
+    <rect x="25" y="125" width="210" height="250" class="blue-box"/>
+    <text x="48" y="158" class="box-title">Live stream</text>
+    <text x="48" y="187" class="small">Web / Electron</text>
+    <rect x="47" y="205" width="166" height="34" rx="6" fill="#E7F4F9" stroke="#247BA0" stroke-width="1.6"/>
+    <text x="130" y="228" class="body" text-anchor="middle" fill="#247BA0">speech x_t</text>
+    <g stroke="#247BA0" stroke-width="3">
+      <line x1="49" y1="275" x2="49" y2="297"/>
+      <line x1="58" y1="266" x2="58" y2="306"/>
+      <line x1="67" y1="257" x2="67" y2="315"/>
+      <line x1="76" y1="270" x2="76" y2="302"/>
+      <line x1="85" y1="278" x2="85" y2="294"/>
+      <line x1="94" y1="264" x2="94" y2="308"/>
+      <line x1="103" y1="274" x2="103" y2="298"/>
+      <line x1="112" y1="280" x2="112" y2="292"/>
+      <line x1="121" y1="268" x2="121" y2="304"/>
+      <line x1="130" y1="256" x2="130" y2="316"/>
+      <line x1="139" y1="271" x2="139" y2="301"/>
+      <line x1="148" y1="278" x2="148" y2="294"/>
+      <line x1="157" y1="266" x2="157" y2="306"/>
+      <line x1="166" y1="273" x2="166" y2="299"/>
+      <line x1="175" y1="281" x2="175" y2="291"/>
+      <line x1="184" y1="267" x2="184" y2="305"/>
+      <line x1="193" y1="276" x2="193" y2="296"/>
+      <line x1="202" y1="272" x2="202" y2="300"/>
+    </g>
+    <rect x="38" y="327" width="184" height="30" rx="15" fill="#F1F8F5" stroke="#3D876D" stroke-width="1.5"/>
+    <text x="130" y="348" class="chip" text-anchor="middle" fill="#2F6E58">zero setup</text>
+  </g>
+
+  <g id="active-inventory">
+    <rect x="310" y="155" width="210" height="165" class="purple-box"/>
+    <circle cx="334" cy="181" r="14" fill="#7651A8"/>
+    <text x="334" y="187" class="step" text-anchor="middle">1</text>
+    <text x="356" y="188" class="box-title">Active slice</text>
+    <text x="334" y="216" class="small">current: M[d_t]</text>
+    <rect x="332" y="232" width="72" height="27" rx="5" fill="#FFFFFF" stroke="#B9A4D5"/>
+    <rect x="410" y="232" width="88" height="27" rx="5" fill="#7651A8" stroke="#7651A8"/>
+    <rect x="332" y="265" width="72" height="27" rx="5" fill="#FFFFFF" stroke="#B9A4D5"/>
+    <rect x="410" y="265" width="88" height="27" rx="5" fill="#FFFFFF" stroke="#B9A4D5"/>
+    <text x="368" y="251" class="chip" text-anchor="middle">NLP</text>
+    <text x="454" y="251" class="chip" text-anchor="middle" fill="#FFFFFF">MED</text>
+    <text x="368" y="284" class="chip" text-anchor="middle">FIN</text>
+    <text x="454" y="284" class="chip" text-anchor="middle">LEGAL</text>
+    <text x="415" y="311" class="tiny" text-anchor="middle">manifest index</text>
+  </g>
+
+  <g id="retrieval">
+    <rect x="555" y="155" width="250" height="165" class="purple-box"/>
+    <circle cx="579" cy="181" r="14" fill="#7651A8"/>
+    <text x="579" y="187" class="step" text-anchor="middle">2</text>
+    <text x="601" y="188" class="box-title">Retrieve + rank</text>
+    <text x="579" y="221" class="body">MaxSim on M[d_t]</text>
+    <text x="579" y="254" class="small">filter + rerank</text>
+    <rect x="612" y="285" width="178" height="30" rx="15" fill="#7651A8"/>
+    <text x="701" y="306" class="chip" text-anchor="middle" fill="#FFFFFF">≤10 prompt refs</text>
+  </g>
+
+  <g id="prompt-references">
+    <rect x="840" y="155" width="235" height="165" class="green-box"/>
+    <circle cx="864" cy="181" r="14" fill="#3D876D"/>
+    <text x="864" y="187" class="step" text-anchor="middle">3</text>
+    <text x="886" y="188" class="box-title">Prompt refs</text>
+    <line x1="862" y1="214" x2="1053" y2="214" class="thin-line"/>
+    <text x="958" y="236" class="tiny" text-anchor="middle">G_t bilingual pairs</text>
+    <rect x="862" y="245" width="191" height="25" rx="4" fill="#E7F3EE"/>
+    <rect x="862" y="276" width="191" height="20" rx="4" fill="#F1F8F5"/>
+    <text x="958" y="264" class="tiny" text-anchor="middle">term_1  -&gt;  target_1</text>
+    <text x="958" y="292" class="tiny" text-anchor="middle">term_2  -&gt;  target_2</text>
+  </g>
+
+  <g id="translation-backbone">
+    <rect x="1190" y="145" width="275" height="175" class="blue-box"/>
+    <circle cx="1215" cy="172" r="14" fill="#247BA0"/>
+    <text x="1215" y="178" class="step" text-anchor="middle">4</text>
+    <text x="1238" y="179" class="box-title">Format + decode</text>
+    <rect x="1214" y="198" width="227" height="39" rx="6" fill="#FFFFFF" stroke="#8ABDD2" stroke-width="1.4"/>
+    <text x="1328" y="224" class="body" text-anchor="middle">format term_map_t</text>
+    <path d="M1328 237 V251" class="thin-line"/>
+    <rect x="1214" y="251" width="227" height="49" rx="6" fill="#DDEFF6" stroke="#247BA0" stroke-width="1.4"/>
+    <text x="1328" y="273" class="body" text-anchor="middle" font-weight="700">Qwen3-Omni</text>
+    <text x="1328" y="298" class="tiny" text-anchor="middle">RASST • vLLM decode</text>
+  </g>
+
+  <g id="hybrid-router">
+    <rect x="550" y="355" width="335" height="140" class="orange-box"/>
+    <text x="572" y="386" class="box-title">Rule-based router</text>
+    <rect x="572" y="402" width="137" height="28" rx="6" fill="#FFF0E4" stroke="#DDA276"/>
+    <rect x="720" y="402" width="142" height="28" rx="6" fill="#FFF0E4" stroke="#DDA276"/>
+    <rect x="572" y="438" width="137" height="28" rx="6" fill="#FFF0E4" stroke="#DDA276"/>
+    <rect x="720" y="438" width="142" height="28" rx="6" fill="#FFF0E4" stroke="#DDA276"/>
+    <text x="640" y="423" class="chip" text-anchor="middle">target .60</text>
+    <text x="791" y="423" class="chip" text-anchor="middle">probe .25</text>
+    <text x="640" y="459" class="chip" text-anchor="middle">centroid .10</text>
+    <text x="791" y="459" class="chip" text-anchor="middle">refs .05</text>
+    <text x="717" y="487" class="tiny" text-anchor="middle">renormalize available signals</text>
+  </g>
+
+  <g id="switch-gate">
+    <rect x="925" y="355" width="190" height="140" class="orange-box"/>
+    <text x="946" y="386" class="box-title">Switch gate</text>
+    <text x="946" y="416" class="tiny">warm-up • interval</text>
+    <text x="946" y="444" class="tiny">margin • repeat</text>
+    <text x="946" y="472" class="tiny">target index ready</text>
+  </g>
+
+  <g id="streaming-output">
+    <rect x="1515" y="120" width="260" height="260" class="green-box"/>
+    <text x="1538" y="153" class="box-title">Streaming UI</text>
+    <text x="1538" y="181" class="small">partial y_t</text>
+    <rect x="1538" y="194" width="214" height="42" rx="6" fill="#FFFFFF" stroke="#8DB9A8" stroke-width="1.4"/>
+    <text x="1552" y="221" class="body">…</text>
+    <rect x="1581" y="202" width="143" height="27" rx="13" fill="#DCEEE7"/>
+    <text x="1652" y="221" class="chip" text-anchor="middle" fill="#2F6E58">matched term</text>
+    <text x="1538" y="266" class="small" font-weight="700">JSON evidence</text>
+    <circle cx="1545" cy="289" r="4" fill="#7651A8"/>
+    <circle cx="1545" cy="316" r="4" fill="#C56A2D"/>
+    <circle cx="1545" cy="343" r="4" fill="#247BA0"/>
+    <text x="1558" y="295" class="small">terms + scores</text>
+    <text x="1558" y="322" class="small">slice + decision</text>
+    <text x="1558" y="349" class="small">confidence + latency</text>
+  </g>
+
+  <rect x="25" y="575" width="1750" height="160" rx="14" fill="#F8F9FB" stroke="#D0D5DD" stroke-width="2"/>
+  <text x="47" y="606" class="panel-title">(b) Offline terminology resources</text>
+  <path d="M345 671 H390" class="main-line"/>
+  <path d="M685 671 H730" class="main-line"/>
+  <path d="M685 650 H708 V614 H1630 V630" class="offline-branch"/>
+
+  <g id="offline-sources">
+    <rect x="47" y="630" width="298" height="82" class="box"/>
+    <text x="68" y="660" class="box-title">Bilingual terms</text>
+    <text x="68" y="689" class="tiny">Wikidata + curated rows</text>
+  </g>
+
+  <g id="offline-processing">
+    <rect x="390" y="630" width="295" height="82" class="box"/>
+    <text x="411" y="660" class="box-title">Normalize • filter</text>
+    <text x="411" y="689" class="tiny">canonicalize rows</text>
+  </g>
+
+  <g id="manifested-domain-resources">
+    <rect x="730" y="620" width="735" height="102" class="purple-box"/>
+    <text x="752" y="649" class="box-title">Domain resources</text>
+    <rect x="752" y="661" width="115" height="27" rx="5" fill="#FFFFFF" stroke="#B9A4D5"/>
+    <rect x="876" y="661" width="145" height="27" rx="5" fill="#F0E8F7" stroke="#7651A8"/>
+    <rect x="1030" y="661" width="128" height="27" rx="5" fill="#FFFFFF" stroke="#B9A4D5"/>
+    <rect x="1167" y="661" width="115" height="27" rx="5" fill="#FFFFFF" stroke="#B9A4D5"/>
+    <text x="809" y="680" class="chip" text-anchor="middle">NLP 10k</text>
+    <text x="948" y="680" class="chip" text-anchor="middle">MED 10k</text>
+    <text x="1094" y="680" class="chip" text-anchor="middle">FIN 10k</text>
+    <text x="1224" y="680" class="chip" text-anchor="middle">LEGAL 10k</text>
+    <text x="752" y="710" class="small">rank • indexes • centroids • manifest</text>
+  </g>
+
+  <g id="open-memory-rescue">
+    <rect x="1507" y="630" width="246" height="82" rx="10" fill="#FFFFFF" stroke="#7651A8" stroke-width="2" stroke-dasharray="6 5"/>
+    <text x="1528" y="657" class="box-title">Broad pool</text>
+    <text x="1528" y="681" class="small">100k-1M indexes</text>
+    <text x="1528" y="703" class="tiny">optional rescue / scale</text>
+  </g>
+</svg>

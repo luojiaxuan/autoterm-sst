@@ -1,49 +1,58 @@
 \section{System Overview}
 \label{sec:system}
 
-AutoTerm-SST is organized as a thin framework plus swappable translation agents
-(Figure~\ref{fig:architecture}). The framework is deliberately small: it serves
-the web UI, accepts REST control requests, streams audio over WebSockets, tracks
-session lifecycle, and routes each session to an agent selected by
-\texttt{agent\_type}. The framework does not know about model prompts,
-retrieval, batching, KV cache, or glossary construction.
+AutoTerm-SST uses a thin framework with swappable translation agents, while its
+main system contribution is the adaptive terminology loop inside the live agent
+(Figure~\ref{fig:architecture}). The framework serves the web UI, accepts REST
+control requests, streams audio over WebSockets, tracks session lifecycle, and
+routes each session by \texttt{agent\_type}; it does not own model prompts,
+retrieval, batching, KV cache, or terminology resources. For chunk \(t\), the
+agent retrieves from the current slice before decoding. The resulting streaming
+evidence may update the slice for a later chunk, no earlier than \(t+1\), but
+never changes the prompt already used for chunk \(t\).
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.80\textwidth]{autoterm_architecture.png}
-\caption{AutoTerm-SST separates transport/session logic from model-specific
-agent logic. Retrieval, active glossary routing, prompting, and vLLM generation
-all live inside the agent boundary, while the framework exposes a stable
-REST/WebSocket protocol and JSON evidence stream to the UI.}
+\includegraphics[width=0.90\textwidth]{autoterm_architecture.pdf}
+\caption{Overview of AutoTerm-SST. (a) For chunk \(t\), the active domain slice
+supplies candidates from which the agent selects at most 10 score-filtered
+references, formats a \texttt{term\_map}, and decodes a partial translation.
+The training-free router combines current speech/retrieval evidence with
+delayed target history; an accepted switch affects only subsequent retrieval.
+The UI exposes translations and routing evidence. (b) Shared bilingual
+resources yield manifest-backed domain indexes and centroids; broad indexes are
+optional fallback pools and scale diagnostics.}
 \label{fig:architecture}
 \end{figure*}
 
 \paragraph{Agent contract.}
 Agents implement a small contract: \texttt{open\_session},
 \texttt{submit\_audio}, \texttt{on\_control}, \texttt{close\_session},
-\texttt{describe}, and \texttt{health}. The same UI and wire protocol
-serve a deterministic mock agent for development, a legacy InfiniSST scheduler
-agent \citep{ouyang2025infinisst}, or the RASST/Qwen3-Omni agent \citep{luo2026rasst} used in the live GPU demo. The boundary is
+\texttt{describe}, and \texttt{health}. The same UI and wire protocol support a
+deterministic mock agent for development, a legacy InfiniSST scheduler agent
+\citep{ouyang2025infinisst}, or the RASST/Qwen3-Omni agent
+\citep{luo2026rasst} used in the live-GPU demo. The boundary is
 backend-agnostic: the live demo uses in-process vLLM \citep{kwon2023efficient},
 and the same protocol can serve external SGLang-compatible backends
 \citep{zheng2024sglang} without changing the terminology memory, router, or
 UI.
 
 \paragraph{Streaming agent.}
-For each audio chunk, the OmniAgent can run MaxSim terminology retrieval over
-the active slices, run the hybrid active-slice router, build a
-\texttt{term\_map}, and call the in-process vLLM backend. In
-\texttt{auto\_working}, the retriever returns up to 10 ranked glossary
-candidates and filters low-confidence matches before the PromptBuilder
-constructs the prompt.
-The agent emits partial translations plus structured metadata, including
-retrieved terms, retrieval latency, active slices, prompt-reference counts, and
-router decisions.
+For each audio chunk, the OmniAgent runs MaxSim terminology retrieval over the
+active slice and collects routing-only domain-probe evidence. Before decoding,
+the hybrid router combines current speech/retrieval evidence with target-text
+history from earlier chunks; an accepted switch affects only later retrieval.
+The agent filters and reranks candidates, caps prompt references at 10, and lets
+the PromptBuilder format the \texttt{term\_map} before calling the in-process
+vLLM backend. After decoding, \(y_t\) is appended to the target history for a
+later routing tick. The agent emits partial translations and
+structured metadata, including retrieved terms, retrieval latency, active
+slices, prompt-reference counts, and router decisions.
 
 \paragraph{Evidence protocol.}
 The default WebSocket output remains plain text for backward compatibility. A
-JSON mode returns \texttt{\{type, text, meta\}}, where \texttt{meta.references}
-drives the live evidence panel and \texttt{meta.topic} /
-\texttt{meta.topic\_router} describe the adaptive glossary state. This evidence protocol is
-central: users see which terms were retrieved and whether the router stayed,
-switched, or deferred.
+JSON mode returns \texttt{\{type, text, meta\}}, where
+\texttt{meta.references} drives the live evidence panel and
+\texttt{meta.topic} and \texttt{meta.topic\_router} describe the adaptive
+glossary state. This evidence protocol lets users see which terms were retrieved
+and whether the router stayed, switched, or deferred.

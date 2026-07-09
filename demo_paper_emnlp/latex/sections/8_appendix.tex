@@ -114,7 +114,7 @@ Setting & Acc\textsubscript{tech} & Acc\textsubscript{raw} & ACL & Med. & Med.\ 
 None & 0.769 & 0.779 & 0.806 & 0.689 & 9/23 & 23.14 & 20.96 \\
 Fixed NLP & 0.839 & 0.867 & 0.888 & 0.733 & 11/23 & 23.37 & 20.32 \\
 Fixed medicine & 0.825 & 0.819 & 0.776 & 0.933 & 20/23 & 22.92 & 20.29 \\
-Auto (zero-setup) & \textbf{0.916} & \textbf{0.912} & \textbf{0.898} & \textbf{0.956} & \textbf{21/23} & \textbf{24.07} & 20.49 \\
+Automatic & \textbf{0.916} & \textbf{0.912} & \textbf{0.898} & \textbf{0.956} & \textbf{21/23} & \textbf{24.07} & 20.49 \\
 Medicine oracle & 0.811 & 0.801 & 0.776 & 0.889 & 18/23 & 22.94 & 20.59 \\
 \bottomrule
 \end{tabular}}
@@ -136,16 +136,16 @@ are resolved from the term list at prompt time), and the language pair selects
 the per-language demo model. Table~\ref{tab:jade} repeats the mixed
 full-length ACL\,$\rightarrow$\,medicine\,$\rightarrow$\,ACL comparison for
 En$\rightarrow$Ja and En$\rightarrow$De. Zero-setup routing has the best
-combined term accuracy in every language, under both gold denominators, and
-all switches across all three languages are directionally correct with zero
-wrong switches. Switch latency grows without language-tuned topic keywords
-(first/second switch: zh 37.4/25.0s; ja 115.3/125.6s; de 875.6/39.2s): the
-keyword channel is en/zh-tuned, so ja/de routing leans on the slower probe
-channel. Late switches cost some medicine coverage (de: 38/49 vs.\ 43/49
-types) and some BLEU (ja), yet combined term accuracy still favors the
-router; language-tuned keyword lists are mechanical future work. German term
-matching is casefolded with light stem tolerance (exact matching undercounts
-under inflection); short variants keep strict word boundaries.
+combined term accuracy in every language under both gold denominators, with
+zero wrong switches and steady-state active-domain accuracy 1.0. With the
+released ja/de topic keywords, switches land within 29--52s
+(ja 28.9/33.5s; de 52.0/33.5s; zh 37.4/25.0s). An ablation without
+language-tuned keywords degrades first-switch latency to 115.3s (ja) and
+875.6s (de) --- routing then leans on the slower probe channel --- which costs
+medicine coverage and BLEU while switch directions stay correct; the keyword
+lists are small, high-precision regex sets per domain. German term matching is
+casefolded with light stem tolerance (exact matching undercounts under
+inflection); short variants keep strict word boundaries.
 
 \begin{table}[ht]
 \centering
@@ -159,18 +159,19 @@ under inflection); short variants keep strict word boundaries.
  & None & 0.703 & 0.720 & 0.730 & 0.687 & 25/53 & 43.55 & 41.60 \\
  & Fixed NLP & 0.718 & 0.760 & 0.900 & 0.608 & 21/53 & 44.19 & 42.21 \\
  & Fixed medicine & 0.861 & 0.837 & 0.720 & \textbf{0.946} & \textbf{48/53} & \textbf{44.90} & \textbf{42.83} \\
- & Auto (zero-setup) & \textbf{0.902} & \textbf{0.894} & \textbf{0.930} & 0.886 & 43/53 & 39.68 & 37.67 \\
+ & Auto (zero-setup) & \textbf{0.910} & \textbf{0.900} & \textbf{0.910} & 0.910 & 45/53 & 40.10 & 38.01 \\
 \midrule
 \multirow{4}{*}{De}
  & None & 0.745 & 0.740 & 0.740 & 0.747 & 24/49 & 37.52 & 37.47 \\
  & Fixed NLP & 0.762 & 0.768 & 0.840 & 0.720 & 23/49 & 37.21 & 36.91 \\
  & Fixed medicine & 0.840 & 0.812 & 0.670 & \textbf{0.934} & \textbf{43/49} & \textbf{37.63} & \textbf{37.18} \\
- & Auto (zero-setup) & \textbf{0.897} & \textbf{0.869} & \textbf{0.880} & 0.907 & 38/49 & 35.90 & 35.37 \\
+ & Auto (zero-setup) & \textbf{0.911} & \textbf{0.880} & \textbf{0.890} & 0.923 & 41/49 & 36.97 & 36.17 \\
 \bottomrule
 \end{tabular}}
 \caption{En$\rightarrow$Ja/De mixed-domain comparison (full-length playlist;
 ja: 266/350 technical/raw gold occurrences, 53 medicine types; de: 282/366,
-49 types). The zero-setup router wins combined term accuracy in both
-languages; BLEU dips reflect the slower switches.}
+49 types). Auto rows use the released configuration with ja/de topic
+keywords. The zero-setup router wins combined term accuracy in both
+languages; the remaining ja BLEU gap tracks its switch windows.}
 \label{tab:jade}
 \end{table}

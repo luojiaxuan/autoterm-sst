@@ -14,12 +14,27 @@ pdflatex -output-directory latex latex/acl_latex.tex
 # output: latex/acl_latex.pdf
 ```
 
+### Regenerate Figure 1
+
+`latex/figures/autoterm_architecture.svg` is the editable vector master. Export
+both manuscript and preview assets from that same source:
+
+```bash
+rsvg-convert -f pdf -b white \
+  -o latex/figures/autoterm_architecture.pdf \
+  latex/figures/autoterm_architecture.svg
+rsvg-convert -b white -w 2400 \
+  -o latex/figures/autoterm_architecture.png \
+  latex/figures/autoterm_architecture.svg
+```
+
 ## Layout
 
 - `latex/acl_latex.tex` — main file (ACL style, `preprint` mode: EMNLP demo
   track is single-blind, so author names stay visible).
 - `latex/sections/` — one file per section.
-- `latex/figures/` — architecture, UI evidence panel, routing timeline.
+- `latex/figures/` — editable architecture source and its PDF/PNG exports, UI
+  evidence panel, and routing timeline.
 - `latex/custom.bib` — references.
 - Table/figure sources: `../runtime/eval_20260621/paper_tables.md` and
   `../docs/` eval reports.

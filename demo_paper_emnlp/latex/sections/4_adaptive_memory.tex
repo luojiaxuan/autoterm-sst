@@ -1,29 +1,29 @@
 \section{Adaptive Terminology Memory}
 \label{sec:adaptive-memory}
 
-AutoTerm-SST separates terminology inventory from the prompt interface. The
-\emph{open memory} is a large offline resource derived from Wikidata/Wikipedia
-and curated glossaries, stored as manifest-driven snapshots with precomputed
-MaxSim indexes. The online system first retrieves at most 10 glossary
-candidates per chunk from the active inventory, then filters low-confidence
-matches before constructing the prompt. The automatic strategy controls which
-inventory slices are active and how candidates are ranked before filtering.
+AutoTerm-SST separates terminology inventory from the prompt interface. Its
+\emph{terminology memory} is a collection of prebuilt inventories derived from
+Wikidata/Wikipedia and curated glossaries. At any time, the \emph{active slice}
+is the compact domain inventory queried for each chunk; a broad \emph{open
+memory} can be consulted as an optional fallback. The online system retains at
+most 10 score-filtered references for each prompt.
 
 \paragraph{Open memory snapshots.}
-Each snapshot maps a preset id to term files, metadata, and a MaxSim index. The
+Each snapshot maps a preset identifier to term files, metadata, and a MaxSim
+index. The
 runtime never stores large indexes in the code repository; instead, manifests
-point to a runtime root on the demo host. Current automatic presets are
-domain-specific slices such as NLP, medicine, finance, and legal; a curated
-238-term ACL glossary is used as an oracle diagnostic, and broad open memories
-with 100k and 1M terms are used as rescue pools or scale diagnostics.
+point to a runtime root on the demo host. The released configuration provides
+NLP, medicine, finance, and legal slices. A curated 238-term ACL glossary is
+used only as an evaluation oracle; the 100k open memory is an optional fallback,
+and the 1M memory is used for scale diagnostics.
 
 \paragraph{Hybrid active glossary router.}
 The default live router is \texttt{hybrid\_window\_topic}. It is not a trained
 topic classifier and does not run a separate ASR path or source-transcript
-classifier in production. Instead, it combines signals that are already
-available in the streaming agent: generated target-translation topic windows
-when present, routing-only speech-window domain probes, weak speech-centroid
-evidence, and retrieved-reference metadata:
+classifier in production. Instead, it combines signals available within the
+streaming agent: windows of recent generated target text, routing-only
+speech-window domain probes, weak speech-centroid evidence, and
+retrieved-reference metadata:
 \begin{equation}
 \begin{split}
 score(d) = & \lambda_t\,\mathrm{topic}_d(y_{\mathrm{recent}}) \\
@@ -40,32 +40,31 @@ embeddings, and reference votes come from metadata such as source preset and
 domain. The default weights are \(\lambda_t=0.60\), \(\lambda_p=0.25\),
 \(\lambda_c=0.10\), and \(\lambda_m=0.05\); weights are renormalized over the
 signals available in a window, so routing already works before the first
-translations are generated. The older
+target text is generated. The older
 \texttt{embedding\_refs} router remains available as a compatibility policy.
 
 \paragraph{Conservative switching.}
 The router is a policy for selecting active domain slices, not an open-world
 topic detector. It switches only after warmup, minimum update interval,
 confidence threshold, top-vs-runner-up margin, repeated consistent windows,
-domain-probe guards, and target index readiness. Generated target text requires
-multiple consecutive consistent windows; audio/probe-only switching is allowed
-only under stricter raw probe floors (Appendix~\ref{app:router}). Generic generated target text without positive
-topic evidence cannot dilute a strong probe or convert a weak probe into a
-high-confidence switch. Cold index loads are non-blocking: the agent preloads a
-target index in the background and activates it only after the retrieval plugin
-reports that the index is ready.
+domain-probe guards, and target index readiness. A switch supported by generated
+target text requires multiple consecutive consistent windows; audio/probe-only
+switching uses stricter raw-probe floors (Appendix~\ref{app:router}). Generated
+target text without positive topic evidence receives no topic weight, so it
+cannot dilute a strong probe or turn a weak probe into a high-confidence switch.
+Cold index loads are non-blocking: the agent preloads a target index in the
+background and activates it only after the retrieval plugin reports that the
+index is ready.
 
 \paragraph{Capped prompt candidates.}
-The automatic mode retrieves candidates from active slices, optionally adds
-\texttt{open\_wiki\_100k} under low-confidence fallback conditions,
-deduplicates by canonical source term, and caps retrieval at
-\(\texttt{PROMPT\_K}=10\). The prompt may receive fewer than 10 candidates
-after score filtering; the
-system does not insert filler terms to reach the cap. Thus slice size trades
-coverage against ranking difficulty inside the top-10 retrieval cap: the 10k
-slice size reflects the clean bilingual terminology available per domain from
-our mining rather than a system limit, and broader inventories remain
-available as fallback pools and scale diagnostics
-(Appendix~\ref{app:sweep}). The live evidence metadata records active slices,
-candidate-pool size, prompt-reference counts, fallback events, and
-retrieval-quality metrics.
+Automatic mode retrieves and score-filters up to 10 candidates from the active
+slice. Under low-confidence fallback conditions, it may query
+\texttt{open\_wiki\_100k} separately, then merge, deduplicate, and rerank the
+two result sets. The prompt receives at most \(\texttt{PROMPT\_K}=10\)
+references, with no filler terms when fewer survive. Slice size therefore
+trades coverage against ranking difficulty within the top-10 prompt cap. The
+10k size reflects the clean bilingual terminology available per domain from our
+mining rather than a system limit; broader inventories remain available as
+fallback pools and scale diagnostics (Appendix~\ref{app:sweep}). The live
+evidence metadata records active slices, candidate-pool size, prompt-reference
+counts, fallback events, and retrieval-quality metrics.

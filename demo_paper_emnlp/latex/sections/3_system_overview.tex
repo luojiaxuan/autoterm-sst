@@ -19,7 +19,7 @@ RASST backbone encodes each chunk and injects at most 10 bilingual term pairs
 from the active slice into Qwen3-Omni. Earlier, \emph{language models} comes
 from the NLP slice; after accumulated evidence confirms a domain shift, a later
 chunk uses \emph{rectal cancer} from the medicine slice. The training-free
-router combines speech probes, prior translations, and term metadata; switches
+router matches accumulated streaming context to the domain memories; switches
 affect later chunks only.}
 \label{fig:architecture}
 \end{figure*}

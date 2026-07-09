@@ -50,6 +50,26 @@ and a diagnostic common-terms slice.}
 \section{Glossary-Scale Streaming Sweep}
 \label{app:sweep}
 
+\begin{table}[ht]
+\centering
+\scriptsize
+\begin{tabular}{lrrr}
+\toprule
+Memory & Terms & p50/p95 ms & Refs/chunk \\
+\midrule
+Curated & 238 & 61.3 / 105.3 & 2.33 \\
+Domain & 10k & 78.5 / 82.1 & 1.80 \\
+Open & 100k & 64.1 / 82.6 & 4.89 \\
+Stress & 1M & 78 / 95 & 9.62 \\
+\bottomrule
+\end{tabular}
+\caption{Warm steady-state MaxSim retrieval latency across terminology memory
+sizes. Cold loading grows with index size (about 0.5s for 238 terms, 6.8s for
+100k, and over 30s for 1M), so AutoTerm-SST preloads candidate working indexes
+outside the streaming batch path.}
+\label{tab:scale}
+\end{table}
+
 Table~\ref{tab:sweep} reports the five-talk streaming sweep referenced in
 Section~\ref{sec:evaluation}: five concatenated ACL 60-60 talks (3{,}442s of
 audio) streamed through the live JSON WebSocket at latency multiplier 2, scored
@@ -95,14 +115,21 @@ byte-identical gold glossary (238 ACL / 212 hard-medicine terms) plus
 seeded wiki fillers, mirroring the recipe of Appendix~\ref{app:sweep}
 (gold coverage 142/142 and 54/54).
 
-Table~\ref{tab:mixed} is a controlled full-coverage comparison on a mixed
-ACL\,$\rightarrow$\,medicine\,$\rightarrow$\,ACL playlist (600s per block,
-live streaming at latency multiplier 2). Automatic mode requires no
+Table~\ref{tab:mixed} gives the full detail for the ten-talk run of
+Table~\ref{tab:quality} (five ACL and five medicine talks alternating,
+16,848s streamed live in real time through one session): raw-gold and
+type-level term accuracy plus masked BLEU. Automatic mode requires no
 session-time glossary input or domain choice but relies on inventories built
-offline. It exceeds \emph{both} single-domain fixed inventories on the combined
-gold, switching twice with zero wrong switches (37.4s / 25.0s after the
-boundaries; steady-state active-domain accuracy 1.0; retrieval p95
-101.6\,ms).
+offline. All nine domain transitions switch in the correct direction with one
+transient extra switch (steady-state active-domain accuracy 0.982); eight of
+nine switches land within 13.6--55.4s, and one delayed medicine-to-ACL switch
+takes 304s over a generic talk opening. A truncated three-block probe
+(ACL\,$\rightarrow$\,medicine\,$\rightarrow$\,ACL, 600s per block) shows the
+same ordering --- Automatic 0.916/0.912 combined versus 0.839/0.867 (fixed
+NLP) and 0.825/0.819 (fixed medicine), with switches 37.4s/25.0s after the
+boundaries --- and a gold-only 212-term medicine inventory without fillers
+reaches just 0.811, confirming that compact curated slices need distractor
+mass to be a realistic comparison.
 
 \begin{table}[ht]
 \centering
@@ -112,20 +139,16 @@ boundaries; steady-state active-domain accuracy 1.0; retrieval p95
 \toprule
 Setting & Acc\textsubscript{tech} & Acc\textsubscript{raw} & ACL & Med. & Med.\ types & BLEU & M-BLEU \\
 \midrule
-None & 0.769 & 0.779 & 0.806 & 0.689 & 9/23 & 23.14 & 20.96 \\
-Fixed NLP & 0.839 & 0.867 & 0.888 & 0.733 & 11/23 & 23.37 & 20.32 \\
-Fixed medicine & 0.825 & 0.819 & 0.776 & 0.933 & 20/23 & 22.92 & 20.29 \\
-Automatic & \textbf{0.916} & \textbf{0.912} & \textbf{0.898} & \textbf{0.956} & \textbf{21/23} & \textbf{24.07} & 20.49 \\
-Gold-only medicine & 0.811 & 0.801 & 0.776 & 0.889 & 18/23 & 22.94 & 20.59 \\
+None & 0.744 & 0.754 & 0.782 & 0.733 & 92/196 & 58.84 & 57.46 \\
+Fixed NLP & 0.744 & 0.777 & 0.907 & 0.698 & 86/196 & 59.18 & 57.85 \\
+Fixed medicine & 0.901 & 0.881 & 0.772 & 0.937 & 168/196 & \textbf{59.63} & 57.53 \\
+Automatic & \textbf{0.936} & \textbf{0.933} & \textbf{0.912} & \textbf{0.943} & \textbf{170/196} & 58.10 & 56.22 \\
 \bottomrule
 \end{tabular}}
-\caption{Mixed-domain streaming comparison with union inventories.
-Acc\textsubscript{tech} scores 143 occurrences (98 ACL + 45 medicine), and
-Acc\textsubscript{raw} scores 226 (181 ACL + the same 45 medicine); the latter
-45 occurrences span 23 medicine types. Per-domain columns and M-BLEU use the
-technical gold. ``Gold-only medicine'' retrieves from the 212-term medicine
-resource without seeded fillers. Automatic routing outperforms both fixed
-single-domain inventories on combined term accuracy in this controlled run.}
+\caption{Ten-talk mixed-domain streaming detail (875 technical / 1{,}064 raw
+gold occurrences; 196 medicine type occurrences). Per-domain columns and
+M-BLEU use the technical gold. Automatic routing matches each single-domain
+expert on its own domain and exceeds both on the combined gold.}
 \label{tab:mixed}
 \end{table}
 

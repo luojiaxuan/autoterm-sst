@@ -16,9 +16,9 @@ streaming stress test.
 
 \paragraph{Metrics.}
 For terminology quality, term accuracy is the fraction of annotated target-term
-occurrences found in the output. The controlled comparison contains 143
-technical occurrences: 98 from ACL and 45 medicine occurrences spanning 23
-medicine term types. Masked BLEU deletes annotated target-term strings from
+occurrences found in the output. The controlled comparison contains 875
+technical occurrences: 193 from ACL and 682 from medicine, the latter spanning
+196 block-local medicine term types. Masked BLEU deletes annotated target-term strings from
 both hypothesis and reference before scoring, and is used only as a
 non-terminology sanity check. For runtime, we report prompt references per
 partial chunk and retrieval-latency percentiles. For routing, we report switch
@@ -29,7 +29,7 @@ StreamLAAL \citep{papi2024streamatt}.
 
 \begin{figure*}[t]
   \centering
-  \includegraphics[width=0.75\textwidth]{routing_timeline_4block.png}
+  \includegraphics[width=0.71\textwidth]{routing_timeline_4block.png}
   \caption{Mixed-domain routing probe on a 480s end-to-end streaming playlist
   with ACL, medicine, ACL, and medicine blocks. The automatic active glossary
   switches after each true domain boundary with no wrong switches; the final
@@ -46,17 +46,18 @@ StreamLAAL \citep{papi2024streamatt}.
 \toprule
 Setting & Session setup & Term acc. & ACL & Med. & BLEU \\
 \midrule
-No memory & None & 0.769 & 0.806 & 0.689 & 23.14 \\
-Fixed NLP & Select NLP & 0.839 & 0.888 & 0.733 & 23.37 \\
-Fixed medicine & Select med. & 0.825 & 0.776 & 0.933 & 22.92 \\
-Automatic & None & \textbf{0.916} & \textbf{0.898} & \textbf{0.956} & \textbf{24.07} \\
+No memory & None & 0.744 & 0.782 & 0.733 & 58.84 \\
+Fixed NLP & Select NLP & 0.744 & 0.907 & 0.698 & 59.18 \\
+Fixed medicine & Select med. & 0.901 & 0.772 & 0.937 & \textbf{59.63} \\
+Automatic & None & \textbf{0.936} & \textbf{0.912} & \textbf{0.943} & 58.10 \\
 \bottomrule
 \end{tabular}}
-\caption{Controlled ACL\,$\rightarrow$\,medicine\,$\rightarrow$\,ACL
-comparison under equal-sized benchmark-aligned union inventories. Each fixed
-domain inventory fully covers the gold terms for its matching domain; Automatic
-switches between the two inventories without session-specific glossary input or
-a domain choice. Term accuracy scores 143 occurrences (98 ACL and 45 medicine).}
+\caption{Ten-talk alternating ACL/medicine comparison (16{,}848s streamed
+live through one session) under equal-sized benchmark-aligned union
+inventories. Each fixed domain inventory fully covers the gold terms for its
+matching domain; Automatic switches between the two inventories without
+session-specific glossary input or a domain choice. Term accuracy scores 875
+occurrences (193 ACL and 682 medicine).}
 \label{tab:quality}
 \end{table}
 
@@ -64,42 +65,21 @@ a domain choice. Term accuracy scores 143 occurrences (98 ACL and 45 medicine).}
 Table~\ref{tab:quality} compares equal-sized domain inventories that fully cover
 the gold terms in their matching domain. It therefore tests whether routing can
 compose domain-specific resources across a stream, rather than evaluating
-open-world terminology mining. Automatic mode reaches 0.916 combined term
-accuracy, exceeding both fixed single-domain inventories, and also has the
-highest BLEU in this run. Appendix~\ref{app:mixed} reports raw-gold,
-per-domain, type-level, and masked-BLEU results. Separately, a five-talk
-fixed-inventory sweep shows term accuracy stable at 0.965--0.979 while retrieval
-precision falls from 0.48 (curated) to 0.14 (100k) as distractors are added
+open-world terminology mining. Automatic mode reaches 0.936 combined term
+accuracy, exceeding both fixed inventories and matching each domain expert
+within its own domain (ACL 0.912 vs.\ 0.907; medicine 0.943 vs.\ 0.937), at
+a 1--1.5 BLEU cost from switch windows. Appendix~\ref{app:mixed} adds
+raw-gold, type-level, and masked-BLEU detail plus a three-block probe. A five-talk sweep shows stable term accuracy (0.965--0.979) while
+retrieval precision falls 0.48\,$\rightarrow$\,0.14 as distractors grow
 (Appendix~\ref{app:sweep}).
 
-\begin{table}[t]
-\centering
-\scriptsize
-\begin{tabular}{lrrr}
-\toprule
-Memory & Terms & p50/p95 ms & Refs/chunk \\
-\midrule
-Curated & 238 & 61.3 / 105.3 & 2.33 \\
-Domain & 10k & 78.5 / 82.1 & 1.80 \\
-Open & 100k & 64.1 / 82.6 & 4.89 \\
-Stress & 1M & 78 / 95 & 9.62 \\
-\bottomrule
-\end{tabular}
-\caption{Warm steady-state MaxSim retrieval latency across terminology memory
-sizes. Cold loading grows with index size (about 0.5s for 238 terms, 6.8s for
-100k, and over 30s for 1M), so AutoTerm-SST preloads candidate working indexes
-outside the streaming batch path.}
-\label{tab:scale}
-\end{table}
 
 \paragraph{Scale and prompt noise.}
-Across Table~\ref{tab:scale}, p50 ranges from 61.3 to 78.5 ms and p95 from 82.1
-to 105.3 ms. Latency does not increase monotonically with inventory size in
-these single runs; the clearer scaling cost is cold index loading. The 100k and
-1M inventories also yield more surviving prompt references than the 10k domain
-slice. This supports keeping the active slice compact, using the 100k open
-memory only as an on-demand fallback, and reserving the 1M index for scale
-diagnostics.
+Warm MaxSim retrieval stays near 60--105\,ms (p50--p95) from curated
+glossaries to million-term memories; the scaling costs are cold index loading
+and reference noise rather than per-chunk retrieval, which is why the active
+slice stays compact and broad memories serve as fallback pools
+(Table~\ref{tab:scale}, Appendix~\ref{app:sweep}).
 
 \paragraph{Mixed-domain routing.}
 Figure~\ref{fig:routing} reports the four-block end-to-end routing probe for
@@ -120,10 +100,9 @@ state-machine proxy tests, using reference-text windows and controlled probe
 evidence, cover 16 alternating/random transitions with zero wrong switches.
 Inverted- and contested-probe controls expose the expected wrong-switch and
 delayed-switch failure modes. These proxies are separate from the preceding
-end-to-end audio run. Under benchmark-aligned union inventories, automatic
-routing also outperforms
-\emph{both} single-domain fixed inventories on a mixed playlist (0.916 vs.\
-0.839/0.825 combined term accuracy; Appendix~\ref{app:mixed}).
+end-to-end audio run. In the ten-talk run of Table~\ref{tab:quality}, all nine domain
+transitions switch in the correct direction (steady-state accuracy 0.982;
+Appendix~\ref{app:mixed}).
 
 \paragraph{Concurrent streaming.}
 In a 32-session stress test, prerecorded ACL audio was streamed to every session

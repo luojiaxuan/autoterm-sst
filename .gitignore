@@ -36,6 +36,8 @@ checkpoints/
 
 # Demo/runtime media and temporary files
 *.wav
+# bundled demo samples are an exception
+!serve/static/samples/*.wav
 *.mp3
 *.mp4
 *.webm

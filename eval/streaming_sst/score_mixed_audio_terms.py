@@ -60,10 +60,51 @@ def output_contains_variant(output: str, variant: str) -> bool:
     return variant in output
 
 
-def classify_output_hit(term: str, variants: Sequence[str], output: str) -> tuple[bool, str | None, str | None]:
+# Latin-script targets (de) inflect; CJK-gated matching undercounts badly
+# (every setting, including no-glossary, scored ~0.11 on de). Casefolded
+# matching with light stem tolerance keeps the metric conservative but usable.
+_DE_INFLECTION_SUFFIXES = ("innen", "en", "er", "es", "e", "n", "s")
+_LATIN_TRANSLATION_TARGETS = {"de"}
+
+
+def _latin_stem(word: str) -> str:
+    for suffix in _DE_INFLECTION_SUFFIXES:
+        if word.endswith(suffix) and len(word) - len(suffix) >= 4:
+            return word[: -len(suffix)]
+    return word
+
+
+def latin_translation_hit(output: str, variant: str) -> bool:
+    variant = normalise_space(variant)
+    if not variant:
+        return False
+    if len(variant) < 4:
+        return bool(
+            re.search(r"(?<![A-Za-z0-9])" + re.escape(variant) + r"(?![A-Za-z0-9])", output, re.IGNORECASE)
+        )
+    out_cf = output.casefold()
+    if variant.casefold() in out_cf:
+        return True
+    stems = [_latin_stem(w) for w in variant.casefold().split()]
+    if stems and all(len(s) >= 4 for s in stems):
+        return all(s in out_cf for s in stems)
+    return False
+
+
+def classify_output_hit(
+    term: str, variants: Sequence[str], output: str, target_lang: str = "zh"
+) -> tuple[bool, str | None, str | None]:
+    latin_target = target_lang in _LATIN_TRANSLATION_TARGETS
     for variant in variants:
         if contains_cjk_or_kana(variant) and output_contains_variant(output, variant):
             return True, variant, "zh_translation"
+        if (
+            latin_target
+            and not contains_cjk_or_kana(variant)
+            and normalise_space(variant).casefold() != normalise_space(term).casefold()
+            and latin_translation_hit(output, variant)
+        ):
+            return True, variant, "latin_translation"
     if allowed_identity_retention_source(term):
         for variant in variants:
             if not contains_cjk_or_kana(variant) and output_contains_variant(output, variant):
@@ -323,7 +364,7 @@ def target_terms_from_occurrences(gold: Sequence[GoldOccurrence]) -> List[str]:
     return terms
 
 
-def score_occurrences(payload: Dict[str, Any], gold: Sequence[GoldOccurrence]) -> Dict[str, Any]:
+def score_occurrences(payload: Dict[str, Any], gold: Sequence[GoldOccurrence], target_lang: str = "zh") -> Dict[str, Any]:
     outputs = block_outputs(payload)
     traces: List[Dict[str, Any]] = []
     hit = 0
@@ -332,7 +373,7 @@ def score_occurrences(payload: Dict[str, Any], gold: Sequence[GoldOccurrence]) -
     by_type: Dict[tuple[int, str, str, str, tuple[str, ...]], List[int]] = defaultdict(list)
     for occ in gold:
         output = outputs.get(occ.block_index, "")
-        ok, variant, kind = classify_output_hit(occ.term, occ.variants, output)
+        ok, variant, kind = classify_output_hit(occ.term, occ.variants, output, target_lang=target_lang)
         hit += int(ok)
         by_domain[occ.domain].append(int(ok))
         by_source[occ.source].append(int(ok))
@@ -472,7 +513,7 @@ def main() -> None:
     for gold_label, gold in gold_sets.items():
         rows: List[Dict[str, Any]] = []
         for label, payload, path in runs:
-            metrics = score_occurrences(payload, gold)
+            metrics = score_occurrences(payload, gold, target_lang=args.target_lang)
             if reference_text:
                 metrics.update(
                     compute_bleu_scores(

@@ -167,10 +167,48 @@
 
         .glossary-grid {
             display: grid;
-            grid-template-columns: minmax(220px, 1fr) minmax(320px, 2fr) minmax(160px, 0.8fr);
+            grid-template-columns: minmax(260px, 1.4fr) minmax(220px, 1fr) minmax(120px, 0.5fr);
             gap: 16px;
-            align-items: stretch;
+            align-items: end;
         }
+
+        .mode-toggle {
+            display: inline-flex;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 10px;
+            padding: 3px;
+            gap: 3px;
+        }
+
+        .mode-pill {
+            border: none;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.65);
+            font-size: 0.88rem;
+            font-weight: 600;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .mode-pill small { font-weight: 500; opacity: 0.75; }
+
+        .mode-pill.active {
+            background: linear-gradient(135deg, #00d2ff, #3a7bd5);
+            color: #fff;
+            box-shadow: 0 2px 10px rgba(0, 210, 255, 0.25);
+        }
+
+        .mode-hint {
+            margin-top: 8px;
+            color: rgba(255, 255, 255, 0.45);
+            font-size: 0.78rem;
+        }
+
+        .container { padding-bottom: 230px; }
 
         .glossary-actions {
             display: flex;
@@ -955,7 +993,7 @@
     <div class="container">
         <div class="header">
             <h1>AutoTerm-SST</h1>
-            <p>Terminology-aware simultaneous speech translation powered by Speech LLM + RAG</p>
+            <p>Zero-setup adaptive terminology for streaming speech translation &middot; Speech LLM + MaxSim RAG</p>
         </div>
 
         <div class="main-panel">
@@ -1004,25 +1042,21 @@
                 </div>
                 <div class="glossary-grid">
                     <div class="control-group">
-                        <label>Preset (terminology source)</label>
+                        <label>Terminology mode</label>
+                        <div class="mode-toggle" id="termModeToggle">
+                            <button type="button" class="mode-pill active" data-mode="auto" id="modeAutoBtn">Auto&nbsp;<small>zero-setup</small></button>
+                            <button type="button" class="mode-pill" data-mode="fixed" id="modeFixedBtn">Fixed preset</button>
+                        </div>
+                        <p class="mode-hint" id="modeHint">Domain glossary is routed automatically from the speech — nothing to configure.</p>
+                    </div>
+                    <div class="control-group" id="fixedPresetGroup" style="display:none">
+                        <label>Fixed preset</label>
                         <select id="glossaryPreset">
-                            <option value="none" selected>None</option>
-                            <option value="acl_tagged_raw">ACL tagged glossary raw</option>
-                            <option value="acl_tagged_1k">ACL tagged glossary 1k</option>
-                            <option value="acl_tagged_10k">ACL tagged glossary 10k</option>
-                            <option value="medicine_raw">Medicine raw glossary</option>
-                            <option value="medicine_1k">Medicine glossary 1k</option>
-                            <option value="medicine_10k">Medicine glossary 10k</option>
+                            <option value="none" selected>No glossary (baseline)</option>
                         </select>
                     </div>
-                    <!-- Manual overrides are an advanced escape hatch: the demo
-                         is zero-setup (AutoTerm), so this stays collapsed. -->
-                    <details class="control-group" id="advancedTermsToggle">
-                        <summary style="cursor:pointer;opacity:0.7;font-size:0.9em;">Advanced: manual term override</summary>
-                        <textarea id="glossaryText" class="glossary-textarea" spellcheck="false" placeholder="advanced — manual terms override retrieved ones&#10;term=translation&#10;large language model=大语言模型"></textarea>
-                    </details>
                     <div class="glossary-actions">
-                        <button id="buildGlossary" class="btn" type="button">Confirm / Build</button>
+                        <button id="buildGlossary" class="btn" type="button">Apply</button>
                     </div>
                 </div>
                 <div id="adaptiveStatus" class="adaptive-status">
@@ -1032,7 +1066,7 @@
                     <div class="adaptive-cell"><span>Active Glossary</span><strong id="adaptiveGlossary">none</strong></div>
                     <div class="adaptive-cell"><span>Active Terms</span><strong id="adaptiveTerms">0</strong></div>
                     <div class="adaptive-cell"><span>Switch Count</span><strong id="adaptiveSwitches">0</strong></div>
-                    <div class="adaptive-cell"><span>Router</span><strong id="adaptiveRouter">embedding_refs</strong></div>
+                    <div class="adaptive-cell"><span>Router</span><strong id="adaptiveRouter">hybrid_window_topic</strong></div>
                 </div>
             </div>
 
@@ -1177,7 +1211,8 @@
         let isDragging = false;
         let isResizing = false;
         let dragOffset = { x: 0, y: 0 };
-        let isMinimized = false;
+        let isMinimized = true;  // start docked; auto-expand on first translation
+        let panelAutoExpanded = false;
 
         // UI Elements
         const agentType = document.getElementById('agentType');
@@ -1247,7 +1282,7 @@
             activeGlossaryPreset: 'none',
             activeTerms: 0,
             switchCount: 0,
-            router: 'embedding_refs',
+            router: 'hybrid_window_topic',
             updatedAt: 0
         };
 
@@ -1262,13 +1297,13 @@
         }
 
         function displayPresetMode(preset) {
-            if (preset === 'auto_working') return 'Auto Working';
+            if (preset === 'auto_working') return 'Automatic';
             if (!preset || preset === 'none') return 'None';
             return 'Manual Preset';
         }
 
         function refreshAdaptiveStatus() {
-            const selectedPreset = glossaryPreset ? glossaryPreset.value : confirmedGlossary.preset;
+            const selectedPreset = selectedTermPreset();
             if (adaptiveMode) adaptiveMode.textContent = displayPresetMode(selectedPreset);
             if (adaptiveTopic) adaptiveTopic.textContent = adaptiveInfo.activeDomain || 'general';
             if (adaptiveConfidence) adaptiveConfidence.textContent = Number(adaptiveInfo.confidence || 0).toFixed(2);
@@ -1276,7 +1311,7 @@
             const terms = adaptiveInfo.activeTerms || confirmedGlossary.presetTerms || termsFromPreset(adaptiveInfo.activeGlossaryPreset);
             if (adaptiveTerms) adaptiveTerms.textContent = Number(terms || 0).toLocaleString();
             if (adaptiveSwitches) adaptiveSwitches.textContent = String(adaptiveInfo.switchCount || 0);
-            if (adaptiveRouter) adaptiveRouter.textContent = adaptiveInfo.router || 'embedding_refs';
+            if (adaptiveRouter) adaptiveRouter.textContent = adaptiveInfo.router || 'hybrid_window_topic';
         }
 
         function applyAdaptiveTopic(topic, extra) {
@@ -1304,7 +1339,7 @@
                 activeGlossaryPreset: routerMeta.to_preset || routerMeta.target_preset_id || adaptiveInfo.activeGlossaryPreset,
                 activeTerms: Number((extra && extra.active_terms) || adaptiveInfo.activeTerms || 0),
                 switchCount: adaptiveInfo.switchCount,
-                router: routerMeta.action ? `${routerMeta.action}: ${routerMeta.reason || ''}` : (routerMeta.reason || 'embedding_refs'),
+                router: routerMeta.action ? `${routerMeta.action}: ${routerMeta.reason || ''}` : (routerMeta.reason || 'hybrid_window_topic'),
                 updatedAt: Date.now()
             };
             if (!adaptiveInfo.activeTerms) {
@@ -1313,19 +1348,42 @@
             refreshAdaptiveStatus();
         }
 
+        function selectedTermPreset() {
+            if (termMode === 'auto') return 'auto_working';
+            return glossaryPreset ? (glossaryPreset.value || 'none') : 'none';
+        }
+
         function isGlossaryConfirmed() {
-            const preset = glossaryPreset ? glossaryPreset.value : serverDefaultGlossaryPreset;
-            const text = glossaryText ? glossaryText.value : '';
-            return confirmedGlossary.preset === preset && confirmedGlossary.text === text && confirmedGlossary.confirmedAt > 0;
+            return confirmedGlossary.preset === selectedTermPreset() && confirmedGlossary.confirmedAt > 0;
+        }
+
+        let termMode = 'auto';
+        function setTermMode(mode, opts) {
+            termMode = mode === 'fixed' ? 'fixed' : 'auto';
+            const autoBtn = document.getElementById('modeAutoBtn');
+            const fixedBtn = document.getElementById('modeFixedBtn');
+            const fixedGroup = document.getElementById('fixedPresetGroup');
+            const hint = document.getElementById('modeHint');
+            if (autoBtn) autoBtn.classList.toggle('active', termMode === 'auto');
+            if (fixedBtn) fixedBtn.classList.toggle('active', termMode === 'fixed');
+            if (fixedGroup) fixedGroup.style.display = termMode === 'fixed' ? '' : 'none';
+            if (hint) hint.textContent = termMode === 'auto'
+                ? 'Domain glossary is routed automatically from the speech — nothing to configure.'
+                : 'Pin one domain glossary for the whole session (no automatic switching).';
+            if (buildGlossary) buildGlossary.parentElement.style.display = termMode === 'fixed' ? '' : 'none';
+            updateGlossaryMeta();
+            if (!opts || opts.apply !== false) confirmGlossarySelection();
         }
 
         function updateGlossaryMeta() {
             if (!glossaryMeta) return;
-            const selected = glossaryPreset ? glossaryPreset.options[glossaryPreset.selectedIndex] : null;
-            const presetLabel = selected ? selected.textContent : 'None';
-            const manualCount = countManualGlossaryTerms(glossaryText ? glossaryText.value : '');
-            const state = isGlossaryConfirmed() ? 'Ready' : 'Pending';
-            glossaryMeta.textContent = `Preset: ${presetLabel} · Manual: ${manualCount} · ${state}`;
+            let presetLabel = 'Auto working glossary';
+            if (termMode === 'fixed') {
+                const selected = glossaryPreset ? glossaryPreset.options[glossaryPreset.selectedIndex] : null;
+                presetLabel = selected ? selected.textContent : 'None';
+            }
+            const state = isGlossaryConfirmed() ? 'Active' : 'Pending';
+            glossaryMeta.textContent = `${presetLabel} · ${state}`;
             refreshAdaptiveStatus();
         }
 
@@ -1335,7 +1393,7 @@
                 ? (glossaryPreset.value || serverDefaultGlossaryPreset)
                 : serverDefaultGlossaryPreset;
             glossaryPreset.innerHTML = '';
-            presets.forEach(preset => {
+            presets.filter(preset => preset.id !== 'auto_working').forEach(preset => {
                 const option = document.createElement('option');
                 option.value = preset.id;
                 option.textContent = preset.label || preset.id;
@@ -1351,16 +1409,15 @@
         }
 
         async function confirmGlossarySelection() {
-            if (!glossaryPreset || !glossaryText) return null;
             const payload = {
                 session_id: sessionId || null,
                 language_pair: languagePair.value,
-                glossary_preset: glossaryPreset.value || serverDefaultGlossaryPreset,
-                glossary_text: glossaryText.value || ''
+                glossary_preset: selectedTermPreset(),
+                glossary_text: ''
             };
             if (buildGlossary) {
                 buildGlossary.disabled = true;
-                buildGlossary.textContent = 'Building...';
+                buildGlossary.textContent = 'Applying...';
             }
             try {
                 const response = await fetch('/glossary/build', {
@@ -1397,7 +1454,7 @@
             } finally {
                 if (buildGlossary) {
                     buildGlossary.disabled = false;
-                    buildGlossary.textContent = 'Confirm / Build';
+                    buildGlossary.textContent = 'Apply';
                 }
             }
         }
@@ -1554,6 +1611,10 @@
             if (isElectron) {
                 updateElectronTranslation(text);
             } else {
+                if (!panelAutoExpanded && isMinimized) {
+                    panelAutoExpanded = true;
+                    toggleMinimize();
+                }
                 translationOutput.textContent = joinTranslationText(translationOutput.textContent, text);
                 setTimeout(() => {
                     scrollTranslationToBottom();
@@ -4737,6 +4798,16 @@
                 loadServerConfig();
                 refreshTermMemoryStatus();
                 checkBackendAvailability();
+                if (translationPanel) translationPanel.classList.add('minimized');
+                if (minimizeBtn) {
+                    minimizeBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z"/></svg>';
+                    minimizeBtn.title = 'Restore';
+                }
+                const modeAutoBtn = document.getElementById('modeAutoBtn');
+                const modeFixedBtn = document.getElementById('modeFixedBtn');
+                if (modeAutoBtn) modeAutoBtn.addEventListener('click', () => setTermMode('auto'));
+                if (modeFixedBtn) modeFixedBtn.addEventListener('click', () => setTermMode('fixed'));
+                setTermMode('auto', { apply: false });
 
                 // 只在非Electron环境下初始化面板拖拽
                 if (!isElectron) {

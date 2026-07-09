@@ -238,7 +238,7 @@ on medicine is mostly base-model recovery rather than useful glossary evidence.
 | done | 4-block mixed-domain term_ACC comparison | Fixed glossary vs `auto_working` table added for early diagnosis. |
 | done | Long ACL -> medicine_606 -> ACL real-time comparison | Fixed NLP, fixed medicine, and `auto_working` evaluated with term_ACC, BLEU, and masked_term_BLEU. |
 | in progress | Route threshold retuning from real probe failure modes | Current tuning uses generated-target text first and `current_margin_threshold=0.30`; speech probe is noisy and should stay auxiliary. |
-| in progress | Medicine slice quality fix | Union built + verified 2026-07-08: `medicine_hardraw_gt_union_gs10000.json` (212 GT byte-identical + 9,788 `wiki_medicine_zh` fillers, 606 oracle 54/54) on taurus `runtime/term_memory/glossaries/` and HF (revisions `204ba141`, `365c84ba`). Remaining: build MaxSim index, register `medicine_hardraw_gs10k` + eval-only `medicine_hardraw_oracle`, rerun the 3-talk comparison with PromptGoldRetrieved@10. |
+| in progress | Medicine slice quality fix | Union + indexes + manifest done 2026-07-08: `medicine_hardraw_gt_union_gs10000.json` (212 GT byte-identical + 9,788 `wiki_medicine_zh` fillers, 606 oracle 54/54; HF `204ba141`/`365c84ba`), MaxSim indexes for `medicine_hardraw_gs10k` + eval-only `medicine_hardraw_oracle` built on aries GPU5, registered in `manifests/auto_working_medicine_hardraw_20260708.json` (loader-validated, `current.json` untouched). Remaining: 3-talk rerun against the new manifest with PromptGoldRetrieved@10. |
 | pending | Paper claim update | Claim can mention long real E2E routing, but should not claim current `medicine_core_10k` improves medicine term_ACC until the slice-quality issue is fixed. |
 
 ## Metrics

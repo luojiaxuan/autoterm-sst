@@ -409,11 +409,26 @@ filler: runtime glossaries/wiki_medicine_zh.json (23,713 pool; 12 GT collisions 
   `wikidata: 9788`。选 `wiki_medicine_zh` 而不是 ESO translated 池做 filler，
   是为了与 ACL `gs` 配方严格对称：distractor 全部来自 wiki，不再混入其他
   talk-derived terms。union + report 已回传 HF（revision `365c84ba`）。
-- 剩余步骤：build MaxSim index（GPU）；注册 preset
-  `medicine_hardraw_gs10k`（union inventory）和 eval-only
-  `medicine_hardraw_oracle`（212 GT only，可直接用现成 hard medicine index）；
-  重跑 3-talk 长流式对比 fixed_nlp / fixed_medicine(union) / auto_working，
-  同时报告 PromptGoldRetrieved@10 与 surviving prompt refs。
+- **Index 与 preset 注册已完成（2026-07-08）**，在 aries GPU5（spaCyEnv,
+  hn1024 checkpoint, tr128/ta256 默认）构建：
+
+```text
+indexes/medicine_hardraw_gs10k/en-zh/maxsim.pt   (10,000 x 1024, 42MB)
+indexes/medicine_hardraw_oracle/en-zh/maxsim.pt  (212 x 1024, 0.9MB)
+manifests/auto_working_medicine_hardraw_20260708.json
+```
+
+  新 manifest 是 `auto_working_alias_20260619T204803Z` 的增量副本（保留
+  common_10k / nlp_core_10k / medicine_core_10k，新增 `medicine_hardraw_gs10k`
+  与 eval-only `medicine_hardraw_oracle`），已用
+  `framework.agents.term_memory.manifest.TermMemoryManifest.load()` 验证 5 个
+  preset 全部 `index_ready`。`current.json` 未动，正在运行的 8012 server 不受
+  影响。
+- 剩余步骤：用
+  `RASST_TERM_MEMORY_MANIFEST=.../manifests/auto_working_medicine_hardraw_20260708.json`
+  启动 eval server，重跑 3-talk 长流式对比 fixed_nlp /
+  fixed_medicine(`medicine_hardraw_gs10k`) / `medicine_hardraw_oracle` /
+  auto_working，同时报告 PromptGoldRetrieved@10 与 surviving prompt refs。
 
 ## 固定 64 命令
 

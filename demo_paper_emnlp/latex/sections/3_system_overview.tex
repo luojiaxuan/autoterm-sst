@@ -23,7 +23,7 @@ Agents implement a small contract: \texttt{open\_session},
 \texttt{submit\_audio}, \texttt{on\_control}, \texttt{close\_session},
 \texttt{describe}, and \texttt{health}. The same UI and wire protocol
 serve a deterministic mock agent for development, a legacy InfiniSST scheduler
-agent \citep{ouyang2025infinisst}, or the RASST/Qwen3-Omni agent used in the live GPU demo. The boundary is
+agent \citep{ouyang2025infinisst}, or the RASST/Qwen3-Omni agent \citep{luo2026rasst} used in the live GPU demo. The boundary is
 backend-agnostic: the live demo uses in-process vLLM \citep{kwon2023efficient},
 and the same protocol can serve external SGLang-compatible backends
 \citep{zheng2024sglang} without changing the terminology memory, router, or

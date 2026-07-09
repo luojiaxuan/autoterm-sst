@@ -109,6 +109,8 @@
 
         .btn-compact { padding: 8px 14px; font-size: 0.85rem; width: auto; }
 
+        .dimmed { opacity: 0.4; pointer-events: none; filter: grayscale(0.6); }
+
         .sample-item {
             display: flex;
             flex-direction: column;
@@ -364,7 +366,7 @@
 
         .input-section {
             display: grid;
-            grid-template-columns: 1fr 2fr 1fr;
+            grid-template-columns: auto 1.7fr 1.1fr auto;
             gap: 20px;
             align-items: center;
             margin-bottom: 30px;
@@ -1078,10 +1080,10 @@
                             <button type="button" class="mode-pill active" data-mode="auto" id="modeAutoBtn">Auto&nbsp;<small>zero-setup</small></button>
                             <button type="button" class="mode-pill" data-mode="fixed" id="modeFixedBtn">Fixed</button>
                         </div>
-                        <select id="glossaryPreset" style="display:none">
+                        <select id="glossaryPreset" class="dimmed" disabled>
                             <option value="none" selected>No glossary (baseline)</option>
                         </select>
-                        <button id="buildGlossary" class="btn btn-compact" type="button" style="display:none">Apply</button>
+                        <button id="buildGlossary" class="btn btn-compact dimmed" type="button" disabled>Apply</button>
                     </div>
                     <p class="mode-hint" id="modeHint">Routed automatically from the speech.</p>
                 </div>
@@ -1409,11 +1411,17 @@
             if (autoBtn) autoBtn.classList.toggle('active', termMode === 'auto');
             if (fixedBtn) fixedBtn.classList.toggle('active', termMode === 'fixed');
             if (fixedGroup) fixedGroup.style.display = termMode === 'fixed' ? '' : 'none';
-            if (glossaryPreset) glossaryPreset.style.display = termMode === 'fixed' ? '' : 'none';
+            if (glossaryPreset) {
+                glossaryPreset.disabled = termMode !== 'fixed';
+                glossaryPreset.classList.toggle('dimmed', termMode !== 'fixed');
+            }
             if (hint) hint.textContent = termMode === 'auto'
                 ? 'Routed automatically from the speech.'
                 : 'Pinned for the whole session.';
-            if (buildGlossary) buildGlossary.style.display = termMode === 'fixed' ? '' : 'none';
+            if (buildGlossary) {
+                buildGlossary.disabled = termMode !== 'fixed';
+                buildGlossary.classList.toggle('dimmed', termMode !== 'fixed');
+            }
             updateGlossaryMeta();
             if (!opts || opts.apply !== false) confirmGlossarySelection();
         }

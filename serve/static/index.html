@@ -109,6 +109,26 @@
 
         .btn-compact { padding: 8px 14px; font-size: 0.85rem; width: auto; }
 
+        .sample-item { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+        .sample-label { color: rgba(255, 255, 255, 0.5); font-size: 0.85rem; }
+
+        .sample-btn {
+            border: 1px solid rgba(0, 210, 255, 0.35);
+            background: rgba(0, 210, 255, 0.08);
+            color: #9be3ff;
+            font-size: 0.85rem;
+            font-weight: 600;
+            padding: 8px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .sample-btn:hover { background: rgba(0, 210, 255, 0.18); }
+
+        .sample-btn.loading { opacity: 0.6; pointer-events: none; }
+
         .control-group {
             display: flex;
             flex-direction: column;
@@ -1069,6 +1089,13 @@
 
             <!-- Audio Input Section -->
             <div class="input-section" id="audioInputSection">
+                <!-- Sample audio quick-start -->
+                <div class="input-item sample-item" id="sampleAudioItem">
+                    <span class="sample-label">Try a sample</span>
+                    <button class="sample-btn" type="button" data-sample="acl_sample.wav" data-title="ACL talk (NLP)">ACL talk</button>
+                    <button class="sample-btn" type="button" data-sample="medicine_sample.wav" data-title="Medicine talk (oncology)">Medicine talk</button>
+                </div>
+
                 <!-- Web Mode Buttons -->
                 <div class="input-item" id="webUploadItem">
                     <button class="upload-btn" type="button" id="uploadBtn">
@@ -2799,12 +2826,27 @@
         }
 
         // Add event listeners to media element
+        async function ensureSession() {
+            if (sessionId) return true;
+            updateStatus('Starting session...', 'processing');
+            loadModel.click();
+            for (let i = 0; i < 100; i++) {
+                if (sessionId) return true;
+                await new Promise(r => setTimeout(r, 150));
+            }
+            return false;
+        }
+
         function addMediaEventListeners(mediaElement) {
             mediaElement.addEventListener('play', async () => {
-                if (!translationInitialized && sessionId) {
+                if (!translationInitialized) {
                     try {
                         const currentTime = mediaElement.currentTime;
                         mediaElement.pause();
+                        if (!(await ensureSession())) {
+                            updateStatus('Could not start a session — check the server.', 'error');
+                            return;
+                        }
                         updateStatus('Initializing translation system...', 'processing');
                         
                         await initializeTranslation(mediaElement);
@@ -3668,6 +3710,30 @@
         // Upload button click handler
         uploadBtn.addEventListener('click', () => {
             audioFile.click();
+        });
+
+        // Bundled sample audio: no upload needed to try the demo.
+        document.querySelectorAll('.sample-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const name = btn.dataset.sample;
+                const title = btn.dataset.title || name;
+                btn.classList.add('loading');
+                updateStatus(`Loading sample: ${title}...`, 'processing');
+                try {
+                    const resp = await fetch(`/static/samples/${name}`, { cache: 'force-cache' });
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    const blob = await resp.blob();
+                    const file = new File([blob], name, { type: 'audio/wav' });
+                    createMediaElement(file);
+                    translationInitialized = false;
+                    updateStatus(`Sample loaded: ${title}. Press play to start translation.`, 'ready');
+                    resetIdleTimer();
+                } catch (err) {
+                    updateStatus(`Failed to load sample: ${err}`, 'error');
+                } finally {
+                    btn.classList.remove('loading');
+                }
+            });
         });
 
         // Microphone functionality

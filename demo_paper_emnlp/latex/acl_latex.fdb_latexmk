@@ -1,13 +1,13 @@
 # Fdb version 4
-["bibtex latex/acl_latex"] 1783638091.51656 "latex/acl_latex.aux" "latex/acl_latex.bbl" "latex/acl_latex" 1783638133.06811 0
+["bibtex latex/acl_latex"] 1783638091.51656 "latex/acl_latex.aux" "latex/acl_latex.bbl" "latex/acl_latex" 1783640076.35596 0
   "acl_natbib.bst" 0 -1 0 ""
-  "latex/acl_latex.aux" 1783638132.74063 15183 98cb71e5c934c2df839d5328b4635594 "pdflatex"
+  "latex/acl_latex.aux" 1783640076.0904 15183 98cb71e5c934c2df839d5328b4635594 "pdflatex"
   "latex/custom.bib" 1783630823.06893 7298 bdb18c9134393b60f170ea07be681c21 ""
   (generated)
   "latex/acl_latex.bbl"
   "latex/acl_latex.blg"
   (rewritten before read)
-["pdflatex"] 1783638131.92642 "latex/acl_latex.tex" "latex/acl_latex.pdf" "acl_latex" 1783638133.06831 0
+["pdflatex"] 1783640075.27173 "latex/acl_latex.tex" "latex/acl_latex.pdf" "acl_latex" 1783640076.35618 0
   "/opt/homebrew/Cellar/texlive/20260301/share/texmf-dist/fonts/enc/dvips/base/8r.enc" 1772380719 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "/opt/homebrew/Cellar/texlive/20260301/share/texmf-dist/fonts/enc/dvips/inconsolata/i4-t1-0.enc" 1772380719 7631 5169ff1acd97ff1c4ab83563c99f96f4 ""
   "/opt/homebrew/Cellar/texlive/20260301/share/texmf-dist/fonts/map/fontname/texfonts.map" 1772380719 3524 cb3e574dea2d1052e39280babc910dc8 ""
@@ -146,11 +146,11 @@
   "/opt/homebrew/Cellar/texlive/20260301/share/texmf-dist/web2c/texmf.cnf" 1772380719 43633 14bbc273cebd985e64ab1a698333eaf9 ""
   "/opt/homebrew/Cellar/texlive/20260301/share/texmf-var/web2c/pdftex/pdflatex.fmt" 1772380719 3636958 d2062700e4b629ba1467c28603bfdc8d ""
   "latex/acl.sty" 1783384753.87209 11597 da9a94cfb2d73b4ccce758d297ef675a ""
-  "latex/acl_latex.aux" 1783638132.74063 15183 98cb71e5c934c2df839d5328b4635594 "pdflatex"
+  "latex/acl_latex.aux" 1783640076.0904 15183 98cb71e5c934c2df839d5328b4635594 "pdflatex"
   "latex/acl_latex.bbl" 1783638091.60404 7374 49fcfa74d72345e0f9912cdab77e5182 "bibtex latex/acl_latex"
-  "latex/acl_latex.out" 1783638132.7422 1860 af864ff7555703f831697a4911f0135d "pdflatex"
+  "latex/acl_latex.out" 1783640076.09232 1860 af864ff7555703f831697a4911f0135d "pdflatex"
   "latex/acl_latex.tex" 1783632640.3154 2910 0780fb29dc6037a31cfbfb9b9388f5f9 ""
-  "latex/figures/autoterm_architecture.pdf" 1783638131.67176 131409 e79793c0134f4f20cb42b8c7e1865616 ""
+  "latex/figures/autoterm_architecture.pdf" 1783640059.39513 145598 268013de9a61794b3148b9b936aace8f ""
   "latex/figures/routing_timeline_4block.png" 1783634545.50684 48746 668d7e9c9ba11a6a826c5583788acc90 ""
   "latex/figures/ui_evidence_panel.png" 1783634545.54915 159332 2f26d5b21b71e6274a5a0c712fcca7ff ""
   "latex/sections/0_abstract.tex" 1783633131.44208 1378 0dd795eeb7e3ac3f656f32bb684b5466 ""

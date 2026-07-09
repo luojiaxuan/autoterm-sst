@@ -44,17 +44,17 @@
   <rect width="1800" height="760" fill="#FFFFFF"/>
 
   <!-- Example translations are aligned with the two speech snapshots below. -->
-  <text x="365" y="42" class="translation" text-anchor="middle">
+  <text x="365" y="30" class="translation" text-anchor="middle" dominant-baseline="central">
     <tspan>……我们改进</tspan><tspan fill="#3B7F2B" font-weight="700">语义角色标注</tspan><tspan>……</tspan>
   </text>
-  <rect x="260" y="56" width="210" height="34" fill="#FFFFFF" stroke="#C86A32" stroke-width="2"/>
-  <text x="365" y="81" class="small" text-anchor="middle" fill="#B85120">Translation at t</text>
+  <rect x="230" y="56" width="270" height="34" fill="#FFFFFF" stroke="#C86A32" stroke-width="2"/>
+  <text x="365" y="80" class="small" text-anchor="middle" fill="#B85120"><tspan>Translation at Chunk</tspan><tspan baseline-shift="sub" font-size="16">t</tspan></text>
 
-  <text x="1080" y="42" class="translation" text-anchor="middle">
+  <text x="1080" y="30" class="translation" text-anchor="middle" dominant-baseline="central">
     <tspan>……患者患有</tspan><tspan fill="#3B7F2B" font-weight="700">直肠癌</tspan><tspan>。</tspan>
   </text>
-  <rect x="957" y="56" width="246" height="34" fill="#FFFFFF" stroke="#C86A32" stroke-width="2"/>
-  <text x="1080" y="81" class="small" text-anchor="middle" fill="#B85120">Translation at t+k</text>
+  <rect x="930" y="56" width="300" height="34" fill="#FFFFFF" stroke="#C86A32" stroke-width="2"/>
+  <text x="1080" y="80" class="small" text-anchor="middle" fill="#B85120"><tspan>Translation at Chunk</tspan><tspan baseline-shift="sub" font-size="16">t+k</tspan></text>
 
   <!-- Shared speech-language model. -->
   <rect x="100" y="108" width="1600" height="105" class="box"/>
@@ -92,9 +92,9 @@
 
   <!-- Earlier and later chunks are separated by an omitted interval; no immediate t-to-t+1 switch is implied. -->
   <rect x="105" y="520" width="380" height="43" class="feature-box"/>
-  <text x="295" y="550" class="domain" text-anchor="middle" fill="#116E93">Chunk t · NLP active</text>
+  <text x="295" y="550" class="domain" text-anchor="middle" fill="#116E93"><tspan>Chunk</tspan><tspan baseline-shift="sub" font-size="18">t</tspan><tspan> · NLP active</tspan></text>
   <rect x="595" y="520" width="500" height="43" class="medicine-box"/>
-  <text x="845" y="550" class="domain" text-anchor="middle" fill="#B85120">Later chunk t+k · Medicine active</text>
+  <text x="845" y="550" class="domain" text-anchor="middle" fill="#B85120"><tspan>Chunk</tspan><tspan baseline-shift="sub" font-size="18">t+k</tspan><tspan> · Medicine active</tspan></text>
 
   <path d="M250 520 V431" class="forward"/>
   <path d="M770 520 V497 H500 V431" class="forward"/>

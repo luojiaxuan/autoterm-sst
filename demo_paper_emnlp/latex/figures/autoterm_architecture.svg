@@ -58,7 +58,6 @@
   <path d="M805 231 H840" class="main-line"/>
   <path d="M1075 231 H1190" class="main-line"/>
   <path d="M1465 231 H1515" class="main-line"/>
-  <text x="1131" y="217" class="small" text-anchor="middle">term_map_t</text>
 
   <path d="M680 320 V355" class="route-line"/>
   <path d="M235 338 H520 V426 H550" class="route-line"/>

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -34,162 +33,6 @@ TINY = font(15)
 def text_size(draw: ImageDraw.ImageDraw, text: str, face: ImageFont.ImageFont) -> tuple[int, int]:
     box = draw.textbbox((0, 0), text, font=face)
     return box[2] - box[0], box[3] - box[1]
-
-
-def wrap_text(draw: ImageDraw.ImageDraw, text: str, face: ImageFont.ImageFont, width: int) -> list[str]:
-    lines: list[str] = []
-    for raw_line in text.split("\n"):
-        words = raw_line.split()
-        line = ""
-        for word in words:
-            trial = word if not line else f"{line} {word}"
-            if text_size(draw, trial, face)[0] <= width:
-                line = trial
-            else:
-                if line:
-                    lines.append(line)
-                line = word
-        if line:
-            lines.append(line)
-    return lines
-
-
-def draw_label(draw: ImageDraw.ImageDraw, xy: tuple[int, int], text: str, face: ImageFont.ImageFont, fill: str) -> None:
-    draw.text(xy, text, font=face, fill=fill)
-
-
-def rounded_box(
-    draw: ImageDraw.ImageDraw,
-    box: tuple[int, int, int, int],
-    title: str,
-    body: list[str],
-    fill: str,
-    outline: str,
-    title_fill: str = "#1F2937",
-) -> None:
-    x0, y0, x1, y1 = box
-    draw.rounded_rectangle(box, radius=24, fill=fill, outline=outline, width=3)
-    draw.text((x0 + 26, y0 + 22), title, font=HEAD, fill=title_fill)
-    y = y0 + 72
-    for item in body:
-        for line_idx, line in enumerate(wrap_text(draw, item, BODY, x1 - x0 - 72)):
-            if line_idx == 0:
-                draw.ellipse((x0 + 30, y + 8, x0 + 40, y + 18), fill=outline)
-                text_x = x0 + 52
-            else:
-                text_x = x0 + 52
-            draw.text((text_x, y), line, font=BODY, fill="#374151")
-            y += 32
-        y += 6
-
-
-def arrow(
-    draw: ImageDraw.ImageDraw,
-    start: tuple[int, int],
-    end: tuple[int, int],
-    color: str = "#475569",
-    width: int = 4,
-) -> None:
-    draw.line((start, end), fill=color, width=width)
-    angle = math.atan2(end[1] - start[1], end[0] - start[0])
-    length = 18
-    spread = 0.45
-    left = (end[0] - length * math.cos(angle - spread), end[1] - length * math.sin(angle - spread))
-    right = (end[0] - length * math.cos(angle + spread), end[1] - length * math.sin(angle + spread))
-    draw.polygon([end, left, right], fill=color)
-
-
-def render_architecture() -> None:
-    img = Image.new("RGB", (1800, 1050), "#F8FAFC")
-    draw = ImageDraw.Draw(img)
-    draw.text((70, 48), "AutoTerm-SST Runtime Architecture", font=TITLE, fill="#0F172A")
-    draw.text(
-        (72, 102),
-        "A thin streaming framework delegates terminology retrieval, routing, prompting, and model serving to swappable agents.",
-        font=SUBTITLE,
-        fill="#475569",
-    )
-
-    rounded_box(
-        draw,
-        (70, 180, 410, 590),
-        "Inputs and UI",
-        [
-            "Web or Electron client",
-            "Microphone, file, or system audio",
-            "Manual terms remain optional",
-            "Mock mode uses the same protocol",
-        ],
-        "#E0F2FE",
-        "#0284C7",
-    )
-    rounded_box(
-        draw,
-        (470, 180, 825, 590),
-        "Thin framework",
-        [
-            "Static UI and REST controls",
-            "WebSocket audio stream",
-            "Session lifecycle tracking",
-            "agent_type routes to an agent",
-        ],
-        "#DCFCE7",
-        "#16A34A",
-    )
-    rounded_box(
-        draw,
-        (885, 180, 1315, 590),
-        "Agent boundary",
-        [
-            "Audio buffer and micro-batcher",
-            "MaxSim retrieval plugin",
-            "Hybrid active-slice router",
-            "PromptBuilder with top-10 terms",
-            "Qwen3-Omni served through vLLM",
-        ],
-        "#F3E8FF",
-        "#7C3AED",
-    )
-    rounded_box(
-        draw,
-        (1375, 180, 1730, 590),
-        "Terminology resources",
-        [
-            "Manifest-driven snapshots",
-            "Domain slices: NLP, medicine, finance, legal",
-            "Broad open memories as fallback pools",
-            "Curated ACL glossary for diagnostics",
-        ],
-        "#FEF3C7",
-        "#D97706",
-    )
-
-    rounded_box(
-        draw,
-        (250, 730, 1560, 950),
-        "JSON evidence stream",
-        [
-            "translation text",
-            "retrieved term pairs and scores",
-            "active slice, router action, confidence, switch count",
-            "retrieval and generation latency",
-        ],
-        "#FFFFFF",
-        "#64748B",
-    )
-
-    arrow(draw, (410, 385), (470, 385))
-    arrow(draw, (825, 385), (885, 385))
-    arrow(draw, (1375, 385), (1315, 385))
-    arrow(draw, (1100, 590), (1100, 730))
-    arrow(draw, (520, 730), (260, 590))
-
-    draw.rounded_rectangle((79, 604, 1730, 675), radius=18, fill="#EEF2FF", outline="#6366F1", width=2)
-    draw.text((112, 625), "Control plane: start/stop, latency mode, terminology mode, manual presets, health checks", font=BODY, fill="#334155")
-    arrow(draw, (640, 590), (640, 604), "#6366F1", 3)
-    arrow(draw, (1110, 604), (1110, 590), "#6366F1", 3)
-
-    img.save(FIG_DIR / "autoterm_architecture.png")
 
 
 def render_routing_timeline() -> None:
@@ -272,7 +115,7 @@ def render_ui_crop() -> None:
 
 def main() -> None:
     FIG_DIR.mkdir(parents=True, exist_ok=True)
-    render_architecture()
+    # note (luojiaxuan): Figure 1 is maintained as editable SVG and exported to PDF/PNG from that single vector source.
     render_routing_timeline()
     render_ui_crop()
 

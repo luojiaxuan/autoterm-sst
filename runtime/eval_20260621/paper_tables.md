@@ -1,4 +1,4 @@
-# RASST-Demo Paper Artifacts, 2026-06-21
+# AutoTerm-SST Paper Artifacts, 2026-07-09
 
 Runtime: Taurus GPU service job `46544`, Qwen3-Omni vLLM TP=2 on GPUs
 `6,7`, MaxSim retriever on GPU `5`, framework port `8011`.
@@ -9,12 +9,29 @@ Figure 2 screenshot:
 runtime/eval_20260621/figure2_ui.png
 ```
 
-The screenshot uses the current web UI plus live Taurus JSON WebSocket output
-from `auto_working` on the ACL6060 smoke audio. It shows translated text,
-retrieved terms, active glossary state, active term count, and retrieve/generate
-latency.
+The screenshot uses the AutoTerm-SST web UI plus a captured diagnostic
+`common_10k` session. It illustrates translated text, retrieved terms, active
+glossary state, active term count, and retrieve/generate latency; the released
+automatic path starts from domain-specific slices.
 
-## Table 1: Quality / User-Effort Comparison
+## Table 1: Current mixed-domain comparison
+
+The paper's main table uses the benchmark-aligned union evaluation, not the
+legacy smoke artifact below. Technical-gold scores are 143 occurrences (98 ACL
+and 45 medicine); raw-gold scores are 226 (181 ACL and 45 medicine). The
+current source-of-truth artifact is staged on Taurus at
+`/mnt/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260708_union_truncated_8013/term_acc_compare_v2.json`
+and `auto_working_v2.json`; these runtime files are local-only staging and have
+not been uploaded to Hugging Face.
+
+| setting | session setup | combined term acc. | ACL | medicine | BLEU |
+|---|---|---:|---:|---:|---:|
+| no memory | none | 0.769 | 0.806 | 0.689 | 23.14 |
+| fixed NLP | select NLP | 0.839 | 0.888 | 0.733 | 23.37 |
+| fixed medicine | select medicine | 0.825 | 0.776 | 0.933 | 22.92 |
+| Automatic | none | **0.916** | **0.898** | **0.956** | **24.07** |
+
+## Legacy smoke artifact: historical quality / user-effort comparison
 
 Scope: ACL6060 smoke talk `2022.acl-long.268`, first 8 segments, independent
 9-term gold file `eval/streaming_sst/acl268_gold_terms.json`. `masked_bleu`
@@ -29,11 +46,9 @@ this JSON-WS harness does not produce SimulEval token-delay logs.
 | auto working | 0 | 10,000 | **0.889** | 45.80 | pending | 88.20 ms |
 | curated oracle | high | 238 | 0.778 | **47.07** | pending | 81.13 ms |
 
-Takeaway for reviewer framing: on this smoke slice, zero-setup `auto_working`
-improves term accuracy over both no glossary and broad open memory, while
-retrieving fewer refs/chunk and keeping p95 retrieval latency below broad open.
-The curated oracle still has the best masked BLEU and lowest RAG latency, but it
-requires manual/curated terminology effort.
+This historical table is retained only for provenance. Its `auto_working` row
+uses the old `common_10k`/general router and must not be presented as evidence
+for the released domain-slice `hybrid_window_topic` configuration.
 
 Primary sources:
 
@@ -74,7 +89,7 @@ docs/open_term_memory_eval.md
 
 ## Remaining Gap
 
-For a camera-ready Table 1, rerun a preset-aware SimulEval harness to fill the
+For a camera-ready latency table, rerun a preset-aware SimulEval harness to fill the
 `StreamLAAL` column for `none`, `broad open`, `auto working`, and `curated
 oracle`. The current table is valid for terminology quality and retrieval
 latency, but it should not pretend that JSON WebSocket timing is canonical

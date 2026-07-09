@@ -512,10 +512,11 @@ python3 eval/streaming_sst/eval_mixed_domain_switch.py \
 - **32-session 压测（aries 8013, auto_working, 300s 实时）**：32/32 完成、
   0 失败 0 掉线、首字 p50 0.346s (1 session) → 0.537s (32)；全部 session 维持
   实时。产物 `taurus data1 rasst_eval/stress_auto_20260709`。
-- **ja/de 全长 3-talk**（aries 本地化车道）：三语 auto 综合 term_acc 全部登顶
-  （zh .916 / ja .902 / de .897 technical；raw 口径一致）。ja 切换 115.3/125.6s、
-  de 875.6/39.2s（keyword 通道 en/zh-only 所致）→ 已加 ja/de topic keywords
-  (`127cf77`) 并在 taurus 8014 重跑 auto（kw_rerun_20260709）。
+- **ja/de 全长 3-talk（keyword-tuned rerun）**：Taurus
+  `kw_rerun_20260709` 已完成。ja auto technical/raw term_acc 为 .9098/.9000，
+  de 为 .9113/.8798；两种语言均 2/2 正确切换、0 错切、steady-state 1.0。
+  切换延迟为 ja 28.917/33.458s、de 51.957/33.458s。原先 115.3s/875.6s
+  的数字保留为无 ja/de keyword 的 ablation，不代表 released 配置。
 - **de 评分 artifact 修复**：`classify_output_hit` 的 CJK 门导致德语翻译
   variant 永不计分（全条件 ~0.11）；`133fd52` 起 matcher 语言感知（de 走
   casefold+词干容忍，短词严格词界），zh/ja 行为不变（回归 15/15 + 单测 6/6）。
@@ -529,3 +530,17 @@ python3 eval/streaming_sst/eval_mixed_domain_switch.py \
 - **checkpoint 清理**：删 de 探索变体 `cap16_exactboundary`（66G）与空 staging；
   zh 在 data1 的逐字节重复副本（66G，与 data2 prod md5 一致）为 root 所有，
   需管理员删除。
+
+## Source-of-truth artifact paths (2026-07-09)
+
+- zh matched-union result: Taurus local staging
+  `/mnt/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260708_union_truncated_8013/term_acc_compare_v2.json`
+  (`auto_working_v2` = 131/143 technical, 206/226 raw).
+- ja keyword-tuned result: Taurus local staging
+  `/mnt/data1/jiaxuanluo/rasst_eval/kw_rerun_20260709/3talk_ja/term_acc_ja_kw.json`.
+- de keyword-tuned result: Taurus local staging
+  `/mnt/data1/jiaxuanluo/rasst_eval/kw_rerun_20260709/3talk_de/term_acc_de_kw.json`.
+- These JSON outputs are local-only evaluation staging; they are not yet uploaded
+  to a Hugging Face dataset. The paper source and the lightweight summaries in
+  this document remain the Git source of truth until an artifact repository is
+  selected.

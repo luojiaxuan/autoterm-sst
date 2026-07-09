@@ -27,14 +27,14 @@ WORKING_DOMAINS = tuple(DOMAIN_TO_PRESET.keys())
 
 WORKING_PRESET_META: Dict[str, Dict[str, str]] = {
     AUTO_WORKING_PRESET: {
-        "label": "Auto working glossary",
+        "label": "Automatic terminology",
         "domain": "auto",
-        "description": "Routes directly among domain-specific working glossary slices.",
+        "description": "Routes directly among domain-specific terminology slices.",
     },
     "common_10k": {
-        "label": "Common working glossary 10k",
+        "label": "Common-terms diagnostic",
         "domain": GENERAL_DOMAIN,
-        "description": "Always-on common terms base slice for automatic routing.",
+        "description": "Diagnostic common-terms slice; not active by default.",
     },
     "nlp_core_10k": {
         "label": "NLP core working glossary 10k",

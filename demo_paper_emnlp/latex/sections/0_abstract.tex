@@ -12,11 +12,10 @@ speech-centroid evidence, and retrieved-term metadata, without running a
 separate ASR or source-transcript classifier in the production path. The demo
 exposes retrieved terms, active slices, router decisions, and retrieval
 latency in a live evidence panel.
-In a terminology smoke evaluation, automatic mode recovers
-eight of nine gold terms while injecting fewer references than a broad 100k
-open memory; scale probes show warm MaxSim retrieval stays near
-60--105 ms (p50--p95) for memories of up to one million terms, and a
-mixed-domain routing probe tracks all three ACL/medicine transitions without a
-wrong switch. The released implementation supports both mock and live-GPU
-modes.
+Under benchmark-aligned mixed-domain inventories, automatic mode reaches 0.916
+combined term accuracy, compared with 0.839 and 0.825 for fixed NLP and medicine
+inventories. Scale probes show warm MaxSim retrieval stays near 60--105 ms
+(p50--p95) for memories of up to one million terms, and an end-to-end routing
+probe tracks all three ACL/medicine transitions without a wrong switch. The
+released implementation supports both mock and live-GPU modes.
 \end{abstract}

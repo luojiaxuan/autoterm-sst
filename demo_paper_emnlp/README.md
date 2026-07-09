@@ -37,7 +37,8 @@ rsvg-convert -b white -w 2400 \
   evidence panel, and routing timeline.
 - `latex/custom.bib` — references.
 - Table/figure sources: `../runtime/eval_20260621/paper_tables.md` and
-  `../docs/` eval reports.
+  `../docs/auto_glossary_mixed_switch_20260707.md` (the matched-union and
+  multilingual source-of-truth records).
 
 ## Submission checklist (EMNLP 2026 demo CFP)
 
@@ -49,7 +50,6 @@ rsvg-convert -b white -w 2400 \
   footnote in `sections/5_demo_interface.tex`**
 - [ ] Live demo link or downloadable package link — **strict requirement;
   update the same footnote**
-- [ ] Fill pending main results (32-session stress numbers in
-  `sections/6_evaluation.tex`) from the final run
+- [x] 32-session stress results recorded in `sections/6_evaluation.tex`
 - Camera-ready: restore the Acknowledgments block in `acl_latex.tex`
   (commented out for the submission page budget; accepted papers get +1 page).

@@ -9,10 +9,10 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 
-ROOT = Path("/home/jiaxuanluo/rasst-demo")
+ROOT = Path(__file__).resolve().parents[2]
 SAMPLE = ROOT / "runtime/eval_20260621/figure2_live_sample.json"
 OUT = ROOT / "runtime/eval_20260621/figure2_ui.png"
-HEADLESS = "/home/jiaxuanluo/.cache/ms-playwright/chromium_headless_shell-1187/chrome-linux/headless_shell"
+HEADLESS = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
 
 def main() -> None:
@@ -65,7 +65,7 @@ def main() -> None:
                 const important = (el, prop, value) => el && el.style.setProperty(prop, value, 'important');
                 document.body.style.background = '#f4f7fb';
                 const title = document.querySelector('.header h1');
-                if (title) title.textContent = 'RASST-Demo';
+                if (title) title.textContent = 'AutoTerm-SST';
                 const subtitle = document.querySelector('.header p');
                 if (subtitle) subtitle.textContent = 'Retrieval-aware streaming speech translation';
                 const gp = $('glossaryPreset');
@@ -73,16 +73,18 @@ def main() -> None:
                     if (!Array.from(gp.options).some(o => o.value === 'auto_working')) {
                         const opt = document.createElement('option');
                         opt.value = 'auto_working';
-                        opt.textContent = 'Auto working glossary';
+                        opt.textContent = 'Automatic terminology';
                         gp.insertBefore(opt, gp.firstChild);
                     }
                     gp.value = 'auto_working';
                 }
-                if ($('glossaryMeta')) $('glossaryMeta').textContent = 'Preset: Auto working glossary · Manual: 0 · Index ready';
-                if ($('adaptiveMode')) $('adaptiveMode').textContent = 'Auto Working';
+                if ($('glossaryMeta')) $('glossaryMeta').textContent = 'Preset: Automatic terminology · Manual: 0 · Index ready';
+                if ($('adaptiveMode')) $('adaptiveMode').textContent = 'Automatic';
                 if ($('adaptiveTopic')) $('adaptiveTopic').textContent = data.topic.active_domain || 'general';
                 if ($('adaptiveConfidence')) $('adaptiveConfidence').textContent = Number(data.topic.confidence || 0).toFixed(2);
-                if ($('adaptiveGlossary')) $('adaptiveGlossary').textContent = data.topic.active_glossary_preset || 'common_10k';
+                const activePreset = data.topic.active_glossary_preset || 'common_10k';
+                const activeLabel = activePreset === 'common_10k' ? 'common-terms diagnostic' : activePreset;
+                if ($('adaptiveGlossary')) $('adaptiveGlossary').textContent = activeLabel;
                 if ($('adaptiveTerms')) $('adaptiveTerms').textContent = Number(data.active_terms || 10000).toLocaleString();
                 if ($('adaptiveSwitches')) $('adaptiveSwitches').textContent = String(data.topic.switch_count || 0);
                 if ($('adaptiveRouter')) $('adaptiveRouter').textContent = `${data.router.action || 'stay'}: ${data.router.reason || 'embedding_refs'}`;
@@ -130,12 +132,14 @@ def main() -> None:
                         const row = document.createElement('div');
                         row.className = 'evidence-row used';
                         const score = Number(ref.score || 0).toFixed(2);
+                        const source = ref.source || 'diagnostic:common_terms';
+                        const sourceLabel = source === 'auto:common_10k' ? 'diagnostic:common_terms' : source;
                         row.innerHTML =
                           `<span class="ev-term" title="${ref.term || ''}">${ref.term || ''}</span>` +
                           `<span class="ev-arrow">→</span>` +
                           `<span class="ev-tr" title="${ref.translation || ''}">${ref.translation || ''}</span>` +
                           `<span class="ev-score">${score}</span>` +
-                          `<span class="ev-source">${ref.source || 'auto:common_10k'}</span>`;
+                          `<span class="ev-source">${sourceLabel}</span>`;
                         evidence.appendChild(row);
                     }
                 }

@@ -41,7 +41,7 @@ def render_routing_timeline() -> None:
     draw.text((70, 42), "4-block real E2E routing probe", font=TITLE, fill="#0F172A")
     draw.text(
         (72, 95),
-        "Preliminary system evidence: active glossary switches follow ACL/medicine domain transitions without wrong switches.",
+        "Active glossary switches follow ACL/medicine domain transitions without wrong switches.",
         font=SUBTITLE,
         fill="#475569",
     )
@@ -94,7 +94,7 @@ def render_routing_timeline() -> None:
         ("switches", "3"),
         ("wrong switches", "0"),
         ("steady-state acc.", "0.9947"),
-        ("retrieval p95", "88.29 ms"),
+        ("retrieval p95", "101.64 ms"),
     ]
     x0 = 130
     for name, value in metrics:

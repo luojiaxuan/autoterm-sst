@@ -154,7 +154,7 @@
     <path d="M1328 237 V251" class="thin-line"/>
     <rect x="1214" y="251" width="227" height="49" rx="6" fill="#DDEFF6" stroke="#247BA0" stroke-width="1.4"/>
     <text x="1328" y="273" class="body" text-anchor="middle" font-weight="700">Qwen3-Omni</text>
-    <text x="1328" y="298" class="tiny" text-anchor="middle">RASST • vLLM decode</text>
+    <text x="1328" y="298" class="tiny" text-anchor="middle">vLLM streaming decode</text>
   </g>
 
   <g id="hybrid-router">
@@ -231,7 +231,7 @@
   <g id="open-memory-rescue">
     <rect x="1507" y="630" width="246" height="82" rx="10" fill="#FFFFFF" stroke="#7651A8" stroke-width="2" stroke-dasharray="6 5"/>
     <text x="1528" y="657" class="box-title">Broad pool</text>
-    <text x="1528" y="681" class="small">100k-1M indexes</text>
-    <text x="1528" y="703" class="tiny">optional rescue / scale</text>
+    <text x="1528" y="681" class="small">100k fallback</text>
+    <text x="1528" y="703" class="tiny">1M scale diagnostic</text>
   </g>
 </svg>

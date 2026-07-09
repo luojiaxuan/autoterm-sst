@@ -3,27 +3,29 @@
 
 \paragraph{Setup.}
 We evaluate terminology memory, routing, and concurrent serving in the live
-AutoTerm-SST system on A6000 GPUs. The RASST agent runs Qwen3-Omni with in-process vLLM
-tensor parallelism over two GPUs and a MaxSim retriever on a third GPU. Audio is
-from ACL6060 English-to-Chinese prepared segments. Unless otherwise stated,
-results use the framework JSON WebSocket protocol, which exposes translated
-text, retrieved references, active glossary metadata, and per-chunk retrieval
-latency.
-We report four complementary evaluations: a terminology smoke comparison, a
+AutoTerm-SST system on A6000 GPUs. Its live agent runs Qwen3-Omni with
+in-process vLLM tensor parallelism over two GPUs and the RASST MaxSim retriever
+on a third GPU. Audio is
+from prepared ACL 60/60 English-to-Chinese and medicine segments. Unless
+otherwise stated, results use the JSON WebSocket protocol, which exposes
+translated text, retrieved references, active glossary metadata, and per-chunk
+retrieval latency. A latency multiplier of 2 corresponds to 1.92s input chunks.
+We report four complementary evaluations: a controlled mixed-domain terminology comparison, a
 warm-retrieval scale sweep, a mixed-domain routing probe, and a concurrent
 streaming stress test.
 
 \paragraph{Metrics.}
-For terminology quality, we report term accuracy over an independent 9-term gold
-set for the smoke talk \texttt{2022.acl-long.268}. Masked BLEU removes
-target-side glossary translations from both hypothesis and reference; we use it
-only as a non-terminology sanity check, not as the primary glossary metric. For
-runtime, we report prompt references per partial chunk and retrieval-latency
-percentiles. For routing, we report switch latency, wrong switches, and
-steady-state active-domain accuracy after transition grace windows. A separate
-32-session run measures serving behavior under concurrent load. These
-terminology and retrieval metrics do not replace token-delay metrics such as
-StreamLAAL \citep{ma2020simuleval}.
+For terminology quality, term accuracy is the fraction of annotated target-term
+occurrences found in the output. The controlled comparison contains 143
+technical occurrences: 98 from ACL and 45 medicine occurrences spanning 23
+medicine term types. Masked BLEU deletes annotated target-term strings from
+both hypothesis and reference before scoring, and is used only as a
+non-terminology sanity check. For runtime, we report prompt references per
+partial chunk and retrieval-latency percentiles. For routing, we report switch
+latency, wrong switches, and steady-state active-domain accuracy after transition
+grace windows. A separate 32-session run measures serving behavior under
+concurrent load. These metrics do not replace token-delay measures such as
+StreamLAAL \citep{papi2024streamatt}.
 
 \begin{figure*}[t]
   \centering
@@ -40,43 +42,35 @@ StreamLAAL \citep{ma2020simuleval}.
 \centering
 \scriptsize
 \resizebox{\columnwidth}{!}{%
-\begin{tabular}{lcrrrrr}
+\begin{tabular}{lcrrrr}
 \toprule
-Setting & Effort & Terms & Term acc. & M-BLEU & Refs & p95 \\
+Setting & Session setup & Term acc. & ACL & Med. & BLEU \\
 \midrule
-None & 0 & 0 & 0.444 & 42.34 & 0.00 & -- \\
-Broad open & 0 & 100k & 0.444 & 45.29 & 5.03 & 111.54 \\
-Automatic & 0 & 10k & \textbf{0.889} & 45.80 & 2.29 & 88.20 \\
-Curated ACL & high & 238 & 0.778 & \textbf{47.07} & 1.94 & 81.13 \\
+No memory & None & 0.769 & 0.806 & 0.689 & 23.14 \\
+Fixed NLP & Select NLP & 0.839 & 0.888 & 0.733 & 23.37 \\
+Fixed medicine & Select med. & 0.825 & 0.776 & 0.933 & 22.92 \\
+Automatic & None & \textbf{0.916} & \textbf{0.898} & \textbf{0.956} & \textbf{24.07} \\
 \bottomrule
 \end{tabular}}
-\caption{User-facing terminology smoke comparison on the first eight audio segments of
-\texttt{2022.acl-long.268}, streamed as 31 JSON partial chunks. M-BLEU is
-masked BLEU; Refs is retrieved references per chunk; p95 is retrieval latency in
-ms. The \texttt{auto\_working} setting recovers 8/9 gold terms while injecting
-fewer references than the broad 100k memory; the small gold set makes this smoke
-evidence rather than a controlled inventory comparison.}
+\caption{Controlled ACL\,$\rightarrow$\,medicine\,$\rightarrow$\,ACL
+comparison under equal-sized benchmark-aligned union inventories. Each fixed
+domain inventory fully covers the gold terms for its matching domain; Automatic
+switches between the two inventories without session-specific glossary input or
+a domain choice. Term accuracy scores 143 occurrences (98 ACL and 45 medicine).}
 \label{tab:quality}
 \end{table}
 
-\paragraph{Terminology usefulness.}
-Table~\ref{tab:quality} compares four user-facing settings. Broad open memory
-requires no user glossary, but it injects more candidates without improving
-term accuracy on this slice. Automatic mode also requires no
-user glossary; it recovers eight of nine gold terms and reduces retrieval p95
-relative to the broad 100k memory. The curated
-ACL glossary has the best masked BLEU and lowest retrieval latency, but it
-requires a manually curated domain glossary. Two caveats apply. First, the gold
-set is deliberately small and inventory coverage differs, so
-Table~\ref{tab:quality} is smoke evidence rather than a causal comparison of
-inventory size. A five-talk streaming sweep with matched gold coverage shows
-term accuracy stable at 0.965--0.979 while retrieval precision falls from 0.48
-(curated) to 0.14 (100k) as the inventory grows
+\paragraph{Controlled terminology comparison.}
+Table~\ref{tab:quality} compares equal-sized domain inventories that fully cover
+the gold terms in their matching domain. It therefore tests whether routing can
+compose domain-specific resources across a stream, rather than evaluating
+open-world terminology mining. Automatic mode reaches 0.916 combined term
+accuracy, exceeding both fixed single-domain inventories, and also has the
+highest BLEU in this run. Appendix~\ref{app:mixed} reports raw-gold,
+per-domain, type-level, and masked-BLEU results. Separately, a five-talk
+fixed-inventory sweep shows term accuracy stable at 0.965--0.979 while retrieval
+precision falls from 0.48 (curated) to 0.14 (100k) as distractors are added
 (Appendix~\ref{app:sweep}).
-Second, this short clip does not exercise a domain switch: the
-\texttt{auto\_working} run stays on the configured initial slice because the
-router's confidence and interval guards do not fire; routing is evaluated
-separately below.
 
 \begin{table}[t]
 \centering
@@ -99,13 +93,13 @@ outside the streaming batch path.}
 \end{table}
 
 \paragraph{Scale and prompt noise.}
-Table~\ref{tab:scale} shows that warm MaxSim retrieval stays near 60--105 ms
-(p50--p95) from curated glossaries to million-term memories. Warm retrieval is
-not the main scaling issue; cold index loading and reference noise are. In the
-broad-memory rows, refs/chunk increases with inventory size, so the prompt
-receives more distractors even when useful terms remain retrievable. This
-supports keeping the active slice compact, using the 100k open memory only as an
-on-demand fallback, and reserving the 1M index for scale diagnostics.
+Across Table~\ref{tab:scale}, p50 ranges from 61.3 to 78.5 ms and p95 from 82.1
+to 105.3 ms. Latency does not increase monotonically with inventory size in
+these single runs; the clearer scaling cost is cold index loading. The 100k and
+1M inventories also yield more surviving prompt references than the 10k domain
+slice. This supports keeping the active slice compact, using the 100k open
+memory only as an on-demand fallback, and reserving the 1M index for scale
+diagnostics.
 
 \paragraph{Mixed-domain routing.}
 Figure~\ref{fig:routing} reports the four-block end-to-end routing probe for
@@ -114,18 +108,20 @@ active-slice switches, and records zero wrong switches. The first two switches
 occur 20.16s and 17.28s after the domain boundary; the final switch occurs
 37.44s after the boundary because the opening of that medicine block contains
 general session framing before clear oncology terms. The run keeps the top-10
-prompt invariant with 99.5\% steady-state active-domain accuracy (30s
-tolerance).
+prompt invariant with 99.5\% active-domain accuracy after excluding a 30s grace
+window following each boundary. The last switch misses the 30s target by 7.44s
+but is not a wrong switch.
 A medicine-only session started from the default NLP slice recovers by
 switching to the medicine slice 59.5s into the session with zero wrong
 switches, so the initial slice is a warm start rather than a hidden oracle.
 The speech probe alone is noisy (0.52 top-1 accuracy), so generated-target
-evidence leads routing and the probe acts as a guard. A 640-window
-state-machine benchmark with controlled probe evidence passes all 16
-alternating/random domain transitions with zero wrong switches. Inverted- and
-contested-probe controls expose the expected wrong-switch and delayed-switch
-failure modes. Under benchmark-aligned union inventories, automatic routing
-also outperforms
+evidence leads routing and the probe acts as a guard. Two 640-window
+state-machine proxy tests, using reference-text windows and controlled probe
+evidence, cover 16 alternating/random transitions with zero wrong switches.
+Inverted- and contested-probe controls expose the expected wrong-switch and
+delayed-switch failure modes. These proxies are separate from the preceding
+end-to-end audio run. Under benchmark-aligned union inventories, automatic
+routing also outperforms
 \emph{both} single-domain fixed inventories on a mixed playlist (0.916 vs.\
 0.839/0.825 combined term accuracy; Appendix~\ref{app:mixed}).
 
@@ -134,6 +130,6 @@ In a 32-session stress test, prerecorded ACL audio was streamed to every session
 at its original pace (\texttt{auto\_working}, 300s each). All 32 sessions
 completed with zero failures or disconnects; median first-output latency
 increased from 0.35s for one session to 0.54s for 32, and every session sustained
-the real-time input rate through vLLM continuous batching. This validates the
+the real-time input rate through vLLM continuous batching. This demonstrates
 transport and serving path under concurrent use, while the other evaluations
 isolate terminology-memory behavior.

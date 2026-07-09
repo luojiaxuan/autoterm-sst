@@ -5,19 +5,19 @@
 
 Table~\ref{tab:router-config} lists the default production configuration of
 the hybrid active-glossary router as released in
-\texttt{configs/autoterm\_slices.yaml}; environment variables can override
-individual values per deployment. Guards are evaluated in order: warmup,
+\texttt{configs/autoterm\_slices.yaml}; deployment-specific configurations can
+override individual values explicitly. Guards are evaluated in order: warmup,
 update interval, target-equals-active, index readiness, probe floors,
 confidence, top-vs-runner-up margin, target-vs-current margin, post-switch
 cooldown, and consecutive-window consistency. Uncertain windows keep the
-current slice. The 640-window benchmark in Section~\ref{sec:evaluation} ran
-under the stricter three-window generated-target setting; the released
-default was later retuned to two windows with a 0.30 target-vs-current
-margin.
+current slice. The released configuration uses two consistent generated-target
+windows and a 0.30 target-vs-current margin; the two 640-window proxy tests in
+Section~\ref{sec:evaluation} used three generated-target windows.
 
 \begin{table}[ht]
 \centering
 \small
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{lr}
 \toprule
 Parameter & Default \\
@@ -39,11 +39,11 @@ Parameter & Default \\
 \quad warmup / update / cooldown / staleness & 20s / 10s / 30s / 120s \\
 \quad cap \texttt{PROMPT\_K} / score threshold & 10 / 0.78 \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \caption{Default hybrid router configuration. Active inventory slices are
-typed: four domain slices (NLP, medicine, finance, legal; 10k terms each), a
-100k open-memory rescue pool, a curated 238-term oracle (evaluation only), and
-a diagnostic common-terms slice.}
+typed: four configurable domain slices (NLP, medicine, finance, and legal), a
+100k open-memory fallback pool, a curated 238-term oracle (evaluation only),
+and a diagnostic common-terms slice.}
 \label{tab:router-config}
 \end{table}
 
@@ -90,18 +90,19 @@ A glossary-channel comparison is only meaningful when the gold terms are
 inside the retrieval inventory: the broad wiki slices cover 29/142 of the ACL
 technical gold and 1/54 of the \texttt{medicine\_606} gold, so their term
 accuracy mostly measures base-model retention. We therefore evaluate with
-\emph{benchmark-aligned union inventories} at a fixed 10k denominator: the
+\emph{benchmark-aligned union inventories} at a fixed 10k inventory size: the
 byte-identical gold glossary (238 ACL / 212 hard-medicine terms) plus
 seeded wiki fillers, mirroring the recipe of Appendix~\ref{app:sweep}
 (gold coverage 142/142 and 54/54).
 
-Table~\ref{tab:mixed} compares user-facing settings on a mixed
+Table~\ref{tab:mixed} is a controlled full-coverage comparison on a mixed
 ACL\,$\rightarrow$\,medicine\,$\rightarrow$\,ACL playlist (600s per block,
-live streaming at latency multiplier 2). Zero-setup \texttt{auto\_working}
-exceeds \emph{both} single-domain fixed inventories on the combined gold:
-it composes the right inventory per segment, switching twice with zero wrong
-switches (37.4s / 25.0s after the boundaries; steady-state active-domain
-accuracy 1.0; retrieval p95 101.6\,ms).
+live streaming at latency multiplier 2). Automatic mode requires no
+session-time glossary input or domain choice but relies on inventories built
+offline. It exceeds \emph{both} single-domain fixed inventories on the combined
+gold, switching twice with zero wrong switches (37.4s / 25.0s after the
+boundaries; steady-state active-domain accuracy 1.0; retrieval p95
+101.6\,ms).
 
 \begin{table}[ht]
 \centering
@@ -115,34 +116,38 @@ None & 0.769 & 0.779 & 0.806 & 0.689 & 9/23 & 23.14 & 20.96 \\
 Fixed NLP & 0.839 & 0.867 & 0.888 & 0.733 & 11/23 & 23.37 & 20.32 \\
 Fixed medicine & 0.825 & 0.819 & 0.776 & 0.933 & 20/23 & 22.92 & 20.29 \\
 Automatic & \textbf{0.916} & \textbf{0.912} & \textbf{0.898} & \textbf{0.956} & \textbf{21/23} & \textbf{24.07} & 20.49 \\
-Medicine oracle & 0.811 & 0.801 & 0.776 & 0.889 & 18/23 & 22.94 & 20.59 \\
+Gold-only medicine & 0.811 & 0.801 & 0.776 & 0.889 & 18/23 & 22.94 & 20.59 \\
 \bottomrule
 \end{tabular}}
 \caption{Mixed-domain streaming comparison with union inventories.
-Acc\textsubscript{tech} scores the curated technical gold (142 ACL + 23
-medicine types), Acc\textsubscript{raw} the full raw annotation (238 ACL);
-per-domain columns use the technical view. ``Medicine oracle'' retrieves from
-the 212 gold terms only. The zero-setup router beats both fixed single-domain
-inventories on combined term accuracy without hurting BLEU.}
+Acc\textsubscript{tech} scores 143 occurrences (98 ACL + 45 medicine), and
+Acc\textsubscript{raw} scores 226 (181 ACL + the same 45 medicine); the latter
+45 occurrences span 23 medicine types. Per-domain columns and M-BLEU use the
+technical gold. ``Gold-only medicine'' retrieves from the 212-term medicine
+resource without seeded fillers. Automatic routing outperforms both fixed
+single-domain inventories on combined term accuracy in this controlled run.}
 \label{tab:mixed}
 \end{table}
 
-\section{Multilingual Terminology (En\,$\rightarrow$\,Ja/De)}
+\section{\texorpdfstring{Multilingual Terminology (En\,$\rightarrow$\,Ja/De)}{Multilingual Terminology (En to Ja/De)}}
 \label{app:multilingual}
 
-The terminology resources are trilingual: the gold glossaries carry zh/ja/de
-translations, a single MaxSim index serves every target language (translations
-are resolved from the term list at prompt time), and the language pair selects
-the per-language demo model. Table~\ref{tab:jade} repeats the mixed
+The terminology resources provide three target-language translations: the gold
+glossaries carry zh/ja/de values, a single MaxSim index serves every target
+language (translations are resolved from the term list at prompt time), and the
+language pair selects the per-language demo model. Table~\ref{tab:jade} repeats
+the mixed
 full-length ACL\,$\rightarrow$\,medicine\,$\rightarrow$\,ACL comparison for
-En$\rightarrow$Ja and En$\rightarrow$De. Zero-setup routing has the best
-combined term accuracy in every language under both gold denominators, with
-zero wrong switches and steady-state active-domain accuracy 1.0. With the
+En$\rightarrow$Ja and En$\rightarrow$De. Automatic routing, with no
+session-time glossary input, has the best combined term accuracy in every
+language under both gold denominators, with zero wrong switches and
+steady-state active-domain accuracy 1.0. With the
 released ja/de topic keywords, switches land within 29--52s
 (ja 28.9/33.5s; de 52.0/33.5s; zh 37.4/25.0s). An ablation without
 language-tuned keywords degrades first-switch latency to 115.3s (ja) and
-875.6s (de) --- routing then leans on the slower probe channel --- which costs
-medicine coverage and BLEU while switch directions stay correct; the keyword
+875.6s (de), when routing leans on the slower probe channel. These delays
+coincide with lower medicine coverage and BLEU while switch directions stay
+correct; the keyword
 lists are small, high-precision regex sets per domain. German term matching is
 casefolded with light stem tolerance (exact matching undercounts under
 inflection); short variants keep strict word boundaries.
@@ -159,19 +164,19 @@ inflection); short variants keep strict word boundaries.
  & None & 0.703 & 0.720 & 0.730 & 0.687 & 25/53 & 43.55 & 41.60 \\
  & Fixed NLP & 0.718 & 0.760 & 0.900 & 0.608 & 21/53 & 44.19 & 42.21 \\
  & Fixed medicine & 0.861 & 0.837 & 0.720 & \textbf{0.946} & \textbf{48/53} & \textbf{44.90} & \textbf{42.83} \\
- & Auto (zero-setup) & \textbf{0.910} & \textbf{0.900} & \textbf{0.910} & 0.910 & 45/53 & 40.10 & 38.01 \\
+ & Automatic & \textbf{0.910} & \textbf{0.900} & \textbf{0.910} & 0.910 & 45/53 & 40.10 & 38.01 \\
 \midrule
 \multirow{4}{*}{De}
  & None & 0.745 & 0.740 & 0.740 & 0.747 & 24/49 & 37.52 & 37.47 \\
  & Fixed NLP & 0.762 & 0.768 & 0.840 & 0.720 & 23/49 & 37.21 & 36.91 \\
  & Fixed medicine & 0.840 & 0.812 & 0.670 & \textbf{0.934} & \textbf{43/49} & \textbf{37.63} & \textbf{37.18} \\
- & Auto (zero-setup) & \textbf{0.911} & \textbf{0.880} & \textbf{0.890} & 0.923 & 41/49 & 36.97 & 36.17 \\
+ & Automatic & \textbf{0.911} & \textbf{0.880} & \textbf{0.890} & 0.923 & 41/49 & 36.97 & 36.17 \\
 \bottomrule
 \end{tabular}}
 \caption{En$\rightarrow$Ja/De mixed-domain comparison (full-length playlist;
 ja: 266/350 technical/raw gold occurrences, 53 medicine types; de: 282/366,
-49 types). Auto rows use the released configuration with ja/de topic
-keywords. The zero-setup router wins combined term accuracy in both
-languages; the remaining ja BLEU gap tracks its switch windows.}
+49 types). Automatic rows use the released configuration with ja/de topic
+keywords. Automatic routing has the highest combined term accuracy in both
+languages, while its BLEU remains below the fixed-medicine setting.}
 \label{tab:jade}
 \end{table}

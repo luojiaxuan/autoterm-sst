@@ -1,4 +1,4 @@
-"""RASST-Demo streaming speech-translation framework.
+"""AutoTerm-SST streaming speech-translation framework.
 
 A maximally-thin middle layer: it accepts user audio/control over the existing
 WS/REST protocol, manages session lifecycle, and routes each session to a

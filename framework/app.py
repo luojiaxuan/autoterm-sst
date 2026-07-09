@@ -92,7 +92,7 @@ async def _read_init_payload(request: Request) -> Dict[str, Any]:
 
 
 def create_app(router: AgentRouter) -> FastAPI:
-    app = FastAPI(title="RASST-Demo SST Framework")
+    app = FastAPI(title="AutoTerm-SST Framework")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],

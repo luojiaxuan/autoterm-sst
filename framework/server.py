@@ -18,7 +18,7 @@ from framework.config import build_router
 
 
 def parse_args(argv=None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="RASST-Demo streaming SST framework")
+    parser = argparse.ArgumentParser(description="AutoTerm-SST streaming SST framework")
     parser.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", "8000")))
     parser.add_argument(

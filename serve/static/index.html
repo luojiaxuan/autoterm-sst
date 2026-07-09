@@ -90,10 +90,24 @@
             padding: 20px;
             margin-bottom: 30px;
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr 2fr;
-            gap: 20px;
+            grid-template-columns: 1fr 1fr 1.8fr auto;
+            gap: 18px;
             align-items: end;
         }
+
+        .controls-section .adaptive-status { grid-column: 1 / -1; }
+
+        .term-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .term-row select { flex: 1; min-width: 150px; }
+
+        .glossary-meta-inline {
+            font-weight: 400;
+            color: rgba(255, 255, 255, 0.45);
+            font-size: 0.78rem;
+            margin-left: 6px;
+        }
+
+        .btn-compact { padding: 8px 14px; font-size: 0.85rem; width: auto; }
 
         .control-group {
             display: flex;
@@ -185,9 +199,9 @@
             border: none;
             background: transparent;
             color: rgba(255, 255, 255, 0.65);
-            font-size: 0.88rem;
+            font-size: 0.82rem;
             font-weight: 600;
-            padding: 8px 16px;
+            padding: 6px 12px;
             border-radius: 8px;
             cursor: pointer;
             transition: all 0.15s ease;
@@ -203,9 +217,9 @@
         }
 
         .mode-hint {
-            margin-top: 8px;
-            color: rgba(255, 255, 255, 0.45);
-            font-size: 0.78rem;
+            margin-top: 6px;
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 0.74rem;
         }
 
         .container { padding-bottom: 230px; }
@@ -997,16 +1011,13 @@
         </div>
 
         <div class="main-panel">
-            <!-- Model Configuration -->
+            <!-- Session Settings -->
             <div class="controls-section">
-                <div class="control-group">
-                    <label>Model</label>
-                    <select id="agentType">
-                        <option value="RASST" selected>RASST</option>
-                        <option value="InfiniSST">InfiniSST Legacy</option>
-                    </select>
-                </div>
-                
+                <select id="agentType" style="display:none">
+                    <option value="RASST" selected>RASST</option>
+                    <option value="InfiniSST">InfiniSST Legacy</option>
+                </select>
+
                 <div class="control-group">
                     <label>Language Pair</label>
                     <select id="languagePair">
@@ -1015,7 +1026,7 @@
                         <option value="English -> German">English → German</option>
                     </select>
                 </div>
-                
+
                 <div class="control-group">
                     <label>Latency</label>
                     <select id="latencyMultiplier">
@@ -1025,42 +1036,28 @@
                         <option value="4">4x (Most Accurate)</option>
                     </select>
                 </div>
-                
-                <div class="control-group buttons-group">
-                    <div class="button-row">
-                        <button id="loadModel" class="btn">Load Model</button>
-                        <button id="updateLatency" class="btn" disabled>Update Latency</button>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Terminology Memory -->
-            <div class="glossary-section">
-                <div class="glossary-header">
-                    <h2>Terminology Memory</h2>
-                    <div id="glossaryMeta" class="glossary-meta">Preset: None · Manual: 0 · Pending</div>
-                </div>
-                <div class="glossary-grid">
-                    <div class="control-group">
-                        <label>Terminology mode</label>
+                <div class="control-group">
+                    <label>Terminology <span id="glossaryMeta" class="glossary-meta-inline"></span></label>
+                    <div class="term-row">
                         <div class="mode-toggle" id="termModeToggle">
                             <button type="button" class="mode-pill active" data-mode="auto" id="modeAutoBtn">Auto&nbsp;<small>zero-setup</small></button>
-                            <button type="button" class="mode-pill" data-mode="fixed" id="modeFixedBtn">Fixed preset</button>
+                            <button type="button" class="mode-pill" data-mode="fixed" id="modeFixedBtn">Fixed</button>
                         </div>
-                        <p class="mode-hint" id="modeHint">Domain glossary is routed automatically from the speech — nothing to configure.</p>
-                    </div>
-                    <div class="control-group" id="fixedPresetGroup" style="display:none">
-                        <label>Fixed preset</label>
-                        <select id="glossaryPreset">
+                        <select id="glossaryPreset" style="display:none">
                             <option value="none" selected>No glossary (baseline)</option>
                         </select>
+                        <button id="buildGlossary" class="btn btn-compact" type="button" style="display:none">Apply</button>
                     </div>
-                    <div class="glossary-actions">
-                        <button id="buildGlossary" class="btn" type="button">Apply</button>
-                    </div>
+                    <p class="mode-hint" id="modeHint">Domain glossary is routed automatically from the speech.</p>
                 </div>
+
+                <div class="control-group buttons-group">
+                    <button id="loadModel" class="btn">Update Session</button>
+                </div>
+
                 <div id="adaptiveStatus" class="adaptive-status">
-                    <div class="adaptive-cell"><span>Mode</span><strong id="adaptiveMode">Manual</strong></div>
+                    <div class="adaptive-cell"><span>Mode</span><strong id="adaptiveMode">Automatic</strong></div>
                     <div class="adaptive-cell"><span>Auto Topic</span><strong id="adaptiveTopic">General</strong></div>
                     <div class="adaptive-cell"><span>Confidence</span><strong id="adaptiveConfidence">0.00</strong></div>
                     <div class="adaptive-cell"><span>Active Glossary</span><strong id="adaptiveGlossary">none</strong></div>
@@ -1173,6 +1170,7 @@
     <script>
         let ws = null;
         let sessionId = null;
+        let sessionLanguagePair = null;
         let audioContext = null;
         let audioSource = null;
         let processor = null;
@@ -1367,10 +1365,11 @@
             if (autoBtn) autoBtn.classList.toggle('active', termMode === 'auto');
             if (fixedBtn) fixedBtn.classList.toggle('active', termMode === 'fixed');
             if (fixedGroup) fixedGroup.style.display = termMode === 'fixed' ? '' : 'none';
+            if (glossaryPreset) glossaryPreset.style.display = termMode === 'fixed' ? '' : 'none';
             if (hint) hint.textContent = termMode === 'auto'
                 ? 'Domain glossary is routed automatically from the speech — nothing to configure.'
                 : 'Pin one domain glossary for the whole session (no automatic switching).';
-            if (buildGlossary) buildGlossary.parentElement.style.display = termMode === 'fixed' ? '' : 'none';
+            if (buildGlossary) buildGlossary.style.display = termMode === 'fixed' ? '' : 'none';
             updateGlossaryMeta();
             if (!opts || opts.apply !== false) confirmGlossarySelection();
         }
@@ -3322,7 +3321,7 @@
                     isQueued = false;
                 }
                 
-                updateLatency.disabled = true;
+                if (updateLatency) updateLatency.disabled = true;
                 resetTranslation.disabled = true;
                 
             } catch (error) {
@@ -3459,7 +3458,7 @@
                     
                     updateStatus('Model loaded successfully. Upload audio and press play to start translation.', 'ready');
                     updateElectronStatus('Model loaded successfully. Use video or microphone to start', 'ready');
-                    updateLatency.disabled = false;
+                    if (updateLatency) updateLatency.disabled = false;
                     resetTranslation.disabled = false;
                     console.log('Model loaded successfully:', {
                         model: agentType.value,
@@ -3531,9 +3530,29 @@
         updateGlossaryMeta();
 
         loadModel.addEventListener('click', async () => {
+            // Cheap path: same session, same language pair, latency-only change.
+            if (sessionId && languagePair.value === sessionLanguagePair) {
+                const wanted = parseInt(latencyMultiplier.value);
+                if (wanted !== currentLatencyMultiplier) {
+                    try {
+                        const resp = await fetch('/update_latency?' + new URLSearchParams({
+                            session_id: sessionId, latency_multiplier: wanted
+                        }), { method: 'POST' });
+                        const data = await resp.json();
+                        if (data.success) {
+                            currentLatencyMultiplier = wanted;
+                            updateStatus('Latency updated to ' + wanted + 'x', 'ready');
+                            return;
+                        }
+                    } catch (e) { /* fall through to full re-init */ }
+                } else {
+                    updateStatus('Session already up to date', 'ready');
+                    return;
+                }
+            }
             try {
                 await cleanupSession();
-                updateStatus('Loading model...', 'processing');
+                updateStatus(sessionId === null ? 'Starting session...' : 'Switching language pair (reloading model)...', 'processing');
                 
                 // 在Electron环境中，立即显示翻译窗口以提供反馈
                 if (isElectron) {
@@ -3562,6 +3581,7 @@
                     throw new Error(data.detail || data.error || `HTTP ${response.status}`);
                 }
                 sessionId = data.session_id;
+                sessionLanguagePair = languagePair.value;
                 localStorage.setItem('translationSessionId_' + clientId, sessionId);
                 startPinging();
                 const currentManualText = glossaryText ? glossaryText.value : '';
@@ -3600,19 +3620,19 @@
                     updateStatus(`Waiting in queue... Position: ${data.queue_position}`, 'processing');
                     updateElectronStatus(`Waiting in queue... Position: ${data.queue_position}`, 'processing');
                     startQueueCheck(sessionId);
-                    updateLatency.disabled = true;
+                    if (updateLatency) updateLatency.disabled = true;
                     resetTranslation.disabled = true;
                 } else if (data.initializing) {
                     updateStatus('Model is initializing, please wait...', 'processing');
                     updateElectronStatus('Loading model...', 'processing');
-                    updateLatency.disabled = true;
+                    if (updateLatency) updateLatency.disabled = true;
                     resetTranslation.disabled = true;
                     isQueued = true;
                     startQueueCheck(sessionId);
                 } else {
                     isQueued = false;
                     translationInitialized = false;
-                    updateLatency.disabled = false;
+                    if (updateLatency) updateLatency.disabled = false;
                     resetTranslation.disabled = false;
                     updateStatus('Model loaded successfully. Upload audio and press play to start translation.', 'ready');
                     updateElectronStatus('Model loaded. Ready to translate.', 'ready');
@@ -4624,7 +4644,7 @@
                 const data = await response.json();
                 if (data.success) {
                     updateStatus(data.message || 'Translation reset successfully. Please select an audio source.', 'ready');
-                    updateLatency.disabled = false;
+                    if (updateLatency) updateLatency.disabled = false;
                     console.log('Translation reset successfully');
                 } else {
                     updateStatus('Failed to reset translation: ' + data.error, 'error');
@@ -4637,7 +4657,7 @@
         });
 
         // Update latency
-        updateLatency.addEventListener('click', async () => {
+        if (updateLatency) updateLatency.addEventListener('click', async () => {
             if (!sessionId) return;
             
             try {
@@ -4728,7 +4748,7 @@
                 const data = await response.json();
                 if (data.success) {
                     updateStatus(data.message || 'Translation reset successfully. Please select an audio source.', 'ready');
-                    updateLatency.disabled = false;
+                    if (updateLatency) updateLatency.disabled = false;
                     console.log('Translation reset successfully from Electron');
                 } else {
                     updateStatus('Failed to reset translation: ' + data.error, 'error');

@@ -1,9 +1,9 @@
-# RASST-Demo · AutoTerm-SST
+# AutoTerm-SST
 
 **Zero-setup, terminology-aware streaming speech translation — as a thin,
 pluggable framework.**
 
-RASST-Demo is an interactive simultaneous speech-translation (SST) system for
+AutoTerm-SST is an interactive simultaneous speech-translation (SST) system for
 term-dense vertical domains (academic, medical, legal, financial). It streams
 speech in, runs a swappable translation **agent**, and streams translated text
 back — with an **adaptive terminology memory** (AutoTerm) that retrieves up to

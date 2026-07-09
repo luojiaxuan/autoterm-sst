@@ -3,18 +3,22 @@
 
 AutoTerm-SST is a live terminology-aware SST system, not a new foundation
 model or topic classifier. The live demo serves En$\rightarrow$Zh/Ja/De;
-routing stays correct across languages but switches more slowly without
-language-tuned topic keywords (Appendix~\ref{app:multilingual}). Large open memories improve coverage but reduce
-retrieval precision under the 10-candidate cap, so the system routes among
-domain slices and keeps broad memory as a fallback pool.
-The hybrid router is intentionally conservative and may stay on
-the initial domain slice when evidence is ambiguous, as in our smoke talk. Our evaluations are single-run system probes; they characterize the
-live system rather than establish corpus-level significance. Finally, the real backend requires high-end NVIDIA GPUs and external
+routing depends partly on small, hand-written target-language keyword lists, so
+unsupported languages or domains may switch more slowly
+(Appendix~\ref{app:multilingual}). Large open memories can expand coverage but
+reduce retrieval precision under the 10-reference cap, so the 100k memory is
+queried only through a guarded fallback. The hybrid router is intentionally
+conservative and may retain the initial slice when evidence is ambiguous. Our
+evaluations are single-run system probes, and the matched-union comparison uses
+full-coverage benchmark inventories; neither establishes open-world or
+corpus-level significance. The retrieval-latency sweep excludes the additional
+routing-only domain probes, whose cost is recorded separately by the runtime.
+Finally, the real backend requires high-end NVIDIA GPUs and external
 model/retriever artifacts; mock mode supports UI and protocol testing without
 them.
 
-We presented AutoTerm-SST, a zero-setup terminology-memory workbench for
-streaming speech translation: broad terminology resources stay offline, active
-slices are selected from streaming evidence, prompt candidates are capped at a
-filtered top-10, and terms, glossary state, router decisions, and latency are
-exposed in real time.
+We presented AutoTerm-SST, a terminology-memory workbench that requires no
+per-session glossary upload or domain choice. It keeps broad resources off the
+default retrieval path, selects active slices from streaming evidence, injects
+at most 10 score-filtered references per prompt, and exposes terminology,
+router decisions, and latency in real time.

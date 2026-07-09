@@ -37,10 +37,16 @@ where \(y_{\mathrm{recent}}\) is the recent generated translation window,
 domain probe, \(q_{\mathrm{speech}}\) is the pooled speech query embedding,
 \(c_d\) is a domain centroid built offline from a slice's MaxSim text
 embeddings, and reference votes come from metadata such as source preset and
-domain. The default weights are \(\lambda_t=0.60\), \(\lambda_p=0.25\),
-\(\lambda_c=0.10\), and \(\lambda_m=0.05\); weights are renormalized over the
-signals available in a window, so routing already works before the first
-target text is generated. The older
+domain. Here, \(\mathrm{topic}_d\) is a weighted keyword/regex score over the
+generated target window, while \(\mathrm{probe}_d\) aggregates top-\(k\) MaxSim
+scores between the speech window and each candidate domain index. The weights
+and switch thresholds are hand-set: ``training-free'' refers only to the router
+and does not imply that the base model or retriever is untrained. The default
+weights are \(\lambda_t=0.60\), \(\lambda_p=0.25\), \(\lambda_c=0.10\), and
+\(\lambda_m=0.05\); they are renormalized over the signals available in a
+window, so routing already works before the first target text is generated. The
+production schedule evaluates switch decisions every 10s after a 20s warmup and
+caches probe scores between refreshes (Appendix~\ref{app:router}). The older
 \texttt{embedding\_refs} router remains available as a compatibility policy.
 
 \paragraph{Conservative switching.}
@@ -63,8 +69,8 @@ slice. Under low-confidence fallback conditions, it may query
 two result sets. The prompt receives at most \(\texttt{PROMPT\_K}=10\)
 references, with no filler terms when fewer survive. Slice size therefore
 trades coverage against ranking difficulty within the top-10 prompt cap. The
-10k size reflects the clean bilingual terminology available per domain from our
-mining rather than a system limit; broader inventories remain available as
-fallback pools and scale diagnostics (Appendix~\ref{app:sweep}). The live
-evidence metadata records active slices, candidate-pool size, prompt-reference
-counts, fallback events, and retrieval-quality metrics.
+controlled comparison uses 10k inventories as an evaluation choice, not a
+system limit; broader inventories remain available as fallback pools and scale
+diagnostics (Appendix~\ref{app:sweep}). The live evidence metadata records
+active slices, candidate-pool size, prompt-reference counts, fallback events,
+and retrieval-quality metrics.

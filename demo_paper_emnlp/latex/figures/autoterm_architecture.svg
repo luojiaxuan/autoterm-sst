@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1800" height="760" viewBox="0 0 1800 760" role="img" aria-labelledby="title desc">
   <title id="title">AutoTerm-SST architecture illustrated with an NLP-to-medicine stream</title>
-  <desc id="desc">A RASST-style example-driven architecture. Earlier speech about language models retrieves an NLP term, while a later medical segment retrieves rectal cancer after AutoTerm switches the active terminology memory from NLP to medicine.</desc>
+  <desc id="desc">A RASST-style example-driven architecture. Earlier speech about lexical borrowing retrieves an NLP term, while a later medical segment retrieves rectal cancer after AutoTerm switches the active glossary from NLP to medicine using a weighted sliding-window domain score.</desc>
   <defs>
     <marker id="arrow-ink" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="strokeWidth">
       <path d="M0,0 L10,4 L0,8 Z" fill="#222222"/>
@@ -44,7 +44,7 @@
 
   <!-- Example translations are aligned with the two speech snapshots below. -->
   <text x="365" y="42" class="translation" text-anchor="middle">
-    <tspan>……我们评估</tspan><tspan fill="#3B7F2B" font-weight="700">语言模型</tspan><tspan>……</tspan>
+    <tspan>……我们研究</tspan><tspan fill="#3B7F2B" font-weight="700">词汇借用</tspan><tspan>……</tspan>
   </text>
   <rect x="260" y="56" width="210" height="34" fill="#FFFFFF" stroke="#C86A32" stroke-width="2"/>
   <text x="365" y="81" class="small" text-anchor="middle" fill="#B85120">Translation at t</text>
@@ -134,7 +134,7 @@
   </g>
 
   <text x="295" y="688" class="example" text-anchor="middle">
-    <tspan>“…we evaluate </tspan><tspan fill="#3B7F2B" font-weight="700">language models</tspan><tspan>…”</tspan>
+    <tspan>“…we study </tspan><tspan fill="#3B7F2B" font-weight="700">lexical borrowing</tspan><tspan>…”</tspan>
   </text>
   <text x="845" y="688" class="example" text-anchor="middle">
     <tspan>“…the patient has </tspan><tspan fill="#3B7F2B" font-weight="700">rectal cancer</tspan><tspan>.”</tspan>
@@ -144,29 +144,29 @@
   <text x="530" y="603" class="example" text-anchor="middle" fill="#667085">…</text>
   <text x="530" y="637" class="small" text-anchor="middle">domain shift</text>
 
-  <!-- AutoTerm matches accumulated stream context to a domain memory. -->
-  <rect x="1160" y="320" width="530" height="365" class="autoterm-box"/>
-  <text x="1190" y="365" class="component-title" fill="#B85120">AutoTerm</text>
+  <!-- AutoTerm selects a glossary from a weighted sliding-window domain score. -->
+  <rect x="1160" y="300" width="530" height="415" class="autoterm-box"/>
+  <text x="1190" y="345" class="component-title" fill="#B85120">AutoTerm</text>
 
-  <rect x="1190" y="390" width="470" height="94" fill="#FFFFFF" stroke="#C86A32" stroke-width="2.2"/>
-  <text x="1425" y="427" class="domain" text-anchor="middle">Accumulated stream context</text>
-  <text x="1330" y="464" class="domain" text-anchor="middle" fill="#667085">Domain match</text>
-  <text x="1435" y="464" class="domain" text-anchor="middle" fill="#667085">→</text>
-  <text x="1540" y="464" class="domain" text-anchor="middle" fill="#B85120">AutoSwitch</text>
+  <rect x="1190" y="370" width="470" height="157" fill="#FFFFFF" stroke="#C86A32" stroke-width="2.2"/>
+  <text x="1425" y="405" class="domain" text-anchor="middle">12-chunk target sliding window</text>
+  <text x="1425" y="443" class="term" text-anchor="middle"><tspan>S</tspan><tspan baseline-shift="sub" font-size="18">d</tspan><tspan> = .60 topic match + .25 MaxSim</tspan></text>
+  <text x="1425" y="477" class="term" text-anchor="middle">+ .10 centroid cosine + .05 ref vote</text>
+  <text x="1425" y="511" class="domain" text-anchor="middle" fill="#B85120">Stable top score → active glossary</text>
 
-  <rect x="1190" y="510" width="215" height="143" class="nlp-box"/>
-  <text x="1298" y="543" class="domain" text-anchor="middle" fill="#116E93">NLP terminology</text>
-  <line x1="1210" y1="556" x2="1385" y2="556" stroke="#AFCFDE" stroke-width="2"/>
-  <text x="1298" y="587" class="term" text-anchor="middle">language models</text>
-  <text x="1298" y="621" class="term" text-anchor="middle" fill="#84257F">→ 语言模型</text>
+  <rect x="1190" y="550" width="215" height="143" class="nlp-box"/>
+  <text x="1298" y="583" class="domain" text-anchor="middle" fill="#116E93">NLP Glossary</text>
+  <line x1="1210" y1="596" x2="1385" y2="596" stroke="#AFCFDE" stroke-width="2"/>
+  <text x="1298" y="627" class="term" text-anchor="middle">lexical borrowing</text>
+  <text x="1298" y="661" class="term" text-anchor="middle" fill="#84257F">→ 词汇借用</text>
 
-  <rect x="1435" y="510" width="225" height="143" class="medicine-box"/>
-  <text x="1548" y="543" class="domain" text-anchor="middle" fill="#B85120">Medicine terminology</text>
-  <line x1="1455" y1="556" x2="1640" y2="556" stroke="#EDC6AC" stroke-width="2"/>
-  <text x="1548" y="587" class="term" text-anchor="middle">rectal cancer</text>
-  <text x="1548" y="621" class="term" text-anchor="middle" fill="#84257F">→ 直肠癌</text>
+  <rect x="1435" y="550" width="225" height="143" class="medicine-box"/>
+  <text x="1548" y="583" class="domain" text-anchor="middle" fill="#B85120">Medicine Glossary</text>
+  <line x1="1455" y1="596" x2="1640" y2="596" stroke="#EDC6AC" stroke-width="2"/>
+  <text x="1548" y="627" class="term" text-anchor="middle">rectal cancer</text>
+  <text x="1548" y="661" class="term" text-anchor="middle" fill="#84257F">→ 直肠癌</text>
 
-  <path d="M1408 582 H1432" class="control-line"/>
+  <path d="M1408 622 H1432" class="control-line"/>
 
   <path d="M1160 385 H1138 V389 H1118" class="control-line"/>
 </svg>

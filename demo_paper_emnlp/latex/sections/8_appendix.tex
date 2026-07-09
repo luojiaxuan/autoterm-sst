@@ -135,3 +135,44 @@ the 212 gold terms only. The zero-setup router beats both fixed single-domain
 inventories on combined term accuracy without hurting BLEU.}
 \label{tab:mixed}
 \end{table}
+
+\section{Multilingual Terminology (En\,$\rightarrow$\,Ja/De)}
+\label{app:multilingual}
+
+The terminology resources are trilingual: the gold glossaries carry zh/ja/de
+translations, a single MaxSim index serves every target language (translations
+are resolved from the term list at prompt time), and the language pair selects
+the per-language demo model. We repeat the mixed comparison on the full-length
+ACL\,$\rightarrow$\,medicine\,$\rightarrow$\,ACL playlist for
+En$\rightarrow$Ja (Table~\ref{tab:ja}). Zero-setup routing again has the best
+combined term accuracy, and both switches are directionally correct with zero
+wrong switches; switching is slower than for zh (115.3s/125.6s vs.\
+37.4s/25.0s) because the topic-keyword channel is en/zh-tuned, which also
+costs some BLEU relative to fixed inventories. For En$\rightarrow$De, routing
+remains directionally correct (2/2 switches, zero wrong; 875.6s/39.2s) and
+BLEU is on par across settings (35.9--37.6), but exact-match term accuracy is
+unreliable under German inflection --- every setting, including
+\texttt{none}, scores $\approx$0.11 --- so we omit the de term table.
+Language-tuned topic keywords and inflection-aware term matching are
+mechanical future work.
+
+\begin{table}[ht]
+\centering
+\scriptsize
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lrrrrrrr}
+\toprule
+Setting & Acc\textsubscript{tech} & Acc\textsubscript{raw} & ACL & Med. & Med.\ types & BLEU & M-BLEU \\
+\midrule
+None & 0.703 & 0.720 & 0.730 & 0.687 & 25/53 & 43.55 & 41.60 \\
+Fixed NLP & 0.718 & 0.760 & 0.900 & 0.608 & 21/53 & 44.19 & 42.21 \\
+Fixed medicine & 0.861 & 0.837 & 0.720 & \textbf{0.946} & \textbf{48/53} & \textbf{44.90} & \textbf{42.83} \\
+Auto (zero-setup) & \textbf{0.902} & \textbf{0.894} & \textbf{0.930} & 0.886 & 43/53 & 39.68 & 37.67 \\
+\bottomrule
+\end{tabular}}
+\caption{En$\rightarrow$Ja mixed-domain comparison (full-length playlist; 266
+technical / 350 raw gold occurrences, 53 medicine types). The zero-setup
+router wins on combined term accuracy; the BLEU dip reflects its slower
+ja switches.}
+\label{tab:ja}
+\end{table}

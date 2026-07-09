@@ -92,7 +92,7 @@
             display: grid;
             grid-template-columns: 1fr 1fr 1.8fr auto;
             gap: 18px;
-            align-items: end;
+            align-items: start;
         }
 
         .controls-section .adaptive-status { grid-column: 1 / -1; }
@@ -208,12 +208,16 @@
 
         .mode-toggle {
             display: inline-flex;
+            align-items: center;
+            height: 48px;
+            box-sizing: border-box;
             background: rgba(255, 255, 255, 0.06);
             border: 1px solid rgba(255, 255, 255, 0.12);
             border-radius: 10px;
             padding: 3px;
             gap: 3px;
         }
+        .term-row { min-height: 48px; }
 
         .mode-pill {
             border: none;
@@ -1073,6 +1077,7 @@
                 </div>
 
                 <div class="control-group buttons-group">
+                    <label>&nbsp;</label>
                     <button id="loadModel" class="btn">Update Session</button>
                 </div>
 
@@ -1807,6 +1812,7 @@
                 close.addEventListener('click', () => {
                     backendBannerDismissed = true;
                     backendBannerEl.style.display = 'none';
+                    document.body.style.paddingTop = '';
                 });
                 const msg = document.createElement('span');
                 msg.id = 'backendBannerMsg';
@@ -1818,9 +1824,13 @@
                 kind === 'offline' ? 'rgba(153,27,27,0.96)' : 'rgba(30,58,95,0.96)';
             backendBannerEl.querySelector('#backendBannerMsg').innerHTML = messageHtml;
             backendBannerEl.style.display = 'block';
+            requestAnimationFrame(() => {
+                document.body.style.paddingTop = backendBannerEl.offsetHeight + 'px';
+            });
         }
         function hideBackendBanner() {
             if (backendBannerEl) backendBannerEl.style.display = 'none';
+            document.body.style.paddingTop = '';
         }
         function backendBannerLink(kind, label) {
             const href = DEMO_FALLBACK_LINKS[kind];

@@ -109,7 +109,14 @@
 
         .btn-compact { padding: 8px 14px; font-size: 0.85rem; width: auto; }
 
-        .sample-item { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .sample-item {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .sample-item .sample-row { display: flex; gap: 8px; }
 
         .sample-label { color: rgba(255, 255, 255, 0.5); font-size: 0.85rem; }
 
@@ -244,6 +251,9 @@
             margin-top: 6px;
             color: rgba(255, 255, 255, 0.4);
             font-size: 0.74rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .container { padding-bottom: 230px; }
@@ -1073,7 +1083,7 @@
                         </select>
                         <button id="buildGlossary" class="btn btn-compact" type="button" style="display:none">Apply</button>
                     </div>
-                    <p class="mode-hint" id="modeHint">Domain glossary is routed automatically from the speech.</p>
+                    <p class="mode-hint" id="modeHint">Routed automatically from the speech.</p>
                 </div>
 
                 <div class="control-group buttons-group">
@@ -1097,8 +1107,10 @@
                 <!-- Sample audio quick-start -->
                 <div class="input-item sample-item" id="sampleAudioItem">
                     <span class="sample-label">Try a sample</span>
-                    <button class="sample-btn" type="button" data-sample="acl_sample.wav" data-title="ACL talk (NLP)">ACL talk</button>
-                    <button class="sample-btn" type="button" data-sample="medicine_sample.wav" data-title="Medicine talk (oncology)">Medicine talk</button>
+                    <div class="sample-row">
+                        <button class="sample-btn" type="button" data-sample="acl_sample.wav" data-title="ACL talk (NLP)">ACL talk</button>
+                        <button class="sample-btn" type="button" data-sample="medicine_sample.wav" data-title="Medicine talk (oncology)">Medicine talk</button>
+                    </div>
                 </div>
 
                 <!-- Web Mode Buttons -->
@@ -1399,8 +1411,8 @@
             if (fixedGroup) fixedGroup.style.display = termMode === 'fixed' ? '' : 'none';
             if (glossaryPreset) glossaryPreset.style.display = termMode === 'fixed' ? '' : 'none';
             if (hint) hint.textContent = termMode === 'auto'
-                ? 'Domain glossary is routed automatically from the speech — nothing to configure.'
-                : 'Pin one domain glossary for the whole session (no automatic switching).';
+                ? 'Routed automatically from the speech.'
+                : 'Pinned for the whole session.';
             if (buildGlossary) buildGlossary.style.display = termMode === 'fixed' ? '' : 'none';
             updateGlossaryMeta();
             if (!opts || opts.apply !== false) confirmGlossarySelection();

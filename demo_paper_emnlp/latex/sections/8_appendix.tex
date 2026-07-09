@@ -10,11 +10,10 @@ individual values per deployment. Guards are evaluated in order: warmup,
 update interval, target-equals-active, index readiness, probe floors,
 confidence, top-vs-runner-up margin, target-vs-current margin, post-switch
 cooldown, and consecutive-window consistency. Uncertain windows keep the
-current slice. The 640-window state-machine benchmark in
-Section~\ref{sec:evaluation} ran under the stricter three-window
-generated-target consistency setting; the released default was subsequently
-retuned to two windows with a raised target-vs-current margin (0.30) based on
-observed real-probe failure modes.
+current slice. The 640-window benchmark in Section~\ref{sec:evaluation} ran
+under the stricter three-window generated-target setting; the released
+default was later retuned to two windows with a 0.30 target-vs-current
+margin.
 
 \begin{table}[ht]
 \centering
@@ -35,17 +34,10 @@ Parameter & Default \\
 \quad target-vs-current margin & 0.30 \\
 \quad consistent windows (text / gen.\ target / audio) & 2 / 2 / 3 \\
 \midrule
-\multicolumn{2}{l}{\emph{Audio-probe-only raw floors}} \\
-\quad min top probe score / raw margin & 0.50 / 0.08 \\
-\quad min positive probe domains & 2 \\
-\midrule
-\multicolumn{2}{l}{\emph{Schedule (production)}} \\
-\quad warmup / update / cooldown & 20s / 10s / 30s \\
-\quad candidate staleness reset & 120s \\
-\midrule
-\multicolumn{2}{l}{\emph{Retrieval}} \\
-\quad retrieval cap \texttt{PROMPT\_K} & 10 \\
-\quad candidate score threshold & 0.78 \\
+\multicolumn{2}{l}{\emph{Audio-probe floors / schedule / retrieval}} \\
+\quad probe top score / margin / positive domains & 0.50 / 0.08 / 2 \\
+\quad warmup / update / cooldown / staleness & 20s / 10s / 30s / 120s \\
+\quad cap \texttt{PROMPT\_K} / score threshold & 10 / 0.78 \\
 \bottomrule
 \end{tabular}
 \caption{Default hybrid router configuration. Active inventory slices are
@@ -64,10 +56,9 @@ audio) streamed through the live JSON WebSocket at latency multiplier 2, scored
 against a curated 142-term technical gold set. Each inventory always contains
 the full 238-entry curated ACL glossary; larger rows add Wikidata-mined AI/CS
 candidates as distractors. These are manual-preset runs isolating inventory
-scale (not \texttt{auto\_working} runs). Output term accuracy, BLEU, and
-masked BLEU stay within a narrow band up to 100k terms, while retrieval
-precision collapses --- the prompt channel fills with distractors long before
-output quality visibly degrades, motivating compact routed active slices.
+scale (not \texttt{auto\_working} runs). Term accuracy, BLEU, and masked
+BLEU stay in a narrow band up to 100k terms while retrieval precision
+collapses, motivating compact routed active slices.
 
 \begin{table}[ht]
 \centering
@@ -142,37 +133,44 @@ inventories on combined term accuracy without hurting BLEU.}
 The terminology resources are trilingual: the gold glossaries carry zh/ja/de
 translations, a single MaxSim index serves every target language (translations
 are resolved from the term list at prompt time), and the language pair selects
-the per-language demo model. We repeat the mixed comparison on the full-length
-ACL\,$\rightarrow$\,medicine\,$\rightarrow$\,ACL playlist for
-En$\rightarrow$Ja (Table~\ref{tab:ja}). Zero-setup routing again has the best
-combined term accuracy, and both switches are directionally correct with zero
-wrong switches; switching is slower than for zh (115.3s/125.6s vs.\
-37.4s/25.0s) because the topic-keyword channel is en/zh-tuned, which also
-costs some BLEU relative to fixed inventories. For En$\rightarrow$De, routing
-remains directionally correct (2/2 switches, zero wrong; 875.6s/39.2s) and
-BLEU is on par across settings (35.9--37.6), but exact-match term accuracy is
-unreliable under German inflection --- every setting, including
-\texttt{none}, scores $\approx$0.11 --- so we omit the de term table.
-Language-tuned topic keywords and inflection-aware term matching are
-mechanical future work.
+the per-language demo model. Table~\ref{tab:jade} repeats the mixed
+full-length ACL\,$\rightarrow$\,medicine\,$\rightarrow$\,ACL comparison for
+En$\rightarrow$Ja and En$\rightarrow$De. Zero-setup routing has the best
+combined term accuracy in every language, under both gold denominators, and
+all switches across all three languages are directionally correct with zero
+wrong switches. Switch latency grows without language-tuned topic keywords
+(first/second switch: zh 37.4/25.0s; ja 115.3/125.6s; de 875.6/39.2s): the
+keyword channel is en/zh-tuned, so ja/de routing leans on the slower probe
+channel. Late switches cost some medicine coverage (de: 38/49 vs.\ 43/49
+types) and some BLEU (ja), yet combined term accuracy still favors the
+router; language-tuned keyword lists are mechanical future work. German term
+matching is casefolded with light stem tolerance (exact matching undercounts
+under inflection); short variants keep strict word boundaries.
 
 \begin{table}[ht]
 \centering
 \scriptsize
 \resizebox{\columnwidth}{!}{%
-\begin{tabular}{lrrrrrrr}
+\begin{tabular}{llrrrrrrr}
 \toprule
-Setting & Acc\textsubscript{tech} & Acc\textsubscript{raw} & ACL & Med. & Med.\ types & BLEU & M-BLEU \\
+ & Setting & Acc\textsubscript{tech} & Acc\textsubscript{raw} & ACL & Med. & Med.\ types & BLEU & M-BLEU \\
 \midrule
-None & 0.703 & 0.720 & 0.730 & 0.687 & 25/53 & 43.55 & 41.60 \\
-Fixed NLP & 0.718 & 0.760 & 0.900 & 0.608 & 21/53 & 44.19 & 42.21 \\
-Fixed medicine & 0.861 & 0.837 & 0.720 & \textbf{0.946} & \textbf{48/53} & \textbf{44.90} & \textbf{42.83} \\
-Auto (zero-setup) & \textbf{0.902} & \textbf{0.894} & \textbf{0.930} & 0.886 & 43/53 & 39.68 & 37.67 \\
+\multirow{4}{*}{Ja}
+ & None & 0.703 & 0.720 & 0.730 & 0.687 & 25/53 & 43.55 & 41.60 \\
+ & Fixed NLP & 0.718 & 0.760 & 0.900 & 0.608 & 21/53 & 44.19 & 42.21 \\
+ & Fixed medicine & 0.861 & 0.837 & 0.720 & \textbf{0.946} & \textbf{48/53} & \textbf{44.90} & \textbf{42.83} \\
+ & Auto (zero-setup) & \textbf{0.902} & \textbf{0.894} & \textbf{0.930} & 0.886 & 43/53 & 39.68 & 37.67 \\
+\midrule
+\multirow{4}{*}{De}
+ & None & 0.745 & 0.740 & 0.740 & 0.747 & 24/49 & 37.52 & 37.47 \\
+ & Fixed NLP & 0.762 & 0.768 & 0.840 & 0.720 & 23/49 & 37.21 & 36.91 \\
+ & Fixed medicine & 0.840 & 0.812 & 0.670 & \textbf{0.934} & \textbf{43/49} & \textbf{37.63} & \textbf{37.18} \\
+ & Auto (zero-setup) & \textbf{0.897} & \textbf{0.869} & \textbf{0.880} & 0.907 & 38/49 & 35.90 & 35.37 \\
 \bottomrule
 \end{tabular}}
-\caption{En$\rightarrow$Ja mixed-domain comparison (full-length playlist; 266
-technical / 350 raw gold occurrences, 53 medicine types). The zero-setup
-router wins on combined term accuracy; the BLEU dip reflects its slower
-ja switches.}
-\label{tab:ja}
+\caption{En$\rightarrow$Ja/De mixed-domain comparison (full-length playlist;
+ja: 266/350 technical/raw gold occurrences, 53 medicine types; de: 282/366,
+49 types). The zero-setup router wins combined term accuracy in both
+languages; BLEU dips reflect the slower switches.}
+\label{tab:jade}
 \end{table}

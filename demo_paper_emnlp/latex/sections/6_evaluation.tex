@@ -20,9 +20,9 @@ only as a non-terminology sanity check, not as the primary glossary metric. For
 runtime, we report retrieved references per partial chunk and retrieval latency
 percentiles. For routing, we report switch latency, wrong switches, and
 steady-state active-domain accuracy after transition grace windows. A separate
-SimulEval-compatible stress run \citep{ma2020simuleval} measures end-to-end
-streaming quality/latency; the glossary tables are terminology and retrieval
-evidence, not a replacement for token-delay StreamLAAL.
+32-session stress run measures serving behavior under concurrent load; the
+glossary tables are terminology and retrieval evidence, not a replacement for
+token-delay metrics such as StreamLAAL \citep{ma2020simuleval}.
 
 \begin{figure*}[t]
   \centering
@@ -112,23 +112,25 @@ active-slice switches, and records zero wrong switches. The first two switches
 occur 20.16s and 17.28s after the domain boundary; the final switch occurs
 37.44s after the boundary because the opening of that medicine block contains
 general session framing before clear oncology terms. The run keeps the top-10
-prompt invariant, reaches 88.29 ms retrieval p95, and obtains 0.9947
-steady-state active-domain accuracy under the 30s transition-tolerance view.
+prompt invariant with 0.9947 steady-state active-domain accuracy (30s
+tolerance).
 A medicine-only session started from the default NLP slice recovers by
 switching to the medicine slice 59.5s into the session with zero wrong
 switches, so the initial slice is a warm start rather than a hidden oracle.
-The speech-window probe alone is noisy (0.52 top-1 domain accuracy on this
-probe), so generated-target topic evidence leads routing and the probe acts as
-a confirmation guard. A complementary state-machine benchmark over 640-window
-alternating and random ACL/medicine playlists with controlled probe evidence
-passes all 16 domain transitions with zero wrong switches, while inverted- and
-contested-probe diagnostics fail as designed.
+The speech probe alone is noisy (0.52 top-1 accuracy), so generated-target
+evidence leads routing and the probe acts as a guard. A 640-window
+state-machine benchmark with controlled probe evidence passes all 16
+alternating/random domain transitions with zero wrong switches; inverted- and
+contested-probe diagnostics fail as designed. Under benchmark-aligned union
+inventories, zero-setup routing also wins on terminology, exceeding
+\emph{both} single-domain fixed inventories on a mixed playlist (0.916 vs.\
+0.839/0.825 combined term accuracy; Appendix~\ref{app:mixed}).
 
 \paragraph{Concurrent streaming.}
-In a separate SimulEval-compatible 32-session stress run, the framework produced
-BLEU 47.38, StreamLAAL 2264 ms, and StreamLAAL-CA 2265 ms over ACL6060 with a
-merged \texttt{instances.log}. This validates the streaming transport and agent
-serving path under concurrent use; it is not a glossary ablation, so we keep it
-out of Table~\ref{tab:quality} and read it as system evidence that the demo
-sustains multi-session streaming while the terminology evaluation isolates
-active-memory behavior.
+In a 32-session stress test that streams live ACL audio to every session
+(\texttt{auto\_working}, 300s each, real-time feed), all 32 sessions complete
+with zero failures or disconnects, median first-output latency rises only from
+0.35s (single session) to 0.54s, and every session sustains the real-time pace
+of the input through vLLM continuous batching. This validates the transport
+and serving path under concurrent use while the terminology evaluation
+isolates active-memory behavior.

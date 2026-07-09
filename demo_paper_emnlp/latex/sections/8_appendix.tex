@@ -92,40 +92,46 @@ accuracy 0.944--0.958; precision 0.479 \(\rightarrow\) 0.133).}
 \label{tab:sweep}
 \end{table}
 
-\section{JSON Evidence Event}
-\label{app:json}
+\section{Mixed-Domain Terminology under Union Inventories}
+\label{app:mixed}
 
-An abridged \texttt{partial} event from the structured WebSocket protocol
-(\texttt{?event\_format=json}), showing the evidence rendered by the live
-panel: retrieved references, routing-only domain-probe scores, adaptive topic
-state, and the router decision with its guard evidence.
+A glossary-channel comparison is only meaningful when the gold terms are
+inside the retrieval inventory: the broad wiki slices cover 29/142 of the ACL
+technical gold and 1/54 of the \texttt{medicine\_606} gold, so their term
+accuracy mostly measures base-model retention. We therefore evaluate with
+\emph{benchmark-aligned union inventories} at a fixed 10k denominator: the
+byte-identical gold glossary (238 ACL / 212 hard-medicine terms) plus
+seeded wiki fillers, mirroring the recipe of Appendix~\ref{app:sweep}
+(gold coverage 142/142 and 54/54).
 
-{\small
-\begin{verbatim}
-{"type": "partial", "text": "...",
- "meta": {
-  "references": [{"term": "...",
-    "translation": "...",
-    "source": "auto:nlp_core_10k"}],
-  "prompt_reference_count": 6,
-  "retrieve_s": 0.081,
-  "domain_probe_scores": {"medicine": {
-    "preset_id": "medicine_core_10k",
-    "top_score": 0.84,
-    "top_terms": ["clinical trial",
-                  "patient"]}},
-  "topic": {"active_domain": "medicine",
-    "confidence": 0.73,
-    "active_glossary_preset":
-      "medicine_core_10k",
-    "switch_count": 1},
-  "topic_router": {"action": "switch",
-    "from_preset": "nlp_core_10k",
-    "to_preset": "medicine_core_10k",
-    "confidence": 0.73, "margin": 0.19,
-    "evidence": {
-      "router_text_source":
-        "generated_target",
-      "candidate_streak": 2}}}}
-\end{verbatim}
-}
+Table~\ref{tab:mixed} compares user-facing settings on a mixed
+ACL\,$\rightarrow$\,medicine\,$\rightarrow$\,ACL playlist (600s per block,
+live streaming at latency multiplier 2). Zero-setup \texttt{auto\_working}
+exceeds \emph{both} single-domain fixed inventories on the combined gold:
+it composes the right inventory per segment, switching twice with zero wrong
+switches (37.4s / 25.0s after the boundaries; steady-state active-domain
+accuracy 1.0; retrieval p95 101.6\,ms).
+
+\begin{table}[ht]
+\centering
+\scriptsize
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lrrrrrrr}
+\toprule
+Setting & Acc\textsubscript{tech} & Acc\textsubscript{raw} & ACL & Med. & Med.\ types & BLEU & M-BLEU \\
+\midrule
+None & 0.769 & 0.779 & 0.806 & 0.689 & 9/23 & 23.14 & 20.96 \\
+Fixed NLP & 0.839 & 0.867 & 0.888 & 0.733 & 11/23 & 23.37 & 20.32 \\
+Fixed medicine & 0.825 & 0.819 & 0.776 & 0.933 & 20/23 & 22.92 & 20.29 \\
+Auto (zero-setup) & \textbf{0.916} & \textbf{0.912} & \textbf{0.898} & \textbf{0.956} & \textbf{21/23} & \textbf{24.07} & 20.49 \\
+Medicine oracle & 0.811 & 0.801 & 0.776 & 0.889 & 18/23 & 22.94 & 20.59 \\
+\bottomrule
+\end{tabular}}
+\caption{Mixed-domain streaming comparison with union inventories.
+Acc\textsubscript{tech} scores the curated technical gold (142 ACL + 23
+medicine types), Acc\textsubscript{raw} the full raw annotation (238 ACL);
+per-domain columns use the technical view. ``Medicine oracle'' retrieves from
+the 212 gold terms only. The zero-setup router beats both fixed single-domain
+inventories on combined term accuracy without hurting BLEU.}
+\label{tab:mixed}
+\end{table}

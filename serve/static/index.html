@@ -1015,10 +1015,12 @@
                             <option value="medicine_10k">Medicine glossary 10k</option>
                         </select>
                     </div>
-                    <div class="control-group">
-                        <label>Manual Terms (optional override)</label>
-                        <textarea id="glossaryText" class="glossary-textarea" spellcheck="false" placeholder="optional — manual terms override retrieved ones&#10;term=translation&#10;large language model=大语言模型"></textarea>
-                    </div>
+                    <!-- Manual overrides are an advanced escape hatch: the demo
+                         is zero-setup (AutoTerm), so this stays collapsed. -->
+                    <details class="control-group" id="advancedTermsToggle">
+                        <summary style="cursor:pointer;opacity:0.7;font-size:0.9em;">Advanced: manual term override</summary>
+                        <textarea id="glossaryText" class="glossary-textarea" spellcheck="false" placeholder="advanced — manual terms override retrieved ones&#10;term=translation&#10;large language model=大语言模型"></textarea>
+                    </details>
                     <div class="glossary-actions">
                         <button id="buildGlossary" class="btn" type="button">Confirm / Build</button>
                     </div>

@@ -22,9 +22,8 @@ live GPU mode with Qwen3-Omni and MaxSim retrieval.
 Users choose a model agent, language pair, latency multiplier, and terminology
 mode. In \texttt{auto\_working} mode, the session starts from a configured
 domain-specific slice and may switch to another routed domain slice; every
-chunk keeps the same capped top-10 prompt interface. Users can also select a
-manual preset or provide ad-hoc terms, which are injected into the prompt but
-do not bias the router.
+chunk keeps the same capped top-10 prompt interface. Manual presets and ad-hoc term overrides remain available as an advanced
+option; they inject into the prompt but never bias the router.
 
 \paragraph{Evidence panel.}
 For each partial translation, the UI renders the latest non-empty retrieved

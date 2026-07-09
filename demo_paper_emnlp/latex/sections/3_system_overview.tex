@@ -23,10 +23,11 @@ Agents implement a small contract: \texttt{open\_session},
 \texttt{submit\_audio}, \texttt{on\_control}, \texttt{close\_session},
 \texttt{describe}, and \texttt{health}. The same UI and wire protocol
 serve a deterministic mock agent for development, a legacy InfiniSST scheduler
-agent, or the RASST/Qwen3-Omni agent used in the live GPU demo. The boundary is
+agent \citep{ouyang2025infinisst}, or the RASST/Qwen3-Omni agent used in the live GPU demo. The boundary is
 backend-agnostic: the live demo uses in-process vLLM \citep{kwon2023efficient},
-and the same protocol can serve external SGLang-compatible backends without
-changing the terminology memory, router, or UI.
+and the same protocol can serve external SGLang-compatible backends
+\citep{zheng2024sglang} without changing the terminology memory, router, or
+UI.
 
 \paragraph{Streaming agent.}
 For each audio chunk, the OmniAgent can run MaxSim terminology retrieval over
@@ -43,6 +44,6 @@ router decisions.
 The default WebSocket output remains plain text for backward compatibility. A
 JSON mode returns \texttt{\{type, text, meta\}}, where \texttt{meta.references}
 drives the live evidence panel and \texttt{meta.topic} /
-\texttt{meta.topic\_router} describe the adaptive glossary state. This evidence
-protocol is central to the demo: users can see which terms were retrieved and
-whether the router stayed, switched, or deferred a glossary change.
+\texttt{meta.topic\_router} describe the adaptive glossary state. This evidence protocol is
+central: users see which terms were retrieved and whether the router stayed,
+switched, or deferred.

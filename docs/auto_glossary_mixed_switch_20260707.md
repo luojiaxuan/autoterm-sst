@@ -502,3 +502,30 @@ python3 eval/streaming_sst/eval_mixed_domain_switch.py \
    active glossary over time、prompt refs、BLEU、term_ACC、masked_term_BLEU。
 3. 把当前 mixed switch benchmark 纳入后续 regression：fixed 64 windows/item、
    alternating + random seed 20260707 必须通过。
+
+## 2026-07-09: 三语 3-talk、10-talk 车道与基础设施事记
+
+- **v2 双 union（zh, 截断 3-talk）**：auto 0.9161/0.9115 双口径超 fixed_nlp
+  (0.839/0.867) 与 fixed_medicine (0.825/0.819)；2/2 切换、0 错切、steady 1.0、
+  切换 37.44s/24.96s。产物 `aries:/mnt/data3/jiaxuanluo/eval_out` 与
+  `20260708_union_truncated_8013`。
+- **32-session 压测（aries 8013, auto_working, 300s 实时）**：32/32 完成、
+  0 失败 0 掉线、首字 p50 0.346s (1 session) → 0.537s (32)；全部 session 维持
+  实时。产物 `taurus data1 rasst_eval/stress_auto_20260709`。
+- **ja/de 全长 3-talk**（aries 本地化车道）：三语 auto 综合 term_acc 全部登顶
+  （zh .916 / ja .902 / de .897 technical；raw 口径一致）。ja 切换 115.3/125.6s、
+  de 875.6/39.2s（keyword 通道 en/zh-only 所致）→ 已加 ja/de topic keywords
+  (`127cf77`) 并在 taurus 8014 重跑 auto（kw_rerun_20260709）。
+- **de 评分 artifact 修复**：`classify_output_hit` 的 CJK 门导致德语翻译
+  variant 永不计分（全条件 ~0.11）；`133fd52` 起 matcher 语言感知（de 走
+  casefold+词干容忍，短词严格词界），zh/ja 行为不变（回归 15/15 + 单测 6/6）。
+- **taurus 内存风暴（11:28）**：host 匿名内存 905/1007GB、页缓存 4GB，NFS 挂载
+  的权重 mmap 重缺页 → 三主机 engine/client 连锁死亡（8015 `execute_model
+  RPC timeout`、所有 client WS keepalive 1011）。对策：aries 全本地化
+  （模型×3/音频/index/gold → /mnt/data3/jiaxuanluo/local_cache），单主机最多
+  一台 vLLM server 的纪律。
+- **repo**：`rasst-demo` 更名 `autoterm-sst`，`framework` fast-forward 进
+  `main`（此后直接 push main）。
+- **checkpoint 清理**：删 de 探索变体 `cap16_exactboundary`（66G）与空 staging；
+  zh 在 data1 的逐字节重复副本（66G，与 data2 prod md5 一致）为 root 所有，
+  需管理员删除。

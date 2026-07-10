@@ -10,7 +10,9 @@ paths refer to lab machines and are meaningless outside the group.
 - AutoTerm progress and eval summaries live in Git docs:
   `docs/adaptive_working_glossary_eval.md`,
   `docs/auto_glossary_mixed_switch_20260707.md`, and
-  `docs/auto_glossary_routing_probe_20260707.md`.
+  `docs/auto_glossary_routing_probe_20260707.md`. The aligned-window
+  AutoTerm-10k vs merged-40k xCOMET-lite sensitivity and its local artifact
+  checksums are in `docs/autoterm_40k_xcomet_eval_20260710.md`.
 - Lightweight ACL 60/60 and ESO medicine MFA TextGrid annotations are tracked
   in Git under `eval/streaming_sst/mfa_alignments/`; that directory records the
   original Taurus paths and SHA-256 checksums. Audio and large derived chunk

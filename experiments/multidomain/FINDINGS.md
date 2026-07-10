@@ -45,3 +45,43 @@ The 1M wiki pool only yields 2–5k domain-matching terms, so the user's
 100k-per-domain / merged-400k end-to-end comparison needs a proper Wikidata
 P31/subclass extraction (stage 3), not a keyword carve. Do that only if
 Stage 2 routing passes.
+
+## Stage 2 result — 4-way E2E routing (PASS, and informative)
+
+3-talk ACL/medicine stream against a 4-candidate host (nlp/medicine/finance/legal):
+
+| metric | value |
+|---|---|
+| wrong switches | **0** |
+| finance/legal active-domain events | **0 / 1997** |
+| steady-state active-domain accuracy | **1.0** |
+| transitions | 2/2 correct (nlp→med 44.3s, med→nlp 27.7s) |
+| domain-probe p95 latency (4 candidates) | 3.2 ms |
+| retrieval p50/p95 | 79.9 / 106.6 ms |
+
+**The informative part:** the raw audio probe channel *did* rank a distractor
+top in 318/1997 windows (legal 247, finance 71 — ~16%), yet the router never
+switched to them. This is a direct demonstration of the intended design: the
+noisy audio probe (0.25) is out-voted by the keyword-led topic signal (0.60)
+and suppressed by the consistency/margin/confidence guards. "Probe as guard,
+not leader" holds empirically at 4 domains.
+
+## Go / no-go
+
+Routing **passes** on both channels at 4 domains, and the probe-noise-but-no-
+misswitch result is a genuine paper point ("a simple training-free router
+selects correctly among registered terminology resources, robust to a noisy
+audio probe"). This justifies Stage 3.
+
+## Stage 3 (justified, not yet run)
+
+Proper Wikidata P31/subclass extraction for tech/medicine/law/finance at 100k
+each (the 1M wiki pool only yields 2–5k domain terms by keyword carve), then
+the end-to-end 3-talk comparison the user asked for:
+oracle-domain vs AutoTerm-routed vs merged-400k-flat, reporting MFA term_acc
+and BLEU. Expected story: routed slices keep retrieval precision that the flat
+400k merge loses (cf. the scale sweep in the paper), so AutoTerm ≈ oracle while
+merged-400k degrades.
+
+The `ema_final` dead-code path is a latent risk if more domains are added; not
+triggered at 4 domains but worth wiring into the sort before scaling to 10.

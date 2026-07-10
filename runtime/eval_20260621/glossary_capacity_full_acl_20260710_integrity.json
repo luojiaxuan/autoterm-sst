@@ -1,0 +1,124 @@
+{
+  "status": "complete_unscored",
+  "experiment": "nested ACL glossary capacity stress",
+  "completed_at": "2026-07-10T18:55:54+00:00",
+  "source_code": {
+    "remote": "git@github.com:luojiaxuan/autoterm-sst.git",
+    "branch": "explore/multidomain-routing",
+    "commit": "5a1df512cf7e4c3dcc42b0c017e1051380aff3da"
+  },
+  "runtime": {
+    "host_alias": "b200",
+    "hostname": "innomatrix-us-adc-smb200-0003",
+    "gpu_ids": [
+      0
+    ],
+    "tensor_parallel_size": 1,
+    "container": "sglang-omni-jaxan-07101717",
+    "container_exit_after_completion": 137,
+    "local_staging": "/data02/jaxan/autoterm-capacity-sweep-20260710/run",
+    "artifact_status": "pending Hugging Face dataset upload; repo TBD"
+  },
+  "protocol": {
+    "target_language": "English -> Chinese",
+    "talks": [
+      "2022.acl-long.268",
+      "2022.acl-long.367",
+      "2022.acl-long.590",
+      "2022.acl-long.110",
+      "2022.acl-long.117"
+    ],
+    "segments": 468,
+    "audio_seconds": 3107.332,
+    "chunk_samples": 30720,
+    "chunk_seconds": 1.92,
+    "feed_sleep_seconds": 1.6,
+    "latency_multiplier": 2,
+    "rag_top_k": 10,
+    "rag_score_threshold": 0.78,
+    "term_map_format": "tagged",
+    "execution_note": "Four concurrent sessions shared one TP=1 server and used session-specific indexes; this differs from the frozen per-scale server-restart protocol."
+  },
+  "integrity": {
+    "playlist_signature_sha256": "4280ffe8fd4d703b0cbeb0d041dd428091d3c68197f31457c4f9ae4bfeb8e9a4",
+    "playlist_signatures_identical": true,
+    "timing_signatures_identical": false,
+    "reference_count_mismatch_chunks": 0,
+    "tail_gap_samples": 12345,
+    "server_batches": 1724,
+    "server_requests_including_smoke": 4973,
+    "server_generation_fail_batches": 0,
+    "server_mean_batch_size": 2.8845707656612527,
+    "server_batch_size_distribution": {
+      "1": 356,
+      "2": 262,
+      "3": 331,
+      "4": 775
+    }
+  },
+  "runs": {
+    "10k": {
+      "preset": "acl_tagged_gs10k",
+      "preset_terms": 10000,
+      "file": "full_acl_10k.json",
+      "bytes": 4400982,
+      "sha256": "dc694f5c28ee7dfe2c43e55f80248e2f825698618737a92bfe8b74db9580f90f",
+      "events": 1221,
+      "prompt_references": 4580,
+      "references_per_event": 3.751024,
+      "text_chars": 15012,
+      "last_cursor_sample": 49704960,
+      "span_end_sample": 49717305,
+      "timing_signature_sha256": "2a361a40ba6e126e0f54868f39db662b830513b07034a94123e5468d0777449b"
+    },
+    "100k": {
+      "preset": "acl_tagged_gs100k",
+      "preset_terms": 100000,
+      "file": "full_acl_100k.json",
+      "bytes": 6507758,
+      "sha256": "a2d1aac1b8bff6f115ac2a142442e5200e46856957abfcf2a029c451f026b18a",
+      "events": 1213,
+      "prompt_references": 7445,
+      "references_per_event": 6.137675,
+      "text_chars": 14589,
+      "last_cursor_sample": 49704960,
+      "span_end_sample": 49717305,
+      "timing_signature_sha256": "33e60582f6a62e0e4554c1ff7a9bd4a68c30636a2ad815de169b6c12f9bc7b02"
+    },
+    "500k": {
+      "preset": "acl_tagged_gs500k",
+      "preset_terms": 500000,
+      "file": "full_acl_500k.json",
+      "bytes": 8976556,
+      "sha256": "219122263a9c4d0db66237730c698847ae57b96fa642eec29e154c2f09e6296a",
+      "events": 1214,
+      "prompt_references": 10825,
+      "references_per_event": 8.916804,
+      "text_chars": 14531,
+      "last_cursor_sample": 49704960,
+      "span_end_sample": 49717305,
+      "timing_signature_sha256": "60df9033ad042f5145011557bc3907028a994c6eada7f2b7891efd2f5110e5e2"
+    },
+    "1m": {
+      "preset": "acl_tagged_gs1m",
+      "preset_terms": 1000000,
+      "file": "full_acl_1m.json",
+      "bytes": 9459530,
+      "sha256": "081e45725d3a78bd20cad944ac1a628a1874523c738438f3b69989a31f782199",
+      "events": 1214,
+      "prompt_references": 11603,
+      "references_per_event": 9.557661,
+      "text_chars": 14540,
+      "last_cursor_sample": 49704960,
+      "span_end_sample": 49717305,
+      "timing_signature_sha256": "1c1436c1ccc1e273899599554dfe70c4c5b7ce9c66c7c4cd6c6c19e02ccad35f"
+    }
+  },
+  "metrics": {
+    "term_acc": "not run",
+    "bleu": "not run",
+    "masked_bleu": "not run",
+    "prompt_precision": "not run",
+    "xcomet": "not run"
+  }
+}

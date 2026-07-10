@@ -12,7 +12,10 @@ paths refer to lab machines and are meaningless outside the group.
   `docs/auto_glossary_mixed_switch_20260707.md`, and
   `docs/auto_glossary_routing_probe_20260707.md`. The fixed-universe
   AutoTerm-10k vs merged-40k pilot and its local artifact checksums are in
-  `docs/multidomain_merged_glossary_pilot_20260710.md`.
+  `docs/multidomain_merged_glossary_pilot_20260710.md`. The paused
+  10k/100k/500k/1M controlled capacity run, artifact hashes, restart commands,
+  and result-validity boundary are in
+  `docs/glossary_capacity_curve_20260710.md`.
 - Lightweight ACL 60/60 and ESO medicine MFA TextGrid annotations are tracked
   in Git under `eval/streaming_sst/mfa_alignments/`; that directory records the
   original Taurus paths and SHA-256 checksums. Audio and large derived chunk
@@ -21,6 +24,15 @@ paths refer to lab machines and are meaningless outside the group.
   `/mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_hybrid_8012`.
   These raw JSON/MD outputs are local staging artifacts, not reusable canonical
   datasets yet.
+- Paused Hyper00 capacity-run staging:
+  `/data02/jaxan/autoterm-capacity-zh-20260710/`. Only the 10k smoke is complete;
+  the interrupted 10k/100k full-run logs are diagnostic-only, while 500k/1M and
+  xCOMET remain deferred.
+- Completed, unscored B200 exploratory capacity-run staging:
+  `/data02/jaxan/autoterm-capacity-sweep-20260710/run/`. The four raw JSONs are
+  locally checksummed and indexed by
+  `runtime/eval_20260621/glossary_capacity_full_acl_20260710_integrity.json`;
+  Hugging Face upload remains pending / repo TBD.
 - Reusable datasets, generated glossaries/index bundles, and larger artifacts
   should be uploaded to Hugging Face and recorded here with repo URLs and
   revisions before being treated as canonical.

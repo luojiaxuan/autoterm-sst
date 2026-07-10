@@ -67,6 +67,7 @@ from framework.agents.term_memory.domain_taxonomy import (
     configured_working_presets,
     domain_for_preset,
 )
+from framework.agents.term_memory.manifest import TermMemoryManifest
 from framework.agents.term_memory.slice_registry import (
     PROMPT_K,
     RetrievalSlice,
@@ -562,11 +563,19 @@ class OmniSession:
 class OmniAgent(Agent):
     """Omni-model streaming SST agent (RASST / Qwen3-Omni / MiniCPM-o)."""
 
-    def __init__(self, name: str = "RASST", model_id: str = "qwen3_omni") -> None:
+    def __init__(
+        self,
+        name: str = "RASST",
+        model_id: str = "qwen3_omni",
+        *,
+        config: Optional[OmniConfig] = None,
+        manifest: Optional[TermMemoryManifest] = None,
+    ) -> None:
         self.name = name
         self.model_id = model_id
         self.template = get_template(model_id)
-        self.config = OmniConfig.from_env(self.template)
+        self.config = config if config is not None else OmniConfig.from_env(self.template)
+        self._manifest = manifest
         self.prompt = PromptBuilder(
             system_prompt_style=self.config.system_prompt_style,
             term_map_format=self.config.term_map_format,
@@ -605,7 +614,11 @@ class OmniAgent(Agent):
     def _catalog(self, language_pair: str) -> GlossaryCatalog:
         catalog = self._catalogs.get(language_pair)
         if catalog is None:
-            catalog = GlossaryCatalog(language_pair, self.config.max_imported_glossary_terms)
+            catalog = GlossaryCatalog(
+                language_pair,
+                self.config.max_imported_glossary_terms,
+                manifest=self._manifest,
+            )
             self._catalogs[language_pair] = catalog
         return catalog
 

@@ -27,6 +27,9 @@ Users choose a model agent, language pair, latency multiplier, and terminology
 mode. In \texttt{auto\_working} mode, the session starts from a configured
 default slice without requiring the user to identify the domain, and it may
 switch to another domain slice; every chunk uses the same top-10 prompt cap.
+The hosted demo serves a lightly curated variant of the two slices (generic
+single-word entries removed, session proper nouns added); all evaluation
+numbers use the unmodified union inventories of Section~\ref{sec:evaluation}.
 Manual presets and ad-hoc term overrides remain available as advanced options;
 they affect the prompt but do not bias the router.
 

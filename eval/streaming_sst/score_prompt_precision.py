@@ -22,6 +22,7 @@ reference list from being presented as decoder-prompt precision.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 import unicodedata
@@ -143,6 +144,19 @@ def validate_same_playlist(payloads: Sequence[Mapping[str, Any]]) -> None:
             raise ValueError(f"run {index} does not share the first run's playlist")
 
 
+def timing_signature(payload: Mapping[str, Any]) -> tuple[tuple[int, int], ...]:
+    return tuple(
+        (int(record.get("start_sample") or 0), int(record.get("cursor_samples") or 0))
+        for record in (payload.get("records") or [])
+        if isinstance(record, Mapping)
+    )
+
+
+def timing_signature_sha256(payload: Mapping[str, Any]) -> str:
+    encoded = json.dumps(timing_signature(payload), separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def _precision(relevant: int, total: int) -> float | None:
     return round(relevant / total, 6) if total else None
 
@@ -227,6 +241,7 @@ def score_payload(
             or ""
         ),
         "chunk_count": chunk_count,
+        "emitted_translation_chunks": chunk_count,
         "chunks_with_references": chunks_with_references,
         "prompt_reference_count": total_prompt_references,
         "captured_reference_count": total_captured_references,
@@ -265,6 +280,7 @@ def build_report(args: argparse.Namespace) -> Dict[str, Any]:
     payloads = [json.loads(Path(path).read_text(encoding="utf-8")) for _, path in run_specs]
     validate_same_playlist(payloads)
     gold_sets = build_timed_gold(payloads[0], args)
+    timing_signatures = [timing_signature(payload) for payload in payloads]
     report: Dict[str, Any] = {
         "protocol": {
             "sample_rate": TARGET_SAMPLE_RATE,
@@ -272,6 +288,10 @@ def build_report(args: argparse.Namespace) -> Dict[str, Any]:
             "alignment_tolerance_s": float(args.alignment_tolerance_s),
             "reference_capture_required": not bool(args.allow_reference_count_mismatch),
             "relevance": "normalized reference source term matches an overlapping MFA source occurrence",
+            "refs_per_chunk_denominator": "emitted translation events; empty-output decoder ticks are not persisted",
+            "timing_signatures_identical": all(
+                signature == timing_signatures[0] for signature in timing_signatures[1:]
+            ),
         },
         "runs": {},
     }
@@ -284,6 +304,7 @@ def build_report(args: argparse.Namespace) -> Dict[str, Any]:
             require_complete_reference_capture=not args.allow_reference_count_mismatch,
         )
         row["path"] = path
+        row["timing_signature_sha256"] = timing_signature_sha256(payload)
         report["runs"][name] = row
     return report
 
@@ -294,6 +315,7 @@ def markdown_report(report: Mapping[str, Any]) -> str:
         "",
         f"- MaxSim lookback: `{report['protocol']['lookback_s']}s`",
         f"- MFA overlap tolerance: `{report['protocol']['alignment_tolerance_s']}s`",
+        f"- Identical event timing across runs: `{report['protocol']['timing_signatures_identical']}`",
         "",
         "| run | preset | technical precision | raw precision | refs/chunk | captured/prompt | mismatch chunks |",
         "|---|---|---:|---:|---:|---:|---:|",

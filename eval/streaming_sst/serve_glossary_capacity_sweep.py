@@ -6,20 +6,24 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import Sequence
 
 import uvicorn
 
-from framework.agents.omni import OmniAgent, OmniConfig
-from framework.agents.plugins.backends import get_template
-from framework.agents.term_memory.manifest import TermMemoryManifest
-from framework.app import create_app
-from framework.router import AgentRouter
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from framework.agents.omni import OmniAgent, OmniConfig  # noqa: E402
+from framework.agents.plugins.backends import get_template  # noqa: E402
+from framework.agents.term_memory.manifest import TermMemoryManifest  # noqa: E402
+from framework.app import create_app  # noqa: E402
+from framework.router import AgentRouter  # noqa: E402
 
 
 DEFAULT_PRESETS = "acl_tagged_gs10k,acl_tagged_gs100k,acl_tagged_gs500k,acl_tagged_gs1m"
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:

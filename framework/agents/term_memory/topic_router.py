@@ -17,7 +17,7 @@ from __future__ import annotations
 import math
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Any, Deque, Dict, Iterable, List, Literal, Optional, Sequence
+from typing import Any, Deque, Dict, Iterable, List, Literal, Mapping, Optional, Sequence
 
 from framework.agents.term_memory.domain_taxonomy import (
     DOMAIN_KEYWORDS,
@@ -118,6 +118,10 @@ class RouterConfig:
     generated_target_probe_min_top_score: float = 0.25
     generated_target_probe_min_raw_margin: float = 0.01
     generated_target_probe_min_positive_domains: int = 1
+    slice_selection_mode: str = "hard_top1"
+    term_budget: int = 100_000
+    max_active_slices: int = 0
+    unknown_slice_term_count: int = 10_000
 
 
 @dataclass
@@ -181,6 +185,40 @@ class RouterDecision:
         }
 
 
+@dataclass(frozen=True)
+class BudgetSliceSelection:
+    slices: Sequence[DomainSlice] = field(default_factory=tuple)
+    scores: Dict[str, float] = field(default_factory=dict)
+    term_counts: Dict[str, int] = field(default_factory=dict)
+    term_budget: int = 0
+
+    @property
+    def preset_ids(self) -> List[str]:
+        return [item.preset_id for item in self.slices]
+
+    @property
+    def total_terms(self) -> int:
+        return sum(int(self.term_counts.get(item.preset_id, 0)) for item in self.slices)
+
+    def to_meta(self) -> Dict[str, Any]:
+        return {
+            "mode": "budgeted_top_slices",
+            "term_budget": int(self.term_budget),
+            "selected_term_count": int(self.total_terms),
+            "selected_slice_count": len(self.slices),
+            "selected_slice_presets": self.preset_ids,
+            "selected_slices": [
+                {
+                    "preset_id": item.preset_id,
+                    "domain_id": item.domain_id,
+                    "score": round(float(self.scores.get(item.preset_id, 0.0)), 4),
+                    "term_count": int(self.term_counts.get(item.preset_id, 0)),
+                }
+                for item in self.slices
+            ],
+        }
+
+
 # Compatibility shape used by older tests and the legacy keyword router.
 @dataclass
 class TopicDecision:
@@ -213,6 +251,66 @@ class AudioNativeActiveGlossaryRouter:
         self.domain_slices: List[DomainSlice] = [item for item in domain_slices if item.enabled]
         self.by_preset = {item.preset_id: item for item in self.domain_slices}
         self.by_domain = {item.domain_id: item for item in self.domain_slices}
+
+    def budgeted_slice_selection_enabled(self) -> bool:
+        mode = str(self.config.slice_selection_mode or "hard_top1").strip().lower()
+        return mode in {"budgeted", "budgeted_top_slices", "top_slices"}
+
+    def select_budgeted_slices(
+        self,
+        similarity_scores: Mapping[str, float],
+        *,
+        term_budget: Optional[int] = None,
+    ) -> BudgetSliceSelection:
+        budget = max(
+            0,
+            int(self.config.term_budget if term_budget is None else term_budget),
+        )
+        if not self.budgeted_slice_selection_enabled() or budget <= 0:
+            return BudgetSliceSelection(term_budget=budget)
+
+        scored: List[tuple[DomainSlice, float]] = []
+        for item in self.domain_slices:
+            raw_score = similarity_scores.get(item.preset_id)
+            if raw_score is None:
+                raw_score = similarity_scores.get(item.domain_id)
+            try:
+                score = float(raw_score)
+            except (TypeError, ValueError):
+                continue
+            if math.isfinite(score):
+                scored.append((item, score))
+        scored.sort(
+            key=lambda row: (
+                -float(row[1]),
+                -int(row[0].priority),
+                row[0].preset_id,
+            )
+        )
+
+        unknown_terms = max(1, int(self.config.unknown_slice_term_count))
+        max_slices = max(0, int(self.config.max_active_slices))
+        selected: List[DomainSlice] = []
+        scores: Dict[str, float] = {}
+        term_counts: Dict[str, int] = {}
+        used_terms = 0
+        for item, score in scored:
+            if max_slices and len(selected) >= max_slices:
+                break
+            item_terms = int(item.term_count) if int(item.term_count) > 0 else unknown_terms
+            if used_terms + item_terms > budget:
+                continue
+            selected.append(item)
+            scores[item.preset_id] = float(score)
+            term_counts[item.preset_id] = item_terms
+            used_terms += item_terms
+
+        return BudgetSliceSelection(
+            slices=tuple(selected),
+            scores=scores,
+            term_counts=term_counts,
+            term_budget=budget,
+        )
 
     def observe(
         self,
@@ -581,6 +679,10 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             "audio_probe_guard": audio_probe_guard,
             "generated_target_probe_guard": generated_target_probe_guard,
         }
+        if self.budgeted_slice_selection_enabled():
+            evidence["slice_selection"] = self.select_budgeted_slices(
+                context_similarity_scores or {},
+            ).to_meta()
 
         unsupported_current = bool(
             current_preset

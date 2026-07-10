@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from contextlib import nullcontext
-from typing import Dict, List, Mapping, Sequence
+from typing import Dict, List, Mapping, Optional, Sequence
 
 from framework.agents.term_memory.domain_taxonomy import DOMAIN_ROUTER_PROTOTYPES
 
@@ -21,12 +21,19 @@ class DomainDescriptionSimilarity:
         model_id: str = "BAAI/bge-m3",
         device: str = "cpu",
         batch_size: int = 32,
-        prototypes: Mapping[str, Sequence[str]] = DOMAIN_ROUTER_PROTOTYPES,
+        prototypes: Optional[Mapping[str, Sequence[str]]] = None,
     ) -> None:
         self.model_id = model_id
         self.device_name = device
         self.batch_size = max(1, int(batch_size))
-        self.prototypes = {domain: tuple(texts) for domain, texts in prototypes.items()}
+        source = DOMAIN_ROUTER_PROTOTYPES if prototypes is None else prototypes
+        self.prototypes = {
+            str(domain): tuple(str(text).strip() for text in texts if str(text).strip())
+            for domain, texts in source.items()
+        }
+        self.prototypes = {
+            domain: texts for domain, texts in self.prototypes.items() if texts
+        }
         self.enabled = False
         self.status: Dict[str, object] = {"status": "disabled"}
         self._model = None
@@ -52,10 +59,19 @@ class DomainDescriptionSimilarity:
         self._tokenizer = AutoTokenizer.from_pretrained(self.model_id)
         self._model = AutoModel.from_pretrained(self.model_id).to(self.device_name).eval()
         self._domains = list(self.prototypes)
+        flat_texts: List[str] = []
+        spans: Dict[str, tuple[int, int]] = {}
+        for domain in self._domains:
+            start = len(flat_texts)
+            flat_texts.extend(self.prototypes[domain])
+            spans[domain] = (start, len(flat_texts))
+        embeddings = self._encode_sync(flat_texts)
         centroids = []
         for domain in self._domains:
-            embeddings = self._encode_sync(self.prototypes[domain])
-            centroids.append(functional.normalize(embeddings.mean(dim=0), p=2, dim=0))
+            start, end = spans[domain]
+            centroids.append(
+                functional.normalize(embeddings[start:end].mean(dim=0), p=2, dim=0)
+            )
         self._centroids = torch.stack(centroids, dim=0)
         self.enabled = True
         self.status = {

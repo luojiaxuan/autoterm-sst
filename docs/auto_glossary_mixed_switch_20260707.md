@@ -618,3 +618,25 @@ guard（虽然真实语音 probe 单独太噪，见 §6 controls）。产物
   状态行首屏显示 "238 terms"；launcher 现显式指向 demo_nlp 索引。
 - 前端（已 push main）：面板半透明、译文/词条独立限高滚动、命中术语
   `mark.term-hit` 内联高亮、播放按钮修复、语言对 (offline) 标注。
+
+## 2026-07-10: term_acc 计分修正（occurrence 独立计数，全线重评）
+
+用户发现 scorer 的 presence 语义 bug：同一 block 内某术语的 k 次 gold
+occurrence，只要输出出现 1 次就 k/k 全命中。修正为 **count clipping**：
+每组 (block, term) 的命中 = min(gold 次数, 输出中不重叠出现次数)，
+匹配语义（CJK 子串 / de casefold+词干 / identity retention）与原
+classify_output_hit 完全镜像；分母不变。`bb4a603`，单测 5/5。
+
+重评结果（旧→修正）：
+
+- **zh 10-talk（主表）**：auto 0.936→**0.905**、0.933→**0.908**；
+  fixed_med 0.901→0.863、fixed_nlp 0.744→0.674、none 0.744→0.659。
+  medicine 列 auto 0.943→0.903、fixed_med 0.937→0.889。ACL 列不变
+  （该侧构造为每块每词 1 次）。**结论增强**：auto 现在 in-domain 也
+  严格超过两个专家（med +1.4pp、ACL +0.5pp），combined 领先 +4.2pp。
+- **zh 3-talk probe**：auto 0.916/0.912→0.909/0.907；oracle 0.811→0.790。
+- **ja 3-talk**：auto 0.910/0.900→0.857/0.860，仍双口径第一。
+- **de 3-talk**：auto 0.911/0.880→**0.801/0.795**；technical 口径被
+  fixed_med (0.812) 反超 1.1pp，raw 口径仍第一。App D 已如实改写，
+  德语 provenance 句同步软化。tab:sweep 不受影响（per-type 构造）。
+- 今晚 ja/de 10-talk 与 zh random 的链式评分自动使用修正版 scorer。

@@ -28,6 +28,7 @@ def _args(root: Path, *, presets: str = "10k,1m", resume: bool = False) -> argpa
         term_memory_manifest=root / "term-memory.json",
         rag_model_path=root / "retriever.pt",
         vllm_compat_dir=root / "compat",
+        extra_python_path=[root / "external-retriever"],
         acl_root=root / "acl",
         medicine_audio_dir=root / "medicine",
         tmp_root=root / "tmp",
@@ -173,6 +174,10 @@ class GlossaryCapacitySweepControllerTest(unittest.TestCase):
         self.assertEqual(server[server.index("--required-presets") + 1], "1m")
         self.assertEqual(server[server.index("--vllm-tp-size") + 1], "2")
         self.assertEqual(server[server.index("--port") + 1], "8123")
+        self.assertEqual(
+            server[server.index("--extra-python-path") + 1],
+            str(args.extra_python_path[0]),
+        )
         self.assertEqual(client[client.index("--medicine-items") + 1], "0")
         self.assertEqual(client[client.index("--chunk") + 1], "30720")
         self.assertEqual(client[client.index("--feed-sleep") + 1], "1.6")

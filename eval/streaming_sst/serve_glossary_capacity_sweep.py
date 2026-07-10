@@ -52,6 +52,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--nccl-ib-disable", type=int, choices=(0, 1), default=1)
     parser.add_argument("--torch-nccl-enable-monitoring", type=int, choices=(0, 1), default=0)
     parser.add_argument("--vllm-compat-dir", type=Path, default=PROJECT_ROOT / "serve" / "vllm_compat")
+    parser.add_argument(
+        "--extra-python-path",
+        action="append",
+        type=Path,
+        default=[],
+        help="Additional import root required by an external retriever implementation.",
+    )
     parser.add_argument("--scheduler-batch-size", type=int, default=8)
     parser.add_argument("--max-inflight-batches", type=int, default=2)
     parser.add_argument("--max-new-tokens", type=int, default=40)
@@ -69,7 +76,11 @@ def _required_presets(raw: str) -> list[str]:
 
 
 def configure_vllm_runtime(args: argparse.Namespace) -> None:
-    python_paths = [str(args.vllm_compat_dir), str(PROJECT_ROOT)]
+    extra_paths = [str(path) for path in getattr(args, "extra_python_path", ())]
+    python_paths = [str(args.vllm_compat_dir), str(PROJECT_ROOT), *extra_paths]
+    for path in reversed(extra_paths):
+        if path not in sys.path:
+            sys.path.insert(0, path)
     existing_pythonpath = os.environ.get("PYTHONPATH", "").strip()
     if existing_pythonpath:
         python_paths.append(existing_pythonpath)
@@ -94,6 +105,9 @@ def validate_inputs(args: argparse.Namespace, manifest: TermMemoryManifest) -> l
     for path in (args.model_path, args.rag_model_path):
         if not path.exists():
             raise FileNotFoundError(path)
+    for path in (args.vllm_compat_dir, *args.extra_python_path):
+        if not path.is_dir():
+            raise NotADirectoryError(path)
     presets = _required_presets(args.required_presets)
     for preset in presets:
         snapshot = manifest.snapshot_for(preset, "zh")

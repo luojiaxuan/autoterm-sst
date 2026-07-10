@@ -226,7 +226,7 @@ def termination_signals() -> Iterator[None]:
 
 
 def server_command(args: argparse.Namespace, *, preset: str, tmp_dir: Path) -> list[str]:
-    return [
+    command = [
         str(args.python_bin),
         str(args.server_script),
         "--host",
@@ -296,6 +296,9 @@ def server_command(args: argparse.Namespace, *, preset: str, tmp_dir: Path) -> l
         "--log-level",
         args.log_level,
     ]
+    for path in args.extra_python_path:
+        command.extend(("--extra-python-path", str(path)))
+    return command
 
 
 def eval_command(args: argparse.Namespace, *, preset: str, out_json: Path) -> list[str]:
@@ -407,6 +410,7 @@ def _manifest_template(args: argparse.Namespace, presets: Sequence[str]) -> dict
             "rag_model_path": str(args.rag_model_path),
             "rag_device": args.rag_device,
             "vllm_compat_dir": str(args.vllm_compat_dir),
+            "extra_python_path": [str(path) for path in args.extra_python_path],
             "server_host": args.server_host,
             "connect_host": args.connect_host,
             "port": args.port,
@@ -653,6 +657,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--term-memory-manifest", type=Path, required=True)
     parser.add_argument("--rag-model-path", type=Path, required=True)
     parser.add_argument("--vllm-compat-dir", type=Path, required=True)
+    parser.add_argument("--extra-python-path", action="append", type=Path, default=[])
     parser.add_argument("--acl-root", type=Path, required=True)
     parser.add_argument("--medicine-audio-dir", type=Path, required=True)
     parser.add_argument("--tmp-root", type=Path, required=True)
@@ -722,6 +727,7 @@ def validate_args(args: argparse.Namespace) -> None:
         args.rag_model_path,
         args.vllm_compat_dir,
         args.acl_root,
+        *args.extra_python_path,
     )
     missing = [str(path) for path in required_paths if not path.exists()]
     if missing:

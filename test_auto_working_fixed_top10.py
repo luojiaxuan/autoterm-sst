@@ -89,6 +89,7 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(config.router_term_budget, 100_000)
         self.assertEqual(config.router_max_active_slices, 0)
         self.assertEqual(config.router_unknown_slice_term_count, 10_000)
+        self.assertTrue(config.router_pin_active_slice)
         self.assertEqual(config.auto_glossary_switch_cooldown_sec, 30.0)
         self.assertEqual(config.auto_glossary_candidate_stale_sec, 120.0)
         self.assertEqual(config.autoterm_topk_per_slice, 10)

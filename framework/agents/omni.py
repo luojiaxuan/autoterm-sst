@@ -333,6 +333,7 @@ class OmniConfig:
     router_term_budget: int = 100_000
     router_max_active_slices: int = 0
     router_unknown_slice_term_count: int = 10_000
+    router_pin_active_slice: bool = True
     prompt_top_k: int = PROMPT_K
     ui_top_k: int = PROMPT_K
     autoterm_topk_per_slice: int = PROMPT_K
@@ -500,6 +501,10 @@ class OmniConfig:
             router_unknown_slice_term_count=_safe_int(
                 routing_config.get("unknown_slice_term_count"),
                 10_000,
+            ),
+            router_pin_active_slice=_meta_bool(
+                routing_config.get("pin_active_slice"),
+                True,
             ),
             prompt_top_k=_env_int("RASST_PROMPT_TOP_K", prompt_k_default),
             ui_top_k=_env_int("RASST_UI_TOP_K", prompt_k_default),
@@ -687,6 +692,7 @@ class OmniAgent(Agent):
             term_budget=self.config.router_term_budget,
             max_active_slices=self.config.router_max_active_slices,
             unknown_slice_term_count=self.config.router_unknown_slice_term_count,
+            pin_active_slice=self.config.router_pin_active_slice,
         )
         router_cls = (
             HybridWindowTopicRouter

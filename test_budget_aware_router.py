@@ -11,6 +11,7 @@ from framework.agents.term_memory.context_similarity import DomainDescriptionSim
 from framework.agents.term_memory.manifest import TermMemoryManifest
 from framework.agents.term_memory.slice_registry import RetrievalSlice
 from framework.agents.term_memory.topic_router import (
+    DomainProbeScore,
     DomainSlice,
     HybridWindowTopicRouter,
     RouterConfig,
@@ -235,7 +236,92 @@ class BudgetAwareRouterTests(unittest.TestCase):
         selection = decision.evidence["slice_selection"]
         self.assertEqual(selection["selected_slice_count"], 10)
         self.assertEqual(selection["selected_term_count"], 100_000)
-        self.assertEqual(selection["selected_slice_presets"][0], "topic_000")
+        self.assertEqual(selection["pinned_active_preset"], "topic_011")
+        self.assertEqual(
+            selection["selected_slice_presets"],
+            ["topic_011", *[f"topic_{index:03d}" for index in range(9)]],
+        )
+
+    def test_active_slice_pin_is_configurable(self) -> None:
+        router = HybridWindowTopicRouter(
+            _topic_slices(),
+            RouterConfig(
+                slice_selection_mode="budgeted_top_slices",
+                term_budget=100_000,
+                pin_active_slice=False,
+            ),
+        )
+        scores = {
+            f"domain_{index:03d}": 1.0 - index * 0.01
+            for index in range(12)
+        }
+
+        selection = router.select_budgeted_slices(
+            scores,
+            active_preset_id="topic_011",
+        )
+
+        self.assertEqual(
+            selection.preset_ids,
+            [f"topic_{index:03d}" for index in range(10)],
+        )
+        self.assertEqual(selection.to_meta()["pinned_active_preset"], None)
+
+    def test_confirmed_switch_pins_target_without_expanding_top_four(self) -> None:
+        router = HybridWindowTopicRouter(
+            _topic_slices(),
+            RouterConfig(
+                warmup_sec=0.0,
+                update_interval_sec=0.0,
+                min_confidence=0.0,
+                min_margin=0.0,
+                min_current_margin=0.0,
+                switch_cooldown_sec=0.0,
+                min_consistent_windows_audio_only=1,
+                context_similarity_weight=0.0,
+                text_topic_weight=0.0,
+                domain_probe_weight=1.0,
+                speech_centroid_weight=0.0,
+                metadata_prior_weight=0.0,
+                audio_probe_min_top_score=0.0,
+                audio_probe_min_raw_margin=0.0,
+                audio_probe_min_positive_domains=1,
+                slice_selection_mode="budgeted_top_slices",
+                term_budget=40_000,
+                max_active_slices=4,
+            ),
+        )
+        semantic_scores = {
+            f"domain_{index:03d}": 1.0 - index * 0.01
+            for index in range(12)
+        }
+
+        decision = router.observe(
+            RouterSessionState("topic_000", "domain_000", created_s=0.0),
+            None,
+            [],
+            now_s=60.0,
+            domain_probe_scores={
+                "domain_011": DomainProbeScore(
+                    domain="domain_011",
+                    preset_id="topic_011",
+                    top_score=1.0,
+                    mean_topk_score=1.0,
+                )
+            },
+            context_similarity_scores=semantic_scores,
+        )
+
+        self.assertEqual(decision.action, "switch")
+        self.assertEqual(decision.target_preset_id, "topic_011")
+        selection = decision.evidence["slice_selection"]
+        self.assertEqual(selection["pinned_active_preset"], "topic_011")
+        self.assertEqual(
+            selection["selected_slice_presets"],
+            ["topic_011", "topic_000", "topic_001", "topic_002"],
+        )
+        self.assertEqual(selection["selected_slice_count"], 4)
+        self.assertEqual(selection["selected_term_count"], 40_000)
 
     def test_manifest_descriptions_define_context_similarity_prototypes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -276,6 +362,7 @@ class BudgetAwareRouterTests(unittest.TestCase):
                 router_slice_selection_mode="budgeted_top_slices",
                 router_term_budget=100_000,
                 router_max_active_slices=0,
+                retrieval_candidate_budget=100,
                 tmp_dir=str(root / "runtime"),
             )
             agent = OmniAgent(config=config, manifest=manifest)
@@ -306,13 +393,26 @@ class BudgetAwareRouterTests(unittest.TestCase):
             self.assertTrue(activated)
             self.assertEqual(
                 session.active_slice_presets,
-                [f"topic_{index:03d}" for index in range(10)],
+                ["topic_011", *[f"topic_{index:03d}" for index in range(9)]],
             )
             self.assertEqual(sum(session.active_slice_terms.values()), 100_000)
             self.assertEqual(
                 {item.domain for item in session.active_retrieval_slices},
-                {f"domain_{index:03d}" for index in range(10)},
+                {"domain_011", *{f"domain_{index:03d}" for index in range(9)}},
             )
+            top_ks = agent._retrieval_top_ks_for(
+                SimpleNamespace(auto_glossary_enabled=True),
+                session.active_retrieval_slices,
+            )
+            self.assertEqual(top_ks, [10] * 10)
+            session.last_retrieval_candidate_requested = 0
+            session.last_retrieval_index_queries = 0
+            session.last_retrieval_scored_inventory_terms = 0
+            session.last_retrieval_top_k_by_slice = {}
+            for plan, top_k in zip(session.active_retrieval_slices, top_ks):
+                agent._record_retrieval_query(session, plan, top_k)
+            self.assertEqual(session.last_retrieval_top_k_by_slice["topic_011"], 10)
+            self.assertEqual(sum(session.last_retrieval_top_k_by_slice.values()), 100)
 
     def test_multiple_slice_candidates_keep_one_global_prompt_top_k(self) -> None:
         agent = OmniAgent()

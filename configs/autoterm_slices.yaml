@@ -102,6 +102,7 @@ auto_working:
     term_budget: 100000
     max_active_slices: 0
     unknown_slice_term_count: 10000
+    pin_active_slice: true
     update_sec: 5
     warmup_sec: 6
     switch_cooldown_sec: 90

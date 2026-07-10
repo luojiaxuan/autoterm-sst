@@ -32,6 +32,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from framework.agents.term_memory.source_normalization import normalize_english_source  # noqa: E402
+
 SUPPORTED_SELECTORS = {
     "category_any",
     "category_path_prefix_any",
@@ -48,7 +50,7 @@ _DEEPCAT_RE = re.compile(r'^deepcat:\s*["\'](.+?)["\']$', re.IGNORECASE)
 
 
 def normalized_term(value: Any) -> str:
-    return " ".join(str(value or "").strip().casefold().split())
+    return normalize_english_source(value)
 
 
 def source_term(row: Mapping[str, Any]) -> str:

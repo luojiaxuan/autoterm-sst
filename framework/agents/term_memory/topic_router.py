@@ -122,6 +122,7 @@ class RouterConfig:
     term_budget: int = 100_000
     max_active_slices: int = 0
     unknown_slice_term_count: int = 10_000
+    pin_active_slice: bool = True
 
 
 @dataclass
@@ -191,6 +192,7 @@ class BudgetSliceSelection:
     scores: Dict[str, float] = field(default_factory=dict)
     term_counts: Dict[str, int] = field(default_factory=dict)
     term_budget: int = 0
+    pinned_preset_id: str = ""
 
     @property
     def preset_ids(self) -> List[str]:
@@ -207,6 +209,7 @@ class BudgetSliceSelection:
             "selected_term_count": int(self.total_terms),
             "selected_slice_count": len(self.slices),
             "selected_slice_presets": self.preset_ids,
+            "pinned_active_preset": self.pinned_preset_id or None,
             "selected_slices": [
                 {
                     "preset_id": item.preset_id,
@@ -261,6 +264,7 @@ class AudioNativeActiveGlossaryRouter:
         similarity_scores: Mapping[str, float],
         *,
         term_budget: Optional[int] = None,
+        active_preset_id: str = "",
     ) -> BudgetSliceSelection:
         budget = max(
             0,
@@ -294,9 +298,41 @@ class AudioNativeActiveGlossaryRouter:
         scores: Dict[str, float] = {}
         term_counts: Dict[str, int] = {}
         used_terms = 0
+        pinned_preset_id = ""
+
+        requested_active_preset = str(active_preset_id or "").strip()
+        pinned = (
+            self.by_preset.get(requested_active_preset)
+            if self.config.pin_active_slice and requested_active_preset
+            else None
+        )
+        if pinned is not None and (not max_slices or max_slices >= 1):
+            pinned_terms = (
+                int(pinned.term_count)
+                if int(pinned.term_count) > 0
+                else unknown_terms
+            )
+            if pinned_terms <= budget:
+                raw_score = similarity_scores.get(pinned.preset_id)
+                if raw_score is None:
+                    raw_score = similarity_scores.get(pinned.domain_id)
+                try:
+                    pinned_score = float(raw_score)
+                except (TypeError, ValueError):
+                    pinned_score = 0.0
+                if not math.isfinite(pinned_score):
+                    pinned_score = 0.0
+                selected.append(pinned)
+                scores[pinned.preset_id] = pinned_score
+                term_counts[pinned.preset_id] = pinned_terms
+                used_terms = pinned_terms
+                pinned_preset_id = pinned.preset_id
+
         for item, score in scored:
             if max_slices and len(selected) >= max_slices:
                 break
+            if item.preset_id == pinned_preset_id:
+                continue
             item_terms = int(item.term_count) if int(item.term_count) > 0 else unknown_terms
             if used_terms + item_terms > budget:
                 continue
@@ -310,6 +346,7 @@ class AudioNativeActiveGlossaryRouter:
             scores=scores,
             term_counts=term_counts,
             term_budget=budget,
+            pinned_preset_id=pinned_preset_id,
         )
 
     def observe(
@@ -679,11 +716,6 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             "audio_probe_guard": audio_probe_guard,
             "generated_target_probe_guard": generated_target_probe_guard,
         }
-        if self.budgeted_slice_selection_enabled():
-            evidence["slice_selection"] = self.select_budgeted_slices(
-                context_similarity_scores or {},
-            ).to_meta()
-
         unsupported_current = bool(
             current_preset
             and current_preset not in self.by_preset
@@ -777,6 +809,14 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             or guard_reason.startswith("consistent_windows<")
         ):
             session_state.last_decision_s = float(now_s)
+        if self.budgeted_slice_selection_enabled():
+            confirmed_preset = (
+                target_preset if action in {"switch", "fallback"} else current_preset
+            )
+            evidence["slice_selection"] = self.select_budgeted_slices(
+                context_similarity_scores or {},
+                active_preset_id=confirmed_preset,
+            ).to_meta()
         decision = RouterDecision(
             action=action,
             target_preset_id=target_preset,

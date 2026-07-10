@@ -78,6 +78,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--autoterm-default-preset", default="")
     parser.add_argument("--autoterm-term-budget", type=int, default=100000)
     parser.add_argument("--autoterm-max-active-slices", type=int, default=0)
+    parser.add_argument(
+        "--autoterm-pin-active-slice",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
     parser.add_argument("--autoterm-context-window-chunks", type=int, default=12)
     parser.add_argument("--autoterm-context-model", default="BAAI/bge-m3")
     parser.add_argument("--autoterm-context-device", default="cpu")
@@ -233,6 +238,9 @@ def build_agent(
         router_term_budget=int(getattr(args, "autoterm_term_budget", 100000)),
         router_max_active_slices=int(
             getattr(args, "autoterm_max_active_slices", 0)
+        ),
+        router_pin_active_slice=bool(
+            getattr(args, "autoterm_pin_active_slice", True)
         ),
         autoterm_candidate_score_threshold=args.rag_score_threshold,
         autoterm_enable_open_rescue=False,

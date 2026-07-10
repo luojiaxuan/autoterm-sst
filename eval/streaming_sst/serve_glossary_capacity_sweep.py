@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 from pathlib import Path
 from typing import Sequence
 
@@ -37,6 +38,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--vllm-enforce-eager", type=int, choices=(0, 1), default=1)
     parser.add_argument("--enable-prefix-caching", type=int, choices=(0, 1), default=1)
     parser.add_argument("--disable-custom-all-reduce", type=int, choices=(0, 1), default=1)
+    parser.add_argument("--vllm-use-v1", type=int, choices=(0, 1), default=1)
+    parser.add_argument("--vllm-enable-v1-multiprocessing", type=int, choices=(0, 1), default=1)
+    parser.add_argument("--vllm-worker-multiproc-method", choices=("spawn", "fork", "forkserver"), default="spawn")
+    parser.add_argument("--vllm-moe-use-deep-gemm", type=int, choices=(0, 1), default=0)
+    parser.add_argument("--vllm-use-fused-moe-grouped-topk", type=int, choices=(0, 1), default=0)
+    parser.add_argument("--nccl-p2p-disable", type=int, choices=(0, 1), default=1)
+    parser.add_argument("--nccl-ib-disable", type=int, choices=(0, 1), default=1)
+    parser.add_argument("--torch-nccl-enable-monitoring", type=int, choices=(0, 1), default=0)
     parser.add_argument("--scheduler-batch-size", type=int, default=8)
     parser.add_argument("--max-inflight-batches", type=int, default=2)
     parser.add_argument("--max-new-tokens", type=int, default=40)
@@ -51,6 +60,22 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def _required_presets(raw: str) -> list[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+def configure_vllm_runtime(args: argparse.Namespace) -> None:
+    values = {
+        "VLLM_USE_V1": args.vllm_use_v1,
+        "VLLM_ENABLE_V1_MULTIPROCESSING": args.vllm_enable_v1_multiprocessing,
+        "VLLM_WORKER_MULTIPROC_METHOD": args.vllm_worker_multiproc_method,
+        "VLLM_MOE_USE_DEEP_GEMM": args.vllm_moe_use_deep_gemm,
+        "VLLM_USE_FUSED_MOE_GROUPED_TOPK": args.vllm_use_fused_moe_grouped_topk,
+        "NCCL_P2P_DISABLE": args.nccl_p2p_disable,
+        "NCCL_IB_DISABLE": args.nccl_ib_disable,
+        "TORCH_NCCL_ENABLE_MONITORING": args.torch_nccl_enable_monitoring,
+        "TOKENIZERS_PARALLELISM": "false",
+    }
+    for key, value in values.items():
+        os.environ[key] = str(value)
 
 
 def validate_inputs(args: argparse.Namespace, manifest: TermMemoryManifest) -> list[str]:
@@ -102,6 +127,7 @@ def build_agent(args: argparse.Namespace, manifest: TermMemoryManifest) -> OmniA
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
+    configure_vllm_runtime(args)
     logging.basicConfig(
         level=getattr(logging, args.log_level.upper(), logging.INFO),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",

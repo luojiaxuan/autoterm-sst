@@ -2145,7 +2145,19 @@ class OmniAgent(Agent):
                 score = 0.0
             return pri, -score
 
-        return sorted((dict(ref) for ref in references or []), key=_priority)
+        ranked = sorted((dict(ref) for ref in references or []), key=_priority)
+        output: List[Dict[str, Any]] = []
+        seen_pairs: set[Tuple[str, str]] = set()
+        for ref in ranked:
+            key = (
+                str(ref.get("term") or "").strip().casefold(),
+                str(ref.get("translation") or "").strip().casefold(),
+            )
+            if not all(key) or key in seen_pairs:
+                continue
+            seen_pairs.add(key)
+            output.append(ref)
+        return output
 
     def _prompt_references(
         self,

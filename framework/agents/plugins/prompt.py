@@ -10,7 +10,7 @@ chat messages an omni model expects. Retrieval is optional: with no terms the
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Set
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 TermRef = Dict[str, Any]
 
@@ -46,19 +46,18 @@ def parse_glossary_text(text: str) -> List[TermRef]:
 
 
 def merge_references(*groups: Sequence[TermRef]) -> List[TermRef]:
-    """Union of term groups, de-duplicated case-insensitively (first wins)."""
+    """Union term groups while preserving source terms with distinct translations."""
 
     merged: List[TermRef] = []
-    seen: Set[str] = set()
+    seen: Set[Tuple[str, str]] = set()
     for group in groups:
         for ref in group or []:
             term = str(ref.get("term") or "").strip().lower()
-            if not term or term in seen:
-                continue
             translation = str(ref.get("translation") or "").strip()
-            if not translation:
+            key = (term, translation.casefold())
+            if not term or not translation or key in seen:
                 continue
-            seen.add(term)
+            seen.add(key)
             merged.append(ref)
     return merged
 

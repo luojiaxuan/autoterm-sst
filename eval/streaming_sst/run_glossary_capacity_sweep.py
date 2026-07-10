@@ -342,12 +342,23 @@ def eval_command(args: argparse.Namespace, *, preset: str, out_json: Path) -> li
     ]
 
 
+def rag_health_error(payload: Any, expected_rag_terms: int) -> str:
+    rag = payload.get("rag") if isinstance(payload, dict) else None
+    if not isinstance(rag, dict) or rag.get("status") != "ready":
+        return f"RAG is not ready: {rag!r}"
+    active_terms = int(rag.get("active_terms") or 0)
+    if active_terms != int(expected_rag_terms):
+        return f"RAG active_terms={active_terms}, expected={expected_rag_terms}"
+    return ""
+
+
 def wait_for_health(
     base_url: str,
     server: subprocess.Popen[Any],
     *,
     timeout_sec: float,
     poll_interval_sec: float,
+    expected_rag_terms: int,
 ) -> None:
     deadline = time.monotonic() + max(0.1, float(timeout_sec))
     health_url = base_url.rstrip("/") + "/health"
@@ -359,12 +370,31 @@ def wait_for_health(
         try:
             with urllib.request.urlopen(health_url, timeout=5.0) as response:
                 if 200 <= int(response.status) < 300:
-                    return
-                last_error = f"HTTP {response.status}"
-        except (OSError, urllib.error.URLError) as exc:
+                    payload = json.loads(response.read().decode("utf-8"))
+                    last_error = rag_health_error(payload, expected_rag_terms)
+                    if not last_error:
+                        return
+                else:
+                    last_error = f"HTTP {response.status}"
+        except (OSError, TypeError, ValueError, urllib.error.URLError) as exc:
             last_error = f"{type(exc).__name__}: {exc}"
         time.sleep(max(0.05, float(poll_interval_sec)))
     raise TimeoutError(f"server health timeout after {timeout_sec}s: {last_error}")
+
+
+def expected_term_count(manifest_path: Path, preset: str, language_pair: str) -> int:
+    target = str(language_pair).split("->")[-1].strip().casefold()
+    language = {"chinese": "zh", "japanese": "ja", "german": "de"}.get(target)
+    if not language:
+        raise ValueError(f"unsupported capacity target language: {language_pair}")
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    snapshot = ((payload.get("scales") or {}).get(preset) or {}).get(f"en-{language}")
+    if not isinstance(snapshot, dict):
+        raise ValueError(f"manifest has no en-{language} snapshot for {preset}")
+    count = int(snapshot.get("num_terms") or 0)
+    if count <= 0:
+        raise ValueError(f"manifest has invalid num_terms for {preset}: {count}")
+    return count
 
 
 def normalized_run_row(
@@ -542,6 +572,11 @@ def run_controller(
             server_log = args.output_dir / "logs" / f"{safe_name}.server.log"
             eval_log = args.output_dir / "logs" / f"{safe_name}.eval.log"
             tmp_dir = args.tmp_root / safe_name
+            expected_rag_terms = expected_term_count(
+                args.term_memory_manifest,
+                preset,
+                args.language_pair,
+            )
             validated = validate_completed_output(
                 output_path,
                 preset=preset,
@@ -581,6 +616,7 @@ def run_controller(
                 "eval_log": str(eval_log),
                 "server_command": server_cmd,
                 "eval_command": client_cmd,
+                "expected_rag_terms": expected_rag_terms,
             }
             upsert_run(manifest, run_row)
             persist_state(args, manifest, presets)
@@ -593,6 +629,7 @@ def run_controller(
                     server_process,
                     timeout_sec=args.health_timeout_sec,
                     poll_interval_sec=args.health_poll_interval_sec,
+                    expected_rag_terms=expected_rag_terms,
                 )
                 eval_process = supervisor.spawn(client_cmd, eval_log)
                 eval_returncode = supervisor.wait(eval_process)

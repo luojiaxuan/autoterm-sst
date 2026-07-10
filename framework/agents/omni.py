@@ -283,6 +283,7 @@ class OmniConfig:
     rag_score_threshold: float = 0.78
     rag_timeline_lookback_sec: float = 1.92
     rag_index_cache_max_entries: int = 16
+    rag_startup_glossary_preset: str = RAG_STARTUP_GLOSSARY_PRESET
 
     auto_glossary_enabled: bool = True
     auto_glossary_base_preset: str = "none"
@@ -1271,7 +1272,9 @@ class OmniAgent(Agent):
         if self.config.rag_enabled:
             try:
                 catalog = self._catalog(self.config.language_pair)
-                startup_index = catalog.index_path_for_preset(RAG_STARTUP_GLOSSARY_PRESET)
+                startup_index = catalog.index_path_for_preset(
+                    self.config.rag_startup_glossary_preset
+                )
                 self.retrieval = MaxSimRetrievalPlugin(
                     model_path=self.config.rag_model_path,
                     index_path=startup_index,

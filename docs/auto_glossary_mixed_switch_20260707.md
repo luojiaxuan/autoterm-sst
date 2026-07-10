@@ -600,3 +600,21 @@ python3 eval/streaming_sst/eval_mixed_domain_switch.py \
 去掉 probe 通道后大多数切换被 guard 挡死——probe 是必要的 corroborating
 guard（虽然真实语音 probe 单独太噪，见 §6 controls）。产物
 `aries:/mnt/data3/jiaxuanluo/eval_out/lambda_sweep/`。已写入论文附录 A。
+
+## 2026-07-10: demo 专用 curated slices（不影响任何评测清单）
+
+用户反馈 demo 检索面板观感差（tasks/task/lexical 等泛词、LanguageWare→LanguageWare
+等 identity filler、"这里"高亮）。新建 demo-only 词表 + 索引 + manifest
+`demo_curated_20260710`（仅 taurus 8014 使用；所有评测 manifest 不变，论文
+§5 已加披露句）：
+
+- `demo_nlp_gs10k`：acl_tagged_gs10k 全量过滤（EN 泛词表、zh 单字/杂词表、
+  zh==term 的 identity 对）→ **10000→4968**（wiki_academic filler 近半是
+  identity 对）。
+- `demo_medicine_gs10k`：union 同规则过滤 + 注入 6 条会话人名/角色
+  （Ramon de Mello→拉蒙·德·梅洛、Katia (Roque) Perez、Maria Antonietta
+  Gambacorta、Medical/Radiation Oncologist、TME surgery）→ 9923。
+- 基座检索器修复：`RASST_INDEX_ZH_ACL` 默认指向 5 月的 238 条老索引，导致
+  状态行首屏显示 "238 terms"；launcher 现显式指向 demo_nlp 索引。
+- 前端（已 push main）：面板半透明、译文/词条独立限高滚动、命中术语
+  `mark.term-hit` 内联高亮、播放按钮修复、语言对 (offline) 标注。

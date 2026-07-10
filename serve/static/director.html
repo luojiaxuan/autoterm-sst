@@ -40,6 +40,7 @@
     const m = media();
     const st = {
       p: phase,
+      geo: [window.screenX, window.screenY, window.outerWidth, window.outerHeight, window.innerWidth, window.innerHeight].join(','),
       rs: m ? m.readyState : -1,
       t: m ? +m.currentTime.toFixed(1) : -1,
       gl: (byLabel('Active Glossary') || '').slice(0, 24),

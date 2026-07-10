@@ -103,6 +103,13 @@
   }, 1000);
   latHot.onclick = () => document.getElementById('bLat').onclick();
 
+  // Click-landing probe: driver clicks this corner hotspot to verify its
+  // synthetic clicks reach THIS page (screen-front check) before recording.
+  const pingHot = document.createElement('div');
+  pingHot.style.cssText = 'position:fixed;top:8px;right:6px;width:48px;height:28px;z-index:2147483647;opacity:0.001;cursor:default';
+  document.body.appendChild(pingHot);
+  pingHot.onclick = () => { phase = 'ping' + Date.now() % 100000; };
+
   document.getElementById('bLat').onclick = () => {
     phase = 'latency';
     const sel = D().getElementById('latencySelect') ||

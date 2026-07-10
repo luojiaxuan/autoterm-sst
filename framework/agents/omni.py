@@ -2560,6 +2560,12 @@ class OmniAgent(Agent):
         if chunk_rms < float(self.config.min_audio_rms):
             session.last_llm_samples = end_sample
             session.segment_idx += 1
+            self._emit_cursor_status(
+                session,
+                text="SILENCE_SKIPPED",
+                start_sample=start_sample,
+                cursor_samples=end_sample,
+            )
             return {"ok": True, "elapsed_s": 0.0, "skipped": "silence"}
 
         seg_no = session.segment_idx + 1
@@ -2624,6 +2630,13 @@ class OmniAgent(Agent):
                             references=references,
                         ),
                     )
+                )
+            else:
+                self._emit_cursor_status(
+                    session,
+                    text="EMPTY_TRANSLATION",
+                    start_sample=start_sample,
+                    cursor_samples=end_sample,
                 )
             return {"ok": True, "elapsed_s": elapsed}
         except Exception as exc:  # noqa: BLE001
@@ -2723,6 +2736,13 @@ class OmniAgent(Agent):
                         ),
                     )
                 )
+            elif ok:
+                self._emit_cursor_status(
+                    session,
+                    text="EMPTY_TRANSLATION",
+                    start_sample=start_sample,
+                    cursor_samples=end_sample,
+                )
             elif not ok:
                 self._emit_event(
                     TranslationEvent(
@@ -2734,6 +2754,27 @@ class OmniAgent(Agent):
                 )
             results.append({"ok": ok, "elapsed_s": elapsed, "error": output.get("error")})
         return results
+
+    def _emit_cursor_status(
+        self,
+        session: OmniSession,
+        *,
+        text: str,
+        start_sample: int,
+        cursor_samples: int,
+    ) -> None:
+        self._emit_event(
+            TranslationEvent(
+                session_id=session.session_id,
+                type=EVENT_STATUS,
+                text=text,
+                meta={
+                    "segment_idx": session.segment_idx,
+                    "start_sample": int(start_sample),
+                    "cursor_samples": int(cursor_samples),
+                },
+            )
+        )
 
     def _trim_messages(self, session: OmniSession) -> None:
         max_cache = int(self.config.max_cache_chunks)

@@ -2,7 +2,7 @@
 \label{sec:evaluation}
 
 \paragraph{Setup.}
-We evaluate terminology memory, routing, and concurrent serving in the live
+We evaluate terminology memory and routing in the live
 AutoTerm-SST system on A6000 GPUs. Its live agent runs Qwen3-Omni with
 in-process vLLM tensor parallelism over two GPUs and the RASST MaxSim retriever
 on a third GPU. Audio is
@@ -10,9 +10,9 @@ from prepared ACL 60/60 English-to-Chinese and medicine segments. Unless
 otherwise stated, results use the JSON WebSocket protocol, which exposes
 translated text, retrieved references, active glossary metadata, and per-chunk
 retrieval latency. A latency multiplier of 2 corresponds to 1.92s input chunks.
-We report four complementary evaluations: a controlled mixed-domain terminology comparison, a
-warm-retrieval scale sweep, a mixed-domain routing probe, and a concurrent
-streaming stress test.
+We report three complementary terminology-memory evaluations --- a controlled
+mixed-domain terminology comparison, a warm-retrieval scale sweep, and a
+mixed-domain routing probe --- alongside single-session real-time serving.
 
 \paragraph{Metrics.}
 For terminology quality, term accuracy is the fraction of annotated target-term
@@ -27,8 +27,7 @@ both hypothesis and reference before scoring, and is used only as a
 non-terminology sanity check. For runtime, we report prompt references per
 partial chunk and retrieval-latency percentiles. For routing, we report switch
 latency, wrong switches, and steady-state active-domain accuracy after transition
-grace windows. A separate 32-session run measures serving behavior under
-concurrent load. These metrics do not replace token-delay measures such as
+grace windows. These metrics do not replace token-delay measures such as
 StreamLAAL \citep{papi2024streamatt}.
 
 \begin{figure*}[t]
@@ -102,11 +101,8 @@ Inverted- and contested-probe controls expose the expected wrong-switch and
 delayed-switch failure modes. These proxies are separate from the preceding
 end-to-end audio runs.
 
-\paragraph{Concurrent streaming.}
-In a 32-session stress test, prerecorded ACL audio was streamed to every session
-at its original pace (\texttt{auto\_working}, 300s each). All 32 sessions
-completed with zero failures or disconnects; median first-output latency
-increased from 0.35s for one session to 0.54s for 32, and every session sustained
-the real-time input rate through vLLM continuous batching. This demonstrates
-transport and serving path under concurrent use, while the other evaluations
-isolate terminology-memory behavior.
+\paragraph{Serving.}
+A single live session sustains the 1.92s real-time input rate (median
+first-output latency 0.35s; warm per-chunk retrieval 60--105\,ms). Multiple
+sessions are served concurrently through vLLM's batched inference, used off
+the shelf.

@@ -1,7 +1,7 @@
 # AutoTerm-SST
 
-**Zero-setup, terminology-aware streaming speech translation — as a thin,
-pluggable framework.**
+**Zero session-time setup for terminology-aware streaming speech translation —
+as a thin, pluggable framework.**
 
 AutoTerm-SST is an interactive simultaneous speech-translation (SST) system for
 term-dense vertical domains (academic, medical, legal, financial). It streams
@@ -9,7 +9,8 @@ speech in, runs a swappable translation **agent**, and streams translated text
 back — with an **adaptive terminology memory** (AutoTerm) that retrieves up to
 10 score-filtered glossary candidates per chunk from an automatically routed,
 domain-specific active slice, so the model gets specialized vocabulary right
-without any user-provided glossary.
+without a per-session glossary upload or domain choice. Domain resources are
+prebuilt and registered by the deployment operator.
 
 The codebase is a **thin middle layer** (transport / session / routing) plus
 **swappable agents**. The framework knows nothing about models, prompting,
@@ -18,8 +19,8 @@ of that internally.
 
 ## Demo
 
-- 📄 Paper: *AutoTerm-SST: Zero-Setup Adaptive Terminology Memory for Streaming
-  Speech Translation* (EMNLP 2026 System Demonstrations, under review) —
+- 📄 Paper: *AutoTerm-SST: Adaptive Terminology Memory with Zero Session-Time
+  Setup for Streaming Speech Translation* (EMNLP 2026 System Demonstrations, under review) —
   source in [`demo_paper_emnlp/`](demo_paper_emnlp/).
 - 🎬 Screencast video: [docs/demo_screencast.mp4](https://github.com/luojiaxuan/autoterm-sst/blob/main/docs/demo_screencast.mp4) (2.5 min).
 - 🌐 Hosted live demo: <https://luojiaxuan.github.io/autoterm-sst/> (stable
@@ -31,7 +32,7 @@ of that internally.
 
 ## Highlights
 
-- **Zero-setup adaptive terminology.** `auto_working` mode starts from a
+- **Zero session-time setup.** `auto_working` mode starts from a
   domain-specific glossary slice and a training-free hybrid router switches
   slices from streaming evidence (generated-translation topic windows,
   speech-window domain probes, speech-centroid similarity, retrieved-term
@@ -118,15 +119,19 @@ start_demo.sh              # primary framework launcher (mock-friendly)
 
 ## Quick start
 
-### 1. Mock mode (no GPU — try the demo in one command)
+### 1. Mock mode (no GPU)
 
 ```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements-mock.txt
 RASST_DEMO_MOCK=1 PORT=8000 bash start_demo.sh
 # open http://127.0.0.1:8000/
 ```
 
-Mock mode loads both agents with a deterministic, dependency-free backend (no
-torch/vLLM/GPU), so you can exercise the full
+`start_demo.sh` resolves the repository from its own location and automatically
+uses `.venv/bin/python` when present; it contains no machine-specific paths.
+Mock mode loads the RASST agent with deterministic CPU-only generation and
+retrieval (no torch/vLLM/GPU), so you can exercise the full
 `/init` → `/wss` → translate → `/delete_session` flow, the web UI, and the JSON
 evidence protocol.
 
@@ -206,7 +211,7 @@ If retrieval fails to load, the agent logs it and continues **without** RAG
 
 | Var | Default | Meaning |
 |-----|---------|---------|
-| `RASST_AUTO_GLOSSARY_ENABLED` | `1` | default to zero-setup `auto_working` mode |
+| `RASST_AUTO_GLOSSARY_ENABLED` | `1` | default to zero session-time setup via `auto_working` mode |
 | `RASST_AUTO_GLOSSARY_DEFAULT` | `nlp_core_10k` | initial domain-specific active slice |
 | `RASST_AUTO_GLOSSARY_PRESETS` | `nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k` | domain slices the topic router may activate |
 | `RASST_AUTO_GLOSSARY_UPDATE_SEC` | `45` | minimum interval between topic decisions |
@@ -260,7 +265,7 @@ terminology memory** (Wikidata/Wikipedia-derived). A small **manifest**
 term files + precomputed MaxSim indexes; selecting an `open_wiki_*` preset
 retrieves from it exactly like a glossary.
 
-The default demo path is the **zero-setup adaptive working glossary**:
+The default demo path provides **zero session-time terminology setup**:
 `auto_working` starts from a domain-specific slice (e.g. `nlp_core_10k`) and
 the `hybrid_window_topic` router may switch to another domain slice (e.g.
 `medicine_core_10k`) from streaming evidence. The prompt interface stays
@@ -382,7 +387,7 @@ respective upstream licenses.
 
 ```bibtex
 @inproceedings{luo2026autoterm,
-  title  = {{AutoTerm-SST}: Zero-Setup Adaptive Terminology Memory for Streaming Speech Translation},
+  title  = {{AutoTerm-SST}: Adaptive Terminology Memory with Zero Session-Time Setup for Streaming Speech Translation},
   author = {Luo, Jiaxuan and Ouyang, Siqi and Xu, Xi and Li, Lei},
   note   = {Under review, EMNLP 2026 System Demonstrations},
   year   = {2026}

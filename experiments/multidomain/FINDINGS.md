@@ -107,3 +107,27 @@ about which domain, not how many terms.
 
 finance/legal are being rebuilt from proper Wikidata P31/category terms
 (collect_wikimedia_domain_glossary.py) at 12k, replacing the general-pool carve.
+
+## Stage 3 build complete; AutoTerm E2E scored
+
+Matched slices + indexes built (en-zh): nlp 9,933 / medicine 9,996 /
+finance 12,000 / legal 12,000, plus a merged flat index of **41,667** unique
+terms. finance/legal are proper Wikidata P31/category terms with QIDs + RDF
+paths (auditable), replacing the general-pool carve.
+
+**AutoTerm (4 candidates), 3-talk, MFA-scored:**
+
+| condition | tech | raw | ACL | medicine |
+|---|---:|---:|---:|---:|
+| AutoTerm (4-way) | 0.863 | 0.833 | 0.906 | 0.778 |
+
+(gold: 593 tech = 395 nlp + 198 med; 1,042 raw)
+
+Remaining two conditions need one GPU host on the same 3-talk audio:
+- **oracle**: fixed nlp on ACL blocks + fixed medicine on medicine blocks
+  (per-domain upper bound).
+- **merged-42k**: fixed flat 42k index, no routing (measures the precision
+  cost the routing avoids; the paper scale sweep predicts a drop).
+
+Both are fixed-preset runs (no router), so they parallelize at 2x on one host
+(~20 min). Blocked on a free GPU host (aries saturated; taurus demo on 6,7).

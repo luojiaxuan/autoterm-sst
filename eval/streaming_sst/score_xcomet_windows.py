@@ -440,6 +440,8 @@ def score_windows(
     bootstrap_samples: int,
     bootstrap_seed: int,
     max_combined_tokens: int,
+    auto_label: str = "AutoTerm",
+    merged_label: str = "merged glossary",
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if xcomet_code_dir:
         sys.path.insert(0, str(Path(xcomet_code_dir).expanduser()))
@@ -569,6 +571,7 @@ def score_windows(
     return scored_rows, {
         "model": model_name,
         "model_revision": model_revision or None,
+        "system_labels": {"auto": auto_label, "merged": merged_label},
         "mode": "reference_based_source_hypothesis_reference",
         "segments": len(scored_rows),
         "xcomet_eligible_segments": len(eligible_indices),
@@ -582,8 +585,14 @@ def score_windows(
 
 
 def markdown_summary(summary: dict[str, Any]) -> str:
+    labels = summary.get("system_labels") or {
+        "auto": "AutoTerm",
+        "merged": "merged glossary",
+    }
+    auto_label = str(labels["auto"])
+    merged_label = str(labels["merged"])
     lines = [
-        "# AutoTerm vs merged glossary: aligned-window quality",
+        f"# {auto_label} vs {merged_label}: aligned-window quality",
         "",
         f"- Model: `{summary['model']}`",
         f"- Mode: `{summary['mode']}`",
@@ -591,7 +600,7 @@ def markdown_summary(summary: dict[str, Any]) -> str:
         f"({summary['xcomet_eligible_segments']} xCOMET-eligible; "
         f"{summary['xcomet_excluded_overlength']} overlength excluded)",
         "",
-        "| metric | AutoTerm | merged | delta | talk-bootstrap 95% CI | talk sign-flip p |",
+        f"| metric | {auto_label} | {merged_label} | delta | talk-bootstrap 95% CI | talk sign-flip p |",
         "|---|---:|---:|---:|---:|---:|",
     ]
     for label, key in (("xCOMET-lite", "xcomet_lite"), ("chrF2", "chrf_pp")):
@@ -609,7 +618,7 @@ def markdown_summary(summary: dict[str, Any]) -> str:
             [
                 f"### {label}",
                 "",
-                "| domain | AutoTerm | merged | delta | windows |",
+                f"| domain | {auto_label} | {merged_label} | delta | windows |",
                 "|---|---:|---:|---:|---:|",
             ]
         )
@@ -642,6 +651,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--bootstrap-samples", type=int, default=10000)
     parser.add_argument("--bootstrap-seed", type=int, default=20260710)
     parser.add_argument("--max-combined-tokens", type=int, default=480)
+    parser.add_argument("--auto-label", default="AutoTerm")
+    parser.add_argument("--merged-label", default="merged glossary")
     parser.add_argument("--out-scored-jsonl", default="")
     parser.add_argument("--out-summary-json", default="")
     parser.add_argument("--out-md", default="")
@@ -685,6 +696,8 @@ def main() -> None:
         bootstrap_samples=args.bootstrap_samples,
         bootstrap_seed=args.bootstrap_seed,
         max_combined_tokens=args.max_combined_tokens,
+        auto_label=args.auto_label,
+        merged_label=args.merged_label,
     )
     write_jsonl(args.out_scored_jsonl, scored_rows)
     write_json(args.out_summary_json, summary)

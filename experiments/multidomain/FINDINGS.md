@@ -85,3 +85,25 @@ merged-400k degrades.
 
 The `ema_final` dead-code path is a latent risk if more domains are added; not
 triggered at 4 domains but worth wiring into the sort before scaling to 10.
+
+## Sizing correction (2026-07-10)
+
+The Stage-2 4-way routing test used these ACTUAL slice sizes (the
+`*_wiki_100k` filenames were aspirational, not literal):
+
+| domain | terms | source |
+|---|---:|---|
+| nlp | 9,933 | curated gold union |
+| medicine | 9,996 | curated gold union |
+| finance | 2,071 | keyword carve from 1M general pool |
+| legal | 5,397 | keyword carve from 1M general pool |
+
+Real domain vocabularies are ~10k, not 100k (beyond ~10-30k Wikidata yields
+long-tail noise — exactly the precision collapse in the paper's scale sweep).
+So Stage 3 targets a MATCHED ~12k per domain (aligned with the paper's 10k
+union convention); "merged" becomes a flat 4x12k index vs the routed slices.
+The routing conclusion (0 mis-switches) is independent of slice size — it is
+about which domain, not how many terms.
+
+finance/legal are being rebuilt from proper Wikidata P31/category terms
+(collect_wikimedia_domain_glossary.py) at 12k, replacing the general-pool carve.

@@ -10,15 +10,13 @@ live GPU mode with Qwen3-Omni and MaxSim retrieval.
 \begin{figure*}[t]
   \centering
   \includegraphics[width=0.72\textwidth]{ui_evidence_panel.png}
-  \caption{Web UI during a live session. The top row sets language pair,
-  latency multiplier, and terminology mode (Auto or Fixed); the chips and the
-  panel below render the JSON evidence stream: active glossary, router
-  confidence, retrieved term pairs with retrieval scores, and per-chunk
-  retrieval/generation latency.
-  % TODO(recapture): screenshot still shows the old common-terms session;
-  % replace per docs/demo_screencast_script.md, then delete this note.
-  The shown session uses a diagnostic slice; production sessions start from
-  domain slices.}
+  \caption{Web UI during a live En$\rightarrow$Zh session, moments after the
+  automatic switch to the medicine slice. The translucent panel renders the
+  JSON evidence stream over the settings card: retrieved term pairs with
+  retrieval scores and their source slice (\texttt{auto:medicine\_core\_10k}),
+  per-chunk retrieval latency, and the streaming translation with retrieved
+  terminology hits highlighted inline. The latency multiplier was changed
+  live mid-session (status chip).}
   \label{fig:ui}
 \end{figure*}
 

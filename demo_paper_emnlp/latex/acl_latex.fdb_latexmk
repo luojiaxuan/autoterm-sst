@@ -1,13 +1,13 @@
 # Fdb version 4
-["bibtex latex/acl_latex"] 1783638091.51656 "latex/acl_latex.aux" "latex/acl_latex.bbl" "latex/acl_latex" 1783640076.35596 0
+["bibtex latex/acl_latex"] 1783642120.82672 "latex/acl_latex.aux" "latex/acl_latex.bbl" "latex/acl_latex" 1783642122.05314 0
   "acl_natbib.bst" 0 -1 0 ""
-  "latex/acl_latex.aux" 1783640076.0904 15183 98cb71e5c934c2df839d5328b4635594 "pdflatex"
+  "latex/acl_latex.aux" 1783642121.80239 14749 61eb646dc125576f3d15f4aaf08feabb "pdflatex"
   "latex/custom.bib" 1783630823.06893 7298 bdb18c9134393b60f170ea07be681c21 ""
   (generated)
   "latex/acl_latex.bbl"
   "latex/acl_latex.blg"
   (rewritten before read)
-["pdflatex"] 1783640075.27173 "latex/acl_latex.tex" "latex/acl_latex.pdf" "acl_latex" 1783640076.35618 0
+["pdflatex"] 1783642120.93528 "latex/acl_latex.tex" "latex/acl_latex.pdf" "acl_latex" 1783642122.05334 0
   "/opt/homebrew/Cellar/texlive/20260301/share/texmf-dist/fonts/enc/dvips/base/8r.enc" 1772380719 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "/opt/homebrew/Cellar/texlive/20260301/share/texmf-dist/fonts/enc/dvips/inconsolata/i4-t1-0.enc" 1772380719 7631 5169ff1acd97ff1c4ab83563c99f96f4 ""
   "/opt/homebrew/Cellar/texlive/20260301/share/texmf-dist/fonts/map/fontname/texfonts.map" 1772380719 3524 cb3e574dea2d1052e39280babc910dc8 ""
@@ -146,11 +146,11 @@
   "/opt/homebrew/Cellar/texlive/20260301/share/texmf-dist/web2c/texmf.cnf" 1772380719 43633 14bbc273cebd985e64ab1a698333eaf9 ""
   "/opt/homebrew/Cellar/texlive/20260301/share/texmf-var/web2c/pdftex/pdflatex.fmt" 1772380719 3636958 d2062700e4b629ba1467c28603bfdc8d ""
   "latex/acl.sty" 1783384753.87209 11597 da9a94cfb2d73b4ccce758d297ef675a ""
-  "latex/acl_latex.aux" 1783640076.0904 15183 98cb71e5c934c2df839d5328b4635594 "pdflatex"
-  "latex/acl_latex.bbl" 1783638091.60404 7374 49fcfa74d72345e0f9912cdab77e5182 "bibtex latex/acl_latex"
-  "latex/acl_latex.out" 1783640076.09232 1860 af864ff7555703f831697a4911f0135d "pdflatex"
+  "latex/acl_latex.aux" 1783642121.80239 14749 61eb646dc125576f3d15f4aaf08feabb "pdflatex"
+  "latex/acl_latex.bbl" 1783642120.92367 7374 49fcfa74d72345e0f9912cdab77e5182 "bibtex latex/acl_latex"
+  "latex/acl_latex.out" 1783642121.8041 1860 af864ff7555703f831697a4911f0135d "pdflatex"
   "latex/acl_latex.tex" 1783632640.3154 2910 0780fb29dc6037a31cfbfb9b9388f5f9 ""
-  "latex/figures/autoterm_architecture.pdf" 1783640059.39513 145598 268013de9a61794b3148b9b936aace8f ""
+  "latex/figures/autoterm_architecture.pdf" 1783642074.18413 145606 f9779cc4b7fb21b36c1526a8649b716c ""
   "latex/figures/routing_timeline_4block.png" 1783634545.50684 48746 668d7e9c9ba11a6a826c5583788acc90 ""
   "latex/figures/ui_evidence_panel.png" 1783634545.54915 159332 2f26d5b21b71e6274a5a0c712fcca7ff ""
   "latex/sections/0_abstract.tex" 1783633131.44208 1378 0dd795eeb7e3ac3f656f32bb684b5466 ""
@@ -158,10 +158,10 @@
   "latex/sections/2_related_works.tex" 1783632640.34483 2210 eb1eed08f4aa67ee51d560c673ba6f7d ""
   "latex/sections/3_system_overview.tex" 1783638028.68253 3232 0b19a601f2c80223973e63a9578bf463 ""
   "latex/sections/4_adaptive_memory.tex" 1783636294.49206 4620 a335fdafec055a963aa74883a81f88b1 ""
-  "latex/sections/5_demo_interface.tex" 1783634177.89917 3156 b5228998570d052790ccd8dd0fdfc835 ""
-  "latex/sections/6_evaluation.tex" 1783634042.54757 7016 633c3e4cc110e20f3d089272e524fbe9 ""
-  "latex/sections/7_limitations_conclusion.tex" 1783633285.73787 1468 a90c0fde06d6e7b378f65e0bd38a35fd ""
-  "latex/sections/8_appendix.tex" 1783636294.49761 8919 3bb6b0d9211a3873fa21bfcca075b5cd ""
+  "latex/sections/5_demo_interface.tex" 1783640591.43432 3156 3f8f93792de8c415034a6d886caee14b ""
+  "latex/sections/6_evaluation.tex" 1783640772.78483 6328 8ce74b0679d9a988818380fb4f65e94c ""
+  "latex/sections/7_limitations_conclusion.tex" 1783640894.18536 1427 e778a9edc8bca3bfe0088ad70b9312f6 ""
+  "latex/sections/8_appendix.tex" 1783640749.29162 9756 3266bbe55415519e23ed58f4493d39aa ""
   (generated)
   "latex/acl_latex.aux"
   "latex/acl_latex.log"

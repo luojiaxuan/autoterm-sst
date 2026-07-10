@@ -44,7 +44,7 @@
   <rect width="1800" height="760" fill="#FFFFFF"/>
 
   <!-- Example translations are aligned with the two speech snapshots below. -->
-  <text x="365" y="30" class="translation" text-anchor="middle" dominant-baseline="central">
+  <text x="365" y="32" class="translation" text-anchor="middle" dominant-baseline="central">
     <tspan>……我们改进</tspan><tspan fill="#3B7F2B" font-weight="700">语义角色标注</tspan><tspan>……</tspan>
   </text>
   <rect x="230" y="56" width="270" height="34" fill="#FFFFFF" stroke="#C86A32" stroke-width="2"/>

@@ -11,6 +11,7 @@ from eval.streaming_sst.score_autoterm_story import (
     validate_timing_compatible,
 )
 from eval.streaming_sst.score_time_aligned_terms import TimedOccurrence
+from eval.streaming_sst.selected_window_smoke import FROZEN4_WINDOWS, PROTOCOL_ID
 
 
 def make_payload(*, item_id: str = "talk-1", text: str = "术语甲") -> dict:
@@ -55,6 +56,35 @@ def occurrence(term: str, translation: str, start: float) -> TimedOccurrence:
     )
 
 
+def selected_window_payload() -> dict:
+    payload = make_payload()
+    payload["config"]["selected_window_protocol"] = PROTOCOL_ID
+    payload["blocks"] = []
+    payload["block_spans"] = []
+    cursor = 0
+    for block_index, window in enumerate(FROZEN4_WINDOWS, start=1):
+        common = {
+            "item_id": window.item_id,
+            "original_item_id": window.original_item_id,
+            "corpus": window.corpus,
+            "expected_domain": window.expected_domain,
+            "source_offset_samples": window.source_offset_samples,
+            "source_end_samples": window.source_end_samples,
+        }
+        payload["blocks"].append(dict(common))
+        payload["block_spans"].append(
+            {
+                **common,
+                "block_index": block_index,
+                "start_sample": cursor,
+                "end_sample": cursor + window.sample_count,
+                "sample_count": window.sample_count,
+            }
+        )
+        cursor += window.sample_count
+    return payload
+
+
 def fake_bleu_scores(*, hypothesis: str, reference: str, target_terms: list[str], sacrebleu_tokenizer: str) -> dict:
     del hypothesis, reference, sacrebleu_tokenizer
     return {
@@ -87,6 +117,7 @@ class AutoTermStoryScorecardTests(unittest.TestCase):
         *,
         expected: int | None = 2,
         allow_timing_mismatch: bool = False,
+        selected_window_smoke: bool = False,
     ) -> dict:
         with patch(
             "eval.streaming_sst.score_autoterm_story.compute_bleu_scores",
@@ -104,6 +135,7 @@ class AutoTermStoryScorecardTests(unittest.TestCase):
                 prompt_alignment_tolerance_s=0.0,
                 expected_raw_denominator=expected,
                 allow_timing_mismatch=allow_timing_mismatch,
+                selected_window_smoke=selected_window_smoke,
             )
 
     def test_headline_uses_only_fixed_raw_mfa_denominator(self) -> None:
@@ -123,6 +155,21 @@ class AutoTermStoryScorecardTests(unittest.TestCase):
     def test_rejects_denominator_drift_from_explicit_assertion(self) -> None:
         with self.assertRaisesRegex(ValueError, "denominator is 2, expected 3"):
             self.build(expected=3)
+
+    def test_selected_window_smoke_enforces_protocol_and_fixed_179_denominator(self) -> None:
+        with self.assertRaisesRegex(ValueError, "selected-window protocol is invalid"):
+            self.build(selected_window_smoke=True)
+
+        payloads = {role: selected_window_payload() for role in RUN_ROLES}
+        with self.assertRaisesRegex(ValueError, "denominator is 2, expected 179"):
+            self.build(
+                payloads,
+                expected=None,
+                selected_window_smoke=True,
+            )
+
+    def test_full_protocol_report_does_not_add_selected_window_metadata(self) -> None:
+        self.assertNotIn("selected_window_smoke", self.build()["protocol"])
 
     def test_rejects_playlist_mismatch(self) -> None:
         payloads = copy.deepcopy(self.payloads)

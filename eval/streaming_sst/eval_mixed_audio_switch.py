@@ -35,6 +35,12 @@ from eval.streaming_sst.eval_mixed_domain_switch import (  # noqa: E402
     DEFAULT_ACL_ROOT,
     DEFAULT_MEDICINE_AUDIO_DIR,
 )
+from eval.streaming_sst.selected_window_smoke import (  # noqa: E402
+    FROZEN4_WINDOWS,
+    PROTOCOL_ID as SELECTED_WINDOW_PROTOCOL_ID,
+    SelectedWindow,
+    protocol_manifest as selected_window_protocol_manifest,
+)
 from framework.agents.term_memory.domain_taxonomy import domain_for_preset  # noqa: E402
 
 TARGET_SAMPLE_RATE = 16000
@@ -46,6 +52,10 @@ class AudioBlock:
     expected_domain: str
     corpus: str
     wav_paths: Sequence[str]
+    wav_ranges: Sequence[Tuple[int, int]] = ()
+    original_item_id: str = ""
+    source_offset_samples: int = 0
+    source_end_samples: int = 0
 
 
 @dataclass(frozen=True)
@@ -58,6 +68,9 @@ class AudioBlockSpan:
     end_sample: int
     sample_count: int
     wav_count: int
+    original_item_id: str = ""
+    source_offset_samples: int = 0
+    source_end_samples: int = 0
 
     @property
     def start_s(self) -> float:
@@ -83,6 +96,7 @@ def read_acl_audio_blocks(
     *,
     limit_items: int,
     max_segs_per_talk: int = 0,
+    talk_ids: Optional[Sequence[str]] = None,
 ) -> List[AudioBlock]:
     if int(limit_items) <= 0:
         return []
@@ -104,8 +118,18 @@ def read_acl_audio_blocks(
             continue
         by_talk.setdefault(talk_id, []).append(wav_path)
 
+    selected_talks: Sequence[str]
+    if talk_ids:
+        selected_talks = [str(talk_id).strip() for talk_id in talk_ids]
+        missing = [talk_id for talk_id in selected_talks if talk_id not in by_talk]
+        if missing:
+            raise FileNotFoundError(f"ACL talk id(s) not found: {', '.join(missing)}")
+    else:
+        selected_talks = list(by_talk)
+
     blocks: List[AudioBlock] = []
-    for talk_id, wavs in by_talk.items():
+    for talk_id in selected_talks:
+        wavs = by_talk[talk_id]
         selected = [path for path in wavs if Path(path).is_file()]
         if int(max_segs_per_talk) > 0:
             selected = selected[: int(max_segs_per_talk)]
@@ -182,6 +206,105 @@ def build_schedule(
     raise ValueError(f"unknown schedule: {schedule}")
 
 
+def _block_wav_ranges(block: AudioBlock) -> List[Tuple[str, int, int]]:
+    if block.wav_ranges and len(block.wav_ranges) != len(block.wav_paths):
+        raise ValueError(
+            f"{block.item_id}: wav_ranges={len(block.wav_ranges)} does not match "
+            f"wav_paths={len(block.wav_paths)}"
+        )
+    ranges: List[Tuple[str, int, int]] = []
+    for index, path in enumerate(block.wav_paths):
+        frames = wav_num_frames(path)
+        if block.wav_ranges:
+            start_frame, end_frame = block.wav_ranges[index]
+        else:
+            start_frame, end_frame = 0, frames
+        start_frame = int(start_frame)
+        end_frame = int(end_frame)
+        if start_frame < 0 or end_frame <= start_frame or end_frame > frames:
+            raise ValueError(
+                f"{block.item_id}: invalid wav range [{start_frame}, {end_frame}) "
+                f"for {frames}-frame file {path}"
+            )
+        ranges.append((str(path), start_frame, end_frame))
+    return ranges
+
+
+def slice_audio_block(block: AudioBlock, window: SelectedWindow) -> AudioBlock:
+    original_item_id = block.original_item_id or block.item_id
+    if original_item_id != window.original_item_id:
+        raise ValueError(
+            f"cannot apply {window.original_item_id} window to block {original_item_id}"
+        )
+    if block.corpus != window.corpus or block.expected_domain != window.expected_domain:
+        raise ValueError(
+            f"{original_item_id}: block corpus/domain does not match selected-window protocol"
+        )
+    if block.wav_ranges:
+        raise ValueError(f"{original_item_id}: cannot window an already sliced block")
+
+    selected_paths: List[str] = []
+    selected_ranges: List[Tuple[int, int]] = []
+    source_cursor = 0
+    for path in block.wav_paths:
+        frames = wav_num_frames(path)
+        source_end = source_cursor + frames
+        overlap_start = max(source_cursor, window.source_offset_samples)
+        overlap_end = min(source_end, window.source_end_samples)
+        if overlap_end > overlap_start:
+            selected_paths.append(str(path))
+            selected_ranges.append(
+                (overlap_start - source_cursor, overlap_end - source_cursor)
+            )
+        source_cursor = source_end
+    if window.source_end_samples > source_cursor:
+        raise ValueError(
+            f"{original_item_id}: selected window ends at {window.source_end_samples}, "
+            f"after source audio ends at {source_cursor}"
+        )
+    selected_samples = sum(end - start for start, end in selected_ranges)
+    if selected_samples != window.sample_count:
+        raise RuntimeError(
+            f"{original_item_id}: selected {selected_samples} samples, "
+            f"expected {window.sample_count}"
+        )
+    return AudioBlock(
+        item_id=window.item_id,
+        expected_domain=block.expected_domain,
+        corpus=block.corpus,
+        wav_paths=selected_paths,
+        wav_ranges=selected_ranges,
+        original_item_id=original_item_id,
+        source_offset_samples=window.source_offset_samples,
+        source_end_samples=window.source_end_samples,
+    )
+
+
+def build_selected_window_blocks(
+    acl_blocks: Sequence[AudioBlock],
+    medicine_blocks: Sequence[AudioBlock],
+    *,
+    windows: Sequence[SelectedWindow] = FROZEN4_WINDOWS,
+) -> List[AudioBlock]:
+    available = {
+        (block.original_item_id or block.item_id): block
+        for block in [*acl_blocks, *medicine_blocks]
+    }
+    missing = [
+        window.original_item_id
+        for window in windows
+        if window.original_item_id not in available
+    ]
+    if missing:
+        raise ValueError(
+            "selected-window source block(s) are unavailable: " + ", ".join(missing)
+        )
+    return [
+        slice_audio_block(available[window.original_item_id], window)
+        for window in windows
+    ]
+
+
 def build_spans(
     blocks: Sequence[AudioBlock],
     *,
@@ -192,10 +315,10 @@ def build_spans(
     max_samples = int(round(float(max_seconds_per_item) * TARGET_SAMPLE_RATE)) if max_seconds_per_item > 0 else 0
     for idx, block in enumerate(blocks, start=1):
         total = 0
-        for path in block.wav_paths:
+        for _path, start_frame, end_frame in _block_wav_ranges(block):
             if max_samples and total >= max_samples:
                 break
-            frames = wav_num_frames(path)
+            frames = end_frame - start_frame
             if max_samples:
                 frames = min(frames, max_samples - total)
             total += max(0, frames)
@@ -209,6 +332,9 @@ def build_spans(
                 end_sample=cursor + total,
                 sample_count=total,
                 wav_count=len(block.wav_paths),
+                original_item_id=block.original_item_id,
+                source_offset_samples=block.source_offset_samples,
+                source_end_samples=block.source_end_samples,
             )
         )
         cursor += total
@@ -238,11 +364,26 @@ def wav_num_frames(path: str) -> int:
         return int(handle.getnframes())
 
 
-def read_wav(path: str, *, max_frames: int = 0) -> np.ndarray:
+def read_wav(
+    path: str,
+    *,
+    start_frame: int = 0,
+    end_frame: int = 0,
+    max_frames: int = 0,
+) -> np.ndarray:
     with wave.open(path) as handle:
         if handle.getframerate() != TARGET_SAMPLE_RATE:
             raise ValueError(f"expected {TARGET_SAMPLE_RATE} Hz wav, got {handle.getframerate()}: {path}")
-        frames = int(handle.getnframes())
+        total_frames = int(handle.getnframes())
+        start_frame = int(start_frame)
+        end_frame = int(end_frame) if end_frame else total_frames
+        if start_frame < 0 or end_frame <= start_frame or end_frame > total_frames:
+            raise ValueError(
+                f"invalid wav range [{start_frame}, {end_frame}) for "
+                f"{total_frames}-frame file {path}"
+            )
+        handle.setpos(start_frame)
+        frames = end_frame - start_frame
         if max_frames > 0:
             frames = min(frames, max_frames)
         raw = handle.readframes(frames)
@@ -259,11 +400,16 @@ def iter_pcm_chunks(
     max_samples = int(round(float(max_seconds_per_item) * TARGET_SAMPLE_RATE)) if max_seconds_per_item > 0 else 0
     for block in blocks:
         emitted_for_block = 0
-        for path in block.wav_paths:
+        for path, start_frame, end_frame in _block_wav_ranges(block):
             remaining = max_samples - emitted_for_block if max_samples else 0
             if max_samples and remaining <= 0:
                 break
-            pcm = read_wav(path, max_frames=remaining if max_samples else 0)
+            pcm = read_wav(
+                path,
+                start_frame=start_frame,
+                end_frame=end_frame,
+                max_frames=remaining if max_samples else 0,
+            )
             emitted_for_block += int(pcm.shape[0])
             if carry.size:
                 pcm = np.concatenate([carry, pcm]).astype(np.float32, copy=False)
@@ -1187,6 +1333,47 @@ def _medicine_audio_sort_key(path: Path) -> Any:
     return (len(stem), stem)
 
 
+def audio_block_payload(block: AudioBlock) -> Dict[str, Any]:
+    payload: Dict[str, Any] = {
+        "item_id": block.item_id,
+        "expected_domain": block.expected_domain,
+        "corpus": block.corpus,
+        "wav_paths": list(block.wav_paths),
+    }
+    if block.original_item_id:
+        payload.update(
+            {
+                "wav_ranges": [list(value) for value in block.wav_ranges],
+                "original_item_id": block.original_item_id,
+                "source_offset_samples": block.source_offset_samples,
+                "source_end_samples": block.source_end_samples,
+            }
+        )
+    return payload
+
+
+def audio_span_payload(span: AudioBlockSpan) -> Dict[str, Any]:
+    payload: Dict[str, Any] = {
+        "block_index": span.block_index,
+        "item_id": span.item_id,
+        "corpus": span.corpus,
+        "expected_domain": span.expected_domain,
+        "start_sample": span.start_sample,
+        "end_sample": span.end_sample,
+        "sample_count": span.sample_count,
+        "wav_count": span.wav_count,
+    }
+    if span.original_item_id:
+        payload.update(
+            {
+                "original_item_id": span.original_item_id,
+                "source_offset_samples": span.source_offset_samples,
+                "source_end_samples": span.source_end_samples,
+            }
+        )
+    return payload
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--base-url", default="http://127.0.0.1:8011")
@@ -1195,6 +1382,15 @@ def main() -> None:
     ap.add_argument("--acl-items", type=int, default=5)
     ap.add_argument("--medicine-items", type=int, default=5)
     ap.add_argument("--medicine-ids", default="")
+    ap.add_argument(
+        "--selected-window-protocol",
+        choices=(SELECTED_WINDOW_PROTOCOL_ID,),
+        default="",
+        help=(
+            "opt into the frozen four-block talk-local smoke windows; full-talk "
+            "evaluation remains the default"
+        ),
+    )
     ap.add_argument("--max-acl-segs-per-talk", type=int, default=0)
     ap.add_argument("--max-seconds-per-item", type=float, default=0.0)
     ap.add_argument(
@@ -1263,19 +1459,55 @@ def main() -> None:
     except ValueError as exc:
         ap.error(str(exc))
 
-    acl_blocks = read_acl_audio_blocks(
-        args.acl_root,
-        limit_items=args.acl_items,
-        max_segs_per_talk=args.max_acl_segs_per_talk,
-    )
-    medicine_ids = [item.strip() for item in str(args.medicine_ids or "").split(",") if item.strip()]
-    medicine_limit = len(medicine_ids) if medicine_ids else args.medicine_items
-    medicine_blocks = read_medicine_audio_blocks(
-        args.medicine_audio_dir,
-        limit_items=medicine_limit,
-        medicine_ids=medicine_ids,
-    )
-    blocks = build_schedule(acl_blocks, medicine_blocks, schedule=args.schedule, seed=args.seed)
+    if args.selected_window_protocol:
+        if args.max_seconds_per_item > 0 or args.max_acl_segs_per_talk > 0:
+            ap.error(
+                "--selected-window-protocol cannot be combined with "
+                "--max-seconds-per-item or --max-acl-segs-per-talk"
+            )
+        if args.schedule != "alternating":
+            ap.error("--selected-window-protocol requires --schedule alternating")
+        medicine_ids = ["545006", "606"]
+        acl_talk_ids = [
+            window.original_item_id
+            for window in FROZEN4_WINDOWS
+            if window.corpus == "acl"
+        ]
+        acl_blocks = read_acl_audio_blocks(
+            args.acl_root,
+            limit_items=len(acl_talk_ids),
+            max_segs_per_talk=0,
+            talk_ids=acl_talk_ids,
+        )
+        medicine_blocks = read_medicine_audio_blocks(
+            args.medicine_audio_dir,
+            limit_items=2,
+            medicine_ids=medicine_ids,
+        )
+        blocks = build_selected_window_blocks(acl_blocks, medicine_blocks)
+    else:
+        acl_blocks = read_acl_audio_blocks(
+            args.acl_root,
+            limit_items=args.acl_items,
+            max_segs_per_talk=args.max_acl_segs_per_talk,
+        )
+        medicine_ids = [
+            item.strip()
+            for item in str(args.medicine_ids or "").split(",")
+            if item.strip()
+        ]
+        medicine_limit = len(medicine_ids) if medicine_ids else args.medicine_items
+        medicine_blocks = read_medicine_audio_blocks(
+            args.medicine_audio_dir,
+            limit_items=medicine_limit,
+            medicine_ids=medicine_ids,
+        )
+        blocks = build_schedule(
+            acl_blocks,
+            medicine_blocks,
+            schedule=args.schedule,
+            seed=args.seed,
+        )
     if not blocks:
         raise SystemExit("no audio blocks found")
     chunk_samples = resolve_chunk_samples(args.chunk, args.base_segment_sec, args.latency_multiplier)
@@ -1294,35 +1526,43 @@ def main() -> None:
         "",
     )
     effective_initial_preset = oracle_preset_map.get(first_domain, args.preset)
+    config: Dict[str, Any] = {
+        "schedule": args.schedule,
+        "seed": args.seed,
+        "preset": args.preset,
+        "effective_initial_preset": effective_initial_preset,
+        "oracle_enabled": bool(oracle_preset_map),
+        "oracle_preset_map": dict(oracle_preset_map),
+        "oracle_switch_timeout_sec": args.oracle_switch_timeout_sec,
+        "language_pair": args.language_pair,
+        "latency_multiplier": args.latency_multiplier,
+        "chunk_samples": chunk_samples,
+        "chunk_seconds": round(chunk_samples / TARGET_SAMPLE_RATE, 3),
+        "feed_sleep": args.feed_sleep,
+        "max_unacked_chunks": args.max_unacked_chunks,
+        "max_unacked_samples": args.max_unacked_chunks * chunk_samples,
+        "backpressure_enabled": args.max_unacked_chunks > 0,
+        "backpressure_stall_timeout_sec": args.backpressure_stall_timeout_sec,
+        "idle_timeout_sec": args.idle_timeout_sec,
+        "idle_timeouts_after_eof": args.idle_timeouts_after_eof,
+        "max_seconds_per_item": args.max_seconds_per_item,
+        "max_acl_segs_per_talk": args.max_acl_segs_per_talk,
+        "medicine_ids": medicine_ids,
+        "base_url": args.base_url,
+        "max_switch_events": max_switch_events,
+        "max_switch_seconds": args.max_switch_seconds,
+    }
+    if args.selected_window_protocol:
+        config.update(
+            {
+                "selected_window_protocol": args.selected_window_protocol,
+                "selected_window_manifest": selected_window_protocol_manifest(),
+            }
+        )
     payload: Dict[str, Any] = {
-        "config": {
-            "schedule": args.schedule,
-            "seed": args.seed,
-            "preset": args.preset,
-            "effective_initial_preset": effective_initial_preset,
-            "oracle_enabled": bool(oracle_preset_map),
-            "oracle_preset_map": dict(oracle_preset_map),
-            "oracle_switch_timeout_sec": args.oracle_switch_timeout_sec,
-            "language_pair": args.language_pair,
-            "latency_multiplier": args.latency_multiplier,
-            "chunk_samples": chunk_samples,
-            "chunk_seconds": round(chunk_samples / TARGET_SAMPLE_RATE, 3),
-            "feed_sleep": args.feed_sleep,
-            "max_unacked_chunks": args.max_unacked_chunks,
-            "max_unacked_samples": args.max_unacked_chunks * chunk_samples,
-            "backpressure_enabled": args.max_unacked_chunks > 0,
-            "backpressure_stall_timeout_sec": args.backpressure_stall_timeout_sec,
-            "idle_timeout_sec": args.idle_timeout_sec,
-            "idle_timeouts_after_eof": args.idle_timeouts_after_eof,
-            "max_seconds_per_item": args.max_seconds_per_item,
-            "max_acl_segs_per_talk": args.max_acl_segs_per_talk,
-            "medicine_ids": medicine_ids,
-            "base_url": args.base_url,
-            "max_switch_events": max_switch_events,
-            "max_switch_seconds": args.max_switch_seconds,
-        },
-        "blocks": [block.__dict__ for block in blocks],
-        "block_spans": [span.__dict__ for span in spans],
+        "config": config,
+        "blocks": [audio_block_payload(block) for block in blocks],
+        "block_spans": [audio_span_payload(span) for span in spans],
         "summary": {},
         "domain_transitions": [],
         "oracle": {

@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-"""Collect auditable bilingual domain candidates from Wikidata and Wikipedia.
+"""Collect auditable bilingual topic candidates from Wikidata and Wikipedia.
 
-Each domain starts with entities whose ``instance of`` / ``subclass of`` path
+Each collection unit starts with entities whose ``instance of`` / ``subclass of`` path
 reaches a Wikidata root concept.  When that strict RDF slice has fewer than the
 requested number of bilingual labels, the collector traverses the matching
 English Wikipedia category tree and keeps pages with a Chinese language link.
 Every output row retains either a QID or its category path.
+
+The original eight-domain CLI remains the default.  ``--topic-specs`` enables a
+frozen, data-driven topic catalog without changing the legacy constants.
 """
 
 from __future__ import annotations
@@ -23,7 +26,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections import deque
+from collections import Counter, deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Sequence, Tuple
@@ -165,6 +168,172 @@ WIKIPEDIA_DEEPCAT_CATEGORIES: Dict[str, Tuple[str, ...]] = {
         "Photography",
     ),
 }
+
+TOPIC_SPEC_SCHEMA_VERSION = 1
+_TOPIC_ID = re.compile(r"^[a-z][a-z0-9_]*$")
+_WIKIDATA_QID = re.compile(r"^Q[1-9][0-9]*$")
+
+
+@dataclass(frozen=True)
+class CollectionUnit:
+    """Validated inputs for one legacy domain or one frozen topic."""
+
+    unit_id: str
+    macro_domain: str
+    router_label: str
+    router_description: str
+    seed_terms: Tuple[str, ...]
+    wikidata_root_qids: Tuple[str, ...]
+    wikidata_exact_p31_qids: Tuple[str, ...]
+    wikipedia_root_categories: Tuple[str, ...]
+    wikipedia_query_categories: Tuple[str, ...]
+    wikipedia_reserve_categories: Tuple[str, ...]
+    skip_rdf_root: bool = False
+
+    @property
+    def all_wikipedia_queries(self) -> Tuple[str, ...]:
+        return self.wikipedia_query_categories + self.wikipedia_reserve_categories
+
+
+def _required_string_list(raw: Mapping[str, Any], field: str, *, minimum: int = 1) -> Tuple[str, ...]:
+    value = raw.get(field)
+    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+        raise ValueError(f"{field} must be a list of strings")
+    cleaned = tuple(" ".join(item.split()) for item in value if item.strip())
+    if len(cleaned) < minimum:
+        raise ValueError(f"{field} must contain at least {minimum} non-empty values")
+    if len(set(item.casefold() for item in cleaned)) != len(cleaned):
+        raise ValueError(f"{field} contains duplicate values")
+    return cleaned
+
+
+def validate_topic_catalog(payload: Mapping[str, Any]) -> List[CollectionUnit]:
+    """Validate the frozen 100-topic contract and return collection units."""
+
+    if payload.get("schema_version") != TOPIC_SPEC_SCHEMA_VERSION:
+        raise ValueError(
+            f"schema_version must be {TOPIC_SPEC_SCHEMA_VERSION}, got {payload.get('schema_version')!r}"
+        )
+    if payload.get("target_topics") != 100:
+        raise ValueError("target_topics must be exactly 100")
+    policy = payload.get("candidate_policy")
+    if not isinstance(policy, dict):
+        raise ValueError("candidate_policy must be an object")
+    target_rows = int(policy.get("target_rows_per_topic") or 0)
+    collection_rows = int(policy.get("collection_rows_per_topic") or 0)
+    preflight_rows = int(policy.get("cheap_preflight_min_raw_candidates") or 0)
+    if target_rows != 10_000:
+        raise ValueError("candidate_policy.target_rows_per_topic must be exactly 10000")
+    if collection_rows < target_rows:
+        raise ValueError("candidate_policy.collection_rows_per_topic must cover target rows")
+    if preflight_rows < target_rows:
+        raise ValueError("candidate_policy cheap preflight must cover target rows")
+    for field in ("global_dedupe_key", "refill_policy"):
+        if not str(policy.get(field) or "").strip():
+            raise ValueError(f"candidate_policy.{field} is required")
+    macro_domains = _required_string_list(payload, "macro_domains", minimum=10)
+    if len(macro_domains) != 10:
+        raise ValueError("macro_domains must contain exactly 10 values")
+    raw_topics = payload.get("topics")
+    if not isinstance(raw_topics, list) or len(raw_topics) != 100:
+        raise ValueError("topics must contain exactly 100 entries")
+
+    required_fields = {
+        "topic_id",
+        "macro_domain",
+        "router_label",
+        "router_description",
+        "seed_terms",
+        "wikidata_root_qids",
+        "wikidata_exact_p31_qids",
+        "wikipedia_category_roots",
+        "wikipedia_reserve_category_roots",
+    }
+    units: List[CollectionUnit] = []
+    for index, raw in enumerate(raw_topics):
+        if not isinstance(raw, dict):
+            raise ValueError(f"topics[{index}] must be an object")
+        missing = sorted(required_fields - raw.keys())
+        if missing:
+            raise ValueError(f"topics[{index}] missing required fields: {', '.join(missing)}")
+        topic_id = str(raw["topic_id"]).strip()
+        macro_domain = str(raw["macro_domain"]).strip()
+        router_label = str(raw["router_label"]).strip()
+        router_description = str(raw["router_description"]).strip()
+        if not _TOPIC_ID.fullmatch(topic_id):
+            raise ValueError(f"topics[{index}].topic_id is not a stable snake-case id: {topic_id!r}")
+        if macro_domain not in macro_domains:
+            raise ValueError(f"{topic_id}: unknown macro_domain {macro_domain!r}")
+        if not topic_id.startswith(f"{macro_domain}_"):
+            raise ValueError(f"{topic_id}: topic_id must start with macro_domain prefix")
+        if not router_label or not router_description:
+            raise ValueError(f"{topic_id}: router_label and router_description are required")
+
+        seed_terms = _required_string_list(raw, "seed_terms", minimum=3)
+        qids = _required_string_list(raw, "wikidata_root_qids")
+        exact_qids = _required_string_list(raw, "wikidata_exact_p31_qids", minimum=0)
+        for qid in (*qids, *exact_qids):
+            if not _WIKIDATA_QID.fullmatch(qid):
+                raise ValueError(f"{topic_id}: invalid Wikidata QID {qid!r}")
+        category_roots = _required_string_list(raw, "wikipedia_category_roots")
+        reserve_roots = _required_string_list(raw, "wikipedia_reserve_category_roots")
+        overlap = set(item.casefold() for item in category_roots) & set(
+            item.casefold() for item in reserve_roots
+        )
+        if overlap:
+            raise ValueError(f"{topic_id}: primary/reserve category overlap: {sorted(overlap)}")
+        units.append(
+            CollectionUnit(
+                unit_id=topic_id,
+                macro_domain=macro_domain,
+                router_label=router_label,
+                router_description=router_description,
+                seed_terms=seed_terms,
+                wikidata_root_qids=qids,
+                wikidata_exact_p31_qids=exact_qids,
+                wikipedia_root_categories=category_roots + reserve_roots,
+                wikipedia_query_categories=category_roots,
+                wikipedia_reserve_categories=reserve_roots,
+            )
+        )
+
+    topic_ids = [unit.unit_id for unit in units]
+    if len(set(topic_ids)) != len(topic_ids):
+        duplicates = sorted(topic_id for topic_id, count in Counter(topic_ids).items() if count > 1)
+        raise ValueError(f"duplicate topic_id values: {', '.join(duplicates)}")
+    counts = Counter(unit.macro_domain for unit in units)
+    expected_counts = {macro_domain: 10 for macro_domain in macro_domains}
+    if dict(counts) != expected_counts:
+        raise ValueError(f"each macro domain must have exactly 10 topics; got {dict(counts)}")
+    return units
+
+
+def load_topic_specs(path: Path) -> Tuple[Mapping[str, Any], List[CollectionUnit]]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("topic spec root must be a JSON object")
+    return payload, validate_topic_catalog(payload)
+
+
+def legacy_domain_units(domains: Sequence[str]) -> List[CollectionUnit]:
+    """Map the old hard-coded domain flags onto the generic collection loop."""
+
+    return [
+        CollectionUnit(
+            unit_id=domain,
+            macro_domain=domain,
+            router_label=domain.replace("_", " ").title(),
+            router_description=f"Legacy {domain} domain collection.",
+            seed_terms=(),
+            wikidata_root_qids=(WIKIDATA_ROOTS[domain],),
+            wikidata_exact_p31_qids=WIKIDATA_EXACT_P31_TYPES.get(domain, ()),
+            wikipedia_root_categories=WIKIPEDIA_ROOT_CATEGORIES[domain],
+            wikipedia_query_categories=WIKIPEDIA_DEEPCAT_CATEGORIES[domain],
+            wikipedia_reserve_categories=(),
+            skip_rdf_root=domain in WIKIDATA_SKIP_ABSTRACT_ROOT,
+        )
+        for domain in domains
+    ]
 
 _BAD_TITLE_PREFIXES = (
     "list of ",
@@ -580,13 +749,14 @@ def collect_deep_category_rows(
     *,
     domain: str,
     root_categories: Sequence[str],
+    category_queries: Sequence[str] | None = None,
     target_rows: int,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     rows: Dict[str, Dict[str, Any]] = {}
     query_stats: List[Dict[str, Any]] = []
     queries: List[Tuple[str, str]] = []
-    category_queries = WIKIPEDIA_DEEPCAT_CATEGORIES[domain]
-    for index, category in enumerate(category_queries):
+    configured_categories = tuple(category_queries or WIKIPEDIA_DEEPCAT_CATEGORIES[domain])
+    for index, category in enumerate(configured_categories):
         root = root_categories[index % len(root_categories)]
         queries.append((root, f"Category:{category.removeprefix('Category:')}"))
 
@@ -618,10 +788,100 @@ def collect_deep_category_rows(
     )
     return result[:target_rows], {
         "backend": "cirrussearch_deepcat",
-        "configured_categories": list(category_queries),
+        "configured_categories": list(configured_categories),
         "queries": query_stats,
         "query_count": len(query_stats),
         "rows_with_zh_langlink": len(result),
+    }
+
+
+def _deep_category_total_hits(
+    client: WikimediaClient,
+    category: str,
+) -> Tuple[int, str]:
+    """Return CirrusSearch's cheap raw-hit estimate for one category."""
+
+    category_name = category.removeprefix("Category:")
+    payload = client.get_json(
+        "https://en.wikipedia.org/w/api.php",
+        {
+            "action": "query",
+            "format": "json",
+            "formatversion": 2,
+            "list": "search",
+            "srsearch": f'deepcat:"{category_name}"',
+            "srnamespace": 0,
+            "srlimit": 1,
+        },
+    )
+    raw_hits = payload.get("query", {}).get("searchinfo", {}).get("totalhits", 0)
+    warning = str((payload.get("warnings", {}).get("search") or {}).get("warnings") or "")
+    try:
+        hits = int(raw_hits)
+    except (TypeError, ValueError):
+        hits = 0
+    return max(0, hits), warning
+
+
+def preflight_topic_capacity(
+    client: WikimediaClient,
+    units: Sequence[CollectionUnit],
+    *,
+    minimum_raw_candidates: int,
+) -> Dict[str, Any]:
+    """Cheap capacity screen; counts are upper bounds, not bilingual yields."""
+
+    topic_reports: Dict[str, Any] = {}
+    failed_topics: List[str] = []
+    for unit in units:
+        categories: List[Dict[str, Any]] = []
+        upper_bound = 0
+        for role, configured in (
+            ("primary", unit.wikipedia_query_categories),
+            ("reserve", unit.wikipedia_reserve_categories),
+        ):
+            for category in configured:
+                error = ""
+                warning = ""
+                try:
+                    hits, warning = _deep_category_total_hits(client, category)
+                except (OSError, ValueError, TimeoutError) as exc:
+                    hits = 0
+                    error = f"{type(exc).__name__}: {exc}"
+                upper_bound += hits
+                categories.append(
+                    {
+                        "category": category,
+                        "role": role,
+                        "raw_hits": hits,
+                        "warning": warning,
+                        "error": error,
+                    }
+                )
+        passes = upper_bound >= minimum_raw_candidates and not all(
+            item["error"] for item in categories
+        )
+        if not passes:
+            failed_topics.append(unit.unit_id)
+        topic_reports[unit.unit_id] = {
+            "macro_domain": unit.macro_domain,
+            "router_label": unit.router_label,
+            "minimum_raw_candidates": minimum_raw_candidates,
+            "raw_hit_upper_bound": upper_bound,
+            "passes_cheap_preflight": passes,
+            "categories": categories,
+        }
+    return {
+        "method": "sum of CirrusSearch deepcat totalhits across frozen primary and reserve roots",
+        "interpretation": (
+            "optimistic upper bound before Chinese-langlink filtering, title filtering, and "
+            "within/cross-topic deduplication"
+        ),
+        "minimum_raw_candidates": minimum_raw_candidates,
+        "topic_count": len(units),
+        "failed_topic_count": len(failed_topics),
+        "failed_topics": failed_topics,
+        "topics": topic_reports,
     }
 
 
@@ -816,7 +1076,27 @@ def parse_domains(raw: str) -> List[str]:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out-dir", required=True, type=Path)
-    ap.add_argument("--domains", default=",".join(WIKIDATA_ROOTS))
+    ap.add_argument(
+        "--domains",
+        default=None,
+        help="Legacy comma-separated domains (default: all eight legacy domains).",
+    )
+    ap.add_argument(
+        "--topic-specs",
+        type=Path,
+        help="Frozen 100-topic JSON spec. Enables data-driven topic collection.",
+    )
+    ap.add_argument(
+        "--topics",
+        default="",
+        help="Optional comma-separated topic_id subset from --topic-specs.",
+    )
+    ap.add_argument(
+        "--preflight-only",
+        action="store_true",
+        help="Only query cheap CirrusSearch hit estimates; do not collect candidates.",
+    )
+    ap.add_argument("--preflight-min-candidates", type=int, default=15_000)
     ap.add_argument("--target-rows", type=int, default=13_000)
     ap.add_argument("--rdf-limit", type=int, default=20_000)
     ap.add_argument(
@@ -843,10 +1123,33 @@ def main() -> None:
         raise SystemExit("--target-rows and --rdf-limit must be positive")
     if args.workers <= 0:
         raise SystemExit("--workers must be positive")
+    if args.preflight_min_candidates <= 0:
+        raise SystemExit("--preflight-min-candidates must be positive")
+    if args.topic_specs and args.domains:
+        raise SystemExit("--topic-specs and legacy --domains are mutually exclusive")
+    if args.topics and not args.topic_specs:
+        raise SystemExit("--topics requires --topic-specs")
 
     try:
-        domains = parse_domains(args.domains)
-    except ValueError as exc:
+        if args.topic_specs:
+            topic_payload, units = load_topic_specs(args.topic_specs)
+            selected = [item.strip() for item in args.topics.split(",") if item.strip()]
+            if selected:
+                by_id = {unit.unit_id: unit for unit in units}
+                unknown = [topic_id for topic_id in selected if topic_id not in by_id]
+                if unknown:
+                    raise ValueError(f"unknown topic_id values: {', '.join(unknown)}")
+                units = [by_id[topic_id] for topic_id in selected]
+            collection_mode = "topic_specs"
+        else:
+            topic_payload = {}
+            configured_domains = (
+                args.domains if args.domains is not None else ",".join(WIKIDATA_ROOTS)
+            )
+            domains = parse_domains(configured_domains)
+            units = legacy_domain_units(domains)
+            collection_mode = "legacy_domains"
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
         raise SystemExit(str(exc)) from exc
     args.out_dir.mkdir(parents=True, exist_ok=True)
     client = WikimediaClient(
@@ -856,36 +1159,76 @@ def main() -> None:
         min_interval_s=args.min_request_interval_s,
         cache_path=args.out_dir / "wikimedia_api_cache.sqlite3",
     )
+    if args.preflight_only:
+        preflight = preflight_topic_capacity(
+            client,
+            units,
+            minimum_raw_candidates=args.preflight_min_candidates,
+        )
+        preflight.update(
+            {
+                "collection_mode": collection_mode,
+                "topic_spec_path": str(args.topic_specs) if args.topic_specs else "",
+                "catalog_id": str(topic_payload.get("catalog_id") or ""),
+            }
+        )
+        preflight_path = args.out_dir / "wikimedia_topic_preflight_report.json"
+        preflight_path.write_text(
+            json.dumps(preflight, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        print(
+            f"preflight topics={len(units)} failed={preflight['failed_topic_count']} "
+            f"-> {preflight_path}",
+            flush=True,
+        )
+        if preflight["failed_topics"]:
+            print("failed topics: " + ", ".join(preflight["failed_topics"]), flush=True)
+        return
+
     report: Dict[str, Any] = {
         "target_rows": args.target_rows,
         "rdf_query": "P31/P279* UNION P279+",
+        "collection_mode": collection_mode,
+        "topic_spec_path": str(args.topic_specs) if args.topic_specs else "",
+        "catalog_id": str(topic_payload.get("catalog_id") or ""),
         "domains": {},
     }
 
-    for domain in domains:
-        root_qid = WIKIDATA_ROOTS[domain]
-        root_categories = WIKIPEDIA_ROOT_CATEGORIES[domain]
+    for unit in units:
+        domain = unit.unit_id
+        root_qids = unit.wikidata_root_qids
+        root_categories = unit.wikipedia_root_categories
         rdf_rows: List[Dict[str, Any]] = []
         exact_p31_rows: List[Dict[str, Any]] = []
         exact_p31_stats: List[Dict[str, Any]] = []
-        rdf_error = ""
-        query_sha256 = ""
+        rdf_errors: List[str] = []
+        rdf_query_stats: List[Dict[str, Any]] = []
         if args.skip_rdf:
-            rdf_error = "skipped by --skip-rdf"
-        elif domain in WIKIDATA_SKIP_ABSTRACT_ROOT:
-            rdf_error = "skipped: abstract root is too broad for a domain-pure glossary"
+            rdf_errors.append("skipped by --skip-rdf")
+        elif unit.skip_rdf_root:
+            rdf_errors.append("skipped: abstract root is too broad for a domain-pure glossary")
         else:
-            try:
-                rdf_rows, query_sha256 = collect_rdf_rows(
-                    client,
-                    domain=domain,
-                    root_qid=root_qid,
-                    limit=args.rdf_limit,
-                )
-            except (OSError, ValueError, TimeoutError) as exc:
-                rdf_error = f"{type(exc).__name__}: {exc}"
+            for root_qid in root_qids:
+                try:
+                    batch, query_sha256 = collect_rdf_rows(
+                        client,
+                        domain=domain,
+                        root_qid=root_qid,
+                        limit=args.rdf_limit,
+                    )
+                    rdf_rows.extend(batch)
+                    rdf_query_stats.append(
+                        {
+                            "root_qid": root_qid,
+                            "rows": len(batch),
+                            "query_sha256": query_sha256,
+                        }
+                    )
+                except (OSError, ValueError, TimeoutError) as exc:
+                    rdf_errors.append(f"{root_qid}: {type(exc).__name__}: {exc}")
 
-        exact_type_qids = WIKIDATA_EXACT_P31_TYPES.get(domain, ())
+        exact_type_qids = unit.wikidata_exact_p31_qids
         if exact_type_qids:
             exact_p31_rows, exact_p31_stats = collect_exact_p31_rows(
                 client,
@@ -909,14 +1252,14 @@ def main() -> None:
                     client,
                     domain=domain,
                     root_categories=root_categories,
+                    category_queries=unit.all_wikipedia_queries,
                     target_rows=category_target,
                 )
             else:
-                shallow_categories = WIKIPEDIA_DEEPCAT_CATEGORIES[domain]
                 category_rows, category_stats = collect_category_rows(
                     client,
                     domain=domain,
-                    root_categories=shallow_categories,
+                    root_categories=unit.all_wikipedia_queries,
                     target_rows=category_target,
                     max_depth=args.max_depth,
                     max_categories=args.max_categories,
@@ -942,11 +1285,23 @@ def main() -> None:
             source = str(row.get("source") or "unknown")
             sources[source] = sources.get(source, 0) + 1
         report["domains"][domain] = {
-            "root_qid": root_qid,
+            "macro_domain": unit.macro_domain,
+            "router_label": unit.router_label,
+            "router_description": unit.router_description,
+            "seed_terms": list(unit.seed_terms),
+            "root_qid": root_qids[0],
+            "root_qids": list(root_qids),
             "root_categories": list(root_categories),
-            "rdf_query_sha256": query_sha256,
+            "primary_category_queries": list(unit.wikipedia_query_categories),
+            "reserve_category_queries": list(unit.wikipedia_reserve_categories),
+            "rdf_query_sha256": (
+                str(rdf_query_stats[0].get("query_sha256") or "")
+                if len(rdf_query_stats) == 1
+                else ""
+            ),
+            "rdf_query_stats": rdf_query_stats,
             "rdf_rows": len(rdf_rows),
-            "rdf_error": rdf_error,
+            "rdf_error": "; ".join(rdf_errors),
             "exact_p31_types": list(exact_type_qids),
             "exact_p31_rows": len(exact_p31_rows),
             "exact_p31_stats": exact_p31_stats,

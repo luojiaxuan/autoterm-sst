@@ -2565,6 +2565,8 @@ class OmniAgent(Agent):
                 text="SILENCE_SKIPPED",
                 start_sample=start_sample,
                 cursor_samples=end_sample,
+                retrieve_s=retrieve_s,
+                references=references,
             )
             return {"ok": True, "elapsed_s": 0.0, "skipped": "silence"}
 
@@ -2637,6 +2639,8 @@ class OmniAgent(Agent):
                     text="EMPTY_TRANSLATION",
                     start_sample=start_sample,
                     cursor_samples=end_sample,
+                    retrieve_s=retrieve_s,
+                    references=references,
                 )
             return {"ok": True, "elapsed_s": elapsed}
         except Exception as exc:  # noqa: BLE001
@@ -2742,6 +2746,8 @@ class OmniAgent(Agent):
                     text="EMPTY_TRANSLATION",
                     start_sample=start_sample,
                     cursor_samples=end_sample,
+                    retrieve_s=retrieve_s,
+                    references=refs,
                 )
             elif not ok:
                 self._emit_event(
@@ -2762,17 +2768,25 @@ class OmniAgent(Agent):
         text: str,
         start_sample: int,
         cursor_samples: int,
+        retrieve_s: Optional[float],
+        references: Sequence[Dict[str, Any]],
     ) -> None:
+        meta = self._event_meta(
+            session,
+            segment_idx=session.segment_idx,
+            elapsed_s=0.0,
+            retrieve_s=retrieve_s,
+            cursor_samples=cursor_samples,
+            start_sample=start_sample,
+            references=references,
+        )
+        meta["cursor_status_reason"] = text.casefold()
         self._emit_event(
             TranslationEvent(
                 session_id=session.session_id,
                 type=EVENT_STATUS,
                 text=text,
-                meta={
-                    "segment_idx": session.segment_idx,
-                    "start_sample": int(start_sample),
-                    "cursor_samples": int(cursor_samples),
-                },
+                meta=meta,
             )
         )
 

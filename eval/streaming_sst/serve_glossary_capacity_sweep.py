@@ -119,7 +119,11 @@ def validate_inputs(args: argparse.Namespace, manifest: TermMemoryManifest) -> l
     return presets
 
 
-def build_agent(args: argparse.Namespace, manifest: TermMemoryManifest) -> OmniAgent:
+def build_agent(
+    args: argparse.Namespace,
+    manifest: TermMemoryManifest,
+    presets: Sequence[str],
+) -> OmniAgent:
     template = get_template("qwen3_omni")
     config = OmniConfig(
         language_pair="English -> Chinese",
@@ -143,6 +147,7 @@ def build_agent(args: argparse.Namespace, manifest: TermMemoryManifest) -> OmniA
         rag_device=args.rag_device,
         rag_top_k=args.rag_top_k,
         rag_score_threshold=args.rag_score_threshold,
+        rag_startup_glossary_preset=presets[0],
         auto_glossary_enabled=False,
         auto_glossary_preload=False,
         router_context_similarity_enabled=False,
@@ -169,7 +174,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.rag_device,
         args.vllm_tp_size,
     )
-    agent = build_agent(args, manifest)
+    agent = build_agent(args, manifest, presets)
     router = AgentRouter({"RASST": agent}, default_agent="RASST")
     uvicorn.run(create_app(router), host=args.host, port=args.port, log_level=args.log_level)
     return 0

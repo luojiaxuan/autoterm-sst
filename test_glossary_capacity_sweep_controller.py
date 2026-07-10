@@ -13,6 +13,8 @@ from eval.streaming_sst.run_glossary_capacity_sweep import (
     ProcessSupervisor,
     TerminationRequested,
     eval_command,
+    expected_term_count,
+    rag_health_error,
     run_controller,
     server_command,
     validate_completed_output,
@@ -20,6 +22,17 @@ from eval.streaming_sst.run_glossary_capacity_sweep import (
 
 
 def _args(root: Path, *, presets: str = "10k,1m", resume: bool = False) -> argparse.Namespace:
+    (root / "term-memory.json").write_text(
+        json.dumps(
+            {
+                "scales": {
+                    "10k": {"en-zh": {"num_terms": 10_000}},
+                    "1m": {"en-zh": {"num_terms": 1_000_000}},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
     return argparse.Namespace(
         python_bin=root / "python",
         server_script=root / "server.py",
@@ -164,6 +177,35 @@ class RecordingSupervisor(ProcessSupervisor):
 
 
 class GlossaryCapacitySweepControllerTest(unittest.TestCase):
+    def test_reads_expected_rag_terms_from_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            args = _args(Path(tmp))
+
+            count = expected_term_count(
+                args.term_memory_manifest,
+                "1m",
+                "English -> Chinese",
+            )
+
+        self.assertEqual(count, 1_000_000)
+
+    def test_health_requires_ready_rag_with_exact_capacity(self) -> None:
+        self.assertEqual(
+            rag_health_error(
+                {"rag": {"status": "ready", "active_terms": 1_000_000}},
+                1_000_000,
+            ),
+            "",
+        )
+        self.assertIn(
+            "expected=1000000",
+            rag_health_error(
+                {"rag": {"status": "ready", "active_terms": 100_000}},
+                1_000_000,
+            ),
+        )
+        self.assertIn("not ready", rag_health_error({"rag": {"status": "disabled"}}, 10_000))
+
     def test_commands_forward_explicit_runtime_configuration(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             args = _args(Path(tmp))

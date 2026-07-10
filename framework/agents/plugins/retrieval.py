@@ -16,9 +16,10 @@ import logging
 import os
 import sys
 import time
-from dataclasses import dataclass
+from collections import OrderedDict
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from framework.agents.term_memory.topic_router import DomainProbeScore
 
@@ -95,6 +96,69 @@ class RetrievalPlugin:
 
         return [RetrievalResult(references=[]) for _ in requests]
 
+    async def retrieve_across_indexes_with_metadata(
+        self,
+        requests: Sequence[Dict[str, Any]],
+        *,
+        index_specs_by_request: Sequence[Sequence["IndexRetrievalSpec"]],
+        lookback_sec: float,
+    ) -> List["MultiIndexRetrievalResult"]:
+        """Retrieve from several indexes while keeping results keyed by slice.
+
+        The default implementation preserves compatibility for lightweight and
+        third-party plugins by activating and querying one index group at a
+        time. Backends that can share speech-side computation should override
+        this method; ``MaxSimRetrievalPlugin`` encodes every request once.
+        """
+
+        if len(requests) != len(index_specs_by_request):
+            raise ValueError("requests and index_specs_by_request must have equal length")
+        started = time.perf_counter()
+        outputs = [MultiIndexRetrievalResult() for _ in requests]
+        grouped: Dict[
+            Tuple[str, int, Optional[float]],
+            List[Tuple[int, IndexRetrievalSpec]],
+        ] = {}
+        for request_idx, specs in enumerate(index_specs_by_request):
+            seen_keys = set()
+            for spec in specs:
+                if spec.key in seen_keys:
+                    raise ValueError(
+                        f"duplicate retrieval index key for request {request_idx}: {spec.key}"
+                    )
+                seen_keys.add(spec.key)
+                outputs[request_idx].references_by_key[spec.key] = []
+                grouped.setdefault(
+                    (spec.index_path, int(spec.top_k), spec.score_threshold),
+                    [],
+                ).append((request_idx, spec))
+
+        for (index_path, top_k, score_threshold), assignments in grouped.items():
+            await self.activate_index(index_path)
+            group_results = await self.retrieve_with_metadata(
+                [requests[request_idx] for request_idx, _ in assignments],
+                top_k=top_k,
+                lookback_sec=lookback_sec,
+                score_threshold=score_threshold,
+            )
+            for (request_idx, spec), result in zip(assignments, group_results):
+                if not isinstance(result, RetrievalResult):
+                    result = RetrievalResult(references=list(result or []))
+                output = outputs[request_idx]
+                output.references_by_key[spec.key] = list(result.references)
+                if output.query_embedding is None and result.query_embedding is not None:
+                    output.query_embedding = result.query_embedding
+                if (
+                    output.query_window_embeddings is None
+                    and result.query_window_embeddings is not None
+                ):
+                    output.query_window_embeddings = result.query_window_embeddings
+
+        elapsed = time.perf_counter() - started
+        for output in outputs:
+            output.retrieve_s = elapsed
+        return outputs
+
     async def probe_domain_scores(
         self,
         request: Dict[str, Any],
@@ -122,6 +186,26 @@ class NullRetrieval(RetrievalPlugin):
 @dataclass
 class RetrievalResult:
     references: List[TermRef]
+    query_embedding: Any = None
+    query_window_embeddings: Any = None
+    retrieve_s: Optional[float] = None
+
+
+@dataclass(frozen=True)
+class IndexRetrievalSpec:
+    """One glossary index to score for one speech request."""
+
+    key: str
+    index_path: str
+    top_k: int
+    score_threshold: Optional[float] = None
+
+
+@dataclass
+class MultiIndexRetrievalResult:
+    """Per-index references plus speech metadata shared across those indexes."""
+
+    references_by_key: Dict[str, List[TermRef]] = field(default_factory=dict)
     query_embedding: Any = None
     query_window_embeddings: Any = None
     retrieve_s: Optional[float] = None
@@ -287,6 +371,7 @@ class MaxSimRetrievalPlugin(RetrievalPlugin):
         text_lora_rank: int = 128,
         target_lang: str = "zh",
         score_threshold: float = 0.78,
+        max_cached_indexes: int = 16,
     ) -> None:
         self.model_path = model_path
         self.index_path = index_path
@@ -296,11 +381,12 @@ class MaxSimRetrievalPlugin(RetrievalPlugin):
         self.text_lora_rank = text_lora_rank
         self.target_lang = target_lang
         self.score_threshold = score_threshold
+        self.max_cached_indexes = max(1, int(max_cached_indexes))
 
         self.retriever: Any = None
         self._lock = asyncio.Lock()
         self._active_index_path = ""
-        self._text_index_cache: Dict[str, Dict[str, Any]] = {}
+        self._text_index_cache: OrderedDict[str, Dict[str, Any]] = OrderedDict()
         self._preload_tasks: Dict[str, asyncio.Task] = {}
         self.status: Dict[str, Any] = {"status": "disabled"}
 
@@ -335,20 +421,43 @@ class MaxSimRetrievalPlugin(RetrievalPlugin):
             maxsim_stride=MAXSIM_STRIDE,
         )
         self._active_index_path = str(Path(self.index_path))
-        self._text_index_cache[self._active_index_path] = {
-            "text_embs": self.retriever.text_embs,
-            "term_list": self.retriever.term_list,
-        }
+        self._remember_index(
+            self._active_index_path,
+            {
+                "text_embs": self.retriever.text_embs,
+                "term_list": self.retriever.term_list,
+            },
+        )
         self.status["active_index_path"] = self._active_index_path
         self.status["active_terms"] = len(self.retriever.term_list)
         self.status["status"] = "ready"
 
+    def _remember_index(self, index_path: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        normalized = str(Path(index_path))
+        self._text_index_cache[normalized] = data
+        self._text_index_cache.move_to_end(normalized)
+        while len(self._text_index_cache) > self.max_cached_indexes:
+            self._text_index_cache.popitem(last=False)
+        self.status["cached_indexes"] = len(self._text_index_cache)
+        self.status["max_cached_indexes"] = self.max_cached_indexes
+        return data
+
     def _ensure_index(self, index_path: str) -> Dict[str, Any]:
         normalized = str(Path(index_path))
         if normalized in self._text_index_cache:
-            return self._text_index_cache[normalized]
+            data = self._text_index_cache[normalized]
+            self._text_index_cache.move_to_end(normalized)
+            return data
         if self.retriever is None:
             raise RuntimeError("retriever not initialized")
+        if normalized == self._active_index_path:
+            return self._remember_index(
+                normalized,
+                {
+                    "text_embs": self.retriever.text_embs,
+                    "term_list": self.retriever.term_list,
+                },
+            )
         path = Path(normalized)
         if not path.is_file():
             raise FileNotFoundError(f"RAG text index not found: {path}")
@@ -359,8 +468,10 @@ class MaxSimRetrievalPlugin(RetrievalPlugin):
         term_list = data["term_list"]
         if text_embs.shape[0] != len(term_list):
             raise RuntimeError("RAG text index mismatch (text_embs vs term_list)")
-        self._text_index_cache[normalized] = {"text_embs": text_embs, "term_list": term_list}
-        return self._text_index_cache[normalized]
+        return self._remember_index(
+            normalized,
+            {"text_embs": text_embs, "term_list": term_list},
+        )
 
     async def preload_index(self, index_path: str) -> None:
         if not index_path:
@@ -386,7 +497,8 @@ class MaxSimRetrievalPlugin(RetrievalPlugin):
     def is_index_ready(self, index_path: str) -> bool:
         if not index_path:
             return False
-        return str(Path(index_path)) in self._text_index_cache
+        normalized = str(Path(index_path))
+        return normalized == self._active_index_path or normalized in self._text_index_cache
 
     def _activate_sync(self, index_path: str) -> None:
         if self.retriever is None:
@@ -449,6 +561,27 @@ class MaxSimRetrievalPlugin(RetrievalPlugin):
                 if score_threshold is not None and old_threshold is not missing:
                     self.retriever.score_threshold = old_threshold
         return list(results)
+
+    async def retrieve_across_indexes_with_metadata(
+        self,
+        requests: Sequence[Dict[str, Any]],
+        *,
+        index_specs_by_request: Sequence[Sequence[IndexRetrievalSpec]],
+        lookback_sec: float,
+    ) -> List[MultiIndexRetrievalResult]:
+        if len(requests) != len(index_specs_by_request):
+            raise ValueError("requests and index_specs_by_request must have equal length")
+        if self.retriever is None or not requests:
+            return [MultiIndexRetrievalResult() for _ in requests]
+        async with self._lock:
+            return list(
+                await asyncio.to_thread(
+                    self._retrieve_across_indexes_sync,
+                    list(requests),
+                    [list(specs) for specs in index_specs_by_request],
+                    float(lookback_sec),
+                )
+            )
 
     async def probe_domain_scores(
         self,
@@ -626,14 +759,71 @@ class MaxSimRetrievalPlugin(RetrievalPlugin):
         top_k: int,
         lookback_sec: float,
     ) -> List[RetrievalResult]:
-        """Run timeline retrieval and expose pooled audio-window embeddings.
+        """Compatibility wrapper for callers that use the active index."""
 
-        This mirrors the external RASST ``retrieve_timeline_batch`` implementation
-        but keeps the pooled speech representation that is already computed for
-        MaxSim scoring. The tensor is returned on CPU so the router can consume it
-        without touching the retriever GPU stream.
-        """
+        outputs = [RetrievalResult(references=[]) for _ in requests]
+        if not self._active_index_path:
+            return outputs
+        threshold = getattr(self.retriever, "score_threshold", None)
+        specs = [
+            [
+                IndexRetrievalSpec(
+                    key="active",
+                    index_path=self._active_index_path,
+                    top_k=int(top_k),
+                    score_threshold=threshold,
+                )
+            ]
+            for _ in requests
+        ]
+        multi_outputs = self._retrieve_across_indexes_sync(requests, specs, lookback_sec)
+        return [
+            RetrievalResult(
+                references=list(item.references_by_key.get("active", [])),
+                query_embedding=item.query_embedding,
+                query_window_embeddings=item.query_window_embeddings,
+                retrieve_s=item.retrieve_s,
+            )
+            for item in multi_outputs
+        ]
 
+    def _retrieve_across_indexes_sync(
+        self,
+        requests: Sequence[Dict[str, Any]],
+        index_specs_by_request: Sequence[Sequence[IndexRetrievalSpec]],
+        lookback_sec: float,
+    ) -> List[MultiIndexRetrievalResult]:
+        """Encode each speech request once, then score indexes sequentially."""
+
+        if len(requests) != len(index_specs_by_request):
+            raise ValueError("requests and index_specs_by_request must have equal length")
+        started = time.perf_counter()
+        outputs, encoded_groups = self._encode_timeline_windows_sync(requests, lookback_sec)
+        for request_idx, specs in enumerate(index_specs_by_request):
+            seen_keys = set()
+            for spec in specs:
+                if spec.key in seen_keys:
+                    raise ValueError(
+                        f"duplicate retrieval index key for request {request_idx}: {spec.key}"
+                    )
+                seen_keys.add(spec.key)
+                outputs[request_idx].references_by_key[spec.key] = []
+        for group in encoded_groups:
+            self._score_encoded_group_across_indexes(
+                group,
+                index_specs_by_request,
+                outputs,
+            )
+        elapsed = time.perf_counter() - started
+        for output in outputs:
+            output.retrieve_s = elapsed
+        return outputs
+
+    def _encode_timeline_windows_sync(
+        self,
+        requests: Sequence[Dict[str, Any]],
+        lookback_sec: float,
+    ) -> Tuple[List[MultiIndexRetrievalResult], List[Dict[str, Any]]]:
         from agents.streaming_maxsim_retriever import (  # noqa: WPS433
             EXPECTED_SAMPLE_RATE,
             _build_window_time_ranges,
@@ -644,29 +834,30 @@ class MaxSimRetrievalPlugin(RetrievalPlugin):
         import torch  # noqa: WPS433
         import torch.nn.functional as F  # noqa: WPS433
 
-        t0 = time.perf_counter()
-        outputs: List[RetrievalResult] = [RetrievalResult(references=[]) for _ in requests]
+        outputs = [MultiIndexRetrievalResult() for _ in requests]
         if self.retriever is None or not requests:
-            return outputs
+            return outputs, []
 
-        k = top_k if top_k is not None else self.top_k
         default_lookback = max(0.0, float(lookback_sec))
         chunks: List[np.ndarray] = []
         metas: List[Dict[str, Any]] = []
-        for req_idx, req in enumerate(requests):
-            audio_buffer = np.asarray(req.get("audio_buffer"), dtype=np.float32).flatten()
+        for request_idx, request in enumerate(requests):
+            audio_buffer = np.asarray(request.get("audio_buffer"), dtype=np.float32).flatten()
             if audio_buffer.size == 0:
                 continue
-            current_start_sec = max(0.0, float(req["current_start_sec"]))
-            current_end_sec = max(current_start_sec, float(req["current_end_sec"]))
-            cur_lookback = max(0.0, float(req.get("lookback_sec", default_lookback)))
+            current_start_sec = max(0.0, float(request["current_start_sec"]))
+            current_end_sec = max(current_start_sec, float(request["current_end_sec"]))
+            current_lookback = max(
+                0.0,
+                float(request.get("lookback_sec", default_lookback)),
+            )
             buffer_end = min(
                 len(audio_buffer),
                 int(round(current_end_sec * EXPECTED_SAMPLE_RATE)),
             )
             if buffer_end <= 0:
                 continue
-            encode_start_sec = max(0.0, current_start_sec - cur_lookback)
+            encode_start_sec = max(0.0, current_start_sec - current_lookback)
             buffer_start = min(
                 buffer_end,
                 int(round(encode_start_sec * EXPECTED_SAMPLE_RATE)),
@@ -679,17 +870,15 @@ class MaxSimRetrievalPlugin(RetrievalPlugin):
             chunks.append(chunk)
             metas.append(
                 {
-                    "request_idx": req_idx,
+                    "request_idx": request_idx,
                     "current_start_sec": current_start_sec,
                     "current_end_sec": current_end_sec,
                     "actual_start_sec": actual_start_sec,
-                    "actual_end_sec": actual_end_sec,
                     "actual_duration": max(1e-6, actual_end_sec - actual_start_sec),
                 }
             )
-
         if not chunks:
-            return outputs
+            return outputs, []
 
         projected_seq, mask = _encode_audio_projected_seq_batch(
             chunks,
@@ -697,37 +886,40 @@ class MaxSimRetrievalPlugin(RetrievalPlugin):
             self.retriever.feat_ext,
             self.retriever.device,
         )
-        groups_by_frames: Dict[int, List[tuple[int, Dict[str, Any]]]] = {}
+        groups_by_frames: Dict[int, List[Tuple[int, Dict[str, Any]]]] = {}
         for batch_idx, meta in enumerate(metas):
             valid_frames = int(mask[batch_idx].sum().item())
             if valid_frames > 0:
                 groups_by_frames.setdefault(valid_frames, []).append((batch_idx, meta))
 
-        text_bank_t = self.retriever.text_embs.float().T
+        encoded_groups: List[Dict[str, Any]] = []
         use_cuda = getattr(self.retriever.device, "type", "") == "cuda"
         for valid_frames, group_items in groups_by_frames.items():
             group_indices = [batch_idx for batch_idx, _ in group_items]
-            seq_g = projected_seq[group_indices, :valid_frames, :]
-            mask_g = mask[group_indices, :valid_frames]
+            seq_group = projected_seq[group_indices, :valid_frames, :]
+            mask_group = mask[group_indices, :valid_frames]
             with torch.amp.autocast("cuda", dtype=torch.bfloat16, enabled=use_cuda):
-                window_embs = self.retriever.retriever._multiscale_pool(seq_g, mask_g)
-                window_embs = F.normalize(window_embs, p=2, dim=-1).float()
-            if window_embs.numel() == 0:
+                window_embeddings = self.retriever.retriever._multiscale_pool(
+                    seq_group,
+                    mask_group,
+                )
+                window_embeddings = F.normalize(window_embeddings, p=2, dim=-1).float()
+            if window_embeddings.numel() == 0:
                 continue
-            rel_starts, rel_ends = _build_window_time_ranges(
+            relative_starts, relative_ends = _build_window_time_ranges(
                 self.retriever.retriever.maxsim_windows,
                 self.retriever.retriever.maxsim_stride,
                 valid_frames,
             )
-            if rel_starts.numel() != window_embs.shape[1]:
+            if relative_starts.numel() != window_embeddings.shape[1]:
                 logger.warning(
                     "Batch timeline retrieval window count mismatch: ranges=%d embs=%d",
-                    rel_starts.numel(),
-                    window_embs.shape[1],
+                    relative_starts.numel(),
+                    window_embeddings.shape[1],
                 )
                 continue
 
-            nominal_duration = max(float(rel_ends.max().item()), 1e-6)
+            nominal_duration = max(float(relative_ends.max().item()), 1e-6)
             actual_duration = torch.tensor(
                 [float(meta["actual_duration"]) for _, meta in group_items],
                 dtype=torch.float32,
@@ -749,63 +941,172 @@ class MaxSimRetrievalPlugin(RetrievalPlugin):
                 device=self.retriever.device,
             )
             scale = actual_duration / nominal_duration
-            rel_starts_d = rel_starts.to(self.retriever.device)
-            rel_ends_d = rel_ends.to(self.retriever.device)
-            abs_starts = actual_start.unsqueeze(1) + rel_starts_d.unsqueeze(0) * scale.unsqueeze(1)
-            abs_ends = actual_start.unsqueeze(1) + rel_ends_d.unsqueeze(0) * scale.unsqueeze(1)
+            relative_starts = relative_starts.to(self.retriever.device)
+            relative_ends = relative_ends.to(self.retriever.device)
+            absolute_starts = (
+                actual_start.unsqueeze(1)
+                + relative_starts.unsqueeze(0) * scale.unsqueeze(1)
+            )
+            absolute_ends = (
+                actual_start.unsqueeze(1)
+                + relative_ends.unsqueeze(0) * scale.unsqueeze(1)
+            )
             valid_windows = (
-                (abs_ends > current_start.unsqueeze(1))
-                & (abs_starts < current_end.unsqueeze(1))
+                (absolute_ends > current_start.unsqueeze(1))
+                & (absolute_starts < current_end.unsqueeze(1))
             )
             if int(valid_windows.sum().item()) == 0:
                 continue
 
-            sim_by_window = torch.matmul(window_embs, text_bank_t)
-            sim_by_window = sim_by_window.masked_fill(
-                ~valid_windows.unsqueeze(2),
-                -float("inf"),
-            )
-            scores, best_window_idx = sim_by_window.max(dim=1)
             for row_idx, (_, meta) in enumerate(group_items):
                 request_idx = int(meta["request_idx"])
                 row_valid = valid_windows[row_idx]
-                if int(row_valid.sum().item()) > 0:
-                    valid_window_embs = window_embs[row_idx][row_valid]
-                    if bool(requests[request_idx].get("return_query_window_embeddings")):
-                        outputs[request_idx].query_window_embeddings = valid_window_embs.detach().cpu().float()
-                    pooled = valid_window_embs.mean(dim=0)
-                    pooled = F.normalize(pooled, p=2, dim=-1).detach().cpu().float()
-                    outputs[request_idx].query_embedding = pooled
+                if int(row_valid.sum().item()) == 0:
+                    continue
+                valid_embeddings = window_embeddings[row_idx][row_valid]
+                if bool(requests[request_idx].get("return_query_window_embeddings")):
+                    outputs[request_idx].query_window_embeddings = (
+                        valid_embeddings.detach().cpu().float()
+                    )
+                pooled = F.normalize(valid_embeddings.mean(dim=0), p=2, dim=-1)
+                outputs[request_idx].query_embedding = pooled.detach().cpu().float()
 
-                row_scores = scores[row_idx]
+            encoded_groups.append(
+                {
+                    "items": group_items,
+                    "window_embeddings": window_embeddings,
+                    "valid_windows": valid_windows,
+                    "absolute_starts": absolute_starts,
+                    "absolute_ends": absolute_ends,
+                }
+            )
+        return outputs, encoded_groups
+
+    def _score_encoded_group_across_indexes(
+        self,
+        group: Dict[str, Any],
+        index_specs_by_request: Sequence[Sequence[IndexRetrievalSpec]],
+        outputs: List[MultiIndexRetrievalResult],
+    ) -> None:
+        import torch  # noqa: WPS433
+
+        group_items = group["items"]
+        window_embeddings = group["window_embeddings"]
+        valid_windows = group["valid_windows"]
+        absolute_starts = group["absolute_starts"]
+        absolute_ends = group["absolute_ends"]
+        assignments: Dict[
+            Tuple[str, int, Optional[float]],
+            List[Tuple[int, int, str]],
+        ] = {}
+        for row_idx, (_, meta) in enumerate(group_items):
+            request_idx = int(meta["request_idx"])
+            for spec in index_specs_by_request[request_idx]:
+                if not spec.index_path or int(spec.top_k) <= 0:
+                    continue
+                assignments.setdefault(
+                    (spec.index_path, int(spec.top_k), spec.score_threshold),
+                    [],
+                ).append((row_idx, request_idx, spec.key))
+
+        for (index_path, top_k, score_threshold), group_assignments in assignments.items():
+            data = self._ensure_index(index_path)
+            text_embeddings = data["text_embs"].float()
+            term_list = data["term_list"]
+            if text_embeddings.numel() == 0:
+                continue
+            unique_rows = sorted({row_idx for row_idx, _, _ in group_assignments})
+            row_tensor = torch.tensor(
+                unique_rows,
+                dtype=torch.long,
+                device=window_embeddings.device,
+            )
+            selected_windows = window_embeddings.index_select(0, row_tensor)
+            selected_valid = valid_windows.index_select(0, row_tensor)
+            similarity = torch.matmul(selected_windows, text_embeddings.T)
+            similarity = similarity.masked_fill(
+                ~selected_valid.unsqueeze(2),
+                -float("inf"),
+            )
+            scores, best_window_indexes = similarity.max(dim=1)
+            assignments_by_row: Dict[int, List[Tuple[int, str]]] = {}
+            for row_idx, request_idx, key in group_assignments:
+                assignments_by_row.setdefault(row_idx, []).append((request_idx, key))
+
+            threshold = (
+                score_threshold
+                if score_threshold is not None
+                else getattr(self.retriever, "score_threshold", None)
+            )
+            for selected_row, original_row in enumerate(unique_rows):
+                row_scores = scores[selected_row]
                 finite = torch.isfinite(row_scores)
                 if int(finite.sum().item()) == 0:
                     continue
-                n = min(int(k), int(finite.sum().item()))
+                result_count = min(int(top_k), int(finite.sum().item()))
                 masked_scores = row_scores.masked_fill(~finite, -float("inf"))
-                top_sco, top_idx = torch.topk(masked_scores, k=n, largest=True, sorted=True)
-                score_threshold = getattr(self.retriever, "score_threshold", None)
-                if score_threshold is not None:
-                    keep = top_sco >= float(score_threshold)
+                top_scores, top_indexes = torch.topk(
+                    masked_scores,
+                    k=result_count,
+                    largest=True,
+                    sorted=True,
+                )
+                if threshold is not None:
+                    keep = top_scores >= float(threshold)
                     if int(keep.sum().item()) == 0:
                         continue
-                    top_sco = top_sco[keep]
-                    top_idx = top_idx[keep]
-                top_win = best_window_idx[row_idx].gather(0, top_idx)
-                top_start = abs_starts[row_idx].gather(0, top_win)
-                top_end = abs_ends[row_idx].gather(0, top_win)
-                outputs[request_idx].references = self.retriever._build_results(
-                    top_idx.detach().cpu().numpy(),
-                    top_sco.detach().cpu().numpy(),
-                    time_starts=top_start.detach().cpu().numpy(),
-                    time_ends=top_end.detach().cpu().numpy(),
-                    retrieval_mode="timeline_batch",
+                    top_scores = top_scores[keep]
+                    top_indexes = top_indexes[keep]
+                top_windows = best_window_indexes[selected_row].gather(0, top_indexes)
+                top_starts = absolute_starts[original_row].gather(0, top_windows)
+                top_ends = absolute_ends[original_row].gather(0, top_windows)
+                references = self._build_index_results(
+                    term_list,
+                    top_indexes.detach().cpu().tolist(),
+                    top_scores.detach().cpu().tolist(),
+                    top_starts.detach().cpu().tolist(),
+                    top_ends.detach().cpu().tolist(),
                 )
+                for request_idx, key in assignments_by_row[original_row]:
+                    outputs[request_idx].references_by_key[key] = [
+                        dict(reference) for reference in references
+                    ]
+            del similarity, scores, best_window_indexes, selected_windows, selected_valid
 
-        elapsed = time.perf_counter() - t0
-        for item in outputs:
-            item.retrieve_s = elapsed
-        return outputs
+    def _build_index_results(
+        self,
+        term_list: Sequence[Any],
+        indexes: Sequence[int],
+        scores: Sequence[float],
+        time_starts: Sequence[float],
+        time_ends: Sequence[float],
+    ) -> List[TermRef]:
+        references: List[TermRef] = []
+        for index, score, time_start, time_end in zip(
+            indexes,
+            scores,
+            time_starts,
+            time_ends,
+        ):
+            entry = term_list[int(index)]
+            if not isinstance(entry, dict):
+                continue
+            translations = entry.get("target_translations", {})
+            translation = translations.get(self.target_lang, "")
+            if not translation:
+                continue
+            references.append(
+                {
+                    "key": entry.get("key", entry.get("term", "")),
+                    "term": entry.get("term", ""),
+                    "translation": translation,
+                    "score": float(score),
+                    "retrieval_mode": "timeline_batch",
+                    "time_start": float(time_start),
+                    "time_end": float(time_end),
+                }
+            )
+        return references
 
     async def health(self) -> Dict[str, Any]:
         return dict(self.status)

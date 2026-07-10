@@ -645,8 +645,8 @@
             transform: translateX(-50%);
             width: calc(100% - 60px);
             max-width: 1160px;
-            background: rgba(0, 0, 0, 0.85);
-            backdrop-filter: blur(20px);
+            background: rgba(8, 12, 26, 0.58);
+            backdrop-filter: blur(14px);
             border: 1px solid rgba(255, 255, 255, 0.2);
             border-radius: 16px;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
@@ -769,13 +769,14 @@
 
         .translation-content {
             padding: 20px;
-            max-height: 300px;
-            overflow-y: auto;
+            /* No outer scroll: the output and the terms list scroll
+               independently so a long terms list can never push the live
+               translation out of view. */
         }
 
         .translation-output {
             min-height: 120px;
-            max-height: 260px; /* 添加最大高度限制 */
+            max-height: 200px;
             padding: 16px;
             background: rgba(255, 255, 255, 0.05);
             border-radius: 12px;
@@ -877,6 +878,13 @@
             color: #b9d3ff;
             white-space: nowrap;
         }
+        .term-hit {
+            background: rgba(120, 220, 150, 0.30);
+            color: #dfffe8;
+            border-radius: 4px;
+            padding: 0 2px;
+        }
+
         .evidence-row.used { background: rgba(120, 220, 150, 0.12); }
         .evidence-row.used .ev-source { background: rgba(120, 220, 150, 0.22); color: #bdebca; }
 
@@ -1661,10 +1669,33 @@
             return `${base} ${text}`;
         }
 
+        // Target-side translations of retrieved terms; used to highlight
+        // terminology hits inside the live translation output.
+        const retrievedTranslations = new Set();
+
+        function renderTranslationHTML(plain) {
+            let html = escapeHtml(plain);
+            const cands = [...retrievedTranslations]
+                .filter(t => t && t.length > 1)
+                .sort((a, b) => b.length - a.length);
+            for (const c of cands) {
+                const e = escapeHtml(c);
+                if (e) html = html.split(e).join(`<mark class="term-hit">${e}</mark>`);
+            }
+            return html;
+        }
+
+        function rehighlightTranslation() {
+            if (!translationOutput) return;
+            const plain = translationOutput.textContent || '';
+            if (plain) translationOutput.innerHTML = renderTranslationHTML(plain);
+        }
+
         function clearTranslationOutput() {
             if (translationOutput) {
                 translationOutput.textContent = '';
             }
+            retrievedTranslations.clear();
             clearEvidencePanel();
             if (isElectron) {
                 updateElectronTranslation('');
@@ -1691,7 +1722,8 @@
                     panelAutoExpanded = true;
                     toggleMinimize();
                 }
-                translationOutput.textContent = joinTranslationText(translationOutput.textContent, text);
+                const joined = joinTranslationText(translationOutput.textContent, text);
+                translationOutput.innerHTML = renderTranslationHTML(joined);
                 setTimeout(() => {
                     scrollTranslationToBottom();
                 }, 10);
@@ -1757,6 +1789,7 @@
                 const score = (ref.score != null && !Number.isNaN(Number(ref.score)))
                     ? Number(ref.score).toFixed(2) : '';
                 const source = ref.source || 'rag';
+                if (translation && translation.length > 1) retrievedTranslations.add(translation);
                 const used = translation && accumulated.indexOf(translation) !== -1;
                 const row = document.createElement('div');
                 row.className = 'evidence-row' + (used ? ' used' : '');
@@ -1768,6 +1801,8 @@
                     `<span class="ev-source">${escapeHtml(source)}</span>`;
                 evidenceList.appendChild(row);
             });
+            // New candidates may match text that already streamed in.
+            rehighlightTranslation();
         }
 
         function clearEvidencePanel() {

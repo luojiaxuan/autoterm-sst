@@ -608,12 +608,12 @@ guard（虽然真实语音 probe 单独太噪，见 §6 controls）。产物
 `demo_curated_20260710`（仅 taurus 8014 使用；所有评测 manifest 不变，论文
 §5 已加披露句）：
 
-- `demo_nlp_gs10k`：acl_tagged_gs10k 全量过滤（EN 泛词表、zh 单字/杂词表、
-  zh==term 的 identity 对）→ **10000→4968**（wiki_academic filler 近半是
-  identity 对）。
+- `demo_nlp_gs10k`：acl_tagged_gs10k 过滤 EN 泛词表 + zh 单字/杂词表 →
+  **10000→9933**。identity 对（BERT→BERT、LanguageWare→LanguageWare 等）
+  按用户裁定为合法术语保留（一度全删到 4968，已回滚重建）。
 - `demo_medicine_gs10k`：union 同规则过滤 + 注入 6 条会话人名/角色
   （Ramon de Mello→拉蒙·德·梅洛、Katia (Roque) Perez、Maria Antonietta
-  Gambacorta、Medical/Radiation Oncologist、TME surgery）→ 9923。
+  Gambacorta、Medical/Radiation Oncologist、TME surgery）→ 9996。
 - 基座检索器修复：`RASST_INDEX_ZH_ACL` 默认指向 5 月的 238 条老索引，导致
   状态行首屏显示 "238 terms"；launcher 现显式指向 demo_nlp 索引。
 - 前端（已 push main）：面板半透明、译文/词条独立限高滚动、命中术语

@@ -108,3 +108,19 @@ time.
 - Export H.264 MP4, ≤2.5 min. Add a one-line lower-third with the live URL.
 - After the tunnel restarts, run `scripts/update_demo_redirect.sh <new-url>` so
   the URL on the title card keeps working for reviewers.
+
+## While recording, also grab the replacement for Figure 2
+
+The paper's Figure 2 (`demo_paper_emnlp/latex/figures/ui_evidence_panel.png`)
+is stale — it shows the old `common_terms` diagnostic glossary. During your
+take, once the session has routed to a real domain, take one clean screenshot
+of the evidence panel showing:
+- **Active Glossary** = `nlp_core_10k` or `medicine_core_10k` (not
+  `common-terms`),
+- a few **Retrieved terms** rows with target-language translations and scores,
+  labelled with a real source (not `diagnostic:common_terms`),
+- some **Live Translation** text visible.
+
+Save it over `ui_evidence_panel.png` (same aspect ratio, ~1230×715) and
+recompile. This can only be captured from a real browser with audio playback;
+an automated/headless Chrome cannot decode the sample and will sit at 0:00.

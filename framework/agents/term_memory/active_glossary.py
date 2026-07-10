@@ -86,7 +86,7 @@ class ActiveGlossaryManager:
         return ActiveGlossarySelection(
             requested_preset=AUTO_WORKING_PRESET if auto else active_preset,
             active_preset=active_preset,
-            active_domain=domain_for_preset(active_preset),
+            active_domain=self._domain_for_preset(catalog, active_preset),
             glossary_path=selection["glossary_path"],
             index_path=selection["index_path"],
             preset_terms=selection["preset_terms"],
@@ -127,6 +127,15 @@ class ActiveGlossaryManager:
             auto_enabled=True,
             reason=str(getattr(decision, "reason", "")),
         )
+
+    def _domain_for_preset(self, catalog: GlossaryCatalog, preset_id: str) -> str:
+        meta = catalog.manifest.meta_for_preset(preset_id) if catalog.manifest else {}
+        return str(
+            meta.get("domain_id")
+            or meta.get("domain")
+            or domain_for_preset(preset_id)
+            or GENERAL_DOMAIN
+        ).strip()
 
     def _describe(
         self,

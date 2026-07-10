@@ -62,6 +62,7 @@ from framework.agents.term_memory.active_glossary import (
 from framework.agents.term_memory.context_similarity import DomainDescriptionSimilarity
 from framework.agents.term_memory.domain_taxonomy import (
     AUTO_WORKING_PRESET,
+    DOMAIN_ROUTER_PROTOTYPES,
     DOMAIN_TO_PRESET,
     GENERAL_DOMAIN,
     configured_working_presets,
@@ -71,7 +72,6 @@ from framework.agents.term_memory.manifest import TermMemoryManifest
 from framework.agents.term_memory.slice_registry import (
     PROMPT_K,
     RetrievalSlice,
-    domain_for_slice_preset,
     rank_references as rank_autoterm_references,
     slice_id_for_preset,
     slice_role_for_preset,
@@ -323,6 +323,10 @@ class OmniConfig:
     router_generated_target_enabled: bool = True
     router_generated_target_window_chunks: int = 3
     router_generated_target_min_chars: int = 6
+    router_slice_selection_mode: str = "hard_top1"
+    router_term_budget: int = 100_000
+    router_max_active_slices: int = 0
+    router_unknown_slice_term_count: int = 10_000
     prompt_top_k: int = PROMPT_K
     ui_top_k: int = PROMPT_K
     autoterm_topk_per_slice: int = PROMPT_K
@@ -478,6 +482,15 @@ class OmniConfig:
             router_generated_target_enabled=_meta_bool(routing_config.get("enable_generated_target_text"), True),
             router_generated_target_window_chunks=_safe_int(routing_config.get("generated_target_window_chunks"), 3),
             router_generated_target_min_chars=_safe_int(routing_config.get("generated_target_min_chars"), 6),
+            router_slice_selection_mode=str(
+                routing_config.get("slice_selection_mode") or "hard_top1"
+            ),
+            router_term_budget=_safe_int(routing_config.get("term_budget"), 100_000),
+            router_max_active_slices=_safe_int(routing_config.get("max_active_slices"), 0),
+            router_unknown_slice_term_count=_safe_int(
+                routing_config.get("unknown_slice_term_count"),
+                10_000,
+            ),
             prompt_top_k=_env_int("RASST_PROMPT_TOP_K", prompt_k_default),
             ui_top_k=_env_int("RASST_UI_TOP_K", prompt_k_default),
             autoterm_topk_per_slice=retrieval_topk_default,
@@ -654,6 +667,10 @@ class OmniAgent(Agent):
             generated_target_probe_min_top_score=self.config.router_generated_target_probe_min_top_score,
             generated_target_probe_min_raw_margin=self.config.router_generated_target_probe_min_raw_margin,
             generated_target_probe_min_positive_domains=self.config.router_generated_target_probe_min_positive_domains,
+            slice_selection_mode=self.config.router_slice_selection_mode,
+            term_budget=self.config.router_term_budget,
+            max_active_slices=self.config.router_max_active_slices,
+            unknown_slice_term_count=self.config.router_unknown_slice_term_count,
         )
         router_cls = (
             HybridWindowTopicRouter
@@ -672,7 +689,7 @@ class OmniAgent(Agent):
         slices: List[DomainSlice] = []
         for preset_id in allowed:
             meta = catalog.manifest.meta_for_preset(preset_id) if catalog.manifest else {}
-            domain_id = str(meta.get("domain_id") or meta.get("domain") or domain_for_preset(preset_id)).strip()
+            domain_id = self._domain_id_for_preset(catalog, preset_id)
             if domain_id == "general":
                 domain_id = GENERAL_DOMAIN
             if (
@@ -715,6 +732,34 @@ class OmniAgent(Agent):
                 )
             )
         return slices
+
+    def _domain_id_for_preset(self, catalog: GlossaryCatalog, preset_id: str) -> str:
+        meta = catalog.manifest.meta_for_preset(preset_id) if catalog.manifest else {}
+        return str(
+            meta.get("domain_id")
+            or meta.get("domain")
+            or domain_for_preset(preset_id)
+            or GENERAL_DOMAIN
+        ).strip()
+
+    def _context_similarity_prototypes_for(
+        self,
+        catalog: GlossaryCatalog,
+    ) -> Dict[str, Tuple[str, ...]]:
+        prototypes: Dict[str, List[str]] = {}
+        for item in self._domain_slices_for(catalog):
+            description = str(item.description or "").strip()
+            texts = [description] if description else list(
+                DOMAIN_ROUTER_PROTOTYPES.get(item.domain_id, ())
+            )
+            if not texts:
+                texts = [item.domain_id.replace("_", " ").replace("-", " ")]
+            domain_texts = prototypes.setdefault(item.domain_id, [])
+            for text in texts:
+                normalized = str(text).strip()
+                if normalized and normalized not in domain_texts:
+                    domain_texts.append(normalized)
+        return {domain: tuple(texts) for domain, texts in prototypes.items() if texts}
 
     def _load_centroid(self, centroid_path: Any) -> Any:
         path = str(centroid_path or "").strip()
@@ -831,7 +876,7 @@ class OmniAgent(Agent):
             preset_id=active_preset,
             slice_id=slice_id_for_preset(active_preset),
             role=resolved_role,
-            domain=domain_for_slice_preset(active_preset),
+            domain=self._domain_id_for_preset(catalog, active_preset),
             index_path=index_path,
             term_count=int(selection.preset_terms or 0),
             weight=slice_weight_for_role(resolved_role),
@@ -860,7 +905,10 @@ class OmniAgent(Agent):
             presets.append((active_preset, "domain"))
         else:
             for preset in configured_working_presets(self.config.auto_glossary_presets):
-                domain = domain_for_preset(preset)
+                domain = self._domain_id_for_preset(
+                    self._catalog(session.language_pair),
+                    preset,
+                )
                 if not preset or preset == "none" or domain in {GENERAL_DOMAIN, "common", "general"}:
                     continue
                 presets.append((preset, "domain_probe"))
@@ -887,8 +935,9 @@ class OmniAgent(Agent):
             return []
         slices: List[RetrievalSlice] = []
         seen: Set[str] = set()
+        catalog = self._catalog(session.language_pair)
         for preset in configured_working_presets(self.config.auto_glossary_presets):
-            domain = domain_for_preset(preset)
+            domain = self._domain_id_for_preset(catalog, preset)
             if not preset or preset == "none" or domain in {GENERAL_DOMAIN, "common", "general"}:
                 continue
             plan = self._slice_for_preset(session, preset, role="domain_probe")
@@ -973,11 +1022,16 @@ class OmniAgent(Agent):
         scorer = self.context_similarity
         if scorer is None or not scorer.enabled:
             return output
-        allowed_domains = [
-            domain_for_preset(preset)
-            for preset in configured_working_presets(self.config.auto_glossary_presets)
-            if domain_for_preset(preset) not in {GENERAL_DOMAIN, "common", "general"}
-        ]
+        allowed_domains = list(getattr(scorer, "prototypes", {}) or {})
+        if not allowed_domains and batch:
+            language_pair = str(
+                getattr(batch[0], "language_pair", self.config.language_pair)
+                or self.config.language_pair
+            )
+            allowed_domains = [
+                item.domain_id
+                for item in self._domain_slices_for(self._catalog(language_pair))
+            ]
         now = time.perf_counter()
         pending_indexes: List[int] = []
         pending_texts: List[str] = []
@@ -1097,6 +1151,60 @@ class OmniAgent(Agent):
         session.active_slice_terms = {item.preset_id: int(item.term_count or 0) for item in slices}
         session.last_retrieval_plan = [item.to_meta() for item in slices]
 
+    def _budgeted_slice_routing_enabled(self) -> bool:
+        mode = str(self.config.router_slice_selection_mode or "hard_top1").strip().lower()
+        return mode in {"budgeted", "budgeted_top_slices", "top_slices"}
+
+    def _activate_budgeted_retrieval_slices(
+        self,
+        session: "OmniSession",
+        decision: RouterDecision,
+    ) -> bool:
+        if not self._budgeted_slice_routing_enabled():
+            return False
+        selection = decision.evidence.get("slice_selection")
+        if not isinstance(selection, dict):
+            return False
+        selected_presets = [
+            str(preset).strip()
+            for preset in selection.get("selected_slice_presets", [])
+            if str(preset).strip()
+        ]
+        if not selected_presets:
+            return False
+
+        budget = max(0, int(self.config.router_term_budget))
+        unknown_terms = max(1, int(self.config.router_unknown_slice_term_count))
+        planned: List[RetrievalSlice] = []
+        used_terms = 0
+        base_preset = str(self.config.auto_glossary_base_preset or "").strip()
+        ordered_presets: List[Tuple[str, str]] = []
+        if base_preset and base_preset != "none":
+            ordered_presets.append((base_preset, "base"))
+        ordered_presets.extend((preset, "domain") for preset in selected_presets)
+
+        seen: Set[str] = set()
+        for preset, role in ordered_presets:
+            plan = self._slice_for_preset(session, preset, role=role)
+            if plan is None or plan.preset_id in seen:
+                continue
+            item_terms = int(plan.term_count) if int(plan.term_count) > 0 else unknown_terms
+            if used_terms + item_terms > budget:
+                continue
+            planned.append(plan)
+            seen.add(plan.preset_id)
+            used_terms += item_terms
+        if not planned:
+            return False
+
+        self._record_active_slices(session, planned)
+        for item in planned:
+            self._schedule_index_preload(item.index_path)
+        selection["activated_slice_presets"] = [item.preset_id for item in planned]
+        selection["activated_slice_count"] = len(planned)
+        selection["activated_term_count"] = used_terms
+        return True
+
     def _retrieval_top_k_for(self, session: "OmniSession") -> int:
         if session.auto_glossary_enabled:
             return max(int(self.config.autoterm_topk_per_slice), int(self.config.prompt_top_k), int(self.config.ui_top_k))
@@ -1182,10 +1290,14 @@ class OmniAgent(Agent):
             and not self.config.mock
         ):
             try:
+                prototypes = self._context_similarity_prototypes_for(
+                    self._catalog(self.config.language_pair)
+                )
                 self.context_similarity = DomainDescriptionSimilarity(
                     model_id=self.config.router_context_similarity_model,
                     device=self.config.router_context_similarity_device,
                     batch_size=self.config.router_context_similarity_batch_size,
+                    prototypes=prototypes,
                 )
                 await self.context_similarity.start()
             except Exception:  # noqa: BLE001 - router falls back to other evidence
@@ -2033,6 +2145,7 @@ class OmniAgent(Agent):
                 annotated_refs,
                 now,
             )
+        self._activate_budgeted_retrieval_slices(session, decision)
         session.topic_confidence = decision.confidence
         session.last_topic_reason = decision.reason
         session.last_topic_update_s = now
@@ -2117,12 +2230,20 @@ class OmniAgent(Agent):
 
         old_preset = session.active_glossary_preset
         old_domain = session.active_domain
+        budgeted_slices = (
+            list(session.active_retrieval_slices)
+            if self._budgeted_slice_routing_enabled()
+            else []
+        )
         session.glossary_preset = selection.active_preset
         session.active_glossary_preset = selection.active_preset
         session.active_domain = selection.active_domain
         session.glossary_index_path = selection.index_path
-        session.active_retrieval_slices = []
-        active_slices = self._active_retrieval_slices(session)
+        if budgeted_slices:
+            active_slices = budgeted_slices
+        else:
+            session.active_retrieval_slices = []
+            active_slices = self._active_retrieval_slices(session)
         self._record_active_slices(session, active_slices)
         for item in active_slices:
             self._schedule_index_preload(item.index_path)
@@ -2480,6 +2601,9 @@ class OmniAgent(Agent):
                 "generated_target_probe_min_positive_domains": self.config.router_generated_target_probe_min_positive_domains,
                 "generated_target_enabled": self.config.router_generated_target_enabled,
                 "generated_target_window_chunks": self.config.router_generated_target_window_chunks,
+                "slice_selection_mode": self.config.router_slice_selection_mode,
+                "term_budget": self.config.router_term_budget,
+                "max_active_slices": self.config.router_max_active_slices,
                 "prompt_top_k": self.config.prompt_top_k,
                 "ui_top_k": self.config.ui_top_k,
             },

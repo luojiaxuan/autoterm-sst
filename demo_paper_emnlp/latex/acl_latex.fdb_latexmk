@@ -1,13 +1,13 @@
 # Fdb version 4
-["bibtex latex/acl_latex"] 1783642120.82672 "latex/acl_latex.aux" "latex/acl_latex.bbl" "latex/acl_latex" 1783642122.05314 0
+["bibtex latex/acl_latex"] 1783642464.39896 "latex/acl_latex.aux" "latex/acl_latex.bbl" "latex/acl_latex" 1783642465.4884 0
   "acl_natbib.bst" 0 -1 0 ""
-  "latex/acl_latex.aux" 1783642121.80239 14749 61eb646dc125576f3d15f4aaf08feabb "pdflatex"
+  "latex/acl_latex.aux" 1783642465.25691 14749 66b0a63cd105c94d8d49373a4cb66a72 "pdflatex"
   "latex/custom.bib" 1783630823.06893 7298 bdb18c9134393b60f170ea07be681c21 ""
   (generated)
   "latex/acl_latex.bbl"
   "latex/acl_latex.blg"
   (rewritten before read)
-["pdflatex"] 1783642120.93528 "latex/acl_latex.tex" "latex/acl_latex.pdf" "acl_latex" 1783642122.05334 0
+["pdflatex"] 1783642464.49953 "latex/acl_latex.tex" "latex/acl_latex.pdf" "acl_latex" 1783642465.48867 0
   "/opt/homebrew/Cellar/texlive/20260301/share/texmf-dist/fonts/enc/dvips/base/8r.enc" 1772380719 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "/opt/homebrew/Cellar/texlive/20260301/share/texmf-dist/fonts/enc/dvips/inconsolata/i4-t1-0.enc" 1772380719 7631 5169ff1acd97ff1c4ab83563c99f96f4 ""
   "/opt/homebrew/Cellar/texlive/20260301/share/texmf-dist/fonts/map/fontname/texfonts.map" 1772380719 3524 cb3e574dea2d1052e39280babc910dc8 ""
@@ -146,11 +146,11 @@
   "/opt/homebrew/Cellar/texlive/20260301/share/texmf-dist/web2c/texmf.cnf" 1772380719 43633 14bbc273cebd985e64ab1a698333eaf9 ""
   "/opt/homebrew/Cellar/texlive/20260301/share/texmf-var/web2c/pdftex/pdflatex.fmt" 1772380719 3636958 d2062700e4b629ba1467c28603bfdc8d ""
   "latex/acl.sty" 1783384753.87209 11597 da9a94cfb2d73b4ccce758d297ef675a ""
-  "latex/acl_latex.aux" 1783642121.80239 14749 61eb646dc125576f3d15f4aaf08feabb "pdflatex"
-  "latex/acl_latex.bbl" 1783642120.92367 7374 49fcfa74d72345e0f9912cdab77e5182 "bibtex latex/acl_latex"
-  "latex/acl_latex.out" 1783642121.8041 1860 af864ff7555703f831697a4911f0135d "pdflatex"
-  "latex/acl_latex.tex" 1783632640.3154 2910 0780fb29dc6037a31cfbfb9b9388f5f9 ""
-  "latex/figures/autoterm_architecture.pdf" 1783642074.18413 145606 f9779cc4b7fb21b36c1526a8649b716c ""
+  "latex/acl_latex.aux" 1783642465.25691 14749 66b0a63cd105c94d8d49373a4cb66a72 "pdflatex"
+  "latex/acl_latex.bbl" 1783642464.48955 7374 49fcfa74d72345e0f9912cdab77e5182 "bibtex latex/acl_latex"
+  "latex/acl_latex.out" 1783642465.25829 1860 af864ff7555703f831697a4911f0135d "pdflatex"
+  "latex/acl_latex.tex" 1783642357.28254 2921 25605ad9a72db2d0872715fc5a954f37 ""
+  "latex/figures/autoterm_architecture.pdf" 1783642438.27775 145609 ccde3e6760bf1428ba70a7198253bb2e ""
   "latex/figures/routing_timeline_4block.png" 1783634545.50684 48746 668d7e9c9ba11a6a826c5583788acc90 ""
   "latex/figures/ui_evidence_panel.png" 1783634545.54915 159332 2f26d5b21b71e6274a5a0c712fcca7ff ""
   "latex/sections/0_abstract.tex" 1783633131.44208 1378 0dd795eeb7e3ac3f656f32bb684b5466 ""

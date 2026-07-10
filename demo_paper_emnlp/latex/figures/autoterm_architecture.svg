@@ -50,7 +50,7 @@
   <rect x="230" y="56" width="270" height="34" fill="#FFFFFF" stroke="#C86A32" stroke-width="2"/>
   <text x="365" y="80" class="small" text-anchor="middle" fill="#B85120"><tspan>Translation at Chunk</tspan><tspan baseline-shift="sub" font-size="16">t</tspan></text>
 
-  <text x="1080" y="27" class="translation" text-anchor="middle" dominant-baseline="central">
+  <text x="1080" y="32" class="translation" text-anchor="middle" dominant-baseline="central">
     <tspan>……患者患有</tspan><tspan fill="#3B7F2B" font-weight="700">直肠癌</tspan><tspan>。</tspan>
   </text>
   <rect x="930" y="56" width="300" height="34" fill="#FFFFFF" stroke="#C86A32" stroke-width="2"/>

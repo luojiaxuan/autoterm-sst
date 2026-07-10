@@ -395,6 +395,29 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertFalse(session.last_domain_probe_cached)
         self.assertTrue(all(item["role"] == "domain_probe" for item in session.last_domain_probe_slices))
 
+    def test_zero_weight_disables_domain_probe_work(self) -> None:
+        agent = OmniAgent()
+        agent.config.router_domain_probe_weight = 0.0
+        agent.retrieval = MockRetrieval(target_lang="zh", top_k=10)
+        session = SimpleNamespace(
+            last_domain_probe_raw_scores={"stale": object()},
+            last_domain_probe_scores={"stale": {}},
+            last_domain_probe_slices=[{"preset_id": "stale"}],
+            last_domain_probe_s=1.0,
+            last_domain_probe_at_s=1.0,
+            last_domain_probe_cached=True,
+        )
+
+        scores = asyncio.run(agent._probe_domain_scores(session, end_sample=16000))
+
+        self.assertEqual(scores, {})
+        self.assertEqual(session.last_domain_probe_raw_scores, {})
+        self.assertEqual(session.last_domain_probe_scores, {})
+        self.assertEqual(session.last_domain_probe_slices, [])
+        self.assertIsNone(session.last_domain_probe_s)
+        self.assertEqual(session.last_domain_probe_at_s, 0.0)
+        self.assertFalse(session.last_domain_probe_cached)
+
     def test_domain_probe_reuses_cached_scores_inside_update_gate(self) -> None:
         agent = OmniAgent()
         agent.config.mock = True

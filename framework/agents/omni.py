@@ -241,6 +241,7 @@ class OmniConfig:
     # Optional alternative backend: external OpenAI-compatible SGLang/vLLM server.
     sglang_base_url: str = "http://127.0.0.1:8100"
     sglang_timeout_sec: float = 900.0
+    vllm_serve_base_url: str = "http://127.0.0.1:8200"
 
     segment_sec: float = 1.92
     # latency-multiplier streaming: chunk = base_segment_sec * lm (lm in 1..4 ->
@@ -355,6 +356,7 @@ class OmniConfig:
             disable_custom_all_reduce=bool(_env_int("RASST_DISABLE_CUSTOM_ALL_REDUCE", 0)),
             sglang_base_url=_env_str("RASST_SGLANG_BASE_URL", "http://127.0.0.1:8100"),
             sglang_timeout_sec=_env_float("RASST_SGLANG_TIMEOUT_SEC", 900.0),
+            vllm_serve_base_url=_env_str("RASST_VLLM_SERVE_URL", "http://127.0.0.1:8200"),
             segment_sec=_env_float("RASST_VLLM_SEGMENT_SEC", _env_float("RASST_SGLANG_SEGMENT_SEC", 1.92)),
             base_segment_sec=_env_float("RASST_BASE_SEGMENT_SEC", 0.96),
             default_latency_multiplier=_env_int("RASST_DEFAULT_LATENCY_MULTIPLIER", 2),
@@ -535,6 +537,17 @@ class OmniAgent(Agent):
         self.name = name
         self.model_id = model_id
         self.template = get_template(model_id)
+        # Optional override: point the agent at an external vllm serve process
+        # (continuous batching) instead of the in-process offline vLLM backend.
+        backend_override = os.environ.get("RASST_BACKEND_KIND", "").strip()
+        if backend_override:
+            import dataclasses  # noqa: WPS433
+            served = os.environ.get("RASST_SERVED_MODEL_NAME", "").strip()
+            self.template = dataclasses.replace(
+                self.template,
+                backend_kind=backend_override,
+                **({"served_model_name": served} if served else {}),
+            )
         self.config = OmniConfig.from_env(self.template)
         self.prompt = PromptBuilder(
             system_prompt_style=self.config.system_prompt_style,
@@ -1032,6 +1045,7 @@ class OmniAgent(Agent):
             mock=self.config.mock,
             sglang_base_url=self.config.sglang_base_url,
             sglang_timeout_sec=self.config.sglang_timeout_sec,
+            vllm_serve_base_url=self.config.vllm_serve_base_url,
             vllm_config=self._vllm_config(),
         )
         await self.backend.start()

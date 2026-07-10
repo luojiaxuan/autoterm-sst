@@ -579,3 +579,24 @@ python3 eval/streaming_sst/eval_mixed_domain_switch.py \
   to a Hugging Face dataset. The paper source and the lightweight summaries in
   this document remain the Git source of truth until an artifact repository is
   selected.
+
+## 2026-07-10: router λ 权重 robustness sweep（CPU proxy）
+
+回答"权重怎么来的"：手设于 proxy，未对 audio eval 拟合。加了 4 个 CLI 旗子
+（`--text-topic-weight` 等，默认不变，权重写入产物 summary）后在固定
+64-window alternating + random(seed 20260707) proxy 上扫 7 组配置：
+
+| config (λt/λp/λc/λm) | wrong | passed | mean lat (win) | regression |
+|---|---:|---:|---:|---|
+| default 0.60/0.25/0.10/0.05 | 0 | 16/16 | 3.00 | pass |
+| topic_heavy 0.80/0.10/0.05/0.05 | 0 | 16/16 | 3.00 | pass |
+| balanced 0.45/0.40/0.10/0.05 | 0 | 16/16 | 3.00 | pass |
+| probe_heavy 0.25/0.60/0.10/0.05 | 0 | 16/16 | 3.00 | pass |
+| probe_only 0/1/0/0 | 0 | 16/16 | 3.00 | pass |
+| no_aux 0.70/0.30/0/0 | 0 | 16/16 | 3.00 | pass |
+| topic_only 1/0/0/0 | 0 | 3/16 | 8.0/5.3 | **fail** |
+
+结论：混合权重在宽区间内不敏感（延迟恒等于 3-window consistency guard）；
+去掉 probe 通道后大多数切换被 guard 挡死——probe 是必要的 corroborating
+guard（虽然真实语音 probe 单独太噪，见 §6 controls）。产物
+`aries:/mnt/data3/jiaxuanluo/eval_out/lambda_sweep/`。已写入论文附录 A。

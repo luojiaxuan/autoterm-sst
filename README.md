@@ -21,7 +21,7 @@ of that internally.
 - 📄 Paper: *AutoTerm-SST: Zero-Setup Adaptive Terminology Memory for Streaming
   Speech Translation* (EMNLP 2026 System Demonstrations, under review) —
   source in [`demo_paper_emnlp/`](demo_paper_emnlp/).
-- 🎬 Screencast video: *link to be added with the submission package.*
+- 🎬 Screencast video: [docs/demo_screencast.mp4](https://github.com/luojiaxuan/autoterm-sst/blob/main/docs/demo_screencast.mp4) (2.5 min).
 - 🌐 Hosted live demo: <https://luojiaxuan.github.io/autoterm-sst/> (stable
   entry page; redirects to the current GPU-backed tunnel).
 - 🖥️ No GPU? Mock mode below runs the full UI, wire protocol, and JSON evidence

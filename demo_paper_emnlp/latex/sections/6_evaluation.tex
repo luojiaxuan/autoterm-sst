@@ -29,12 +29,14 @@ StreamLAAL \citep{papi2024streamatt}.
 
 \begin{figure*}[t]
   \centering
-  \includegraphics[width=0.71\textwidth]{routing_timeline_4block.png}
-  \caption{Mixed-domain routing probe on a 480s end-to-end streaming playlist
-  with ACL, medicine, ACL, and medicine blocks. The automatic active glossary
-  switches after each true domain boundary with no wrong switches; the final
-  switch is delayed because the medicine segment begins with speaker and
-  session framing before explicit oncology terminology appears.}
+  \includegraphics[width=0.92\textwidth]{routing_timeline_10talk.png}
+  \caption{Active-glossary routing over the ten-talk alternating run of
+  Table~\ref{tab:quality} (16,848s streamed end-to-end through one live
+  session). All nine domain transitions switch in the correct direction;
+  eight land 13.6--55.4s after the boundary and one medicine-to-ACL switch
+  (amber) is delayed 304s over a generic talk opening. A single 35s
+  transient wrong switch self-corrects; steady-state active-domain accuracy
+  is 0.982 outside 30s transition grace windows.}
   \label{fig:routing}
 \end{figure*}
 
@@ -82,15 +84,13 @@ slice stays compact and broad memories serve as fallback pools
 (Table~\ref{tab:scale}, Appendix~\ref{app:sweep}).
 
 \paragraph{Mixed-domain routing.}
-Figure~\ref{fig:routing} reports the four-block end-to-end routing probe for
-\texttt{auto\_working}. The run observes three domain transitions, makes three
-active-slice switches, and records zero wrong switches. The first two switches
-occur 20.16s and 17.28s after the domain boundary; the final switch occurs
-37.44s after the boundary because the opening of that medicine block contains
-general session framing before clear oncology terms. The run keeps the top-10
-prompt invariant with 99.5\% active-domain accuracy after excluding a 30s grace
-window following each boundary. The last switch misses the 30s target by 7.44s
-but is not a wrong switch.
+Figure~\ref{fig:routing} traces active-slice routing across the ten-talk run
+of Table~\ref{tab:quality}: nine correct-direction transitions, one delayed
+switch over a generic talk opening, and one self-correcting 35s transient,
+with the top-10 prompt invariant held throughout
+(Appendix~\ref{app:mixed}). A shorter four-block probe (480s) behaves the
+same way: three switches 17.3--37.4s after the boundaries, zero wrong
+switches, 99.5\% steady-state accuracy.
 A medicine-only session started from the default NLP slice recovers by
 switching to the medicine slice 59.5s into the session with zero wrong
 switches, so the initial slice is a warm start rather than a hidden oracle.
@@ -100,9 +100,7 @@ state-machine proxy tests, using reference-text windows and controlled probe
 evidence, cover 16 alternating/random transitions with zero wrong switches.
 Inverted- and contested-probe controls expose the expected wrong-switch and
 delayed-switch failure modes. These proxies are separate from the preceding
-end-to-end audio run. In the ten-talk run of Table~\ref{tab:quality}, all nine domain
-transitions switch in the correct direction (steady-state accuracy 0.982;
-Appendix~\ref{app:mixed}).
+end-to-end audio runs.
 
 \paragraph{Concurrent streaming.}
 In a 32-session stress test, prerecorded ACL audio was streamed to every session

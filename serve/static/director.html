@@ -5,11 +5,11 @@
 <title>DIR|boot</title>
 <style>
   html,body{margin:0;padding:0;height:100%;background:#0b1020;overflow:hidden}
-  #strip{position:fixed;top:0;left:0;right:0;height:44px;display:flex;gap:2px;z-index:10}
+  #strip{display:none}
   #strip button{flex:1;font:600 13px -apple-system,sans-serif;border:none;cursor:pointer;
     background:#1b2438;color:#9fb3d9}
   #strip button:disabled{opacity:.35}
-  #frame{position:fixed;top:44px;left:0;width:100%;height:calc(100% - 44px);border:none}
+  #frame{position:fixed;top:0;left:0;width:100%;height:100%;border:none}
 </style>
 </head>
 <body>
@@ -38,8 +38,26 @@
   // Telemetry via title: readable from AppleScript without any JS permission.
   setInterval(() => {
     const m = media();
+    const chromeH = window.outerHeight - window.innerHeight;
+    const pt = el => {
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return [Math.round(window.screenX + r.x + r.width / 2), Math.round(window.screenY + chromeH + r.y + r.height / 2)];
+    };
+    const btns = (() => {
+      try {
+        const doc = D();
+        return {
+          load: pt(doc.querySelector('.sample-btn-primary')),
+          play: pt(doc.getElementById('playBtn')),
+          lat: pt(doc.getElementById('latencySelect') || [...doc.querySelectorAll('select')].find(x => [...x.options].some(o => /2x/.test(o.textContent)))),
+          upd: pt([...doc.querySelectorAll('button')].find(b => /update session/i.test(b.textContent)))
+        };
+      } catch (e) { return null; }
+    })();
     const st = {
       p: phase,
+      btn: btns,
       geo: [window.screenX, window.screenY, window.outerWidth, window.outerHeight, window.innerWidth, window.innerHeight].join(','),
       rs: m ? m.readyState : -1,
       t: m ? +m.currentTime.toFixed(1) : -1,

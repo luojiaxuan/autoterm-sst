@@ -640,3 +640,39 @@ classify_output_hit 完全镜像；分母不变。`bb4a603`，单测 5/5。
   fixed_med (0.812) 反超 1.1pp，raw 口径仍第一。App D 已如实改写，
   德语 provenance 句同步软化。tab:sweep 不受影响（per-type 构造）。
 - 今晚 ja/de 10-talk 与 zh random 的链式评分自动使用修正版 scorer。
+
+## 2026-07-10: MFA 时间对齐 occurrence-level term_acc（论文主指标）
+
+用户提供 MFA 对齐数据（5 ACL + 5 ESO TextGrid，commit 966c8b6）。新增
+`score_time_aligned_terms.py`：每个 gold occurrence 锚到 source 秒
+（ACL 走 words tier + **段偏移映射**——playlist 拼接去掉了段间静音，须把
+TextGrid 原始时间经 segments.meta 的 offset/seg_duration 映射到播放秒；
+medicine 走 oracle start/end），命中要求输出在 [t-2, t+30]s 窗口内出现可
+接受译文变体，按时间贪心一对一分配。窗口 15–45s 结果稳定（auto tech
+0.868→0.880）。这是**比 count-clipping 更严格且更真实**的口径，已设为论文主指标。
+
+**zh 10-talk（主表 / 摘要 / §6 / 附录 C）**：gold tech 1462（ACL 780 + med 682）、
+raw 2551。
+
+| run | tech | raw | ACL | med |
+|---|---:|---:|---:|---:|
+| none | 0.670 | 0.706 | 0.767 | 0.559 |
+| fixed_nlp | 0.679 | 0.746 | 0.797 | 0.544 |
+| fixed_med | 0.805 | 0.784 | 0.764 | 0.852 |
+| **auto** | **0.874** | **0.868** | **0.890** | **0.856** |
+
+结论更强：auto 双口径第一，且 in-domain 严格超两个专家（ACL +9.3pp、med +0.4pp），
+combined 领先 fixed_med +6.9/8.4pp。
+
+**zh 3-talk probe（附录 C 散文）**：auto 0.908/0.888、fixed_nlp 0.888/0.874、
+fixed_med 0.738/0.727、oracle 0.738。probe 偏 ACL（412 中 367 为 ACL），故
+fixed_nlp 逼近。
+
+**ja/de 3-talk（附录 D）**：
+- ja: auto **0.742/0.767**（ACL 0.754 / med 0.711），双口径第一。
+- de: auto **0.558/0.492**（ACL 0.575 / med 0.522），双口径第一。
+  → **MFA 口径下德语 technical 反超消失**（count-clip 版曾被 fixed_med 0.812
+  反超），德语 provenance 句与 App D intro 的软化表述已回滚。
+
+产物：各 run 目录 `term_acc_10talk_mfa.json` / `mfa_3talk.json`。
+今晚 ja/de 10-talk 落地后用同脚本重评替换 App D 3-talk。

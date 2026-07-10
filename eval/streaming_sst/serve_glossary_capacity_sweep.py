@@ -151,7 +151,10 @@ def build_agent(
         rag_top_k=args.rag_top_k,
         rag_score_threshold=args.rag_score_threshold,
         rag_startup_glossary_preset=presets[0],
-        retrieval_candidate_budget=max(0, int(args.retrieval_candidate_budget)),
+        retrieval_candidate_budget=max(
+            0,
+            int(getattr(args, "retrieval_candidate_budget", 0)),
+        ),
         auto_glossary_enabled=False,
         auto_glossary_preload=False,
         router_context_similarity_enabled=False,

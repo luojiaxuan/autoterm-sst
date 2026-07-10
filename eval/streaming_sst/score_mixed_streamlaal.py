@@ -470,6 +470,12 @@ def render_markdown(report: Mapping[str, Any]) -> str:
     metrics = report["metrics"]
     playlist = report["playlist"]
     text = report["text"]
+    ca_ms = metrics["stream_laal_ca_ms"]
+    ca_summary = (
+        f"`{ca_ms:.3f}ms`"
+        if ca_ms is not None
+        else "`unavailable (standard-only)`"
+    )
     return "\n".join(
         [
             "# Mixed-run StreamLAAL",
@@ -480,7 +486,7 @@ def render_markdown(report: Mapping[str, Any]) -> str:
             f"- Source duration: `{playlist['source_length_ms'] / 1000.0:.3f}s`",
             f"- Reference / hypothesis characters: `{text['reference_chars']} / {text['hypothesis_chars']}`",
             f"- StreamLAAL: `{metrics['stream_laal_ms']:.3f}ms`",
-            f"- StreamLAAL-CA: `{metrics['stream_laal_ca_ms']:.3f}ms`",
+            f"- StreamLAAL-CA: {ca_summary}",
             f"- Tail gap: `{playlist['tail_gap_samples']}` samples",
             "",
             "StreamLAAL-CA uses client-side `emitted_wall_s`; comparisons require the same wall-clock origin and pacing protocol.",

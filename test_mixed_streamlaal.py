@@ -9,6 +9,7 @@ from eval.streaming_sst.score_mixed_streamlaal import (
     fbk_stream_elapsed,
     load_reference_text,
     main,
+    render_markdown,
     score_payload,
 )
 
@@ -124,6 +125,7 @@ class MixedStreamLAALTest(unittest.TestCase):
         self.assertIsNotNone(report["metrics"]["stream_laal_ms"])
         self.assertIsNone(report["metrics"]["stream_laal_ca_ms"])
         self.assertFalse(report["protocol"]["computation_aware_enabled"])
+        self.assertIn("unavailable (standard-only)", render_markdown(report))
 
     def test_non_monotonic_cursor_or_wall_time_fails(self) -> None:
         bad_cursor = _payload(

@@ -101,6 +101,60 @@ class DedupedMergedIndexTests(unittest.TestCase):
                 ["Q1", "Q3"],
             )
 
+    def test_source_target_mode_preserves_conflicts_and_drops_exact_pairs(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_dir:
+            root = Path(raw_dir)
+            checkpoint = self._checkpoint(root)
+            first = _write_pair(
+                root,
+                "finance",
+                [_entry("bank", "银行", qid="Q1")],
+                torch.tensor([[1.0, 10.0]]),
+            )
+            second = _write_pair(
+                root,
+                "environment",
+                [
+                    _entry("BANK", "河岸", qid="Q2"),
+                    _entry("bank", "银行", qid="Q3"),
+                ],
+                torch.tensor([[2.0, 20.0], [3.0, 30.0]]),
+            )
+            out = root / "out"
+
+            report = build_deduped_merged_index(
+                sources=[first, second],
+                topup_source=None,
+                target_size=None,
+                out_dir=out,
+                preset_id="toy_pair_dedup",
+                language_pair="en-zh",
+                embedding_checkpoint=checkpoint,
+                dedup_mode="source_target",
+            )
+
+            glossary = json.loads((out / "glossary.json").read_text(encoding="utf-8"))
+            payload = torch.load(out / "maxsim.pt", map_location="cpu", weights_only=True)
+            audit = json.loads((out / "duplicate_audit.json").read_text(encoding="utf-8"))
+
+            self.assertEqual(
+                [(row["term"], row["target_translations"]["zh"]) for row in glossary],
+                [("bank", "银行"), ("BANK", "河岸")],
+            )
+            self.assertTrue(
+                torch.equal(payload["text_embs"], torch.tensor([[1.0, 10.0], [2.0, 20.0]]))
+            )
+            self.assertEqual(report["base_input_rows"], 3)
+            self.assertEqual(report["base_unique_terms"], 1)
+            self.assertEqual(report["base_unique_identities"], 2)
+            self.assertEqual(report["base_duplicate_rows"], 1)
+            self.assertEqual(report["base_target_variant_conflict_term_count"], 1)
+            self.assertEqual(report["output_term_count"], 2)
+            self.assertEqual(report["output_unique_source_count"], 1)
+            self.assertEqual(len(audit["duplicate_terms"]), 1)
+            self.assertEqual(len(audit["source_overlap_terms"]), 1)
+            self.assertTrue(audit["source_overlap_terms"][0]["target_variant_conflict"])
+
     def test_topup_reaches_exact_unique_target_without_counting_collisions(self) -> None:
         with tempfile.TemporaryDirectory() as raw_dir:
             root = Path(raw_dir)

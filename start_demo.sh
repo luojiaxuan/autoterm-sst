@@ -14,20 +14,44 @@
 #   scripts/legacy/start_rasst_sglang.sh     (serve.rasst_sglang_server)
 set -euo pipefail
 
-REPO_ROOT="/mnt/taurus/home/jiaxuanluo/rasst-demo"
-PYTHON_BIN="${PYTHON_BIN:-/mnt/taurus/home/jiaxuanluo/miniconda3/envs/infinisst/bin/python}"
-FAIRSEQ_ROOT="${FAIRSEQ_ROOT:-/mnt/taurus/data2/jiaxuanluo/fairseq-0.12.2}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="${REPO_ROOT:-${SCRIPT_DIR}}"
+if [ -z "${PYTHON_BIN:-}" ]; then
+  if [ -x "${REPO_ROOT}/.venv/bin/python" ]; then
+    PYTHON_BIN="${REPO_ROOT}/.venv/bin/python"
+  else
+    PYTHON_BIN="$(command -v python3 || true)"
+  fi
+fi
+if [ -z "${PYTHON_BIN}" ]; then
+  echo "ERROR: Python 3 was not found. Install it or set PYTHON_BIN." >&2
+  exit 1
+fi
+FAIRSEQ_ROOT="${FAIRSEQ_ROOT:-}"
 HOST="${HOST:-127.0.0.1}"
 PORT="${PORT:-8000}"
 
-export PYTHONPATH="${REPO_ROOT}:${FAIRSEQ_ROOT}:${PYTHONPATH:-}"
+PYTHONPATH_ENTRIES="${REPO_ROOT}"
+if [ -n "${FAIRSEQ_ROOT}" ]; then
+  PYTHONPATH_ENTRIES="${PYTHONPATH_ENTRIES}:${FAIRSEQ_ROOT}"
+fi
+if [ -n "${PYTHONPATH:-}" ]; then
+  PYTHONPATH_ENTRIES="${PYTHONPATH_ENTRIES}:${PYTHONPATH}"
+fi
+export PYTHONPATH="${PYTHONPATH_ENTRIES}"
 export PYTHONNOUSERSITE=1
 
 export RASST_DEMO_MOCK="${RASST_DEMO_MOCK:-0}"
 
 # Which agents the framework loads, and which one handles a blank/unknown
-# agent_type. The UI's model picker uses these agent_type ids.
-export RASST_FRAMEWORK_AGENTS="${RASST_FRAMEWORK_AGENTS:-InfiniSST,RASST}"
+# agent_type. Mock mode defaults to the dependency-light RASST mock agent;
+# live deployments may still request the legacy InfiniSST agent explicitly.
+if [ "${RASST_DEMO_MOCK}" = "1" ]; then
+  DEFAULT_FRAMEWORK_AGENTS="RASST"
+else
+  DEFAULT_FRAMEWORK_AGENTS="InfiniSST,RASST"
+fi
+export RASST_FRAMEWORK_AGENTS="${RASST_FRAMEWORK_AGENTS:-${DEFAULT_FRAMEWORK_AGENTS}}"
 export RASST_FRAMEWORK_DEFAULT_AGENT="${RASST_FRAMEWORK_DEFAULT_AGENT:-RASST}"
 
 # RASST/omni generation backend: in-process vLLM (batched generate -> 32+

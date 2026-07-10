@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Build a globally source-deduplicated glossary and aligned MaxSim index.
+"""Build a deduplicated merged glossary and aligned MaxSim index.
 
-Inputs are ordered glossary/index pairs.  The first occurrence of a normalized
-English source term wins, while every later occurrence is retained in a full
-duplicate audit.  An optional distractor pair can deterministically top up the
-deduplicated union to an exact unique-term target without re-encoding text.
+Inputs are ordered glossary/index pairs. Deduplication can use either normalized
+English sources or normalized ``(source, target)`` pairs. An optional distractor
+pair can deterministically top up the union without re-encoding text.
 """
 
 from __future__ import annotations
@@ -95,6 +94,21 @@ def _translation_map(entry: Mapping[str, Any], target_lang: str) -> Dict[str, st
 
 def _canonical_target(value: str) -> str:
     return " ".join(str(value).split())
+
+
+def _dedup_key(
+    entry: Mapping[str, Any],
+    *,
+    target_lang: str,
+    dedup_mode: str,
+) -> str:
+    source = normalize_english_source(source_term(entry))
+    if dedup_mode == "source":
+        return source
+    if dedup_mode == "source_target":
+        target = _canonical_target(_target_translation(entry, target_lang)).casefold()
+        return json.dumps([source, target], ensure_ascii=False, separators=(",", ":"))
+    raise ValueError(f"unsupported dedup mode: {dedup_mode}")
 
 
 def _index_source_term(entry: Mapping[str, Any]) -> str:
@@ -257,6 +271,9 @@ def _audit_entries(
     audit: List[Dict[str, Any]] = []
     for key in sorted(duplicate_occurrences):
         occurrences = list(duplicate_occurrences[key])
+        normalized_source = normalize_english_source(
+            str(occurrences[0]["source_term"])
+        )
         targets = sorted({_canonical_target(row["target_translation"]) for row in occurrences})
         translation_maps = {
             json.dumps(row["target_translations"], ensure_ascii=False, sort_keys=True)
@@ -266,10 +283,44 @@ def _audit_entries(
         roles = sorted({str(row["source_role"]) for row in occurrences})
         audit.append(
             {
-                "normalized_source": key,
+                "dedup_identity": key,
+                "normalized_source": normalized_source,
                 "output_winner": dict(output_winner[key]) if key in output_winner else None,
                 "source_roles": roles,
                 "surface_forms": surfaces,
+                "target_variants": targets,
+                "target_variant_conflict": len(targets) > 1,
+                "translation_map_conflict": len(translation_maps) > 1,
+                "occurrences": occurrences,
+            }
+        )
+    return audit
+
+
+def _source_overlap_entries(
+    source_occurrences: Mapping[str, Sequence[Mapping[str, Any]]],
+) -> List[Dict[str, Any]]:
+    audit: List[Dict[str, Any]] = []
+    for normalized_source in sorted(source_occurrences):
+        occurrences = list(source_occurrences[normalized_source])
+        if len(occurrences) < 2:
+            continue
+        targets = sorted(
+            {_canonical_target(row["target_translation"]) for row in occurrences}
+        )
+        translation_maps = {
+            json.dumps(row["target_translations"], ensure_ascii=False, sort_keys=True)
+            for row in occurrences
+        }
+        audit.append(
+            {
+                "normalized_source": normalized_source,
+                "source_roles": sorted(
+                    {str(row["source_role"]) for row in occurrences}
+                ),
+                "surface_forms": sorted(
+                    {str(row["source_term"]) for row in occurrences}
+                ),
                 "target_variants": targets,
                 "target_variant_conflict": len(targets) > 1,
                 "translation_map_conflict": len(translation_maps) > 1,
@@ -307,6 +358,7 @@ def build_deduped_merged_index(
     label: str = "",
     description: str = "",
     strict_checkpoint_evidence: bool = False,
+    dedup_mode: str = "source",
 ) -> Dict[str, Any]:
     if not sources:
         raise ValueError("at least one --source is required")
@@ -317,8 +369,16 @@ def build_deduped_merged_index(
         raise ValueError("--target-size must be positive")
     if topup_source is not None and target_size is None:
         raise ValueError("--topup-source requires --target-size")
+    if dedup_mode not in {"source", "source_target"}:
+        raise ValueError("--dedup-mode must be source or source_target")
     target_lang = _target_language(language_pair)
     checkpoint_sha256 = file_sha256(embedding_checkpoint)
+    conflict_policy = (
+        "first normalized source-target pair in CLI order wins; "
+        "distinct target translations are preserved"
+        if dedup_mode == "source_target"
+        else "first base source in CLI order wins; top-up only fills unseen keys"
+    )
 
     expected_embedding_shape: tuple[int, ...] | None = None
     expected_dtype: torch.dtype | None = None
@@ -326,9 +386,11 @@ def build_deduped_merged_index(
     output_index_terms: List[Dict[str, Any]] = []
     output_tensor_chunks: List[torch.Tensor] = []
     output_keys: List[str] = []
+    output_source_keys: List[str] = []
     output_winner: Dict[str, Dict[str, Any]] = {}
     first_occurrence: Dict[str, Dict[str, Any]] = {}
     duplicate_occurrences: Dict[str, List[Dict[str, Any]]] = {}
+    source_occurrences: Dict[str, List[Dict[str, Any]]] = {}
     base_keys: set[str] = set()
     source_reports: List[Dict[str, Any]] = []
 
@@ -363,11 +425,17 @@ def build_deduped_merged_index(
         validate_tensor(spec, loaded)
         selected_indices: List[int] = []
         within_source_keys: set[str] = set()
+        within_identity_keys: set[str] = set()
         duplicates_before = sum(len(rows) - 1 for rows in duplicate_occurrences.values())
         for row_index, (glossary_entry, index_entry) in enumerate(
             zip(loaded.glossary, loaded.index_terms)
         ):
-            key = normalize_english_source(source_term(glossary_entry))
+            source_key = normalize_english_source(source_term(glossary_entry))
+            key = _dedup_key(
+                glossary_entry,
+                target_lang=target_lang,
+                dedup_mode=dedup_mode,
+            )
             occurrence = _occurrence(
                 spec,
                 row_index,
@@ -375,17 +443,21 @@ def build_deduped_merged_index(
                 index_entry,
                 target_lang=target_lang,
             )
+            source_occurrences.setdefault(source_key, []).append(occurrence)
             if key in first_occurrence:
                 _record_duplicate(duplicate_occurrences, first_occurrence, key, occurrence)
             else:
                 first_occurrence[key] = occurrence
             if key in base_keys:
-                within_source_keys.add(key)
+                within_source_keys.add(source_key)
+                within_identity_keys.add(key)
                 continue
             base_keys.add(key)
-            within_source_keys.add(key)
+            within_source_keys.add(source_key)
+            within_identity_keys.add(key)
             selected_indices.append(row_index)
             output_keys.append(key)
+            output_source_keys.append(source_key)
             output_glossary.append(glossary_entry)
             output_index_terms.append(index_entry)
             output_winner[key] = {
@@ -411,6 +483,7 @@ def build_deduped_merged_index(
                 "index_sha256": file_sha256(spec.index_path),
                 "input_rows": len(loaded.glossary),
                 "input_unique_terms": len(within_source_keys),
+                "input_unique_identities": len(within_identity_keys),
                 "selected_unique_terms": len(selected_indices),
                 "duplicate_rows": duplicate_rows,
                 "embedding_shape": list(loaded.text_embs.shape),
@@ -420,13 +493,15 @@ def build_deduped_merged_index(
         )
         del loaded
 
-    base_unique_terms = len(output_keys)
-    if target_size is not None and target_size < base_unique_terms:
+    base_unique_identities = len(output_keys)
+    base_unique_terms = len(set(output_source_keys))
+    if target_size is not None and target_size < base_unique_identities:
         raise ValueError(
-            f"--target-size {target_size} is smaller than base deduplicated union {base_unique_terms}; "
+            f"--target-size {target_size} is smaller than base deduplicated union "
+            f"{base_unique_identities}; "
             "this builder never truncates base sources"
         )
-    needed = (target_size - base_unique_terms) if target_size is not None else 0
+    needed = (target_size - base_unique_identities) if target_size is not None else 0
     if needed and topup_source is None:
         raise ValueError(f"need {needed} unique top-up terms but no --topup-source was provided")
 
@@ -447,7 +522,12 @@ def build_deduped_merged_index(
         for row_index, (glossary_entry, index_entry) in enumerate(
             zip(loaded.glossary, loaded.index_terms)
         ):
-            key = normalize_english_source(source_term(glossary_entry))
+            source_key = normalize_english_source(source_term(glossary_entry))
+            key = _dedup_key(
+                glossary_entry,
+                target_lang=target_lang,
+                dedup_mode=dedup_mode,
+            )
             occurrence = _occurrence(
                 spec,
                 row_index,
@@ -455,6 +535,7 @@ def build_deduped_merged_index(
                 index_entry,
                 target_lang=target_lang,
             )
+            source_occurrences.setdefault(source_key, []).append(occurrence)
             if key in first_occurrence:
                 _record_duplicate(duplicate_occurrences, first_occurrence, key, occurrence)
             else:
@@ -471,6 +552,7 @@ def build_deduped_merged_index(
                 continue
             selected_indices.append(row_index)
             output_keys.append(key)
+            output_source_keys.append(source_key)
             output_glossary.append(glossary_entry)
             output_index_terms.append(index_entry)
             output_winner[key] = {
@@ -508,7 +590,7 @@ def build_deduped_merged_index(
         )
         del loaded
 
-    expected_size = target_size if target_size is not None else base_unique_terms
+    expected_size = target_size if target_size is not None else base_unique_identities
     if len(output_keys) != expected_size or len(set(output_keys)) != expected_size:
         raise RuntimeError(
             f"unique output invariant failed: rows={len(output_keys)}, "
@@ -535,10 +617,13 @@ def build_deduped_merged_index(
         "language_pair": language_pair,
         "term_count": expected_size,
         "base_unique_term_count": base_unique_terms,
+        "base_unique_identity_count": base_unique_identities,
+        "dedup_mode": dedup_mode,
         "embedding_checkpoint_path": str(embedding_checkpoint),
         "embedding_checkpoint_sha256": checkpoint_sha256,
         "source_normalization": SOURCE_NORMALIZATION_POLICY,
-        "source_term_fingerprint_sha256": identity_fingerprint(output_keys),
+        "source_term_fingerprint_sha256": identity_fingerprint(output_source_keys),
+        "dedup_identity_fingerprint_sha256": identity_fingerprint(output_keys),
     }
     torch.save(
         {
@@ -550,10 +635,13 @@ def build_deduped_merged_index(
     )
 
     audit = _audit_entries(duplicate_occurrences, output_winner)
+    source_overlap_audit = _source_overlap_entries(source_occurrences)
     audit_payload = {
-        "conflict_policy": "first base source in CLI order wins; top-up only fills unseen keys",
+        "conflict_policy": conflict_policy,
+        "dedup_mode": dedup_mode,
         "source_normalization": SOURCE_NORMALIZATION_POLICY,
         "duplicate_terms": audit,
+        "source_overlap_terms": source_overlap_audit,
     }
     audit_path.write_text(
         json.dumps(audit_payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
@@ -577,10 +665,19 @@ def build_deduped_merged_index(
                 "label": label or preset_id.replace("_", " ").title(),
                 "domain": "merged",
                 "domain_id": "merged",
-                "description": description or "Globally source-deduplicated merged glossary.",
+                "description": description or (
+                    "Globally source-target-pair-deduplicated merged glossary."
+                    if dedup_mode == "source_target"
+                    else "Globally source-deduplicated merged glossary."
+                ),
                 "term_count": expected_size,
                 "maxsim_index_path": str(index_path.resolve()),
-                "source_term_fingerprint_sha256": identity_fingerprint(output_keys),
+                "source_term_fingerprint_sha256": identity_fingerprint(
+                    output_source_keys
+                ),
+                "dedup_identity_fingerprint_sha256": identity_fingerprint(
+                    output_keys
+                ),
                 "enabled_for_auto_router": False,
             }
         },
@@ -601,32 +698,60 @@ def build_deduped_merged_index(
         if len({row["source_role"] for row in item["occurrences"] if row["source_kind"] == "base"}) > 1
         or sum(1 for row in item["occurrences"] if row["source_kind"] == "base") > 1
     ]
+    base_source_overlap_audit = [
+        item
+        for item in source_overlap_audit
+        if len(
+            {
+                row["source_role"]
+                for row in item["occurrences"]
+                if row["source_kind"] == "base"
+            }
+        )
+        > 1
+        or sum(
+            1 for row in item["occurrences"] if row["source_kind"] == "base"
+        )
+        > 1
+    ]
     report: Dict[str, Any] = {
         "status": "complete",
         "preset_id": preset_id,
         "language_pair": language_pair,
+        "dedup_mode": dedup_mode,
         "source_normalization": SOURCE_NORMALIZATION_POLICY,
-        "conflict_policy": "first base source in CLI order wins; top-up only fills unseen keys",
+        "conflict_policy": conflict_policy,
         "base_input_rows": sum(
             item["input_rows"] for item in source_reports if item["kind"] == "base"
         ),
         "base_unique_terms": base_unique_terms,
+        "base_unique_identities": base_unique_identities,
         "base_duplicate_rows": base_duplicate_rows,
         "base_duplicate_term_count": len(base_audit),
         "base_target_variant_conflict_term_count": sum(
-            bool(item["target_variant_conflict"]) for item in base_audit
+            bool(item["target_variant_conflict"])
+            for item in base_source_overlap_audit
         ),
         "base_translation_map_conflict_term_count": sum(
-            bool(item["translation_map_conflict"]) for item in base_audit
+            bool(item["translation_map_conflict"])
+            for item in base_source_overlap_audit
         ),
         "output_term_count": expected_size,
-        "topup_term_count": expected_size - base_unique_terms,
+        "output_unique_source_count": len(set(output_source_keys)),
+        "topup_term_count": expected_size - base_unique_identities,
         "all_duplicate_term_count": len(audit),
         "all_target_variant_conflict_term_count": sum(
-            bool(item["target_variant_conflict"]) for item in audit
+            bool(item["target_variant_conflict"])
+            for item in source_overlap_audit
         ),
-        "base_pair_overlap_term_counts": _pair_overlap_counts(audit, base_only=True),
-        "all_pair_overlap_term_counts": _pair_overlap_counts(audit, base_only=False),
+        "base_pair_overlap_term_counts": _pair_overlap_counts(
+            source_overlap_audit,
+            base_only=True,
+        ),
+        "all_pair_overlap_term_counts": _pair_overlap_counts(
+            source_overlap_audit,
+            base_only=False,
+        ),
         "source_roles": source_reports,
         "embedding": {
             "trailing_shape": list(expected_embedding_shape or ()),
@@ -635,7 +760,10 @@ def build_deduped_merged_index(
             "checkpoint_sha256": checkpoint_sha256,
         },
         "fingerprints": {
-            "ordered_normalized_source_terms_sha256": identity_fingerprint(output_keys),
+            "ordered_normalized_source_terms_sha256": identity_fingerprint(
+                output_source_keys
+            ),
+            "ordered_dedup_identities_sha256": identity_fingerprint(output_keys),
             "glossary_sha256": file_sha256(glossary_path),
             "index_sha256": file_sha256(index_path),
             "duplicate_audit_sha256": file_sha256(audit_path),
@@ -709,6 +837,11 @@ def main() -> None:
         help="optional role=/path/index_build_report.json checkpoint evidence",
     )
     parser.add_argument("--target-size", type=int)
+    parser.add_argument(
+        "--dedup-mode",
+        choices=("source", "source_target"),
+        default="source",
+    )
     parser.add_argument("--embedding-checkpoint", required=True, type=Path)
     parser.add_argument("--strict-checkpoint-evidence", action="store_true")
     parser.add_argument("--language-pair", default="en-zh")
@@ -739,6 +872,7 @@ def main() -> None:
             label=args.label,
             description=args.description,
             strict_checkpoint_evidence=args.strict_checkpoint_evidence,
+            dedup_mode=args.dedup_mode,
         )
         print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
     except (OSError, ValueError, RuntimeError, json.JSONDecodeError) as exc:

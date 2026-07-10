@@ -819,6 +819,11 @@ def main() -> None:
     ap.add_argument("--domains", default=",".join(WIKIDATA_ROOTS))
     ap.add_argument("--target-rows", type=int, default=13_000)
     ap.add_argument("--rdf-limit", type=int, default=20_000)
+    ap.add_argument(
+        "--skip-rdf",
+        action="store_true",
+        help="Skip Wikidata SPARQL roots and collect only category-provenance rows.",
+    )
     ap.add_argument("--exact-type-limit", type=int, default=10_000)
     ap.add_argument("--max-depth", type=int, default=4)
     ap.add_argument("--max-categories", type=int, default=4_000)
@@ -865,7 +870,9 @@ def main() -> None:
         exact_p31_stats: List[Dict[str, Any]] = []
         rdf_error = ""
         query_sha256 = ""
-        if domain in WIKIDATA_SKIP_ABSTRACT_ROOT:
+        if args.skip_rdf:
+            rdf_error = "skipped by --skip-rdf"
+        elif domain in WIKIDATA_SKIP_ABSTRACT_ROOT:
             rdf_error = "skipped: abstract root is too broad for a domain-pure glossary"
         else:
             try:

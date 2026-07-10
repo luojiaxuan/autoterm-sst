@@ -96,6 +96,7 @@ def build_catalog(
     domain_sources: Mapping[str, Sequence[Path]],
     target_lang: str,
     limit: int,
+    allow_cross_domain_overlap: bool = False,
 ) -> Tuple[Dict[str, List[Dict[str, Any]]], Dict[str, Any]]:
     rows: Dict[str, List[Dict[str, Any]]] = {domain: [] for domain in domains}
     seen_by_domain: Dict[str, set[str]] = {domain: set() for domain in domains}
@@ -123,9 +124,11 @@ def build_catalog(
                     break
                 entry = _quality_entry(raw, target_lang, require_domain_provenance=True)
                 key = normalized_term(raw)
-                if entry is None or not key or key in global_seen:
+                seen_scope = seen_by_domain[domain] if allow_cross_domain_overlap else global_seen
+                if entry is None or not key or key in seen_scope:
                     continue
-                global_seen.add(key)
+                if not allow_cross_domain_overlap:
+                    global_seen.add(key)
                 seen_by_domain[domain].add(key)
                 rows[domain].append(entry)
                 roles[domain][str(entry.get("source") or "domain_source")] += 1
@@ -151,6 +154,7 @@ def build_catalog(
     report = {
         "construction": "seeded evaluated slices plus Wikidata P31/P279 and Wikipedia category paths",
         "domain_inference_from_substrings": False,
+        "cross_domain_overlap_preserved": bool(allow_cross_domain_overlap),
         "target_lang": target_lang,
         "domains": list(domains),
         "slice_size": limit,
@@ -221,6 +225,11 @@ def main() -> None:
         help="Repeat domain=/path; rows must carry RDF/category provenance.",
     )
     ap.add_argument("--source-revision", default="")
+    ap.add_argument(
+        "--allow-cross-domain-overlap",
+        action="store_true",
+        help="Keep the same source term in multiple domain slices; deduplicate only within each slice.",
+    )
     args = ap.parse_args()
 
     domains = [item.strip() for item in args.domains.split(",") if item.strip()]
@@ -238,6 +247,7 @@ def main() -> None:
             domain_sources=sources,
             target_lang=args.target_lang,
             limit=args.limit,
+            allow_cross_domain_overlap=args.allow_cross_domain_overlap,
         )
         if args.source_revision:
             report["source_revision"] = args.source_revision

@@ -349,6 +349,55 @@ class BudgetAwareRouterTests(unittest.TestCase):
                 ("Manifest description for topic 1.",),
             )
 
+    def test_known_domain_keeps_manifest_and_bilingual_router_prototypes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            index_path = root / "indexes" / "nlp_test" / "maxsim.pt"
+            index_path.parent.mkdir(parents=True, exist_ok=True)
+            index_path.write_bytes(b"stub")
+            manifest = TermMemoryManifest.from_dict(
+                {
+                    "snapshot_id": "known-domain-prototype-test",
+                    "scales": {
+                        "nlp_test": {
+                            "en-zh": {
+                                "terms_path": "terms/nlp_test.jsonl",
+                                "indexes": {"maxsim": str(index_path)},
+                                "num_terms": 1_000,
+                            }
+                        }
+                    },
+                    "preset_meta": {
+                        "nlp_test": {
+                            "domain_id": "nlp",
+                            "domain_description": "Manifest NLP description.",
+                            "term_count": 1_000,
+                        }
+                    },
+                },
+                base_dir=root,
+                path=str(root / "manifest.json"),
+            )
+            agent = OmniAgent(
+                config=OmniConfig(
+                    mock=True,
+                    rag_enabled=False,
+                    auto_glossary_presets="nlp_test",
+                    tmp_dir=str(root / "runtime"),
+                ),
+                manifest=manifest,
+            )
+
+            prototypes = agent._context_similarity_prototypes_for(
+                agent._catalog("English -> Chinese")
+            )["nlp"]
+
+            self.assertEqual(prototypes[0], "Manifest NLP description.")
+            self.assertTrue(
+                any("Natural language processing" in text for text in prototypes)
+            )
+            self.assertTrue(any("自然语言处理" in text for text in prototypes))
+
     def test_agent_activates_multiple_manifest_slices_under_budget(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

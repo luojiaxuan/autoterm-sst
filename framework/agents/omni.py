@@ -771,9 +771,10 @@ class OmniAgent(Agent):
         prototypes: Dict[str, List[str]] = {}
         for item in self._domain_slices_for(catalog):
             description = str(item.description or "").strip()
-            texts = [description] if description else list(
-                DOMAIN_ROUTER_PROTOTYPES.get(item.domain_id, ())
-            )
+            texts = []
+            if description:
+                texts.append(description)
+            texts.extend(DOMAIN_ROUTER_PROTOTYPES.get(item.domain_id, ()))
             if not texts:
                 texts = [item.domain_id.replace("_", " ").replace("-", " ")]
             domain_texts = prototypes.setdefault(item.domain_id, [])

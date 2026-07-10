@@ -22,7 +22,8 @@ of that internally.
   Speech Translation* (EMNLP 2026 System Demonstrations, under review) —
   source in [`demo_paper_emnlp/`](demo_paper_emnlp/).
 - 🎬 Screencast video: *link to be added with the submission package.*
-- 🌐 Hosted live demo: *link to be added with the submission package.*
+- 🌐 Hosted live demo: <https://luojiaxuan.github.io/autoterm-sst/> (stable
+  entry page; redirects to the current GPU-backed tunnel).
 - 🖥️ No GPU? Mock mode below runs the full UI, wire protocol, and JSON evidence
   stream on a laptop with zero model downloads.
 

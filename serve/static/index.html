@@ -138,6 +138,14 @@
 
         .sample-btn.loading { opacity: 0.6; pointer-events: none; }
 
+        .sample-btn-primary {
+            border-color: rgba(120, 200, 120, 0.55);
+            background: rgba(120, 200, 120, 0.14);
+            color: #bff0c0;
+        }
+
+        .sample-btn-primary:hover { background: rgba(120, 200, 120, 0.24); }
+
         .control-group {
             display: flex;
             flex-direction: column;
@@ -1110,6 +1118,7 @@
                 <div class="input-item sample-item" id="sampleAudioItem">
                     <span class="sample-label">Try a sample</span>
                     <div class="sample-row">
+                        <button class="sample-btn sample-btn-primary" type="button" data-sample="acl_then_medicine.wav" data-title="ACL → Medicine (auto-switch)">ACL → Medicine</button>
                         <button class="sample-btn" type="button" data-sample="acl_sample.wav" data-title="ACL talk (NLP)">ACL talk</button>
                         <button class="sample-btn" type="button" data-sample="medicine_sample.wav" data-title="Medicine talk (oncology)">Medicine talk</button>
                     </div>

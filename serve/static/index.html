@@ -1527,14 +1527,23 @@
                 }
                 if (Array.isArray(config.language_pairs) && config.language_pairs.length > 0) {
                     languagePair.innerHTML = '';
+                    const anyUnavailable = config.language_pairs.some(p => p.available === false);
                     config.language_pairs.forEach(pair => {
                         const option = document.createElement('option');
                         option.value = pair.id;
-                        option.textContent = pair.label || pair.id;
-                        option.disabled = pair.available === false;
+                        const unavailable = pair.available === false;
+                        option.textContent = unavailable
+                            ? `${pair.label || pair.id} — not loaded on this host`
+                            : (pair.label || pair.id);
+                        option.disabled = unavailable;
                         option.selected = pair.id === config.loaded_language_pair;
                         languagePair.appendChild(option);
                     });
+                    // The live single-GPU-pair host serves one checkpoint at a time;
+                    // explain the greyed options instead of letting them look broken.
+                    languagePair.title = anyUnavailable
+                        ? 'The live host loads one language model at a time. Other pairs are evaluated offline (see paper Appendix D).'
+                        : '';
                 }
                 if (Array.isArray(config.glossary_presets) && config.glossary_presets.length > 0) {
                     serverDefaultGlossaryPreset = config.default_glossary_preset || serverDefaultGlossaryPreset;
@@ -3284,11 +3293,26 @@
             }
         }
 
-        // handle youtube player
+        // handle play button: prefer a loaded sample/upload, fall back to YouTube.
         playBtn.addEventListener("click", async () => {
-            if (!youtubeUrl || !youtubeUrl.value || !sessionId) {
-                alert("Please enter a YouTube URL and ensure a session is active.");
-                updateStatus("Please enter a YouTube URL and ensure a session is active",'error')
+            const hasYoutubeUrl = youtubeUrl && youtubeUrl.value && youtubeUrl.value.trim();
+            // If a sample or uploaded clip is loaded and no YouTube URL is queued,
+            // just start it — the media element's play handler opens the session.
+            if (currentMediaElement && !hasYoutubeUrl) {
+                try {
+                    await currentMediaElement.play();
+                } catch (e) {
+                    console.error('Error starting loaded media:', e);
+                    updateStatus('Could not start playback: ' + e, 'error');
+                }
+                return;
+            }
+            if (!hasYoutubeUrl) {
+                updateStatus('Load a sample or an audio/video file first, or paste a YouTube URL.', 'ready');
+                return;
+            }
+            if (!sessionId && !(await ensureSession())) {
+                updateStatus('Could not start a session — check the server.', 'error');
                 return;
             }
 

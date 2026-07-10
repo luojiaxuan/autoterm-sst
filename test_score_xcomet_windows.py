@@ -25,6 +25,21 @@ class ScoreXcometWindowsTest(unittest.TestCase):
         self.assertEqual(windows[1]["local_end_s"], 60.0)
         self.assertEqual(windows[0]["reference"], "参考一参考二参考三")
 
+    def test_groups_latin_references_with_spaces(self) -> None:
+        segments = [
+            ReferenceSegment(0.0, 4.0, "source one", "erste Referenz"),
+            ReferenceSegment(4.0, 8.0, "source two", "zweite Referenz"),
+        ]
+
+        windows = group_reference_segments(
+            segments,
+            block_duration_s=8.0,
+            target_window_s=8.0,
+            reference_separator=" ",
+        )
+
+        self.assertEqual(windows[0]["reference"], "erste Referenz zweite Referenz")
+
     def test_assigns_hypothesis_by_local_cursor(self) -> None:
         records = [
             {"cursor_samples": 16000, "text": "甲"},

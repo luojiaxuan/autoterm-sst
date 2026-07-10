@@ -107,6 +107,7 @@ def medicine_reference_segments(
     block_duration_s: float,
     *,
     medicine_input_dir: str,
+    target_lang: str = "zh",
 ) -> list[ReferenceSegment]:
     try:
         import yaml
@@ -119,7 +120,7 @@ def medicine_reference_segments(
     source_lines = (root / f"medicine.source_text.en__medicine_{medicine_id}.txt").read_text(
         encoding="utf-8"
     ).splitlines()
-    reference_lines = (root / f"medicine.ref.zh__medicine_{medicine_id}.txt").read_text(
+    reference_lines = (root / f"medicine.ref.{target_lang}__medicine_{medicine_id}.txt").read_text(
         encoding="utf-8"
     ).splitlines()
     if not (len(audio_rows) == len(source_lines) == len(reference_lines)):
@@ -150,6 +151,7 @@ def group_reference_segments(
     *,
     block_duration_s: float,
     target_window_s: float,
+    reference_separator: str = "",
 ) -> list[dict[str, Any]]:
     if not segments:
         return []
@@ -179,7 +181,9 @@ def group_reference_segments(
                 "local_start_s": start_s,
                 "local_end_s": max(start_s, end_s),
                 "source": " ".join(item.source for item in group if item.source),
-                "reference": "".join(item.reference for item in group if item.reference),
+                "reference": reference_separator.join(
+                    item.reference for item in group if item.reference
+                ),
                 "reference_segment_count": len(group),
             }
         )
@@ -245,6 +249,7 @@ def prepare_windows(
     acl_reference_text: str,
     medicine_input_dir: str,
     target_window_s: float,
+    target_lang: str = "zh",
 ) -> list[dict[str, Any]]:
     auto_signature = payload_signature(auto_payload)
     merged_signature = payload_signature(merged_payload)
@@ -275,6 +280,7 @@ def prepare_windows(
                 block,
                 block_duration_s,
                 medicine_input_dir=medicine_input_dir,
+                target_lang=target_lang,
             )
         else:
             raise ValueError(f"unsupported corpus: {block.get('corpus')}")
@@ -283,6 +289,7 @@ def prepare_windows(
             reference_segments,
             block_duration_s=block_duration_s,
             target_window_s=target_window_s,
+            reference_separator=" " if target_lang == "de" else "",
         )
         for window_index, window in enumerate(grouped, start=1):
             auto_hypothesis, auto_event_count = hypothesis_for_window(
@@ -643,6 +650,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--acl-source-text", default=DEFAULT_ACL_SOURCE_TEXT)
     parser.add_argument("--acl-reference-text", default=DEFAULT_ACL_REFERENCE_TEXT)
     parser.add_argument("--medicine-input-dir", default=DEFAULT_MEDICINE_INPUT_DIR)
+    parser.add_argument("--target-lang", choices=("zh", "ja", "de"), default="zh")
     parser.add_argument("--window-sec", type=float, default=30.0)
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--model-name", default="myyycroft/XCOMET-lite")
@@ -676,6 +684,7 @@ def main() -> None:
             acl_reference_text=args.acl_reference_text,
             medicine_input_dir=args.medicine_input_dir,
             target_window_s=args.window_sec,
+            target_lang=args.target_lang,
         )
         if not rows:
             raise SystemExit("no aligned windows were prepared")

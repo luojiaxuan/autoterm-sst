@@ -370,7 +370,12 @@ class MaxSimRetrievalPlugin(RetrievalPlugin):
             return
         task = self._preload_tasks.get(normalized)
         if task is None or task.done():
-            task = asyncio.create_task(asyncio.to_thread(self._ensure_index, normalized))
+            async def _load_one() -> None:
+                async with self._lock:
+                    if normalized not in self._text_index_cache:
+                        await asyncio.to_thread(self._ensure_index, normalized)
+
+            task = asyncio.create_task(_load_one())
             self._preload_tasks[normalized] = task
         try:
             await task

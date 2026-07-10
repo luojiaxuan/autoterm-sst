@@ -135,6 +135,34 @@ class RealSIDomainCatalogTests(unittest.TestCase):
             self.assertFalse(report["domain_inference_from_substrings"])
             self.assertEqual(report["per_domain"]["education"]["source_roles"]["wikipedia_category"], 1)
 
+    def test_can_preserve_cross_domain_conflicting_mappings(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_dir:
+            root = Path(raw_dir)
+            finance = root / "finance.json"
+            legal = root / "legal.json"
+            finance.write_text(
+                json.dumps([_row("bond", "债券", "wikipedia_category")]),
+                encoding="utf-8",
+            )
+            legal.write_text(
+                json.dumps([_row("bond", "保释金", "wikipedia_category")]),
+                encoding="utf-8",
+            )
+
+            rows, report = build_catalog(
+                domains=("finance", "legal"),
+                seeds={"finance": (), "legal": ()},
+                domain_sources={"finance": (finance,), "legal": (legal,)},
+                target_lang="zh",
+                limit=1,
+                allow_cross_domain_overlap=True,
+            )
+
+            self.assertEqual(rows["finance"][0]["target_translations"]["zh"], "债券")
+            self.assertEqual(rows["legal"][0]["target_translations"]["zh"], "保释金")
+            self.assertTrue(report["cross_domain_overlap_preserved"])
+            self.assertEqual(report["cross_slice_duplicate_terms"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

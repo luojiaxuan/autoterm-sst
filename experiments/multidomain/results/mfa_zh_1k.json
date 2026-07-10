@@ -1,0 +1,88 @@
+{
+ "post_s": 30.0,
+ "pre_s": 2.0,
+ "runs": {
+  "oracle_nlp_1k": {
+   "technical_plus_medicine": {
+    "gold_occurrences": 630,
+    "hits": 481,
+    "term_acc": 0.7635,
+    "by_domain": {
+     "medicine": {
+      "gold_occurrences": 235,
+      "hits": 131,
+      "term_acc": 0.5574
+     },
+     "nlp": {
+      "gold_occurrences": 395,
+      "hits": 350,
+      "term_acc": 0.8861
+     }
+    }
+   },
+   "raw_plus_medicine": {
+    "gold_occurrences": 1079,
+    "hits": 834,
+    "term_acc": 0.7729,
+    "by_domain": {
+     "medicine": {
+      "gold_occurrences": 235,
+      "hits": 131,
+      "term_acc": 0.5574
+     },
+     "nlp": {
+      "gold_occurrences": 844,
+      "hits": 703,
+      "term_acc": 0.8329
+     }
+    }
+   }
+  },
+  "oracle_med_1k": {
+   "technical_plus_medicine": {
+    "gold_occurrences": 630,
+    "hits": 487,
+    "term_acc": 0.773,
+    "by_domain": {
+     "medicine": {
+      "gold_occurrences": 235,
+      "hits": 194,
+      "term_acc": 0.8255
+     },
+     "nlp": {
+      "gold_occurrences": 395,
+      "hits": 293,
+      "term_acc": 0.7418
+     }
+    }
+   },
+   "raw_plus_medicine": {
+    "gold_occurrences": 1079,
+    "hits": 808,
+    "term_acc": 0.7488,
+    "by_domain": {
+     "medicine": {
+      "gold_occurrences": 235,
+      "hits": 194,
+      "term_acc": 0.8255
+     },
+     "nlp": {
+      "gold_occurrences": 844,
+      "hits": 614,
+      "term_acc": 0.7275
+     }
+    }
+   }
+  }
+ },
+ "gold_technical_plus_medicine": {
+  "total": 630,
+  "nlp": 395,
+  "medicine": 235
+ },
+ "gold_raw_plus_medicine": {
+  "total": 1079,
+  "nlp": 844,
+  "medicine": 235
+ }
+}

@@ -59,11 +59,23 @@ class BlockSpan:
     audio_path: str
 
 
+DEFAULT_ROUTER_WEIGHTS = {
+    "text_topic_weight": 0.60,
+    "domain_probe_weight": 0.25,
+    "speech_centroid_weight": 0.10,
+    "metadata_prior_weight": 0.05,
+}
+
+
 def build_router(
     *,
     min_consistent_windows_generated_target: int = 3,
     min_confidence: float = 0.60,
+    router_weights: Optional[Dict[str, float]] = None,
 ) -> HybridWindowTopicRouter:
+    weights = dict(DEFAULT_ROUTER_WEIGHTS)
+    if router_weights:
+        weights.update(router_weights)
     return HybridWindowTopicRouter(
         [
             DomainSlice("nlp_core_10k", "nlp", centroid=[1.0, 0.0], index_path="mock://nlp"),
@@ -79,10 +91,7 @@ def build_router(
             min_consistent_windows_with_text=2,
             min_consistent_windows_generated_target=min_consistent_windows_generated_target,
             min_consistent_windows_audio_only=3,
-            text_topic_weight=0.60,
-            domain_probe_weight=0.25,
-            speech_centroid_weight=0.10,
-            metadata_prior_weight=0.05,
+            **weights,
         ),
     )
 
@@ -211,9 +220,11 @@ def evaluate_playlist(
     max_switch_windows: int = 3,
     initial_domain: str = "first",
     min_consistent_windows_generated_target: int = 3,
+    router_weights: Optional[Dict[str, float]] = None,
 ) -> Dict[str, Any]:
     router = build_router(
         min_consistent_windows_generated_target=min_consistent_windows_generated_target,
+        router_weights=router_weights,
     )
     state = initial_state_for(blocks, initial_domain=initial_domain)
     records: List[Dict[str, Any]] = []
@@ -286,6 +297,10 @@ def evaluate_playlist(
         max_switch_windows=max_switch_windows,
         min_consistent_windows_generated_target=min_consistent_windows_generated_target,
     )
+    weights = dict(DEFAULT_ROUTER_WEIGHTS)
+    if router_weights:
+        weights.update(router_weights)
+    summary["router_weights"] = weights
     return {
         "summary": summary,
         "blocks": [span.__dict__ for span in spans],
@@ -536,6 +551,10 @@ def main() -> None:
     ap.add_argument("--initial-domain", choices=("first", "nlp", "medicine"), default="first")
     ap.add_argument("--max-switch-windows", type=int, default=3)
     ap.add_argument("--min-consistent-generated-target", type=int, default=3)
+    ap.add_argument("--text-topic-weight", type=float, default=None)
+    ap.add_argument("--domain-probe-weight", type=float, default=None)
+    ap.add_argument("--speech-centroid-weight", type=float, default=None)
+    ap.add_argument("--metadata-prior-weight", type=float, default=None)
     ap.add_argument("--out-json", default="")
     ap.add_argument("--out-md", default="")
     ap.add_argument("--no-assert", action="store_true")
@@ -571,6 +590,16 @@ def main() -> None:
         max_switch_windows=args.max_switch_windows,
         initial_domain=args.initial_domain,
         min_consistent_windows_generated_target=args.min_consistent_generated_target,
+        router_weights={
+            key: value
+            for key, value in {
+                "text_topic_weight": args.text_topic_weight,
+                "domain_probe_weight": args.domain_probe_weight,
+                "speech_centroid_weight": args.speech_centroid_weight,
+                "metadata_prior_weight": args.metadata_prior_weight,
+            }.items()
+            if value is not None
+        },
     )
     text = json.dumps(payload, ensure_ascii=False, indent=2)
     print(text)

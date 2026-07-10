@@ -59,8 +59,10 @@ from framework.agents.term_memory.active_glossary import (
     ActiveGlossaryManager,
     glossary_topic_meta,
 )
+from framework.agents.term_memory.context_similarity import DomainDescriptionSimilarity
 from framework.agents.term_memory.domain_taxonomy import (
     AUTO_WORKING_PRESET,
+    DOMAIN_TO_PRESET,
     GENERAL_DOMAIN,
     configured_working_presets,
     domain_for_preset,
@@ -91,6 +93,7 @@ logger = logging.getLogger(__name__)
 TARGET_SAMPLE_RATE = 16000
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 EMPTY_GLOSSARY_PRESETS = {"", "none", "no_glossary"}
+DEFAULT_AUTO_GLOSSARY_PRESETS = ",".join(DOMAIN_TO_PRESET.values())
 
 
 def _env_str(key: str, default: str) -> str:
@@ -280,7 +283,7 @@ class OmniConfig:
     auto_glossary_enabled: bool = True
     auto_glossary_base_preset: str = "none"
     auto_glossary_default_preset: str = "nlp_core_10k"
-    auto_glossary_presets: str = "nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k"
+    auto_glossary_presets: str = DEFAULT_AUTO_GLOSSARY_PRESETS
     auto_glossary_update_sec: float = 45.0
     auto_glossary_warmup_sec: float = 30.0
     auto_glossary_min_conf: float = 0.60
@@ -291,16 +294,21 @@ class OmniConfig:
     auto_glossary_candidate_stale_sec: float = 120.0
     auto_glossary_fallback_preset: str = "none"
     auto_glossary_preload: bool = True
-    auto_glossary_preload_presets: str = "nlp_core_10k,medicine_core_10k"
+    auto_glossary_preload_presets: str = DEFAULT_AUTO_GLOSSARY_PRESETS
     router_mode: str = "hybrid_window_topic"
     router_legacy_keywords: bool = False
     router_embed_weight: float = 0.65
     router_ref_weight: float = 0.35
     router_ema_alpha: float = 0.80
-    router_text_topic_weight: float = 0.60
-    router_domain_probe_weight: float = 0.25
-    router_speech_centroid_weight: float = 0.10
-    router_metadata_prior_weight: float = 0.05
+    router_context_similarity_enabled: bool = True
+    router_context_similarity_model: str = "BAAI/bge-m3"
+    router_context_similarity_device: str = "cpu"
+    router_context_similarity_batch_size: int = 32
+    router_context_similarity_weight: float = 0.60
+    router_text_topic_weight: float = 0.25
+    router_domain_probe_weight: float = 0.10
+    router_speech_centroid_weight: float = 0.03
+    router_metadata_prior_weight: float = 0.02
     router_domain_probe_top_k: int = 5
     router_min_consistent_windows_with_text: int = 2
     router_min_consistent_windows_generated_target: int = 3
@@ -336,7 +344,7 @@ class OmniConfig:
         initial_preset_default = _autoterm_initial_preset(autoterm_config, "nlp_core_10k")
         working_presets_default = _autoterm_working_presets(
             autoterm_config,
-            "nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k",
+            DEFAULT_AUTO_GLOSSARY_PRESETS,
         )
         rescue_preset_default = _autoterm_rescue_preset(autoterm_config, "open_wiki_100k")
         mock = _env_bool("RASST_DEMO_MOCK", False)
@@ -425,10 +433,28 @@ class OmniConfig:
             router_embed_weight=_env_float("RASST_ROUTER_EMBED_WEIGHT", 0.65),
             router_ref_weight=_env_float("RASST_ROUTER_REF_WEIGHT", 0.35),
             router_ema_alpha=_env_float("RASST_ROUTER_EMA_ALPHA", 0.80),
-            router_text_topic_weight=_safe_float(routing_config.get("text_topic_weight"), 0.60),
-            router_domain_probe_weight=_safe_float(routing_config.get("domain_probe_weight"), 0.25),
-            router_speech_centroid_weight=_safe_float(routing_config.get("speech_centroid_weight"), 0.10),
-            router_metadata_prior_weight=_safe_float(routing_config.get("metadata_prior_weight"), 0.05),
+            router_context_similarity_enabled=_meta_bool(
+                routing_config.get("enable_context_similarity"),
+                True,
+            ),
+            router_context_similarity_model=str(
+                routing_config.get("context_similarity_model") or "BAAI/bge-m3"
+            ),
+            router_context_similarity_device=str(
+                routing_config.get("context_similarity_device") or "cpu"
+            ),
+            router_context_similarity_batch_size=_safe_int(
+                routing_config.get("context_similarity_batch_size"),
+                32,
+            ),
+            router_context_similarity_weight=_safe_float(
+                routing_config.get("context_similarity_weight"),
+                0.60,
+            ),
+            router_text_topic_weight=_safe_float(routing_config.get("text_topic_weight"), 0.25),
+            router_domain_probe_weight=_safe_float(routing_config.get("domain_probe_weight"), 0.10),
+            router_speech_centroid_weight=_safe_float(routing_config.get("speech_centroid_weight"), 0.03),
+            router_metadata_prior_weight=_safe_float(routing_config.get("metadata_prior_weight"), 0.02),
             router_domain_probe_top_k=_safe_int(routing_config.get("domain_probe_top_k"), 5),
             router_min_consistent_windows_with_text=_safe_int(
                 routing_config.get("min_consistent_windows_with_text"),
@@ -523,6 +549,11 @@ class OmniSession:
     last_domain_probe_s: Optional[float] = None
     last_domain_probe_at_s: float = 0.0
     last_domain_probe_cached: bool = False
+    last_context_similarity_scores: Dict[str, float] = field(default_factory=dict)
+    last_context_similarity_s: Optional[float] = None
+    last_context_similarity_at_s: float = 0.0
+    last_context_similarity_text: str = ""
+    last_context_similarity_cached: bool = False
     active_retrieval_slices: List[RetrievalSlice] = field(default_factory=list)
     pending_since_s: Optional[float] = None
     latency_multiplier: int = 2
@@ -546,6 +577,7 @@ class OmniAgent(Agent):
         self._emit: Optional[EmitFn] = None
         self.backend = None
         self.retrieval: RetrievalPlugin = NullRetrieval()
+        self.context_similarity: Optional[DomainDescriptionSimilarity] = None
         self.sessions: Dict[str, OmniSession] = {}
         self.pending: Deque[str] = deque()
         self.pending_set: Set[str] = set()
@@ -596,6 +628,7 @@ class OmniAgent(Agent):
             ema_alpha=self.config.router_ema_alpha,
             fallback_preset_id=self.config.auto_glossary_fallback_preset,
             text_topic_weight=self.config.router_text_topic_weight,
+            context_similarity_weight=self.config.router_context_similarity_weight,
             domain_probe_weight=self.config.router_domain_probe_weight,
             speech_centroid_weight=self.config.router_speech_centroid_weight,
             metadata_prior_weight=self.config.router_metadata_prior_weight,
@@ -882,6 +915,13 @@ class OmniAgent(Agent):
         session.last_domain_probe_at_s = 0.0
         session.last_domain_probe_cached = False
 
+    def _clear_context_similarity_meta(self, session: "OmniSession") -> None:
+        session.last_context_similarity_scores = {}
+        session.last_context_similarity_s = None
+        session.last_context_similarity_at_s = 0.0
+        session.last_context_similarity_text = ""
+        session.last_context_similarity_cached = False
+
     def _cached_domain_probe_scores(
         self,
         session: "OmniSession",
@@ -911,6 +951,63 @@ class OmniAgent(Agent):
             latency_multiplier = int(self.config.default_latency_multiplier)
         latency_multiplier = max(1, min(4, latency_multiplier))
         return max(0.1, float(self.config.base_segment_sec) * latency_multiplier)
+
+    async def _context_similarity_scores_batch(
+        self,
+        batch: Sequence["OmniSession"],
+    ) -> List[Dict[str, float]]:
+        output = [dict(session.last_context_similarity_scores) for session in batch]
+        scorer = self.context_similarity
+        if scorer is None or not scorer.enabled:
+            return output
+        allowed_domains = [
+            domain_for_preset(preset)
+            for preset in configured_working_presets(self.config.auto_glossary_presets)
+            if domain_for_preset(preset) not in {GENERAL_DOMAIN, "common", "general"}
+        ]
+        now = time.perf_counter()
+        pending_indexes: List[int] = []
+        pending_texts: List[str] = []
+        for index, session in enumerate(batch):
+            text = str(session.router_text_window or "").strip()
+            source = str(session.router_text_source or "none")
+            if not session.auto_glossary_enabled or not text or source == "none":
+                continue
+            refresh_sec = self._domain_probe_refresh_sec(session)
+            cache_fresh = bool(
+                session.last_context_similarity_scores
+                and (
+                    text == session.last_context_similarity_text
+                    or now - float(session.last_context_similarity_at_s) < refresh_sec
+                )
+            )
+            if cache_fresh:
+                session.last_context_similarity_cached = True
+                session.last_context_similarity_s = 0.0
+                continue
+            pending_indexes.append(index)
+            pending_texts.append(text)
+        if not pending_texts:
+            return output
+        started = time.perf_counter()
+        try:
+            scores = await scorer.score_batch(
+                pending_texts,
+                allowed_domains=allowed_domains,
+            )
+        except Exception:  # noqa: BLE001 - context evidence is optional
+            logger.exception("context-similarity scoring failed; using cached router evidence")
+            return output
+        elapsed = time.perf_counter() - started
+        for index, text, row in zip(pending_indexes, pending_texts, scores):
+            session = batch[index]
+            session.last_context_similarity_scores = dict(row)
+            session.last_context_similarity_s = elapsed
+            session.last_context_similarity_at_s = now
+            session.last_context_similarity_text = text
+            session.last_context_similarity_cached = False
+            output[index] = dict(row)
+        return output
 
     async def _probe_domain_scores(
         self,
@@ -1066,6 +1163,22 @@ class OmniAgent(Agent):
         else:
             self.retrieval = NullRetrieval()
 
+        if (
+            self.config.auto_glossary_enabled
+            and self.config.router_context_similarity_enabled
+            and not self.config.mock
+        ):
+            try:
+                self.context_similarity = DomainDescriptionSimilarity(
+                    model_id=self.config.router_context_similarity_model,
+                    device=self.config.router_context_similarity_device,
+                    batch_size=self.config.router_context_similarity_batch_size,
+                )
+                await self.context_similarity.start()
+            except Exception:  # noqa: BLE001 - router falls back to other evidence
+                logger.exception("context-similarity router failed to load; continuing without it")
+                self.context_similarity = None
+
         if self.config.auto_glossary_enabled and self.retrieval.enabled:
             self._schedule_auto_preloads()
 
@@ -1098,6 +1211,11 @@ class OmniAgent(Agent):
             await self.retrieval.stop()
         except Exception:  # noqa: BLE001
             logger.exception("retrieval stop failed")
+        if self.context_similarity is not None:
+            try:
+                await self.context_similarity.stop()
+            except Exception:  # noqa: BLE001
+                logger.exception("context-similarity router shutdown failed")
         for path in self.tmp_dir.glob("*.wav"):
             try:
                 path.unlink()
@@ -1305,6 +1423,7 @@ class OmniAgent(Agent):
         session.router_text_window = ""
         session.router_text_source = "none"
         self._clear_domain_probe_meta(session)
+        self._clear_context_similarity_meta(session)
         if session.auto_glossary_enabled:
             try:
                 selection = self.active_glossary.initial_selection(
@@ -1385,6 +1504,7 @@ class OmniAgent(Agent):
             session.imported_glossary = selection.manual_refs
             session.last_router_decision = None
             session.last_query_embedding = None
+            self._clear_context_similarity_meta(session)
             session.router_state = RouterSessionState(
                 active_preset_id=session.active_glossary_preset,
                 active_domain_id=session.active_domain,
@@ -1621,6 +1741,7 @@ class OmniAgent(Agent):
                 query_window_embeddings,
             )
 
+        context_scores_by_session = await self._context_similarity_scores_batch(batch)
         for idx, session in enumerate(batch):
             if session.auto_glossary_enabled:
                 outputs[idx] = rank_autoterm_references(outputs[idx], active_domain=session.active_domain)
@@ -1643,6 +1764,7 @@ class OmniAgent(Agent):
                     session,
                     RetrievalResult(references=observer_refs, query_embedding=query_embeddings[idx]),
                     domain_probe_scores=domain_probe_scores,
+                    context_similarity_scores=context_scores_by_session[idx],
                 )
             else:
                 session.last_query_embedding = query_embeddings[idx]
@@ -1807,6 +1929,16 @@ class OmniAgent(Agent):
             "domain_probe_cached": bool(session.last_domain_probe_cached),
             "domain_probe_scores": dict(session.last_domain_probe_scores),
             "domain_probe_slices": list(session.last_domain_probe_slices),
+            "context_similarity_scores": {
+                domain: round(float(score), 4)
+                for domain, score in session.last_context_similarity_scores.items()
+            },
+            "context_similarity_s": (
+                round(float(session.last_context_similarity_s), 6)
+                if session.last_context_similarity_s is not None
+                else None
+            ),
+            "context_similarity_cached": bool(session.last_context_similarity_cached),
             "router_text_source": session.router_text_source,
             "router_text_chars": len(session.router_text_window or ""),
             "topic": self._topic_meta(session),
@@ -1847,6 +1979,7 @@ class OmniAgent(Agent):
         result: RetrievalResult,
         *,
         domain_probe_scores: Optional[Dict[str, DomainProbeScore]] = None,
+        context_similarity_scores: Optional[Dict[str, float]] = None,
     ) -> None:
         if not session.auto_glossary_enabled:
             return
@@ -1878,6 +2011,7 @@ class OmniAgent(Agent):
                 router_text=session.router_text_window,
                 router_text_source=session.router_text_source,
                 domain_probe_scores=domain_probe_scores or {},
+                context_similarity_scores=context_similarity_scores or {},
             )
         else:
             decision = router.observe(
@@ -2412,10 +2546,24 @@ class OmniAgent(Agent):
     async def health(self) -> Dict[str, Any]:
         backend_health = await self.backend.health() if self.backend is not None else {"status": "starting"}
         rag_health = await self.retrieval.health()
+        context_health = (
+            await self.context_similarity.health()
+            if self.context_similarity is not None
+            else {"status": "disabled"}
+        )
         backend_ok = self.config.mock or backend_health.get("status") in {"healthy", "ready"}
         rag_ok = (not self.config.rag_enabled) or rag_health.get("status") in {"ready", "disabled"}
-        status = "healthy" if backend_ok and rag_ok else "starting"
-        if backend_health.get("status") == "error" or rag_health.get("status") == "error":
+        context_ok = (
+            not self.config.router_context_similarity_enabled
+            or self.config.mock
+            or context_health.get("status") in {"ready", "disabled"}
+        )
+        status = "healthy" if backend_ok and rag_ok and context_ok else "starting"
+        if (
+            backend_health.get("status") == "error"
+            or rag_health.get("status") == "error"
+            or context_health.get("status") == "error"
+        ):
             status = "error"
         return {
             "status": status,
@@ -2427,6 +2575,7 @@ class OmniAgent(Agent):
             "active_sessions": len(self.sessions),
             "mock_mode": self.config.mock,
             "rag": rag_health,
+            "context_similarity": context_health,
             "term_memory": self._term_memory_status(rag_health),
             "backend_health": backend_health,
             "scheduler_batch_size": self.config.scheduler_batch_size,

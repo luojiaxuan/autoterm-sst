@@ -103,6 +103,7 @@ class RouterConfig:
     consistency_bonus: float = 0.05
     ambiguity_penalty: float = 0.10
     text_topic_weight: float = 0.60
+    context_similarity_weight: float = 0.60
     domain_probe_weight: float = 0.25
     speech_centroid_weight: float = 0.10
     metadata_prior_weight: float = 0.05
@@ -486,6 +487,7 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
         router_text: str = "",
         router_text_source: Literal["manifest_source", "streaming_asr", "generated_target", "none"] = "none",
         domain_probe_scores: Optional[Dict[str, Any]] = None,
+        context_similarity_scores: Optional[Dict[str, float]] = None,
     ) -> RouterDecision:
         session_state.recent_references = _bounded_deque(
             session_state.recent_references,
@@ -513,6 +515,7 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             router_text=router_text,
             router_text_source=router_text_source,
             domain_probe_scores=domain_probe_scores or {},
+            context_similarity_scores=context_similarity_scores or {},
         )
         top = top_scores[0] if top_scores else None
         second = top_scores[1] if len(top_scores) > 1 else None
@@ -534,8 +537,19 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
         has_text = bool((router_text or "").strip() and text_source != "none")
         text_raw_for_guard, _ = topic_keyword_scores(router_text)
         has_text_topic_signal = bool(has_text and any(float(value) > 0.0 for value in text_raw_for_guard.values()))
+        has_context_similarity = any(
+            math.isfinite(float(value)) and float(value) > 0.0
+            for value in (context_similarity_scores or {}).values()
+        )
         has_probe = any(_probe_value(value) > 0.0 for value in (domain_probe_scores or {}).values())
-        has_signal = bool(has_text or has_probe or query_vec or session_state.ema_query_embedding or session_state.recent_references)
+        has_signal = bool(
+            has_text
+            or has_context_similarity
+            or has_probe
+            or query_vec
+            or session_state.ema_query_embedding
+            or session_state.recent_references
+        )
         audio_probe_guard = self._audio_probe_guard(
             domain_probe_scores or {},
             target_domain=target_domain,
@@ -553,6 +567,7 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             "router_text_source": text_source,
             "has_router_text": has_text,
             "has_text_topic_signal": has_text_topic_signal,
+            "has_context_similarity": has_context_similarity,
             "has_domain_probe": has_probe,
             "has_query_embedding": bool(query_vec or session_state.ema_query_embedding),
             "recent_reference_count": len(session_state.recent_references),
@@ -594,11 +609,22 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             guard_reason = "general_or_common"
         elif not self._slice_available(target_preset):
             guard_reason = "target_unavailable"
-        elif is_generated_target and not has_text_topic_signal and not generated_target_probe_guard.get("ok", False):
+        elif (
+            is_generated_target
+            and not has_text_topic_signal
+            and not has_context_similarity
+            and not generated_target_probe_guard.get("ok", False)
+        ):
             guard_reason = "generated_target_probe_evidence_insufficient"
-        elif has_text and not has_text_topic_signal and not has_probe:
+        elif has_text and not has_text_topic_signal and not has_context_similarity and not has_probe:
             guard_reason = "topic_text_or_probe_required"
-        elif has_probe and has_text and not has_text_topic_signal and not audio_probe_guard.get("ok", False):
+        elif (
+            has_probe
+            and has_text
+            and not has_text_topic_signal
+            and not has_context_similarity
+            and not audio_probe_guard.get("ok", False)
+        ):
             guard_reason = "probe_only_evidence_insufficient"
         elif not has_text and not has_probe:
             guard_reason = "audio_probe_required"
@@ -764,15 +790,20 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
         router_text: str,
         router_text_source: str,
         domain_probe_scores: Dict[str, Any],
+        context_similarity_scores: Dict[str, float],
     ) -> List[DomainScore]:
         text_raw, text_hits = topic_keyword_scores(router_text)
         text_by_domain = _normalize_nonnegative_score_map({key: value for key, value in text_raw.items()})
         probe_by_domain = _normalize_nonnegative_score_map(
             {key: _probe_value(value) for key, value in domain_probe_scores.items()}
         )
+        context_by_domain = _normalize_nonnegative_score_map(
+            {key: value for key, value in context_similarity_scores.items()}
+        )
         has_text = bool((router_text or "").strip() and str(router_text_source or "none") != "none")
         has_text_topic_signal = any(float(value) > 0.0 for value in text_by_domain.values())
         has_probe = any(float(value) > 0.0 for value in probe_by_domain.values())
+        has_context_similarity = any(float(value) > 0.0 for value in context_by_domain.values())
 
         ema = session_state.ema_query_embedding
         embedding_raw: Dict[str, Optional[float]] = {}
@@ -788,6 +819,7 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
         has_reference = any(float(value) > 0.0 for value in reference_by_preset.values())
         active_weight_sum = (
             (float(self.config.text_topic_weight) if has_text_topic_signal else 0.0)
+            + (float(self.config.context_similarity_weight) if has_context_similarity else 0.0)
             + (float(self.config.domain_probe_weight) if has_probe else 0.0)
             + (float(self.config.speech_centroid_weight) if has_embedding else 0.0)
             + (float(self.config.metadata_prior_weight) if has_reference else 0.0)
@@ -800,11 +832,14 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             probe_score = float(
                 probe_by_domain.get(item.domain_id, probe_by_domain.get(item.preset_id, 0.0))
             )
+            context_score = float(context_by_domain.get(item.domain_id, 0.0))
             speech_score = float(embedding_by_preset.get(item.preset_id, 0.0))
             metadata_prior = float(reference_by_preset.get(item.preset_id, 0.0))
             weighted = 0.0
             if has_text_topic_signal:
                 weighted += float(self.config.text_topic_weight) * text_score
+            if has_context_similarity:
+                weighted += float(self.config.context_similarity_weight) * context_score
             if has_probe:
                 weighted += float(self.config.domain_probe_weight) * probe_score
             if has_embedding:
@@ -831,6 +866,7 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             probe_score = float(
                 probe_by_domain.get(item.domain_id, probe_by_domain.get(item.preset_id, 0.0))
             )
+            context_score = float(context_by_domain.get(item.domain_id, 0.0))
             speech_score = float(embedding_by_preset.get(item.preset_id, 0.0))
             metadata_prior = float(reference_by_preset.get(item.preset_id, 0.0))
             raw_final = float(raw_final_by_preset.get(item.preset_id, 0.0))
@@ -847,6 +883,7 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
                         "router_text_source": router_text_source or "none",
                         "has_text_topic_signal": has_text_topic_signal,
                         "text_topic_score": round(text_score, 4),
+                        "context_similarity_score": round(context_score, 4),
                         "domain_probe_score": round(probe_score, 4),
                         "speech_centroid_score": round(speech_score, 4),
                         "metadata_prior": round(metadata_prior, 4),

@@ -18,6 +18,11 @@ auto_working:
       type: domain
       domain: medicine
       weight: 0.8
+    education_core_10k:
+      path: /mnt/data2/jiaxuanluo/rasst-demo/runtime/term_memory/education_core_10k.json
+      type: domain
+      domain: education
+      weight: 0.8
     finance_core_10k:
       path: /mnt/data2/jiaxuanluo/rasst-demo/runtime/term_memory/finance_core_10k.json
       type: domain
@@ -27,6 +32,31 @@ auto_working:
       path: /mnt/data2/jiaxuanluo/rasst-demo/runtime/term_memory/legal_core_10k.json
       type: domain
       domain: legal
+      weight: 0.8
+    environment_core_10k:
+      path: /mnt/data2/jiaxuanluo/rasst-demo/runtime/term_memory/environment_core_10k.json
+      type: domain
+      domain: environment
+      weight: 0.8
+    entertainment_core_10k:
+      path: /mnt/data2/jiaxuanluo/rasst-demo/runtime/term_memory/entertainment_core_10k.json
+      type: domain
+      domain: entertainment
+      weight: 0.8
+    science_core_10k:
+      path: /mnt/data2/jiaxuanluo/rasst-demo/runtime/term_memory/science_core_10k.json
+      type: domain
+      domain: science
+      weight: 0.8
+    sports_core_10k:
+      path: /mnt/data2/jiaxuanluo/rasst-demo/runtime/term_memory/sports_core_10k.json
+      type: domain
+      domain: sports
+      weight: 0.8
+    art_core_10k:
+      path: /mnt/data2/jiaxuanluo/rasst-demo/runtime/term_memory/art_core_10k.json
+      type: domain
+      domain: art
       weight: 0.8
     open_wiki_100k:
       path: /mnt/data2/jiaxuanluo/rasst-demo/runtime/term_memory/open_wiki_100k.json
@@ -42,11 +72,16 @@ auto_working:
     enable_talk_level: true
     enable_chunk_level: true
     enable_fallback: true
-    text_topic_weight: 0.60
-    domain_probe_weight: 0.25
+    enable_context_similarity: true
+    context_similarity_model: BAAI/bge-m3
+    context_similarity_device: cpu
+    context_similarity_batch_size: 32
+    context_similarity_weight: 0.60
+    text_topic_weight: 0.25
+    domain_probe_weight: 0.10
     domain_probe_top_k: 5
-    speech_centroid_weight: 0.10
-    metadata_prior_weight: 0.05
+    speech_centroid_weight: 0.03
+    metadata_prior_weight: 0.02
     domain_activate_threshold: 0.60
     domain_margin_threshold: 0.15
     current_margin_threshold: 0.30

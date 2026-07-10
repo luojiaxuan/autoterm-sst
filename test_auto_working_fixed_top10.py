@@ -40,6 +40,11 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(config.auto_glossary_base_preset, "none")
         self.assertEqual(config.auto_glossary_default_preset, "nlp_core_10k")
         self.assertEqual(config.router_mode, "hybrid_window_topic")
+        self.assertTrue(config.router_context_similarity_enabled)
+        self.assertEqual(config.router_context_similarity_model, "BAAI/bge-m3")
+        self.assertEqual(config.router_context_similarity_device, "cpu")
+        self.assertEqual(config.router_context_similarity_weight, 0.60)
+        self.assertEqual(len(config.auto_glossary_presets.split(",")), 10)
         self.assertEqual(config.router_domain_probe_top_k, 5)
         self.assertEqual(config.router_min_consistent_windows_with_text, 2)
         self.assertEqual(config.router_min_consistent_windows_generated_target, 2)
@@ -467,6 +472,42 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
 
         self.assertEqual(agent._domain_probe_refresh_sec(no_text), 1.92)
         self.assertEqual(agent._domain_probe_refresh_sec(with_text), 30.0)
+
+    def test_context_similarity_batches_and_reuses_cached_scores(self) -> None:
+        class FakeContextSimilarity:
+            enabled = True
+
+            def __init__(self) -> None:
+                self.calls = []
+
+            async def score_batch(self, texts, *, allowed_domains):  # noqa: ANN001, ANN202
+                self.calls.append((list(texts), list(allowed_domains)))
+                return [{"nlp": 0.2, "medicine": 0.9} for _ in texts]
+
+        agent = OmniAgent()
+        agent.config.auto_glossary_update_sec = 30.0
+        scorer = FakeContextSimilarity()
+        agent.context_similarity = scorer
+        session = SimpleNamespace(
+            auto_glossary_enabled=True,
+            router_text_window="患者接受临床治疗。",
+            router_text_source="generated_target",
+            latency_multiplier=2,
+            last_context_similarity_scores={},
+            last_context_similarity_s=None,
+            last_context_similarity_at_s=0.0,
+            last_context_similarity_text="",
+            last_context_similarity_cached=False,
+        )
+
+        first = asyncio.run(agent._context_similarity_scores_batch([session]))
+        second = asyncio.run(agent._context_similarity_scores_batch([session]))
+
+        self.assertEqual(first, [{"nlp": 0.2, "medicine": 0.9}])
+        self.assertEqual(second, first)
+        self.assertEqual(len(scorer.calls), 1)
+        self.assertTrue(session.last_context_similarity_cached)
+        self.assertEqual(session.last_context_similarity_s, 0.0)
 
     def test_cached_probe_scores_can_confirm_audio_only_switch(self) -> None:
         router = HybridWindowTopicRouter(

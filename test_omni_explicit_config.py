@@ -1,14 +1,37 @@
 from __future__ import annotations
 
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
+from eval.streaming_sst.serve_glossary_capacity_sweep import configure_vllm_runtime
 from framework.agents.omni import OmniAgent, OmniConfig
 from framework.agents.term_memory.manifest import TermMemoryManifest
 
 
 class OmniExplicitConfigTest(unittest.TestCase):
+    def test_capacity_server_configures_vllm_runtime_explicitly(self) -> None:
+        args = SimpleNamespace(
+            vllm_use_v1=1,
+            vllm_enable_v1_multiprocessing=1,
+            vllm_worker_multiproc_method="spawn",
+            vllm_moe_use_deep_gemm=0,
+            vllm_use_fused_moe_grouped_topk=0,
+            nccl_p2p_disable=1,
+            nccl_ib_disable=1,
+            torch_nccl_enable_monitoring=0,
+        )
+        with patch.dict(os.environ, {}, clear=True):
+            configure_vllm_runtime(args)
+            self.assertEqual(os.environ["VLLM_USE_V1"], "1")
+            self.assertEqual(os.environ["VLLM_ENABLE_V1_MULTIPROCESSING"], "1")
+            self.assertEqual(os.environ["VLLM_WORKER_MULTIPROC_METHOD"], "spawn")
+            self.assertEqual(os.environ["NCCL_P2P_DISABLE"], "1")
+            self.assertEqual(os.environ["NCCL_IB_DISABLE"], "1")
+
     def test_agent_uses_injected_config_and_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

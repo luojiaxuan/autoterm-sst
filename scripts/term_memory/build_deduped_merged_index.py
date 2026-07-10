@@ -421,6 +421,18 @@ def build_deduped_merged_index(
         del loaded
 
     base_unique_terms = len(output_keys)
+    base_audit = _audit_entries(duplicate_occurrences, output_winner)
+    base_audit_summary = {
+        "duplicate_term_count": len(base_audit),
+        "target_variant_conflict_term_count": sum(
+            bool(item["target_variant_conflict"]) for item in base_audit
+        ),
+        "translation_map_conflict_term_count": sum(
+            bool(item["translation_map_conflict"]) for item in base_audit
+        ),
+        "pair_overlap_term_counts": _pair_overlap_counts(base_audit, base_only=True),
+    }
+    del base_audit
     if target_size is not None and target_size < base_unique_terms:
         raise ValueError(
             f"--target-size {target_size} is smaller than base deduplicated union {base_unique_terms}; "
@@ -595,12 +607,6 @@ def build_deduped_merged_index(
         for spec_report in source_reports
         if spec_report["kind"] == "base"
     )
-    base_audit = [
-        item
-        for item in audit
-        if len({row["source_role"] for row in item["occurrences"] if row["source_kind"] == "base"}) > 1
-        or sum(1 for row in item["occurrences"] if row["source_kind"] == "base") > 1
-    ]
     report: Dict[str, Any] = {
         "status": "complete",
         "preset_id": preset_id,
@@ -612,20 +618,20 @@ def build_deduped_merged_index(
         ),
         "base_unique_terms": base_unique_terms,
         "base_duplicate_rows": base_duplicate_rows,
-        "base_duplicate_term_count": len(base_audit),
-        "base_target_variant_conflict_term_count": sum(
-            bool(item["target_variant_conflict"]) for item in base_audit
-        ),
-        "base_translation_map_conflict_term_count": sum(
-            bool(item["translation_map_conflict"]) for item in base_audit
-        ),
+        "base_duplicate_term_count": base_audit_summary["duplicate_term_count"],
+        "base_target_variant_conflict_term_count": base_audit_summary[
+            "target_variant_conflict_term_count"
+        ],
+        "base_translation_map_conflict_term_count": base_audit_summary[
+            "translation_map_conflict_term_count"
+        ],
         "output_term_count": expected_size,
         "topup_term_count": expected_size - base_unique_terms,
         "all_duplicate_term_count": len(audit),
         "all_target_variant_conflict_term_count": sum(
             bool(item["target_variant_conflict"]) for item in audit
         ),
-        "base_pair_overlap_term_counts": _pair_overlap_counts(audit, base_only=True),
+        "base_pair_overlap_term_counts": base_audit_summary["pair_overlap_term_counts"],
         "all_pair_overlap_term_counts": _pair_overlap_counts(audit, base_only=False),
         "source_roles": source_reports,
         "embedding": {

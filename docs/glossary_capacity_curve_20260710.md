@@ -103,6 +103,11 @@ Hyper00 active run（2026-07-10）：
   `prompt_reference_count` 完全一致。
 - Full run：`outputs/full-zh` 正在运行；GPU 2 执行 10k -> 1M，GPU 3 执行
   100k -> 500k。每档完成后 server 会重启，并由 health gate 检查精确 term count。
+- xCOMET-lite staging：`/data02/jaxan/floras_qe_eval/`，NL2G code commit
+  `e21e291b2a09a5a854c55b0c01c53ab580692beb`，model revision
+  `8d628ebffb4e3f20f53f52f9570d19dee38b9b9a`。Hyper runtime 显式固定
+  `huggingface_hub==0.36.0`、`transformers==4.57.1`；在无 GPU、
+  `local_files_only=True` 条件下已成功载入 283,731,987 参数，正式评分不需要网络。
 - 一个共享机 failure mode：首次 preflight 后 GPU 0/1 被已有的他人容器恢复任务
   抢占，两个 server 在 health 前因显存不足失败；失败输出隔离在 `outputs/full`，
   不进入正式结果。重新 preflight 后正式任务使用 GPU 2/3。

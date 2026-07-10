@@ -18,8 +18,12 @@ topic-union catalog 将在 capacity crossover 确认后独立构建和审计。
   `acl_tagged_gs10k/100k/500k/1m`；每档前 238 entries 完全相同。
 - Streaming：latency multiplier 2，30,720 samples / 1.92s per chunk，
   feed sleep 1.6s。
-- Retriever：MaxSim，top-k 10，score threshold 0.78，tagged term map。
-- Decoder：同一 zh Qwen3-Omni checkpoint，TP=2，固定 sampling/config。
+- Retriever：MaxSim，最终 prompt top-k 10，score threshold 0.78，tagged term
+  map；四档统一设置 pre-rerank candidate budget = 10，并记录实际 scored
+  inventory，避免候选预算随 glossary 规模变化。
+- Decoder：同一 zh Qwen3-Omni checkpoint，Hyper H200 单卡 TP=1，固定
+  sampling/config。每个 capacity server 只见一张物理 GPU；不同 capacity 档可在
+  两张卡上并行，但每档内部不做跨卡切分。
 - 每档重启 server，只加载一个 capacity index，避免 1M index 与前面档位在
   retriever cache 中叠加。
 - 四档全部报告，不根据结果只保留一个所谓 sweet point。
@@ -85,19 +89,37 @@ segments.meta.jsonl   b8c911aab3cde27190e331f7769b353aecff2ff856ffa2fa31a2a04261
 
 ## Artifact status
 
+Hyper00 active run（2026-07-10）：
+
+```text
+/data02/jaxan/autoterm-capacity-zh-20260710/
+```
+
+- Code：Git branch `explore/multidomain-routing` at `82d6394`。
+- Integrity：RAG、四个 glossary 和四个 MaxSim index 的 SHA-256 均与上表一致；
+  copied Conda runtime file count 与 Taurus source 同为 92,523。
+- Smoke：`outputs/smoke-10k` 已完成 60.0s / 28 emitted events，health 显示
+  `active_terms=10000`，`tail_gap_samples=0`，保存的 112 条 prompt references 与
+  `prompt_reference_count` 完全一致。
+- Full run：`outputs/full-zh` 正在运行；GPU 2 执行 10k -> 1M，GPU 3 执行
+  100k -> 500k。每档完成后 server 会重启，并由 health gate 检查精确 term count。
+- 一个共享机 failure mode：首次 preflight 后 GPU 0/1 被已有的他人容器恢复任务
+  抢占，两个 server 在 health 前因显存不足失败；失败输出隔离在 `outputs/full`，
+  不进入正式结果。重新 preflight 后正式任务使用 GPU 2/3。
+
 Taurus local staging：
 
 ```text
 /mnt/data1/jiaxuanluo/rasst_eval/autoterm_capacity_100topics_20260710/
 ```
 
-Aries active-run staging：
+Aries earlier staging：
 
 ```text
 /mnt/data6/jiaxuanluo/autoterm_capacity_curve_20260710/
 ```
 
-这些目录当前是 active-run staging，不是 canonical reusable artifact。实验完成后，
+这些目录当前是 local staging，不是 canonical reusable artifact。实验完成后，
 轻量 summaries 和命令记录进 Git；raw run JSON/reference events 后续与真正的
 100-topic catalog 一起选择 Hugging Face dataset repo，当前 upload status 为
 `pending / repo TBD`。

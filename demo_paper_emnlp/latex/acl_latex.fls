@@ -326,10 +326,10 @@ INPUT ./latex/sections/6_evaluation.tex
 INPUT ./latex/sections/6_evaluation.tex
 INPUT latex/sections/6_evaluation.tex
 INPUT /opt/homebrew/Cellar/texlive/20260301/share/texmf-dist/fonts/vf/adobe/times/ptmr8t.vf
-INPUT latex/figures/routing_timeline_4block.png
-INPUT latex/figures/routing_timeline_4block.png
-INPUT latex/figures/routing_timeline_4block.png
-INPUT latex/figures/routing_timeline_4block.png
+INPUT latex/figures/routing_timeline_10talk.png
+INPUT latex/figures/routing_timeline_10talk.png
+INPUT latex/figures/routing_timeline_10talk.png
+INPUT latex/figures/routing_timeline_10talk.png
 INPUT /opt/homebrew/Cellar/texlive/20260301/share/texmf-dist/fonts/tfm/adobe/times/ptmr8t.tfm
 INPUT /opt/homebrew/Cellar/texlive/20260301/share/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmex7.tfm
 INPUT /opt/homebrew/Cellar/texlive/20260301/share/texmf-dist/fonts/tfm/public/latex-fonts/lasy7.tfm

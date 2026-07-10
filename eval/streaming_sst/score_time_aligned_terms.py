@@ -294,7 +294,7 @@ def main() -> None:
     ap.add_argument("--acl-raw-glossary", required=True)
     ap.add_argument("--medicine-oracle-dir", required=True)
     ap.add_argument("--target-lang", default="zh")
-    ap.add_argument("--post-s", type=float, default=POST_S)
+    ap.add_argument("--post-s", type=float, default=30.0)
     ap.add_argument("--out-json", default="")
     args = ap.parse_args()
     global POST_S

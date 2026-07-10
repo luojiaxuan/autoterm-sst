@@ -47,6 +47,23 @@ class PromptReferenceConflictTests(unittest.TestCase):
         self.assertIn("bank => 银行", term_map)
         self.assertIn("bank => 河岸", term_map)
 
+    def test_dense_pair_policy_uses_identical_ranking_for_auto_and_fixed(self) -> None:
+        agent = OmniAgent()
+        agent.config.reference_ranking_policy = "dense_pair"
+        references = [
+            {"term": "bank", "translation": "银行", "score": 0.90},
+            {"term": "bank", "translation": "河岸", "score": 0.80},
+            {"term": "BANK", "translation": "银行", "score": 0.70},
+        ]
+        auto = SimpleNamespace(auto_glossary_enabled=True, active_domain="finance")
+        fixed = SimpleNamespace(auto_glossary_enabled=False, active_domain="merged")
+
+        auto_ranked = agent._rank_references_for_session(auto, references)
+        fixed_ranked = agent._rank_references_for_session(fixed, references)
+
+        self.assertEqual(auto_ranked, fixed_ranked)
+        self.assertEqual(len(auto_ranked), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

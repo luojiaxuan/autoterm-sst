@@ -445,6 +445,9 @@ def score_windows(
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if xcomet_code_dir:
         sys.path.insert(0, str(Path(xcomet_code_dir).expanduser()))
+    # note (luojiaxuan): xCOMET does not use HF hub kernels, and newer serving
+    # images can ship an incompatible optional ``kernels`` package.
+    sys.modules.setdefault("kernels", None)
     from sacrebleu.metrics import CHRF
     from xcomet.deberta_encoder import XCOMETLite
 

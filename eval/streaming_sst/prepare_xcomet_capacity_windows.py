@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import wave
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -37,7 +36,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--acl-meta", type=Path, required=True)
     parser.add_argument("--acl-source-text", type=Path, required=True)
     parser.add_argument("--acl-reference-text", type=Path, required=True)
-    parser.add_argument("--audio-dir", type=Path, required=True)
+    parser.add_argument(
+        "--audio-dir",
+        type=Path,
+        help="Legacy compatibility argument; streamed timing comes from segment metadata.",
+    )
     parser.add_argument("--talks", default=DEFAULT_TALKS)
     parser.add_argument("--window-sec", type=float, default=30.0)
     parser.add_argument("--out-jsonl", type=Path, required=True)
@@ -46,11 +49,6 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
-
-
-def audio_duration_s(path: Path) -> float:
-    with wave.open(str(path)) as handle:
-        return handle.getnframes() / handle.getframerate()
 
 
 def prepare_windows(args: argparse.Namespace) -> list[dict[str, Any]]:
@@ -77,15 +75,23 @@ def prepare_windows(args: argparse.Namespace) -> list[dict[str, Any]]:
     output: list[dict[str, Any]] = []
     block_start_sample = 0
     for block_index, talk in enumerate(talks, start=1):
-        wav_path = args.audio_dir / f"{talk}.wav"
-        block_duration_s = audio_duration_s(wav_path)
+        talk_meta = by_talk.get(talk, [])
+        if not talk_meta:
+            raise ValueError(f"ACL metadata has no streamed segments for {talk}")
+        block_duration_s = sum(
+            float(meta.get("seg_duration") or meta.get("duration") or 0.0)
+            for meta in talk_meta
+        )
         segments: list[ReferenceSegment] = []
-        for meta in by_talk.get(talk, []):
+        played_cursor_s = 0.0
+        for meta in talk_meta:
             index = int(meta.get("index") if meta.get("index") is not None else meta.get("orig_index", -1))
             if not 0 <= index < len(source_lines) or not 0 <= index < len(reference_lines):
                 raise ValueError(f"ACL line index out of range: {index}")
-            start_s = float(meta.get("offset") or 0.0)
-            end_s = min(block_duration_s, start_s + float(meta.get("duration") or 0.0))
+            duration_s = float(meta.get("seg_duration") or meta.get("duration") or 0.0)
+            start_s = played_cursor_s
+            end_s = min(block_duration_s, start_s + duration_s)
+            played_cursor_s = end_s
             if end_s <= start_s:
                 continue
             segments.append(

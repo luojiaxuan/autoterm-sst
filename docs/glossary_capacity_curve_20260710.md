@@ -38,6 +38,25 @@ Headline：
 同时保留 corpus-gold retrieval precision（reference key 是否属于全局 ACL gold
 inventory），但它只作较弱的诊断指标，不冒充 time-local Prompt Precision。
 
+## Budget-aware router implementation
+
+容量曲线给出的 crossover 用来确定检索预算 $B$，而不是直接作为 AutoTerm 的
+topic taxonomy。实验分支 `explore/multidomain-routing` 已实现显式
+`budgeted_top_slices` 模式：router 对 accumulated generated-target sliding-window
+context 与 manifest 中每个 topic description 计算语义相似度，再按分数从高到低
+激活总 term count 不超过 $B$ 的 slices。若 slices 均为 10k、$B=100k$，即激活
+top-10 slices；随后 MaxSim 在每个激活 slice 内召回，并沿用现有全局 rerank，最终
+仍只向 LLM 注入全局 top-10 references。
+
+- 代码状态：GitHub 分支 `explore/multidomain-routing`，核心实现 commit
+  `40f71b6`。
+- 默认兼容：`slice_selection_mode=hard_top1`；只有显式设置
+  `budgeted_top_slices` 才改变线上行为。
+- 评测链：`score_capacity_prompt_precision.py` 保存并统计实际 prompt references，
+  同时区分 gold-type precision 与 MFA source-time-aligned precision。
+- 100-topic catalog：尚在构建和 provenance 审计中；在完成前不把 nested
+  distractor glossary 描述为 topic-union catalog。
+
 ## Inputs and integrity
 
 Manifest：
@@ -69,7 +88,13 @@ Taurus local staging：
 /mnt/data1/jiaxuanluo/rasst_eval/autoterm_capacity_100topics_20260710/
 ```
 
-该目录当前是 active-run staging，不是 canonical reusable artifact。实验完成后，
+Aries active-run staging：
+
+```text
+/mnt/data6/jiaxuanluo/autoterm_capacity_curve_20260710/
+```
+
+这些目录当前是 active-run staging，不是 canonical reusable artifact。实验完成后，
 轻量 summaries 和命令记录进 Git；raw run JSON/reference events 后续与真正的
 100-topic catalog 一起选择 Hugging Face dataset repo，当前 upload status 为
 `pending / repo TBD`。

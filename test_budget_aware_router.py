@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from framework.agents.omni import OmniAgent, OmniConfig
 from framework.agents.term_memory.context_similarity import DomainDescriptionSimilarity
 from framework.agents.term_memory.manifest import TermMemoryManifest
+from framework.agents.term_memory.slice_registry import RetrievalSlice
 from framework.agents.term_memory.topic_router import (
     DomainSlice,
     HybridWindowTopicRouter,
@@ -30,7 +31,116 @@ def _topic_slices(count: int = 12) -> list[DomainSlice]:
     ]
 
 
+def _retrieval_slices(count: int) -> list[RetrievalSlice]:
+    return [
+        RetrievalSlice(
+            preset_id=f"topic_{index:03d}",
+            slice_id=f"topic_{index:03d}",
+            role="domain",
+            domain=f"domain_{index:03d}",
+            index_path=f"mock://topic_{index:03d}",
+            term_count=10_000,
+        )
+        for index in range(count)
+    ]
+
+
 class BudgetAwareRouterTests(unittest.TestCase):
+    def test_shared_candidate_budget_is_equal_for_one_two_and_ten_slices(self) -> None:
+        agent = OmniAgent(
+            config=OmniConfig(
+                mock=True,
+                rag_enabled=False,
+                retrieval_candidate_budget=100,
+            )
+        )
+        auto_session = SimpleNamespace(auto_glossary_enabled=True)
+        merged_session = SimpleNamespace(auto_glossary_enabled=False)
+
+        merged = agent._retrieval_top_ks_for(merged_session, _retrieval_slices(1))
+        two_slices = agent._retrieval_top_ks_for(auto_session, _retrieval_slices(2))
+        ten_slices = agent._retrieval_top_ks_for(auto_session, _retrieval_slices(10))
+
+        self.assertEqual(merged, [100])
+        self.assertEqual(two_slices, [50, 50])
+        self.assertEqual(ten_slices, [10] * 10)
+        self.assertEqual({sum(merged), sum(two_slices), sum(ten_slices)}, {100})
+
+    def test_shared_candidate_budget_assigns_remainder_deterministically(self) -> None:
+        agent = OmniAgent(
+            config=OmniConfig(
+                mock=True,
+                rag_enabled=False,
+                retrieval_candidate_budget=103,
+            )
+        )
+
+        allocation = agent._retrieval_top_ks_for(
+            SimpleNamespace(auto_glossary_enabled=True),
+            _retrieval_slices(10),
+        )
+
+        self.assertEqual(allocation, [11, 11, 11, 10, 10, 10, 10, 10, 10, 10])
+        self.assertEqual(sum(allocation), 103)
+
+    def test_zero_candidate_budget_preserves_legacy_per_slice_top_k(self) -> None:
+        agent = OmniAgent(
+            config=OmniConfig(
+                mock=True,
+                rag_enabled=False,
+                retrieval_candidate_budget=0,
+                rag_top_k=7,
+                prompt_top_k=10,
+                ui_top_k=8,
+                autoterm_topk_per_slice=12,
+            )
+        )
+
+        auto = agent._retrieval_top_ks_for(
+            SimpleNamespace(auto_glossary_enabled=True),
+            _retrieval_slices(2),
+        )
+        merged = agent._retrieval_top_ks_for(
+            SimpleNamespace(auto_glossary_enabled=False),
+            _retrieval_slices(1),
+        )
+
+        self.assertEqual(auto, [12, 12])
+        self.assertEqual(merged, [10])
+
+    def test_candidate_cost_metadata_reports_pre_rerank_work(self) -> None:
+        agent = OmniAgent(
+            config=OmniConfig(
+                mock=True,
+                rag_enabled=False,
+                retrieval_candidate_budget=100,
+            )
+        )
+        session = SimpleNamespace(
+            last_candidate_pool_count=37,
+            last_retrieval_candidate_requested=0,
+            last_retrieval_candidate_returned=0,
+            last_retrieval_index_queries=0,
+            last_retrieval_scored_inventory_terms=0,
+            last_retrieval_top_k_by_slice={},
+        )
+        plans = _retrieval_slices(2)
+
+        agent._record_retrieval_query(session, plans[0], 50)
+        agent._record_retrieval_query(session, plans[1], 50)
+        session.last_retrieval_candidate_returned = 82
+        cost = agent._retrieval_candidate_cost_meta(session)
+
+        self.assertEqual(cost["allocation_mode"], "shared_total")
+        self.assertEqual(cost["configured_budget"], 100)
+        self.assertEqual(cost["requested_top_k"], 100)
+        self.assertEqual(cost["returned_before_rerank"], 82)
+        self.assertEqual(cost["pool_after_rerank"], 37)
+        self.assertEqual(cost["index_queries"], 2)
+        self.assertEqual(cost["scored_inventory_terms"], 20_000)
+        self.assertEqual(cost["top_k_by_slice"], {"topic_000": 50, "topic_001": 50})
+        self.assertEqual(agent._remaining_retrieval_candidate_budget(session), 0)
+
     def test_hard_top1_remains_the_default(self) -> None:
         router = HybridWindowTopicRouter(_topic_slices(), RouterConfig())
 

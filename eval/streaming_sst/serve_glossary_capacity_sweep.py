@@ -64,6 +64,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-new-tokens", type=int, default=40)
     parser.add_argument("--rag-top-k", type=int, default=10)
     parser.add_argument("--rag-score-threshold", type=float, default=0.78)
+    parser.add_argument("--retrieval-candidate-budget", type=int, default=0)
     parser.add_argument("--term-map-format", choices=("plain", "tagged", "xml_tagged"), default="tagged")
     parser.add_argument("--empty-term-map-policy", default="none_block")
     parser.add_argument("--tmp-dir", type=Path, required=True)
@@ -102,6 +103,8 @@ def configure_vllm_runtime(args: argparse.Namespace) -> None:
 
 
 def validate_inputs(args: argparse.Namespace, manifest: TermMemoryManifest) -> list[str]:
+    if args.retrieval_candidate_budget < 0:
+        raise ValueError("--retrieval-candidate-budget must be non-negative")
     for path in (args.model_path, args.rag_model_path):
         if not path.exists():
             raise FileNotFoundError(path)
@@ -148,6 +151,7 @@ def build_agent(
         rag_top_k=args.rag_top_k,
         rag_score_threshold=args.rag_score_threshold,
         rag_startup_glossary_preset=presets[0],
+        retrieval_candidate_budget=max(0, int(args.retrieval_candidate_budget)),
         auto_glossary_enabled=False,
         auto_glossary_preload=False,
         router_context_similarity_enabled=False,

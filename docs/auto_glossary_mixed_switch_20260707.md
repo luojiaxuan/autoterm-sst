@@ -676,3 +676,33 @@ fixed_nlp 逼近。
 
 产物：各 run 目录 `term_acc_10talk_mfa.json` / `mfa_3talk.json`。
 今晚 ja/de 10-talk 落地后用同脚本重评替换 App D 3-talk。
+
+## 2026-07-10: 32-session 并发——修正 + continuous-batching 后端
+
+**先前"32 路不可行"是单位错误。** doc 的 12.97 "seg/s" 单位是完整 ACL 段
+(均 6.64s = 3.46 chunk),换算 = 86 音频秒/墙钟秒;32 路实时只需 32 音频秒/秒
+→ **2.7× 余量**。之前拿段/秒比 chunk/秒(16.67)混了单位。
+
+**引擎实测(vllm serve, 修正版 unique-audio probe, 2×A6000 TP=2):**
+N=32 饱和并发 58(graph off)/63.5(graph on)chunk/s,每-chunk p95 0.61s ≪ 1.92s。
+CUDA graph 对纯文本仅 +9%(decode 40 token),benchmark 的 enforce_eager 已够。
+
+**端到端后端修复(用户选 b):** 新增 `VLLMServeBackend`(`RASST_BACKEND_KIND=
+vllm_serve`),框架 per-request 打外部 vllm serve → 真 continuous batching,替代
+in-process offline `vllm.LLM`(其单 worker + 阻塞 generate 在高负载退化到 26s 尾)。
+aries 6,7 起 vllm serve(zh_hf 模型)+ 框架(vllm_serve 后端)+ 真 WS 压测
+`concurrency_term_memory.py`:
+
+| N | partials | gen p50 | **gen p95** | 实时(<1920ms) |
+|---|---:|---:|---:|:--:|
+| 8 | 120 | 482 | 805 | ✓ |
+| 16 | 240 | 420 | 826 | ✓ |
+| 24 | 360 | 471 | 894 | ✓ |
+| 32 | 480 | 519 | **820** | ✓ |
+
+p95 从 N=8 到 N=32 保持 ~820ms(continuous batching 签名:延迟平坦、吞吐线性
+1.37→5.47 seg/s),**2.3× 余量**。N=1 的 38s 是首请求引擎 warmup 冷启动,非稳态。
+
+**结论:32 路实时可行且已实测**(引擎 + 端到端两条独立证据)。论文 §6 恢复为
+verified claim。代码 `5a0f94d` 已进 main;live demo 可通过 env 切到 vllm_serve
+架构(需 vllm serve TP=2 + RAG GPU)。

@@ -16,8 +16,7 @@ whose cost the runtime records separately. Finally, the real backend needs
 high-end NVIDIA GPUs and external model/retriever artifacts; mock mode covers
 UI and protocol testing without them.
 
-We presented AutoTerm-SST, a terminology-memory workbench that requires no
-per-session glossary upload or domain choice. It keeps broad resources off the
-default retrieval path, selects active slices from streaming evidence,
-injects at most 10 score-filtered references per prompt, and surfaces live
-terminology and router evidence.
+We presented AutoTerm-SST, a terminology-memory workbench that needs no
+per-session glossary upload or domain choice: it keeps broad resources off the
+default path, routes active slices from streaming evidence, and caps each
+prompt at 10 score-filtered references.

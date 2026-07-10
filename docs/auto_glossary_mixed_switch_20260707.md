@@ -531,9 +531,44 @@ python3 eval/streaming_sst/eval_mixed_domain_switch.py \
   zh 在 data1 的逐字节重复副本（66G，与 data2 prod md5 一致）为 root 所有，
   需管理员删除。
 
+## 2026-07-09 深夜: zh 10-talk alternating 主结果（论文 Table 1 / 附录 C）
+
+单 session 实时流式 16,848.1s（5 ACL + 5 medicine 交替，8,531 chunks），
+双 union 10k inventories，`term_acc_10talk.{json,md}` 为权威产物
+（aries `/mnt/data3/jiaxuanluo/eval_out/10talk_zh/`）。
+
+| run | tech acc (875) | raw acc (1064) | ACL | Med. | Med. types | BLEU | M-BLEU |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| none | 0.744 | 0.754 | 0.782 | 0.733 | 92/196 | 58.84 | 57.46 |
+| fixed_nlp_union | 0.744 | 0.777 | 0.907 | 0.698 | 86/196 | 59.18 | 57.85 |
+| fixed_medicine_union | 0.901 | 0.881 | 0.772 | 0.937 | 168/196 | 59.63 | 57.53 |
+| auto_working | **0.936** | **0.933** | **0.912** | **0.943** | **170/196** | 58.10 | 56.22 |
+
+- gold 口径：technical 875 occurrences（ACL 193 + medicine 682）；raw 1,064
+  （ACL raw 382 + medicine 682）；medicine block-local 196 term types。
+- 路由：9/9 domain transitions 方向正确 + 1 次瞬时多余切换（共 11 switches）；
+  steady-state active-domain accuracy 0.9824；8/9 切换在 13.6–55.4s 内落地，
+  1 次 medicine→ACL 延迟 304s（generic talk opening）。
+- 结论：auto 双口径超两个 fixed union，且各自 in-domain 追平/略超对应
+  domain expert（ACL 0.912 vs 0.907，medicine 0.943 vs 0.937）；BLEU 代价
+  1–1.5（切换窗口）。论文 §6 tab:quality 与附录 C tab:mixed 已同步。
+
+## 2026-07-10: zh 10-talk random（seed 20260707）车道与 8016 启动修复
+
+- 首夜 random 链两次失败根因：8016 `RASST_GPU_MEMORY_UTILIZATION=0.55`
+  在 A6000 48GB 上仅留 26.4GB < TP=2 权重 ~33GB/卡，vLLM 报
+  `Available KV cache memory: -5.71 GiB` → engine init 失败。修复：0.85 +
+  RAG 移到 cuda:0（GPU 4 全空），8016 于 00:06:59 UTC 起服务，75s 完成
+  engine 装载。auto（8016, 实时 1.92s feed）+ trio（8013, 2×）并行中，
+  产物将落 `aries:/mnt/data3/jiaxuanluo/eval_out/10talk_zh_random/`
+  （`term_acc_random.{json,md}`）。
+
 ## Source-of-truth artifact paths (2026-07-09)
 
-- zh matched-union result: Taurus local staging
+- zh 10-talk alternating main result: aries
+  `/mnt/data3/jiaxuanluo/eval_out/10talk_zh/term_acc_10talk.json`
+  (`auto_working` = 819/875 technical, 993/1064 raw).
+- zh 3-talk matched-union result: Taurus local staging
   `/mnt/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260708_union_truncated_8013/term_acc_compare_v2.json`
   (`auto_working_v2` = 131/143 technical, 206/226 raw).
 - ja keyword-tuned result: Taurus local staging

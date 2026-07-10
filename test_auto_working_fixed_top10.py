@@ -192,7 +192,7 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
             auto_glossary_enabled=True,
             router_text_window="",
             router_text_source="none",
-            history=["这是一个语言模型。", "患者接受临床治疗。"],
+            router_generated_target_history=["这是一个语言模型。"],
         )
 
         agent._after_translation_tick(session, text="患者接受临床治疗。", references=[])
@@ -209,7 +209,7 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
             auto_glossary_enabled=True,
             router_text_window="",
             router_text_source="none",
-            history=[],
+            router_generated_target_history=[],
         )
 
         agent._after_translation_tick(session, text="患者接受临床治疗。", references=[])
@@ -223,13 +223,36 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
             auto_glossary_enabled=True,
             router_text_window="external source text",
             router_text_source="manifest_source",
-            history=["患者接受临床治疗。"],
+            router_generated_target_history=["患者接受临床治疗。"],
         )
 
         agent._after_translation_tick(session, text="患者接受临床治疗。", references=[])
 
         self.assertEqual(session.router_text_source, "manifest_source")
         self.assertEqual(session.router_text_window, "external source text")
+
+    def test_generated_target_router_history_is_independent_of_decoder_cache(self) -> None:
+        agent = OmniAgent()
+        agent.config.router_generated_target_enabled = True
+        agent.config.router_generated_target_window_chunks = 3
+        agent.config.router_generated_target_min_chars = 1
+        session = SimpleNamespace(
+            auto_glossary_enabled=True,
+            router_text_window="",
+            router_text_source="none",
+            router_generated_target_history=[],
+            history=["decoder-only context"],
+        )
+
+        for text in ("oldest", "middle", "newest", "current"):
+            agent._after_translation_tick(session, text=text, references=[])
+
+        self.assertEqual(
+            session.router_generated_target_history,
+            ["middle", "newest", "current"],
+        )
+        self.assertEqual(session.router_text_window, "middle\nnewest\ncurrent")
+        self.assertNotIn("decoder-only context", session.router_text_window)
 
     def test_generated_target_text_is_used_by_next_router_tick_only(self) -> None:
         agent = OmniAgent()

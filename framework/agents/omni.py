@@ -560,6 +560,7 @@ class OmniSession:
     last_query_embedding: Any = None
     router_text_window: str = ""
     router_text_source: str = "none"
+    router_generated_target_history: List[str] = field(default_factory=list)
     active_slice_presets: List[str] = field(default_factory=list)
     active_slice_terms: Dict[str, int] = field(default_factory=dict)
     last_retrieval_plan: List[Dict[str, Any]] = field(default_factory=list)
@@ -1644,6 +1645,7 @@ class OmniAgent(Agent):
         session.last_query_embedding = None
         session.router_text_window = ""
         session.router_text_source = "none"
+        session.router_generated_target_history.clear()
         self._clear_domain_probe_meta(session)
         self._clear_context_similarity_meta(session)
         if session.auto_glossary_enabled:
@@ -2249,10 +2251,16 @@ class OmniAgent(Agent):
         if current_source not in {"none", "generated_target"}:
             return
         window = max(1, int(self.config.router_generated_target_window_chunks))
-        texts = [str(item).strip() for item in session.history[-window:] if str(item).strip()]
+        texts = [
+            str(item).strip()
+            for item in getattr(session, "router_generated_target_history", [])
+            if str(item).strip()
+        ]
         current_text = str(text or "").strip()
         if current_text and (not texts or texts[-1] != current_text):
-            texts = (texts + [current_text])[-window:]
+            texts.append(current_text)
+        texts = texts[-window:]
+        session.router_generated_target_history = texts
         router_text = "\n".join(texts).strip()
         if len(router_text) < max(1, int(self.config.router_generated_target_min_chars)):
             return

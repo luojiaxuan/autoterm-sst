@@ -46,6 +46,14 @@ def _retrieval_slices(count: int) -> list[RetrievalSlice]:
 
 
 class BudgetAwareRouterTests(unittest.TestCase):
+    def test_context_similarity_keeps_the_most_recent_tokens(self) -> None:
+        class FakeTokenizer:
+            truncation_side = "right"
+
+        tokenizer = DomainDescriptionSimilarity._configure_tokenizer(FakeTokenizer())
+
+        self.assertEqual(tokenizer.truncation_side, "left")
+
     def test_shared_candidate_budget_is_equal_for_one_two_and_ten_slices(self) -> None:
         agent = OmniAgent(
             config=OmniConfig(

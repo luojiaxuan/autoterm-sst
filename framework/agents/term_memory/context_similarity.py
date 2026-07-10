@@ -42,6 +42,11 @@ class DomainDescriptionSimilarity:
         self._domains: List[str] = []
         self._lock = asyncio.Lock()
 
+    @staticmethod
+    def _configure_tokenizer(tokenizer):
+        tokenizer.truncation_side = "left"
+        return tokenizer
+
     async def start(self) -> None:
         async with self._lock:
             await asyncio.to_thread(self._load)
@@ -56,7 +61,9 @@ class DomainDescriptionSimilarity:
             "model_id": self.model_id,
             "device": self.device_name,
         }
-        self._tokenizer = AutoTokenizer.from_pretrained(self.model_id)
+        self._tokenizer = self._configure_tokenizer(
+            AutoTokenizer.from_pretrained(self.model_id)
+        )
         self._model = AutoModel.from_pretrained(self.model_id).to(self.device_name).eval()
         self._domains = list(self.prototypes)
         flat_texts: List[str] = []
@@ -79,6 +86,7 @@ class DomainDescriptionSimilarity:
             "model_id": self.model_id,
             "device": self.device_name,
             "domains": list(self._domains),
+            "truncation_side": self._tokenizer.truncation_side,
         }
 
     def _encode_sync(self, texts: Sequence[str]):

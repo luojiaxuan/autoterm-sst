@@ -284,6 +284,7 @@ class OmniConfig:
     rag_timeline_lookback_sec: float = 1.92
     rag_index_cache_max_entries: int = 16
     rag_startup_glossary_preset: str = RAG_STARTUP_GLOSSARY_PRESET
+    retrieval_candidate_budget: int = 0
 
     auto_glossary_enabled: bool = True
     auto_glossary_base_preset: str = "none"
@@ -401,6 +402,10 @@ class OmniConfig:
             rag_text_lora_r=_env_int("RASST_RAG_TEXT_LORA_R", 128),
             rag_score_threshold=_env_float("RASST_RAG_SCORE_THRESHOLD", 0.78),
             rag_timeline_lookback_sec=_env_float("RASST_RAG_LOOKBACK_SEC", 1.92),
+            retrieval_candidate_budget=_safe_int(
+                retrieval_config.get("candidate_budget"),
+                0,
+            ),
             auto_glossary_enabled=_env_bool("RASST_AUTO_GLOSSARY_ENABLED", True),
             auto_glossary_base_preset=base_preset_default,
             auto_glossary_default_preset=_env_str("RASST_AUTO_GLOSSARY_DEFAULT", initial_preset_default),
@@ -561,6 +566,11 @@ class OmniSession:
     last_rescue_triggered: bool = False
     last_candidate_pool_count: int = 0
     last_prompt_reference_count: int = 0
+    last_retrieval_candidate_requested: int = 0
+    last_retrieval_candidate_returned: int = 0
+    last_retrieval_index_queries: int = 0
+    last_retrieval_scored_inventory_terms: int = 0
+    last_retrieval_top_k_by_slice: Dict[str, int] = field(default_factory=dict)
     last_domain_probe_raw_scores: Dict[str, DomainProbeScore] = field(default_factory=dict)
     last_domain_probe_scores: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     last_domain_probe_slices: List[Dict[str, Any]] = field(default_factory=list)
@@ -1225,6 +1235,68 @@ class OmniAgent(Agent):
             return max(int(self.config.autoterm_topk_per_slice), int(self.config.prompt_top_k), int(self.config.ui_top_k))
         return max(int(self.config.rag_top_k), int(self.config.prompt_top_k), int(self.config.ui_top_k))
 
+    def _retrieval_top_ks_for(
+        self,
+        session: "OmniSession",
+        slices: Sequence[RetrievalSlice],
+    ) -> List[int]:
+        if not slices:
+            return []
+        candidate_budget = max(0, int(self.config.retrieval_candidate_budget))
+        if candidate_budget <= 0:
+            return [self._retrieval_top_k_for(session) for _ in slices]
+        per_slice, remainder = divmod(candidate_budget, len(slices))
+        return [
+            per_slice + (1 if index < remainder else 0)
+            for index in range(len(slices))
+        ]
+
+    def _remaining_retrieval_candidate_budget(self, session: "OmniSession") -> int:
+        candidate_budget = max(0, int(self.config.retrieval_candidate_budget))
+        if candidate_budget <= 0:
+            return self._retrieval_top_k_for(session)
+        return max(
+            0,
+            candidate_budget - int(session.last_retrieval_candidate_requested),
+        )
+
+    def _reset_retrieval_candidate_metrics(self, session: "OmniSession") -> None:
+        session.last_retrieval_candidate_requested = 0
+        session.last_retrieval_candidate_returned = 0
+        session.last_retrieval_index_queries = 0
+        session.last_retrieval_scored_inventory_terms = 0
+        session.last_retrieval_top_k_by_slice = {}
+
+    def _record_retrieval_query(
+        self,
+        session: "OmniSession",
+        plan: RetrievalSlice,
+        top_k: int,
+    ) -> None:
+        requested = max(0, int(top_k))
+        if requested <= 0:
+            return
+        session.last_retrieval_candidate_requested += requested
+        session.last_retrieval_index_queries += 1
+        session.last_retrieval_scored_inventory_terms += max(0, int(plan.term_count))
+        key = str(plan.preset_id or plan.slice_id)
+        session.last_retrieval_top_k_by_slice[key] = (
+            int(session.last_retrieval_top_k_by_slice.get(key, 0)) + requested
+        )
+
+    def _retrieval_candidate_cost_meta(self, session: "OmniSession") -> Dict[str, Any]:
+        candidate_budget = max(0, int(self.config.retrieval_candidate_budget))
+        return {
+            "allocation_mode": "shared_total" if candidate_budget > 0 else "legacy_per_slice",
+            "configured_budget": candidate_budget,
+            "requested_top_k": int(session.last_retrieval_candidate_requested),
+            "returned_before_rerank": int(session.last_retrieval_candidate_returned),
+            "pool_after_rerank": int(session.last_candidate_pool_count),
+            "index_queries": int(session.last_retrieval_index_queries),
+            "scored_inventory_terms": int(session.last_retrieval_scored_inventory_terms),
+            "top_k_by_slice": dict(session.last_retrieval_top_k_by_slice),
+        }
+
     def _retrieval_score_threshold_for(self, session: "OmniSession") -> Optional[float]:
         if session.auto_glossary_enabled:
             return float(self.config.autoterm_candidate_score_threshold)
@@ -1448,6 +1520,10 @@ class OmniAgent(Agent):
             "active_slices": list(session.active_slice_presets),
             "active_slice_terms": dict(session.active_slice_terms),
             "fixed_prompt_k": int(self.config.prompt_top_k),
+            "retrieval_candidate_budget": max(
+                0,
+                int(self.config.retrieval_candidate_budget),
+            ),
             "topic": self._topic_meta(session),
         }
         return SessionInfo(admitted=True, queued=False, queue_position=0, meta=meta)
@@ -1802,6 +1878,23 @@ class OmniAgent(Agent):
             "references_avg": round(sum(len(item) for item in refs_by_session) / len(refs_by_session), 4)
             if refs_by_session
             else 0.0,
+            "retrieval_candidates_requested_avg": round(
+                sum(session.last_retrieval_candidate_requested for session in batch) / len(batch),
+                4,
+            ),
+            "retrieval_candidates_returned_avg": round(
+                sum(session.last_retrieval_candidate_returned for session in batch) / len(batch),
+                4,
+            ),
+            "retrieval_index_queries_avg": round(
+                sum(session.last_retrieval_index_queries for session in batch) / len(batch),
+                4,
+            ),
+            "retrieval_scored_inventory_terms_avg": round(
+                sum(session.last_retrieval_scored_inventory_terms for session in batch)
+                / len(batch),
+                4,
+            ),
             "generation_ok": sum(1 for item in results if item.get("ok")),
             "request_elapsed_avg_s": round(sum(request_elapsed_values) / len(request_elapsed_values), 4)
             if request_elapsed_values
@@ -1830,15 +1923,20 @@ class OmniAgent(Agent):
         for idx, session in enumerate(batch):
             session.last_rescue_triggered = False
             session.last_candidate_pool_count = 0
+            self._reset_retrieval_candidate_metrics(session)
             slices = self._active_retrieval_slices(session)
             self._record_active_slices(session, slices)
-            for plan in slices:
+            top_ks = self._retrieval_top_ks_for(session, slices)
+            for plan, top_k in zip(slices, top_ks):
+                if top_k <= 0:
+                    continue
                 if session.auto_glossary_enabled and not self.retrieval.is_index_ready(plan.index_path):
                     self._schedule_index_preload(plan.index_path)
                     continue
+                self._record_retrieval_query(session, plan, top_k)
                 key = (
                     plan.index_path,
-                    self._retrieval_top_k_for(session),
+                    top_k,
                     self._retrieval_score_threshold_for(session),
                 )
                 grouped.setdefault(key, []).append((idx, session, plan))
@@ -1855,6 +1953,7 @@ class OmniAgent(Agent):
 
             rescue_grouped: Dict[Tuple[str, int, Optional[float]], List[Tuple[int, OmniSession, RetrievalSlice]]] = {}
             for idx, session in enumerate(batch):
+                session.last_retrieval_candidate_returned = len(outputs[idx])
                 if session.auto_glossary_enabled:
                     ranked = rank_autoterm_references(outputs[idx], active_domain=session.active_domain)
                 else:
@@ -1865,17 +1964,22 @@ class OmniAgent(Agent):
                 rescue = self._rescue_retrieval_slice(session)
                 if rescue is None or rescue.preset_id in set(session.active_slice_presets):
                     continue
+                rescue_top_k = self._remaining_retrieval_candidate_budget(session)
+                if rescue_top_k <= 0:
+                    continue
                 if session.auto_glossary_enabled and not self.retrieval.is_index_ready(rescue.index_path):
                     self._schedule_index_preload(rescue.index_path)
                     continue
                 session.last_rescue_triggered = True
                 session.last_retrieval_plan.append(rescue.to_meta())
+                self._record_retrieval_query(session, rescue, rescue_top_k)
                 key = (
                     rescue.index_path,
-                    self._retrieval_top_k_for(session),
+                    rescue_top_k,
                     self._retrieval_score_threshold_for(session),
                 )
                 rescue_grouped.setdefault(key, []).append((idx, session, rescue))
+            pre_rescue_counts = [len(items) for items in outputs]
             await self._retrieve_slice_groups(
                 rescue_grouped,
                 end_by_session,
@@ -1883,6 +1987,11 @@ class OmniAgent(Agent):
                 query_embeddings,
                 query_window_embeddings,
             )
+            for idx, session in enumerate(batch):
+                session.last_retrieval_candidate_returned += max(
+                    0,
+                    len(outputs[idx]) - pre_rescue_counts[idx],
+                )
 
         context_scores_by_session = await self._context_similarity_scores_batch(batch)
         for idx, session in enumerate(batch):
@@ -2086,6 +2195,11 @@ class OmniAgent(Agent):
             "fixed_prompt_k": prompt_k,
             "prompt_candidate_shortfall": max(0, prompt_k - len(prompt_refs)),
             "candidate_pool_count": int(session.last_candidate_pool_count or len(references or [])),
+            "retrieval_candidate_budget": max(
+                0,
+                int(self.config.retrieval_candidate_budget),
+            ),
+            "retrieval_candidate_cost": self._retrieval_candidate_cost_meta(session),
             "active_slices": list(session.active_slice_presets),
             "active_slice_terms": dict(session.active_slice_terms),
             "retrieval_plan": list(session.last_retrieval_plan),
@@ -2648,6 +2762,10 @@ class OmniAgent(Agent):
                 "slice_selection_mode": self.config.router_slice_selection_mode,
                 "term_budget": self.config.router_term_budget,
                 "max_active_slices": self.config.router_max_active_slices,
+                "retrieval_candidate_budget": max(
+                    0,
+                    int(self.config.retrieval_candidate_budget),
+                ),
                 "prompt_top_k": self.config.prompt_top_k,
                 "ui_top_k": self.config.ui_top_k,
             },

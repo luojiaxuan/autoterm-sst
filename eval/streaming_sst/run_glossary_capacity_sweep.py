@@ -287,6 +287,8 @@ def server_command(args: argparse.Namespace, *, preset: str, tmp_dir: Path) -> l
         str(args.rag_top_k),
         "--rag-score-threshold",
         str(args.rag_score_threshold),
+        "--retrieval-candidate-budget",
+        str(args.retrieval_candidate_budget),
         "--term-map-format",
         args.term_map_format,
         "--empty-term-map-policy",
@@ -465,6 +467,7 @@ def _manifest_template(args: argparse.Namespace, presets: Sequence[str]) -> dict
             "max_new_tokens": args.max_new_tokens,
             "rag_top_k": args.rag_top_k,
             "rag_score_threshold": args.rag_score_threshold,
+            "retrieval_candidate_budget": args.retrieval_candidate_budget,
             "term_map_format": args.term_map_format,
             "empty_term_map_policy": args.empty_term_map_policy,
             "acl_root": str(args.acl_root),
@@ -740,6 +743,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-new-tokens", type=int, default=40)
     parser.add_argument("--rag-top-k", type=int, default=10)
     parser.add_argument("--rag-score-threshold", type=float, default=0.78)
+    parser.add_argument("--retrieval-candidate-budget", type=int, default=0)
     parser.add_argument(
         "--term-map-format", choices=("plain", "tagged", "xml_tagged"), default="tagged"
     )
@@ -773,6 +777,8 @@ def validate_args(args: argparse.Namespace) -> None:
         raise ValueError("--port and --vllm-tp-size must be positive")
     if args.chunk_samples <= 0 or args.latency_multiplier <= 0 or args.acl_items <= 0:
         raise ValueError("chunk, latency multiplier, and ACL item count must be positive")
+    if args.retrieval_candidate_budget < 0:
+        raise ValueError("--retrieval-candidate-budget must be non-negative")
 
 
 def main(argv: Sequence[str] | None = None) -> int:

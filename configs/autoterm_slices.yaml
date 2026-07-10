@@ -112,6 +112,7 @@ auto_working:
     low_confidence_threshold: 0.35
   retrieval:
     topk_per_slice: 10
+    candidate_budget: 0
     prompt_k: 10
     candidate_score_threshold: 0.78
     use_lexical_match: true

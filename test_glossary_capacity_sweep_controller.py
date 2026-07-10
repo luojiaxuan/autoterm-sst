@@ -81,6 +81,7 @@ def _args(root: Path, *, presets: str = "10k,1m", resume: bool = False) -> argpa
         max_new_tokens=40,
         rag_top_k=10,
         rag_score_threshold=0.78,
+        retrieval_candidate_budget=100,
         term_map_format="tagged",
         empty_term_map_policy="none_block",
         health_timeout_sec=30.0,
@@ -219,6 +220,10 @@ class GlossaryCapacitySweepControllerTest(unittest.TestCase):
         self.assertEqual(
             server[server.index("--extra-python-path") + 1],
             str(args.extra_python_path[0]),
+        )
+        self.assertEqual(
+            server[server.index("--retrieval-candidate-budget") + 1],
+            "100",
         )
         self.assertEqual(client[client.index("--medicine-items") + 1], "0")
         self.assertEqual(client[client.index("--chunk") + 1], "30720")

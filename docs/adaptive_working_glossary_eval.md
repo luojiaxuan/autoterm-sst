@@ -111,6 +111,16 @@ harness fails hard if required runtime fields such as `cursor_samples`,
 `fixed_prompt_k`, or `candidate_pool_count` are missing, because span-aligned
 metrics are meaningless without them.
 
+For fair AutoTerm-versus-merged comparisons, set `retrieval.candidate_budget`
+or the capacity server's `--retrieval-candidate-budget` to the same positive
+value for both systems. A budget of `K` is split deterministically across the
+`M` active slices as `K // M`, with the first `K % M` slices receiving one
+extra candidate; the fixed merged index receives all `K`. The default `0`
+preserves the legacy per-slice top-k behavior. Runtime events report the
+requested and returned candidate counts, index-query count, scored inventory
+size, and per-slice allocation in `retrieval_candidate_cost` before the final
+global prompt top-10.
+
 ```bash
 cd /mnt/taurus/home/jiaxuanluo/rasst-demo
 

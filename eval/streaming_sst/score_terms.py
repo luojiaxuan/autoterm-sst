@@ -340,12 +340,14 @@ async def collect_output(
                     text = strip_tags(o.get("text") or "")
                     parts.append(text)
                     meta = o.get("meta") or {}
+                    cursor_samples = int(meta.get("cursor_samples") or 0)
+                    start_sample = int(meta.get("start_sample") or 0)
                     output_events.append(
                         {
                             "chunk_index": chunks - 1,
                             "text": text,
-                            "cursor_samples": int(meta.get("cursor_samples") or 0),
-                            "start_sample": int(meta.get("start_sample") or 0),
+                            "cursor_samples": cursor_samples,
+                            "start_sample": start_sample,
                         }
                     )
                     prompt_counts.append(int(meta.get("prompt_reference_count") or 0))
@@ -359,6 +361,8 @@ async def collect_output(
                         refs.append((term, translation))
                         event = dict(r)
                         event["chunk_index"] = chunks - 1
+                        event["cursor_samples"] = cursor_samples
+                        event["start_sample"] = start_sample
                         ref_events.append(event)
             await ft
     finally:
@@ -532,6 +536,7 @@ def main() -> None:
     ap.add_argument("--feed-sleep", type=float, default=0.45, help="per-chunk send delay (lower = faster than realtime)")
     ap.add_argument("--save-output-text", action="store_true", help="persist full hypothesis text in --out-json rows for later rescoring audits")
     ap.add_argument("--save-output-events", action="store_true", help="persist chunk text/cursors for aligned-window quality scoring")
+    ap.add_argument("--save-reference-events", action="store_true", help="persist retrieved references with chunk cursors for prompt-precision audits")
     ap.add_argument("--out-json", default="")
     args = ap.parse_args()
 
@@ -593,6 +598,8 @@ def main() -> None:
                 row["output_text"] = res["text"]
             if args.save_output_events:
                 row["output_events"] = res["output_events"]
+            if args.save_reference_events:
+                row["reference_events"] = res["ref_events"]
             row["latency_multiplier"] = res.get("latency_multiplier")
             row["streaming_chunk_samples"] = res.get("chunk_samples")
             row["chunks"] = res["chunks"]

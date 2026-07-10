@@ -67,28 +67,38 @@ This is the beat to hold on screen. If the switch lands late in your take,
 speed the pre-switch stretch 1.5× in edit but show the switch itself at real
 time.
 
-### 1:45–2:05 — Why this is hard / honest framing
-*Screen: point at Router = `hybrid_window_topic`, Confidence value.*
+### 1:45–2:00 — Latency control, live
+*Screen: mid-session, open the Latency dropdown, switch 2x → 1x, click
+Update Session (cheap path — no reinit). Point at the retrieve/gen ms in the
+terms panel.*
 
-> "The router is training-free — a few interpretable signals with hand-set
-> weights, no separate classifier or ASR pass. It only ever puts ten
-> score-filtered terms in the prompt, so a broad glossary never floods the
-> model. And it's conservative: it waits for consistent evidence before
-> switching, which is why there are no false flips."
+> "Latency is a live control: I drop the chunk multiplier from two to one and
+> the session keeps going, now with faster partials. Retrieval stays around
+> eighty milliseconds a chunk, and the prompt never carries more than ten
+> score-filtered terms — a broad glossary can't flood the model."
 
-### 2:05–2:25 — Evidence + breadth
-*Screen: cut to the paper's Figure 3 (ten-talk routing timeline) or Table 1.*
+### 2:00–2:20 — Three languages
+*Screen: split or quick cuts: (1) the En→Ja tab and (2) the En→De tab,
+each already mid-stream on the same combined clip, glossary chip showing
+`medicine_core_10k` / retrieved ja/de term pairs. Keep each ~8s.*
 
-> "Across a ten-talk, four-and-a-half-hour stream this automatic routing beats
-> both fixed single-domain glossaries and matches each domain expert in its own
-> domain — in Chinese, Japanese, and German. Thirty-two concurrent sessions
-> stay real-time."
+> "The same terminology memory serves three target languages — one MaxSim
+> index, per-language translations. Here's the same talk going to Japanese,
+> and to German — same automatic switch, no setup in any of them. Across
+> ten-talk streams, automatic routing beats both fixed single-domain
+> glossaries in all three languages, and thirty-two concurrent sessions stay
+> real-time."
 
-### 2:25–2:30 — Close
-*Screen: back to the live UI, or the repo/live-demo URL card.*
+*(Practical: record the ja/de B-roll from the aries demo hosts — I bring up
+En→Ja and En→De servers with their own tunnel URLs after the eval runs
+finish; ask Claude for the current URLs. If they are not up at recording
+time, substitute the paper's Appendix D table for this beat.)*
 
-> "Zero-setup terminology memory for streaming translation. It's live — try it
-> yourself."
+### 2:20–2:30 — Close
+*Screen: back to the zh live UI, lower-third with the stable URL.*
+
+> "Zero-setup terminology memory for streaming translation — live at this
+> URL. Try it yourself."
 
 ---
 

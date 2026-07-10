@@ -84,6 +84,25 @@
     try { await m.play(); } catch (e) { phase = 'playerr:' + (e && e.name); }
   };
 
+  // Transparent always-on-top hotspot pinned over the latency select, so a
+  // real cursor click there triggers the scripted latency change even when
+  // the translation panel overlaps the settings card.
+  const latHot = document.createElement('div');
+  latHot.style.cssText = 'position:fixed;z-index:2147483647;opacity:0.001;cursor:pointer;display:none';
+  document.body.appendChild(latHot);
+  setInterval(() => {
+    try {
+      const sel = D().getElementById('latencySelect') ||
+        [...D().querySelectorAll('select')].find(x => [...x.options].some(o => /2x/.test(o.textContent)));
+      if (!sel) { latHot.style.display = 'none'; return; }
+      const r = sel.getBoundingClientRect();
+      latHot.style.display = 'block';
+      latHot.style.left = r.x + 'px'; latHot.style.top = r.y + 'px';
+      latHot.style.width = r.width + 'px'; latHot.style.height = r.height + 'px';
+    } catch (e) { latHot.style.display = 'none'; }
+  }, 1000);
+  latHot.onclick = () => document.getElementById('bLat').onclick();
+
   document.getElementById('bLat').onclick = () => {
     phase = 'latency';
     const sel = D().getElementById('latencySelect') ||

@@ -49,8 +49,10 @@ from framework.agents.glossary import (
 from framework.agents.plugins.backends import ModelTemplate, Sampling, build_backend, get_template
 from framework.agents.plugins.prompt import PromptBuilder
 from framework.agents.plugins.retrieval import (
+    IndexRetrievalSpec,
     MaxSimRetrievalPlugin,
     MockRetrieval,
+    MultiIndexRetrievalResult,
     NullRetrieval,
     RetrievalPlugin,
     RetrievalResult,
@@ -280,6 +282,7 @@ class OmniConfig:
     rag_text_lora_r: int = 128
     rag_score_threshold: float = 0.78
     rag_timeline_lookback_sec: float = 1.92
+    rag_index_cache_max_entries: int = 16
 
     auto_glossary_enabled: bool = True
     auto_glossary_base_preset: str = "none"
@@ -811,6 +814,9 @@ class OmniAgent(Agent):
         }
 
     def _schedule_auto_preloads(self) -> None:
+        # note (luojiaxuan): Budgeted routing warms only the slices it selects.
+        if self._budgeted_slice_routing_enabled():
+            return
         catalog = self._catalog(self.config.language_pair)
         for preset in configured_working_presets(self.config.auto_glossary_preload_presets):
             try:
@@ -1093,8 +1099,16 @@ class OmniAgent(Agent):
             return {}
         state = session.router_state
 
+        probe_slices = self._domain_probe_slices(session)
+        if self._budgeted_slice_routing_enabled():
+            # note (luojiaxuan): Keep probe indexes inside the active term budget.
+            probe_slices = [
+                plan
+                for plan in self._active_retrieval_slices(session)
+                if plan.domain not in {GENERAL_DOMAIN, "common", "general"}
+            ]
         candidates: List[RetrievalSlice] = []
-        for plan in self._domain_probe_slices(session):
+        for plan in probe_slices:
             if self.retrieval.is_index_ready(plan.index_path):
                 candidates.append(plan)
             else:
@@ -1267,6 +1281,7 @@ class OmniAgent(Agent):
                     text_lora_rank=self.config.rag_text_lora_r,
                     target_lang=catalog.lang_code,
                     score_threshold=self.config.rag_score_threshold,
+                    max_cached_indexes=self.config.rag_index_cache_max_entries,
                 )
                 await self.retrieval.start()
             except Exception:  # noqa: BLE001 - retrieval is optional; degrade gracefully
@@ -1903,9 +1918,32 @@ class OmniAgent(Agent):
         query_embeddings: List[Any],
         query_window_embeddings: List[Any],
     ) -> None:
+        if not grouped:
+            return
+        request_entries: Dict[int, Dict[str, Any]] = {}
         for (index_path, top_k, score_threshold), indexed_sessions in grouped.items():
-            await self.retrieval.activate_index(index_path)
-            requests = [
+            for original_idx, session, plan in indexed_sessions:
+                entry = request_entries.setdefault(
+                    original_idx,
+                    {"session": session, "specs": [], "plans": {}},
+                )
+                spec_key = f"slice-{len(entry['specs'])}"
+                entry["specs"].append(
+                    IndexRetrievalSpec(
+                        key=spec_key,
+                        index_path=index_path,
+                        top_k=top_k,
+                        score_threshold=score_threshold,
+                    )
+                )
+                entry["plans"][spec_key] = plan
+
+        ordered_entries = list(request_entries.items())
+        requests = []
+        specs_by_request = []
+        for _, entry in ordered_entries:
+            session = entry["session"]
+            requests.append(
                 {
                     "audio_buffer": session.audio[: end_by_session[session.session_id]],
                     "current_start_sec": float(session.last_llm_samples) / TARGET_SAMPLE_RATE,
@@ -1913,25 +1951,28 @@ class OmniAgent(Agent):
                     "lookback_sec": float(self.config.rag_timeline_lookback_sec),
                     "return_query_window_embeddings": bool(session.auto_glossary_enabled),
                 }
-                for _, session, _ in indexed_sessions
-            ]
-            group_results = await self.retrieval.retrieve_with_metadata(
-                requests,
-                top_k=top_k,
-                lookback_sec=self.config.rag_timeline_lookback_sec,
-                score_threshold=score_threshold,
             )
-            for (original_idx, session, plan), result in zip(indexed_sessions, group_results):
-                if not isinstance(result, RetrievalResult):
-                    result = RetrievalResult(references=list(result or []))
-                if query_embeddings[original_idx] is None and result.query_embedding is not None:
-                    query_embeddings[original_idx] = result.query_embedding
-                if (
-                    query_window_embeddings[original_idx] is None
-                    and result.query_window_embeddings is not None
-                ):
-                    query_window_embeddings[original_idx] = result.query_window_embeddings
-                for ref in result.references:
+            specs_by_request.append(entry["specs"])
+
+        group_results = await self.retrieval.retrieve_across_indexes_with_metadata(
+            requests,
+            index_specs_by_request=specs_by_request,
+            lookback_sec=self.config.rag_timeline_lookback_sec,
+        )
+        for (original_idx, entry), result in zip(ordered_entries, group_results):
+            if not isinstance(result, MultiIndexRetrievalResult):
+                raise TypeError("multi-index retrieval returned an invalid result")
+            session = entry["session"]
+            if query_embeddings[original_idx] is None and result.query_embedding is not None:
+                query_embeddings[original_idx] = result.query_embedding
+            if (
+                query_window_embeddings[original_idx] is None
+                and result.query_window_embeddings is not None
+            ):
+                query_window_embeddings[original_idx] = result.query_window_embeddings
+            for spec in entry["specs"]:
+                plan = entry["plans"][spec.key]
+                for ref in result.references_by_key.get(spec.key, []):
                     item = dict(ref)
                     item.setdefault("source_preset", plan.preset_id)
                     item["source_slice"] = plan.slice_id

@@ -29,7 +29,9 @@ from framework.agents.plugins.prompt import (
     parse_glossary_text,
 )
 from framework.agents.plugins.retrieval import (
+    IndexRetrievalSpec,
     MaxSimRetrievalPlugin,
+    MultiIndexRetrievalResult,
     NullRetrieval,
     RetrievalPlugin,
 )
@@ -49,7 +51,9 @@ __all__ = [
     "format_term_map",
     "merge_references",
     "parse_glossary_text",
+    "IndexRetrievalSpec",
     "MaxSimRetrievalPlugin",
+    "MultiIndexRetrievalResult",
     "NullRetrieval",
     "RetrievalPlugin",
 ]

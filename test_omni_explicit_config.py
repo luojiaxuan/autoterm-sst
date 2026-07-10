@@ -123,6 +123,71 @@ class OmniExplicitConfigTest(unittest.TestCase):
 
             self.assertEqual(agent.config.rag_startup_glossary_preset, "capacity_1m")
 
+    def test_capacity_agent_can_enable_explicit_budgeted_autoterm(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = TermMemoryManifest.from_dict(
+                {
+                    "snapshot_id": "budgeted-autoterm",
+                    "scales": {
+                        name: {
+                            "description": f"{name} terminology",
+                            "en-zh": {
+                                "terms_path": f"{name}.json",
+                                "indexes": {"maxsim": f"{name}.pt"},
+                                "num_terms": 10_000,
+                            },
+                        }
+                        for name in ("nlp_core_10k", "medicine_core_10k")
+                    },
+                },
+                base_dir=root,
+                path=str(root / "manifest.json"),
+            )
+            args = SimpleNamespace(
+                model_path=root / "model",
+                rag_model_path=root / "retriever.pt",
+                rag_device="cuda:0",
+                vllm_tp_size=1,
+                gpu_memory_utilization=0.6,
+                max_num_seqs=8,
+                max_model_len=16384,
+                enable_prefix_caching=1,
+                vllm_enforce_eager=1,
+                vllm_limit_audio=16,
+                disable_custom_all_reduce=1,
+                scheduler_batch_size=8,
+                max_inflight_batches=2,
+                max_new_tokens=40,
+                term_map_format="tagged",
+                empty_term_map_policy="none_block",
+                rag_top_k=10,
+                rag_score_threshold=0.78,
+                retrieval_candidate_budget=100,
+                autoterm_policy="budgeted_top_slices",
+                autoterm_default_preset="nlp_core_10k",
+                autoterm_term_budget=20_000,
+                autoterm_max_active_slices=2,
+                autoterm_context_window_chunks=12,
+                tmp_dir=root / "tmp",
+            )
+
+            agent = build_agent(
+                args,
+                manifest,
+                ["nlp_core_10k", "medicine_core_10k"],
+            )
+
+            self.assertTrue(agent.config.auto_glossary_enabled)
+            self.assertEqual(agent.config.router_slice_selection_mode, "budgeted_top_slices")
+            self.assertEqual(agent.config.router_term_budget, 20_000)
+            self.assertEqual(agent.config.router_max_active_slices, 2)
+            self.assertEqual(agent.config.retrieval_candidate_budget, 100)
+            self.assertEqual(
+                agent.config.auto_glossary_presets,
+                "nlp_core_10k,medicine_core_10k",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

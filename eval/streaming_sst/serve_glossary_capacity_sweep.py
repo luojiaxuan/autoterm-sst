@@ -65,6 +65,26 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--rag-top-k", type=int, default=10)
     parser.add_argument("--rag-score-threshold", type=float, default=0.78)
     parser.add_argument("--retrieval-candidate-budget", type=int, default=0)
+    parser.add_argument(
+        "--autoterm-policy",
+        choices=("fixed", "hard_top1", "budgeted_top_slices"),
+        default="fixed",
+    )
+    parser.add_argument("--autoterm-default-preset", default="")
+    parser.add_argument("--autoterm-term-budget", type=int, default=100000)
+    parser.add_argument("--autoterm-max-active-slices", type=int, default=0)
+    parser.add_argument("--autoterm-context-window-chunks", type=int, default=12)
+    parser.add_argument("--autoterm-context-model", default="BAAI/bge-m3")
+    parser.add_argument("--autoterm-context-device", default="cpu")
+    parser.add_argument("--autoterm-context-weight", type=float, default=0.80)
+    parser.add_argument("--autoterm-text-weight", type=float, default=0.10)
+    parser.add_argument("--autoterm-domain-probe-weight", type=float, default=0.07)
+    parser.add_argument("--autoterm-speech-weight", type=float, default=0.02)
+    parser.add_argument("--autoterm-metadata-weight", type=float, default=0.01)
+    parser.add_argument("--autoterm-ema-alpha", type=float, default=0.80)
+    parser.add_argument("--autoterm-update-sec", type=float, default=5.0)
+    parser.add_argument("--autoterm-warmup-sec", type=float, default=6.0)
+    parser.add_argument("--autoterm-cooldown-sec", type=float, default=30.0)
     parser.add_argument("--term-map-format", choices=("plain", "tagged", "xml_tagged"), default="tagged")
     parser.add_argument("--empty-term-map-policy", default="none_block")
     parser.add_argument("--tmp-dir", type=Path, required=True)
@@ -105,6 +125,12 @@ def configure_vllm_runtime(args: argparse.Namespace) -> None:
 def validate_inputs(args: argparse.Namespace, manifest: TermMemoryManifest) -> list[str]:
     if args.retrieval_candidate_budget < 0:
         raise ValueError("--retrieval-candidate-budget must be non-negative")
+    if args.autoterm_term_budget <= 0:
+        raise ValueError("--autoterm-term-budget must be positive")
+    if args.autoterm_max_active_slices < 0:
+        raise ValueError("--autoterm-max-active-slices must be non-negative")
+    if args.autoterm_context_window_chunks <= 0:
+        raise ValueError("--autoterm-context-window-chunks must be positive")
     for path in (args.model_path, args.rag_model_path):
         if not path.exists():
             raise FileNotFoundError(path)
@@ -119,6 +145,9 @@ def validate_inputs(args: argparse.Namespace, manifest: TermMemoryManifest) -> l
         for path in (snapshot.terms_path, snapshot.index_path("maxsim")):
             if not path or not Path(path).is_file():
                 raise FileNotFoundError(f"{preset}: {path}")
+    default_preset = str(args.autoterm_default_preset or presets[0])
+    if args.autoterm_policy != "fixed" and default_preset not in presets:
+        raise ValueError("--autoterm-default-preset must be included in --required-presets")
     return presets
 
 
@@ -128,6 +157,9 @@ def build_agent(
     presets: Sequence[str],
 ) -> OmniAgent:
     template = get_template("qwen3_omni")
+    autoterm_policy = str(getattr(args, "autoterm_policy", "fixed"))
+    autoterm_enabled = autoterm_policy != "fixed"
+    default_preset = str(getattr(args, "autoterm_default_preset", "") or presets[0])
     config = OmniConfig(
         language_pair="English -> Chinese",
         vllm_model_path=str(args.model_path),
@@ -150,14 +182,54 @@ def build_agent(
         rag_device=args.rag_device,
         rag_top_k=args.rag_top_k,
         rag_score_threshold=args.rag_score_threshold,
-        rag_startup_glossary_preset=presets[0],
+        rag_startup_glossary_preset=default_preset,
         retrieval_candidate_budget=max(
             0,
             int(getattr(args, "retrieval_candidate_budget", 0)),
         ),
-        auto_glossary_enabled=False,
+        auto_glossary_enabled=autoterm_enabled,
+        auto_glossary_default_preset=default_preset,
+        auto_glossary_presets=",".join(presets),
+        auto_glossary_update_sec=float(getattr(args, "autoterm_update_sec", 5.0)),
+        auto_glossary_warmup_sec=float(getattr(args, "autoterm_warmup_sec", 6.0)),
+        auto_glossary_switch_cooldown_sec=float(
+            getattr(args, "autoterm_cooldown_sec", 30.0)
+        ),
         auto_glossary_preload=False,
-        router_context_similarity_enabled=False,
+        auto_glossary_preload_presets="",
+        router_context_similarity_enabled=autoterm_enabled,
+        router_context_similarity_model=str(
+            getattr(args, "autoterm_context_model", "BAAI/bge-m3")
+        ),
+        router_context_similarity_device=str(
+            getattr(args, "autoterm_context_device", "cpu")
+        ),
+        router_context_similarity_weight=float(
+            getattr(args, "autoterm_context_weight", 0.80)
+        ),
+        router_text_topic_weight=float(getattr(args, "autoterm_text_weight", 0.10)),
+        router_domain_probe_weight=float(
+            getattr(args, "autoterm_domain_probe_weight", 0.07)
+        ),
+        router_speech_centroid_weight=float(
+            getattr(args, "autoterm_speech_weight", 0.02)
+        ),
+        router_metadata_prior_weight=float(
+            getattr(args, "autoterm_metadata_weight", 0.01)
+        ),
+        router_ema_alpha=float(getattr(args, "autoterm_ema_alpha", 0.80)),
+        router_generated_target_window_chunks=int(
+            getattr(args, "autoterm_context_window_chunks", 12)
+        ),
+        router_slice_selection_mode=(
+            autoterm_policy if autoterm_enabled else "hard_top1"
+        ),
+        router_term_budget=int(getattr(args, "autoterm_term_budget", 100000)),
+        router_max_active_slices=int(
+            getattr(args, "autoterm_max_active_slices", 0)
+        ),
+        autoterm_candidate_score_threshold=args.rag_score_threshold,
+        autoterm_enable_open_rescue=False,
         tmp_dir=str(args.tmp_dir),
     )
     return OmniAgent(name="RASST", model_id="qwen3_omni", config=config, manifest=manifest)

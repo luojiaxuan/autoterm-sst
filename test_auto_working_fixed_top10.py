@@ -29,6 +29,25 @@ from framework.agents.term_memory.topic_router import (
 
 
 class AutoWorkingFixedTop10Tests(unittest.TestCase):
+    def test_empty_translation_status_acknowledges_the_stream_cursor(self) -> None:
+        events = []
+        agent = OmniAgent()
+        agent._emit = events.append
+        session = SimpleNamespace(session_id="empty-output", segment_idx=7)
+
+        agent._emit_cursor_status(
+            session,
+            text="EMPTY_TRANSLATION",
+            start_sample=10,
+            cursor_samples=20,
+        )
+
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].type, "status")
+        self.assertEqual(events[0].text, "EMPTY_TRANSLATION")
+        self.assertEqual(events[0].meta["start_sample"], 10)
+        self.assertEqual(events[0].meta["cursor_samples"], 20)
+
     def test_autoterm_yaml_hysteresis_defaults_reach_omni_config(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             config = OmniConfig.from_env(get_template("qwen3_omni"))

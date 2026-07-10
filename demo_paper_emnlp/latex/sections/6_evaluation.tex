@@ -12,7 +12,7 @@ translated text, retrieved references, active glossary metadata, and per-chunk
 retrieval latency. A latency multiplier of 2 corresponds to 1.92s input chunks.
 We report three complementary terminology-memory evaluations --- a controlled
 mixed-domain terminology comparison, a warm-retrieval scale sweep, and a
-mixed-domain routing probe --- alongside single-session real-time serving.
+mixed-domain routing probe --- alongside real-time serving under concurrent load.
 
 \paragraph{Metrics.}
 For terminology quality, term accuracy is the fraction of annotated target-term
@@ -101,8 +101,8 @@ Inverted- and contested-probe controls expose the expected wrong-switch and
 delayed-switch failure modes. These proxies are separate from the preceding
 end-to-end audio runs.
 
-\paragraph{Serving.}
-A single live session sustains the 1.92s real-time input rate (median
-first-output latency 0.35s; warm per-chunk retrieval 60--105\,ms). Multiple
-sessions are served concurrently through vLLM's batched inference, used off
-the shelf.
+\paragraph{Concurrent serving.}
+A single live session runs in real time (median first-output latency 0.35s).
+With vLLM continuous batching on 2$\times$A6000 (TP=2), 32 concurrent sessions
+stay real-time: 95th-percentile per-segment latency holds near 0.82s
+(8--32 sessions), below the 1.92s stride.

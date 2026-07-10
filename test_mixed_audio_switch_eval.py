@@ -15,6 +15,7 @@ import numpy as np
 from eval.streaming_sst.eval_mixed_audio_switch import (
     TARGET_SAMPLE_RATE,
     AudioBlock,
+    CursorBackpressure,
     build_schedule,
     build_spans,
     domain_transitions,
@@ -39,6 +40,58 @@ def _write_wav(path: Path, frames: int) -> None:
 
 
 class MixedAudioSwitchEvalTests(unittest.TestCase):
+    def test_cursor_backpressure_waits_for_status_or_partial_cursor(self) -> None:
+        async def scenario():
+            pacing = CursorBackpressure(
+                chunk_samples=16,
+                max_unacked_chunks=1,
+                stall_timeout_sec=1.0,
+            )
+            pacing.record_sent(16)
+            waiting = asyncio.create_task(pacing.wait_to_send(16))
+            await asyncio.sleep(0)
+            self.assertFalse(waiting.done())
+
+            await pacing.observe_event("status", {"cursor_samples": 16})
+            self.assertFalse(await waiting)
+            pacing.record_sent(16)
+            await pacing.observe_event("partial", {"cursor_samples": 32})
+            return pacing.snapshot()
+
+        stats = asyncio.run(scenario())
+
+        self.assertEqual(stats["sent_samples"], 32)
+        self.assertEqual(stats["acknowledged_cursor_samples"], 32)
+        self.assertEqual(stats["wait_count"], 1)
+        self.assertEqual(stats["status_cursor_event_count"], 1)
+        self.assertEqual(stats["partial_cursor_event_count"], 1)
+        self.assertEqual(stats["timeout_release_count"], 0)
+        self.assertLessEqual(stats["max_observed_unacked_chunks"], 1.0)
+
+    def test_cursor_backpressure_silence_timeout_releases_only_one_chunk(self) -> None:
+        async def scenario():
+            pacing = CursorBackpressure(
+                chunk_samples=16,
+                max_unacked_chunks=1,
+                stall_timeout_sec=0.01,
+            )
+            pacing.record_sent(16)
+            first_released = await pacing.wait_to_send(16)
+            pacing.record_sent(16, timeout_released=first_released)
+            second_waiting = asyncio.create_task(pacing.wait_to_send(16))
+            await asyncio.sleep(0)
+            self.assertFalse(second_waiting.done())
+            await pacing.observe_event("status", {"cursor_samples": 32})
+            second_released = await second_waiting
+            pacing.record_sent(16, timeout_released=second_released)
+            return pacing.snapshot()
+
+        stats = asyncio.run(scenario())
+
+        self.assertEqual(stats["wait_count"], 2)
+        self.assertEqual(stats["timeout_release_count"], 1)
+        self.assertEqual(stats["timeout_release_samples"], 16)
+
     def test_resolve_max_switch_events_from_seconds(self) -> None:
         chunk_samples = int(1.92 * TARGET_SAMPLE_RATE)
 
@@ -359,6 +412,9 @@ class MixedAudioSwitchEvalTests(unittest.TestCase):
 
         self.assertEqual(len(payload["records"]), 1)
         self.assertEqual(payload["records"][0]["active_domain"], "nlp")
+        self.assertFalse(payload["pacing"]["enabled"])
+        self.assertEqual(payload["pacing"]["sent_samples"], 16)
+        self.assertEqual(payload["pacing"]["partial_cursor_event_count"], 1)
         self.assertEqual(fake_ws.sent[-1], "EOF")
 
 

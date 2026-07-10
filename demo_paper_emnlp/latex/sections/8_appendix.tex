@@ -14,6 +14,16 @@ current slice. The released configuration uses two consistent generated-target
 windows and a 0.30 target-vs-current margin; the two 640-window proxy tests in
 Section~\ref{sec:evaluation} used three generated-target windows.
 
+The weights are hand-set on the proxy schedules, not fitted to the audio
+evaluation runs. A proxy weight sweep (\(\lambda_t\) from 0.25 to 0.80,
+including dropping the centroid and metadata terms) leaves switching
+unchanged: every mixed-signal configuration completes all 16
+alternating/random transitions with zero wrong switches, at a latency fixed
+by the three-window consistency guard. Setting \(\lambda_t{=}1\) (no probe
+channel) blocks most switches (1/9 and 2/7), so the speech probe is a
+required corroborating guard even though it is too noisy to lead
+(Section~\ref{sec:evaluation}).
+
 \begin{table}[ht]
 \centering
 \small

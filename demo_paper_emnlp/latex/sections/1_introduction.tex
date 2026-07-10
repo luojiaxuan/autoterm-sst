@@ -12,17 +12,22 @@ that are difficult to infer from local acoustic context alone.
 
 Glossaries are a practical way to control terminology, but they are awkward for
 live use. A user may not know the exact topic before a talk starts, and asking
-every speaker or viewer to upload a domain glossary creates friction. A naive
-alternative retrieves from a broad open memory of hundreds of thousands of
-terms. AutoTerm-SST injects at most 10 score-filtered glossary references into
-each prompt; the systems problem is therefore to select a compact active
-inventory and rank useful terms within this cap.
+every speaker or viewer to upload a domain glossary or select a domain creates
+friction. At deployment time, operators register modular, pre-indexed
+terminology resources for different domains. At session time, users neither
+upload a glossary nor select a domain: AutoTerm-SST selects the active resource
+from streaming evidence and injects at most 10 retrieved terms into each LLM
+prompt. This allows new domains to be added without retraining the translation
+model or collapsing all terminology resources into a single monolithic
+inventory.
 
 AutoTerm-SST treats terminology control as an active-inventory and ranking
-problem. Automatic mode starts from a deployment-configured default slice,
-without asking the user to identify the domain, and a training-free router
-switches among domain slices when streaming evidence is strong. Broad open
-memory is used only as an optional low-confidence fallback pool.
+problem. Its motivation is not that million-term retrieval is computationally
+infeasible, but that modular domain resources are easier to maintain, update,
+attribute, and keep relevant under a fixed prompt-evidence budget. Automatic
+mode starts from a deployment-configured default slice, and a training-free
+router switches among domain slices when streaming evidence is strong. Broad
+open memory is used only as an optional low-confidence fallback pool.
 
 The result is an interactive streaming SST workbench rather than a new
 translation model. The framework handles REST/WebSocket transport, session
@@ -37,9 +42,10 @@ Our contributions are:
     \item We build AutoTerm-SST, a pluggable streaming SST demo with a live
     evidence panel for retrieved terminology, active glossary state, router
     decisions, and latency.
-    \item We introduce an adaptive terminology strategy that requires no
-    user-provided glossary, routes among domain-specific slices, and sends at
-    most 10 score-filtered candidates to the prompt.
+    \item We introduce zero session-time terminology setup: users neither
+    upload a glossary nor select a domain, while a training-free router selects
+    among prebuilt domain slices and sends at most 10 score-filtered candidates
+    to the prompt.
     \item We evaluate terminology recall, retrieval latency and scale up to
     million-term memories, mixed-domain routing, and 32-session concurrent
     streaming.

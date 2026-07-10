@@ -1,21 +1,23 @@
 \begin{abstract}
 We present AutoTerm-SST, an interactive system for terminology-aware streaming
 speech translation. Live domain talks contain rare entities and technical
-terms, yet requiring users to prepare a glossary before a session creates
-substantial friction. AutoTerm-SST removes this per-session glossary-setup step
-by routing among domain slices built offline: each streaming chunk injects at
-most 10 score-filtered glossary references into the prompt, normally drawn from
-a compact active slice, and a training-free router selects the active domain.
+terms, yet requiring users to prepare a glossary or select a domain before a
+session creates substantial friction. AutoTerm-SST provides zero session-time
+terminology setup by routing among domain slices registered offline: each
+streaming chunk injects at most 10 score-filtered glossary references into the
+prompt, normally drawn from a compact active slice, and a training-free router
+selects the active domain.
 The router combines
 generated target-translation topic evidence, speech-window domain probes,
 speech-centroid evidence, and retrieved-term metadata, without running a
 separate ASR or source-transcript classifier in the production path. The demo
 exposes retrieved terms, active slices, router decisions, and retrieval
 latency in a live evidence panel.
-Under benchmark-aligned mixed-domain inventories, automatic mode reaches 0.916
-combined term accuracy, compared with 0.839 and 0.825 for fixed NLP and medicine
+On a ten-talk alternating ACL/medicine stream, automatic mode reaches 0.936
+combined term accuracy, compared with 0.744 and 0.901 for fixed NLP and medicine
 inventories. Scale probes show warm MaxSim retrieval stays near 60--105 ms
-(p50--p95) for memories of up to one million terms, and an end-to-end routing
-probe tracks all three ACL/medicine transitions without a wrong switch. The
-released implementation supports both mock and live-GPU modes.
+(p50--p95) for memories of up to one million terms. Across the ten-talk stream,
+all nine domain transitions switch in the correct direction, with one
+self-correcting transient. The released implementation supports both mock and
+live-GPU modes.
 \end{abstract}

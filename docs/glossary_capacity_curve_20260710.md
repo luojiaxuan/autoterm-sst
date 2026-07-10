@@ -12,7 +12,7 @@ topic-union catalog 将在 capacity crossover 确认后独立构建和审计。
 ## Frozen protocol
 
 - Audio：5 个 ACL talks，固定顺序
-  `268 → 367 → 590 → 110 → 117`，总计 468 segments / 3,441.718s。
+  `268 → 367 → 590 → 110 → 117`，总计 468 segments / 3,107.332s。
 - Target language：English → Chinese。
 - Glossaries：严格前缀嵌套的
   `acl_tagged_gs10k/100k/500k/1m`；每档前 238 entries 完全相同。
@@ -39,10 +39,13 @@ Headline：
    decoder tick 不进入分母。四档另保存 `(start_sample, cursor_samples)` signature，
    用于检查 glossary latency 是否改变 chunk coalescing。
 4. BLEU、technical-masked BLEU、raw-masked BLEU。
-5. 约 15s aligned-window xCOMET-lite；30s 只作 segmentation sensitivity。
 
 同时保留 corpus-gold retrieval precision（reference key 是否属于全局 ACL gold
 inventory），但它只作较弱的诊断指标，不冒充 time-local Prompt Precision。
+
+xCOMET-lite 不作为本轮 headline 或完成条件。其约 15s aligned-window 评分仅保留为
+后续可选的质量补充，等四档主指标完整且确有必要时再运行；30s 版本只作
+segmentation sensitivity。
 
 ## Budget-aware router implementation
 
@@ -89,7 +92,7 @@ segments.meta.jsonl   b8c911aab3cde27190e331f7769b353aecff2ff856ffa2fa31a2a04261
 
 ## Artifact status
 
-Hyper00 active run（2026-07-10）：
+Hyper00 paused staging（2026-07-10）：
 
 ```text
 /data02/jaxan/autoterm-capacity-zh-20260710/
@@ -101,16 +104,77 @@ Hyper00 active run（2026-07-10）：
 - Smoke：`outputs/smoke-10k` 已完成 60.0s / 28 emitted events，health 显示
   `active_terms=10000`，`tail_gap_samples=0`，保存的 112 条 prompt references 与
   `prompt_reference_count` 完全一致。
-- Full run：`outputs/full-zh` 正在运行；GPU 2 执行 10k -> 1M，GPU 3 执行
-  100k -> 500k。每档完成后 server 会重启，并由 health gate 检查精确 term count。
+- Full run：按用户要求已暂停并释放 GPU。`outputs/full-zh` 的 10k / 100k
+  controller 分别在 1,172 / 1,171 batches 时收到 SIGTERM；
+  `run_manifest_{a,b}.json` 明确记录
+  `TerminationRequested: received signal 15`。由于 raw run JSON 只在一个 preset
+  完整结束后原子写入，当前 `runs_{a,b}.json` 均为空，不能把 partial server log
+  当成正式 metric 输入。两个 server log、完整启动命令和 exact expected term count
+  均已保留；500k / 1M 尚未启动。
+- Cleanup：`sglang-omni-jaxan-07110219` / `07110220` 已删除，GPU 2/3 回到
+  4 MiB；Hyper00 没有遗留本项目的 GPU container。
 - xCOMET-lite staging：`/data02/jaxan/floras_qe_eval/`，NL2G code commit
   `e21e291b2a09a5a854c55b0c01c53ab580692beb`，model revision
   `8d628ebffb4e3f20f53f52f9570d19dee38b9b9a`。Hyper runtime 显式固定
-  `huggingface_hub==0.36.0`、`transformers==4.57.1`；在无 GPU、
-  `local_files_only=True` 条件下已成功载入 283,731,987 参数，正式评分不需要网络。
+  `huggingface_hub==0.36.0`、`transformers==4.57.1`，CPU checkpoint load 已通过。
+  xCOMET 评分按用户要求延期；额外的 `--network none` 检查发现上游
+  DeBERTa encoder 仍会尝试 Hub HEAD request，因此当前不能声称 fully offline，
+  后续运行前应显式传 local encoder snapshot 或启用 upstream offline mode。
 - 一个共享机 failure mode：首次 preflight 后 GPU 0/1 被已有的他人容器恢复任务
   抢占，两个 server 在 health 前因显存不足失败；失败输出隔离在 `outputs/full`，
   不进入正式结果。重新 preflight 后正式任务使用 GPU 2/3。
+
+### Restart note
+
+以后重跑时先重新执行 GPU preflight，再复用
+`run_manifest_{a,b}.json` 中保存的 controller 参数。Partial preset 不能续接，必须从
+音频开头重跑；建议使用新的 `outputs/full-zh-rerun-<date>/` 和对应 tmp 目录，避免
+把新日志 append 到本次暂停日志。等某一 preset 完整写出并通过 validator 后，才可用
+`--resume` 跳过该 completed preset。
+
+### B200 completed exploratory run（2026-07-10）
+
+另一条 B200 exploratory run 已完整落盘，但尚未计算任何质量指标：
+
+```text
+/data02/jaxan/autoterm-capacity-sweep-20260710/run/
+```
+
+- Host / compute：`b200`（`innomatrix-us-adc-smb200-0003`），GPU 0，单卡 TP=1；
+  container `sglang-omni-jaxan-07101717`。四个 client 同时串流同一 playlist，分别固定
+  `acl_tagged_gs10k/100k/500k/1m`。
+- Runtime code：`explore/multidomain-routing` at
+  `5a1df512cf7e4c3dcc42b0c017e1051380aff3da`。该 exploratory run 复用一个 server，
+  四个 session 各自绑定独立 MaxSim index；它与上面的 frozen final protocol“每档重启
+  server”不同，不能把两者混写成同一个 run。
+- Streaming：`chunk_samples=30,720`、`chunk_seconds=1.92`、
+  `feed_sleep=1.6`、latency multiplier 2、top-k 10、threshold 0.78；5 个 talk
+  实际总长 3,107.332s。所有 run 使用同一 block/span playlist，playlist signature
+  SHA-256 为
+  `4280ffe8fd4d703b0cbeb0d041dd428091d3c68197f31457c4f9ae4bfeb8e9a4`。
+- Completion：四个 session 均正常删除后，guard 看到四个 JSON 已落盘并停止 container
+  释放 GPU。Container 的最终 `Exited (137)` 来自完成后的强制收尾，不是生成中 OOM；
+  server 的 1,724 个 batches 中 `generation_ok != batch_size` 为 0。
+
+| scale | events | prompt refs | refs/event | last cursor / span end | JSON SHA-256 |
+|---|---:|---:|---:|---:|---|
+| 10k | 1,221 | 4,580 | 3.751 | 49,704,960 / 49,717,305 | `dc694f5c28ee7dfe2c43e55f80248e2f825698618737a92bfe8b74db9580f90f` |
+| 100k | 1,213 | 7,445 | 6.138 | 49,704,960 / 49,717,305 | `a2d1aac1b8bff6f115ac2a142442e5200e46856957abfcf2a029c451f026b18a` |
+| 500k | 1,214 | 10,825 | 8.917 | 49,704,960 / 49,717,305 | `219122263a9c4d0db66237730c698847ae57b96fa642eec29e154c2f09e6296a` |
+| 1M | 1,214 | 11,603 | 9.558 | 49,704,960 / 49,717,305 | `081e45725d3a78bd20cad944ac1a628a1874523c738438f3b69989a31f782199` |
+
+四档的 `event_count == len(records)`、cursor/start 均单调、完整 prompt reference capture
+的 mismatch chunks 均为 0；尾部 gap 为 12,345 samples，小于一个 30,720-sample
+chunk。并行 continuous batching 导致 event timing signatures 不完全相同，事件数最大
+相差 8（0.66%）；后续不得把 event index 当作配对样本，应使用按 source-audio time
+对齐的窗口 scorer。当前状态严格为 `complete_unscored`：尚未运行 TERM_ACC、BLEU、
+masked BLEU、Prompt Precision 或 xCOMET。
+
+Git 中的轻量完整性清单为
+`runtime/eval_20260621/glossary_capacity_full_acl_20260710_integrity.json`。Raw JSON 与完整
+reference events 仍只在上述 B200 staging，Hugging Face dataset repo / revision 为
+`pending / TBD`；在上传前不能把本地路径当作 canonical artifact。四个 `full_acl_*.log`
+与对应 JSON byte-identical，只是 stdout duplicate，不是独立数据版本。
 
 Taurus local staging：
 

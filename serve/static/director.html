@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DIR|boot</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;background:#0b1020;overflow:hidden}
+  #strip{position:fixed;top:0;left:0;right:0;height:44px;display:flex;gap:2px;z-index:10}
+  #strip button{flex:1;font:600 13px -apple-system,sans-serif;border:none;cursor:pointer;
+    background:#1b2438;color:#9fb3d9}
+  #strip button:disabled{opacity:.35}
+  #frame{position:fixed;top:44px;left:0;width:100%;height:calc(100% - 44px);border:none}
+</style>
+</head>
+<body>
+<div id="strip">
+  <button id="bLoad">1 LOAD SAMPLE</button>
+  <button id="bPlay">2 PLAY</button>
+  <button id="bLat">3 LATENCY 1x</button>
+  <button id="bReset">RESET</button>
+</div>
+<iframe id="frame" src="/"></iframe>
+<script>
+(() => {
+  const frame = document.getElementById('frame');
+  const D = () => frame.contentDocument;
+  const W = () => frame.contentWindow;
+  const media = () => D() && D().querySelector('#mediaContainer audio, #mediaContainer video, audio, video');
+  let phase = 'boot';
+
+  const byLabel = lbl => {
+    try {
+      const el = [...D().querySelectorAll('*')].find(e => e.children.length === 0 && e.textContent.trim() === lbl);
+      return el ? el.parentElement.textContent.replace(lbl, '').trim() : null;
+    } catch (e) { return null; }
+  };
+
+  // Telemetry via title: readable from AppleScript without any JS permission.
+  setInterval(() => {
+    const m = media();
+    const st = {
+      p: phase,
+      rs: m ? m.readyState : -1,
+      t: m ? +m.currentTime.toFixed(1) : -1,
+      gl: (byLabel('Active Glossary') || '').slice(0, 24),
+      sw: byLabel('Switch Count') || '',
+      status: (() => { try { return (D().getElementById('statusText') || {}).textContent?.trim().slice(0, 40) || ''; } catch (e) { return ''; } })()
+    };
+    document.title = 'DIR|' + JSON.stringify(st);
+  }, 1000);
+
+  document.getElementById('bLoad').onclick = () => {
+    phase = 'loading';
+    D().querySelector('.sample-btn-primary').click();
+  };
+
+  document.getElementById('bPlay').onclick = async () => {
+    phase = 'waitbuf';
+    const m = media();
+    for (let i = 0; i < 120; i++) {
+      if (m && m.readyState >= 2 && m.duration > 0) break;
+      await new Promise(r => setTimeout(r, 500));
+    }
+    phase = 'playing';
+    try { await m.play(); } catch (e) { phase = 'playerr:' + (e && e.name); }
+  };
+
+  document.getElementById('bLat').onclick = () => {
+    phase = 'latency';
+    const sel = D().getElementById('latencySelect') ||
+      [...D().querySelectorAll('select')].find(s => [...s.options].some(o => /1x/i.test(o.textContent)));
+    if (!sel) { phase = 'lat:noselect'; return; }
+    const opt = [...sel.options].find(o => /1x/i.test(o.textContent));
+    sel.value = opt.value;
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    const btn = [...D().querySelectorAll('button')].find(b => /update session/i.test(b.textContent));
+    if (btn) btn.click();
+    phase = 'lat:done';
+  };
+
+  document.getElementById('bReset').onclick = () => { W().location.reload(); phase = 'reset'; };
+})();
+</script>
+</body>
+</html>

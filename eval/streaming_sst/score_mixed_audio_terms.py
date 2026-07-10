@@ -193,7 +193,7 @@ class GoldOccurrence:
 
 
 def load_gold_entries(path: str, *, target_lang: str = "zh") -> List[tuple[str, List[str]]]:
-    data = json.load(open(path, encoding="utf-8"))
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
     entries = data.values() if isinstance(data, dict) else data
     out: List[tuple[str, List[str]]] = []
     for item in entries:
@@ -262,7 +262,11 @@ def selected_acl_lines(
 ) -> str:
     remaining = int(span["sample_count"])
     selected: List[str] = []
-    for wav_path in block.get("wav_paths") or []:
+    wav_paths = list(block.get("wav_paths") or [])
+    wav_ranges = list(block.get("wav_ranges") or [])
+    if wav_ranges and len(wav_ranges) != len(wav_paths):
+        raise ValueError("ACL block wav_ranges does not match wav_paths")
+    for path_index, wav_path in enumerate(wav_paths):
         if remaining <= 0:
             break
         meta = by_wav.get(str(wav_path))
@@ -271,7 +275,17 @@ def selected_acl_lines(
         idx = int(meta.get("index") or meta.get("orig_index") or 0)
         if 0 <= idx < len(lines):
             selected.append(lines[idx])
-        remaining -= int(round(float(meta.get("seg_duration") or meta.get("duration") or 0.0) * TARGET_SAMPLE_RATE))
+        if wav_ranges:
+            range_start, range_end = wav_ranges[path_index]
+            selected_samples = int(range_end) - int(range_start)
+        else:
+            selected_samples = int(
+                round(
+                    float(meta.get("seg_duration") or meta.get("duration") or 0.0)
+                    * TARGET_SAMPLE_RATE
+                )
+            )
+        remaining -= selected_samples
     return "\n".join(selected)
 
 
@@ -291,7 +305,7 @@ def acl_occurrences(
             out.append(
                 GoldOccurrence(
                     domain="nlp",
-                    item_id=str(block["item_id"]),
+                    item_id=str(block.get("original_item_id") or block["item_id"]),
                     block_index=int(span["block_index"]),
                     term=term,
                     variants=list(variants),
@@ -302,13 +316,21 @@ def acl_occurrences(
 
 
 def medicine_occurrences(block: Dict[str, Any], span: Dict[str, Any], *, oracle_dir: str) -> List[GoldOccurrence]:
-    medicine_id = str(block["item_id"]).removeprefix("medicine_")
+    original_item_id = str(block.get("original_item_id") or block["item_id"])
+    medicine_id = original_item_id.removeprefix("medicine_")
     oracle_path = Path(oracle_dir) / f"hard_medicine.oracle_term_map__medicine_{medicine_id}.json"
-    rows = json.load(open(oracle_path, encoding="utf-8"))
-    duration_s = float(span["sample_count"]) / TARGET_SAMPLE_RATE
+    rows = json.loads(oracle_path.read_text(encoding="utf-8"))
+    source_offset_s = int(block.get("source_offset_samples") or 0) / TARGET_SAMPLE_RATE
+    raw_source_end = int(block.get("source_end_samples") or 0)
+    source_end_s = (
+        raw_source_end / TARGET_SAMPLE_RATE
+        if raw_source_end
+        else source_offset_s + float(span["sample_count"]) / TARGET_SAMPLE_RATE
+    )
     out: List[GoldOccurrence] = []
     for row in rows:
-        if float(row.get("start_sec") or 0.0) >= duration_s:
+        row_start = float(row.get("start_sec") or 0.0)
+        if row_start < source_offset_s or row_start >= source_end_s:
             continue
         for ref in row.get("references") or []:
             term = normalise_space(ref.get("term") or "")
@@ -317,7 +339,7 @@ def medicine_occurrences(block: Dict[str, Any], span: Dict[str, Any], *, oracle_
                 out.append(
                     GoldOccurrence(
                         domain="medicine",
-                        item_id=str(block["item_id"]),
+                        item_id=original_item_id,
                         block_index=int(span["block_index"]),
                         term=term,
                         variants=[translation],
@@ -327,10 +349,47 @@ def medicine_occurrences(block: Dict[str, Any], span: Dict[str, Any], *, oracle_
     return out
 
 
-def medicine_reference_text(block: Dict[str, Any], *, medicine_input_dir: str, target_lang: str) -> str:
-    medicine_id = str(block["item_id"]).removeprefix("medicine_")
+def medicine_reference_text(
+    block: Dict[str, Any],
+    span: Dict[str, Any],
+    *,
+    medicine_input_dir: str,
+    target_lang: str,
+) -> str:
+    original_item_id = str(block.get("original_item_id") or block["item_id"])
+    medicine_id = original_item_id.removeprefix("medicine_")
     ref_path = Path(medicine_input_dir) / f"medicine.ref.{target_lang}__medicine_{medicine_id}.txt"
-    return ref_path.read_text(encoding="utf-8")
+    raw_reference = ref_path.read_text(encoding="utf-8")
+    reference_lines = raw_reference.splitlines()
+    source_offset_samples = int(block.get("source_offset_samples") or 0)
+    raw_source_end = int(block.get("source_end_samples") or 0)
+    if not source_offset_samples and not raw_source_end:
+        return raw_reference
+    source_offset_s = source_offset_samples / TARGET_SAMPLE_RATE
+    source_end_s = (
+        raw_source_end / TARGET_SAMPLE_RATE
+        if raw_source_end
+        else source_offset_s + float(span["sample_count"]) / TARGET_SAMPLE_RATE
+    )
+    try:
+        import yaml
+    except ImportError as exc:  # pragma: no cover - available on evaluation hosts
+        raise RuntimeError("PyYAML is required to read medicine timestamps") from exc
+    timestamp_path = Path(medicine_input_dir) / f"medicine.audio__medicine_{medicine_id}.yaml"
+    rows = yaml.safe_load(timestamp_path.read_text(encoding="utf-8"))
+    if len(rows) != len(reference_lines):
+        raise ValueError(
+            f"medicine alignment mismatch for {medicine_id}: "
+            f"audio={len(rows)} ref={len(reference_lines)}"
+        )
+    selected: List[str] = []
+    for row, reference in zip(rows, reference_lines):
+        row_start = float(row.get("offset") or 0.0)
+        row_end = row_start + float(row.get("duration") or 0.0)
+        if row_end <= source_offset_s or row_start >= source_end_s:
+            continue
+        selected.append(reference)
+    return "\n".join(selected)
 
 
 def build_reference_text(payload: Dict[str, Any], args: argparse.Namespace) -> str:
@@ -353,6 +412,7 @@ def build_reference_text(payload: Dict[str, Any], args: argparse.Namespace) -> s
             references.append(
                 medicine_reference_text(
                     block,
+                    span,
                     medicine_input_dir=args.medicine_oracle_dir,
                     target_lang=args.target_lang,
                 )

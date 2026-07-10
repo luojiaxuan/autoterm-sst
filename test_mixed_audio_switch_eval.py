@@ -19,11 +19,15 @@ from eval.streaming_sst.eval_mixed_audio_switch import (
     AudioBlock,
     AudioBlockSpan,
     CursorBackpressure,
+    audio_block_payload,
+    audio_span_payload,
     build_schedule,
+    build_selected_window_blocks,
     build_spans,
     domain_transitions,
     extract_record,
     expected_domain_at,
+    iter_pcm_chunks,
     iter_oracle_chunk_plan,
     parse_oracle_preset_map,
     read_acl_audio_blocks,
@@ -35,6 +39,7 @@ from eval.streaming_sst.eval_mixed_audio_switch import (
     switch_session_glossary,
     validate_oracle_preset_map,
 )
+from eval.streaming_sst.selected_window_smoke import SelectedWindow
 
 
 def _write_wav(path: Path, frames: int) -> None:
@@ -45,6 +50,15 @@ def _write_wav(path: Path, frames: int) -> None:
         handle.setsampwidth(2)
         handle.setframerate(TARGET_SAMPLE_RATE)
         handle.writeframes(data.tobytes())
+
+
+def _write_wav_values(path: Path, values: np.ndarray) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with wave.open(str(path), "wb") as handle:
+        handle.setnchannels(1)
+        handle.setsampwidth(2)
+        handle.setframerate(TARGET_SAMPLE_RATE)
+        handle.writeframes(values.astype(np.int16).tobytes())
 
 
 class MixedAudioSwitchEvalTests(unittest.TestCase):
@@ -289,6 +303,47 @@ class MixedAudioSwitchEvalTests(unittest.TestCase):
         self.assertEqual(expected_domain_at(spans, 1), "nlp")
         self.assertEqual(expected_domain_at(spans, TARGET_SAMPLE_RATE), "nlp")
         self.assertEqual(expected_domain_at(spans, TARGET_SAMPLE_RATE + 1), "medicine")
+
+    def test_selected_window_slices_concatenated_wavs_and_serializes_provenance(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            wav_a = root / "a.wav"
+            wav_b = root / "b.wav"
+            _write_wav_values(wav_a, np.arange(1, 11, dtype=np.int16))
+            _write_wav_values(wav_b, np.arange(11, 21, dtype=np.int16))
+            source = AudioBlock("acl-a", "nlp", "acl", [str(wav_a), str(wav_b)])
+            window = SelectedWindow("acl-a", "acl", "nlp", 6, 15)
+
+            blocks = build_selected_window_blocks([source], [], windows=[window])
+            spans = build_spans(blocks)
+            samples = np.concatenate(list(iter_pcm_chunks(blocks, chunk_samples=4)))
+
+        block = blocks[0]
+        span = spans[0]
+        self.assertEqual(block.wav_ranges, [(6, 10), (0, 5)])
+        self.assertEqual(span.sample_count, 9)
+        np.testing.assert_allclose(samples * 32768.0, np.arange(7, 16), atol=1e-6)
+        self.assertEqual(
+            audio_block_payload(block)["original_item_id"],
+            "acl-a",
+        )
+        self.assertEqual(audio_block_payload(block)["source_offset_samples"], 6)
+        self.assertEqual(audio_span_payload(span)["source_end_samples"], 15)
+
+    def test_default_payload_serialization_keeps_the_full_protocol_schema(self) -> None:
+        block = AudioBlock("acl", "nlp", "acl", ["mock.wav"])
+        span = AudioBlockSpan(1, "acl", "acl", "nlp", 0, 16, 16, 1)
+
+        self.assertEqual(
+            audio_block_payload(block),
+            {
+                "item_id": "acl",
+                "expected_domain": "nlp",
+                "corpus": "acl",
+                "wav_paths": ["mock.wav"],
+            },
+        )
+        self.assertNotIn("source_offset_samples", audio_span_payload(span))
 
     def test_summary_detects_transition_latency_and_steady_state(self) -> None:
         blocks = [

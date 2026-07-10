@@ -35,6 +35,12 @@ from eval.streaming_sst.score_prompt_precision import (  # noqa: E402
 )
 from eval.streaming_sst.score_terms import compute_bleu_scores  # noqa: E402
 from eval.streaming_sst.score_time_aligned_terms import TimedOccurrence  # noqa: E402
+from eval.streaming_sst.selected_window_smoke import (  # noqa: E402
+    EXPECTED_RAW_DENOMINATOR as SELECTED_WINDOW_RAW_DENOMINATOR,
+    PROTOCOL_ID as SELECTED_WINDOW_PROTOCOL_ID,
+    protocol_manifest as selected_window_protocol_manifest,
+    validate_payload as validate_selected_window_payload,
+)
 
 RUN_ROLES = ("oracle", "autoterm", "merged")
 SCHEMA_VERSION = "autoterm_story_scorecard.v1"
@@ -216,6 +222,7 @@ def assemble_scorecard(
     prompt_alignment_tolerance_s: float,
     expected_raw_denominator: int | None = None,
     allow_timing_mismatch: bool = False,
+    selected_window_smoke: bool = False,
 ) -> Dict[str, Any]:
     """Assemble a scorecard from already-loaded and validated run payloads."""
 
@@ -225,6 +232,19 @@ def assemble_scorecard(
         raise ValueError(f"runs must be exactly {RUN_ROLES}; missing={missing}, extra={extra}")
     validate_same_playlist([payloads[role] for role in RUN_ROLES])
     timing = validate_timing_compatible(payloads, allow_mismatch=allow_timing_mismatch)
+    if selected_window_smoke:
+        for role in RUN_ROLES:
+            try:
+                validate_selected_window_payload(payloads[role])
+            except ValueError as exc:
+                raise ValueError(f"{role} selected-window protocol is invalid: {exc}") from exc
+        if expected_raw_denominator is None:
+            expected_raw_denominator = SELECTED_WINDOW_RAW_DENOMINATOR
+        elif expected_raw_denominator != SELECTED_WINDOW_RAW_DENOMINATOR:
+            raise ValueError(
+                f"selected-window protocol requires raw denominator "
+                f"{SELECTED_WINDOW_RAW_DENOMINATOR}, got {expected_raw_denominator}"
+            )
     if TECHNICAL_GOLD_KEY not in gold_sets or HEADLINE_GOLD_KEY not in gold_sets:
         raise ValueError(
             f"gold_sets must contain {TECHNICAL_GOLD_KEY!r} and {HEADLINE_GOLD_KEY!r}"
@@ -300,6 +320,8 @@ def assemble_scorecard(
         },
         "runs": {},
     }
+    if selected_window_smoke:
+        report["protocol"]["selected_window_smoke"] = selected_window_protocol_manifest()
 
     original_post_s = mfa_term_scorer.POST_S
     mfa_term_scorer.POST_S = float(post_s)
@@ -388,6 +410,7 @@ def build_report(args: argparse.Namespace) -> Dict[str, Any]:
             args.expected_raw_denominator if args.expected_raw_denominator > 0 else None
         ),
         allow_timing_mismatch=args.allow_timing_mismatch,
+        selected_window_smoke=bool(getattr(args, "selected_window_smoke", False)),
     )
 
 
@@ -481,6 +504,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help=(
             "score nonidentical event windows as unpaired conditions; marks timing_comparable=false "
             "and forbids paired/delta claims"
+        ),
+    )
+    parser.add_argument(
+        "--selected-window-smoke",
+        action="store_true",
+        help=(
+            f"require {SELECTED_WINDOW_PROTOCOL_ID} metadata and enforce its fixed "
+            f"raw denominator {SELECTED_WINDOW_RAW_DENOMINATOR}"
         ),
     )
     parser.add_argument("--out-json", required=True)

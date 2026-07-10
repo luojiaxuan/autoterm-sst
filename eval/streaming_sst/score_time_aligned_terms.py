@@ -235,6 +235,35 @@ def map_orig_to_played(spans: List[tuple[float, float, float]], t_orig: float) -
     return None
 
 
+def block_source_window(
+    block: Dict[str, Any],
+    span: Dict[str, Any],
+) -> tuple[str, float, float]:
+    original_item_id = str(block.get("original_item_id") or block.get("item_id") or "")
+    source_offset_samples = int(block.get("source_offset_samples") or 0)
+    raw_source_end = int(block.get("source_end_samples") or 0)
+    if raw_source_end:
+        source_end_samples = raw_source_end
+    else:
+        source_end_samples = source_offset_samples + int(span["sample_count"])
+    if source_end_samples <= source_offset_samples:
+        raise ValueError(
+            f"{original_item_id}: invalid source window "
+            f"[{source_offset_samples}, {source_end_samples})"
+        )
+    expected_samples = source_end_samples - source_offset_samples
+    if expected_samples != int(span["sample_count"]):
+        raise ValueError(
+            f"{original_item_id}: source window has {expected_samples} samples, "
+            f"span has {span['sample_count']}"
+        )
+    return (
+        original_item_id,
+        source_offset_samples / TARGET_SAMPLE_RATE,
+        source_end_samples / TARGET_SAMPLE_RATE,
+    )
+
+
 def build_timed_gold(payload: Dict[str, Any], args: argparse.Namespace) -> Dict[str, List[TimedOccurrence]]:
     blocks = payload.get("blocks") or []
     spans = {int(s["block_index"]): s for s in payload.get("block_spans") or []}
@@ -246,8 +275,7 @@ def build_timed_gold(payload: Dict[str, Any], args: argparse.Namespace) -> Dict[
     for block_index, block in enumerate(blocks, start=1):
         span = spans[block_index]
         block_start = int(span["start_sample"]) / TARGET_SAMPLE_RATE
-        duration = int(span["sample_count"]) / TARGET_SAMPLE_RATE
-        item = str(block["item_id"])
+        item, source_offset, source_end = block_source_window(block, span)
         if block.get("corpus") == "acl":
             tg = mfa_root / "acl6060" / item / f"{item}.TextGrid"
             words = parse_textgrid_words(tg)
@@ -261,24 +289,51 @@ def build_timed_gold(payload: Dict[str, Any], args: argparse.Namespace) -> Dict[
                             continue
                         if pe is None:
                             pe = ps
-                        if ps >= duration:
+                        if ps < source_offset or ps >= source_end:
                             continue
+                        local_start = ps - source_offset
+                        local_end = min(
+                            max(pe - source_offset, local_start),
+                            source_end - source_offset,
+                        )
                         gold[gold_key].append(
-                            TimedOccurrence("nlp", block_index, term, variants, block_start + ps, block_start + pe)
+                            TimedOccurrence(
+                                "nlp",
+                                block_index,
+                                term,
+                                variants,
+                                block_start + local_start,
+                                block_start + local_end,
+                            )
                         )
         elif block.get("corpus") == "medicine":
             mid = item.removeprefix("medicine_")
-            rows = json.load(open(Path(args.medicine_oracle_dir) / f"hard_medicine.oracle_term_map__medicine_{mid}.json"))
+            oracle_path = (
+                Path(args.medicine_oracle_dir)
+                / f"hard_medicine.oracle_term_map__medicine_{mid}.json"
+            )
+            rows = json.loads(oracle_path.read_text(encoding="utf-8"))
             for row in rows:
                 ts = float(row.get("start_sec") or 0.0)
                 te = float(row.get("end_sec") or ts)
-                if ts >= duration:
+                if ts < source_offset or ts >= source_end:
                     continue
                 for ref in row.get("references") or []:
                     term = normalise_space(ref.get("term") or "")
                     translation = normalise_space(ref.get("translation") or "")
                     if term and translation:
-                        occ = TimedOccurrence("medicine", block_index, term, [translation], block_start + ts, block_start + te)
+                        occ = TimedOccurrence(
+                            "medicine",
+                            block_index,
+                            term,
+                            [translation],
+                            block_start + (ts - source_offset),
+                            block_start
+                            + min(
+                                max(te - source_offset, ts - source_offset),
+                                source_end - source_offset,
+                            ),
+                        )
                         gold["technical_plus_medicine"].append(occ)
                         gold["raw_plus_medicine"].append(occ)
     return gold

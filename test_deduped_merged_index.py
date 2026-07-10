@@ -23,6 +23,12 @@ def _entry(term: str, zh: str, *, qid: str) -> dict:
     }
 
 
+def _entry_with_translations(term: str, translations: dict[str, str], *, qid: str) -> dict:
+    entry = _entry(term, translations["zh"], qid=qid)
+    entry["target_translations"] = translations
+    return entry
+
+
 def _write_pair(
     root: Path,
     role: str,
@@ -157,6 +163,139 @@ class DedupedMergedIndexTests(unittest.TestCase):
             self.assertEqual(topup_report["collisions_with_base_rows"], 1)
             self.assertEqual(topup_report["duplicate_rows_within_topup"], 1)
             self.assertEqual(topup_report["eligible_unique_terms_not_selected"], 1)
+
+    def test_topup_cannot_change_base_conflict_audit_or_base_output_prefix(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_dir:
+            root = Path(raw_dir)
+            checkpoint = self._checkpoint(root)
+            first = _write_pair(
+                root,
+                "first",
+                [
+                    _entry_with_translations(
+                        "Alpha", {"zh": "甲", "ja": "アルファ"}, qid="Q1"
+                    ),
+                    _entry_with_translations(
+                        "Beta", {"zh": "乙", "ja": "ベータ"}, qid="Q2"
+                    ),
+                    _entry_with_translations(
+                        "Gamma", {"zh": "丙", "ja": "ガンマ"}, qid="Q3"
+                    ),
+                ],
+                torch.tensor([[1.0, 10.0], [2.0, 20.0], [3.0, 30.0]]),
+            )
+            second = _write_pair(
+                root,
+                "second",
+                [
+                    _entry_with_translations(
+                        "alpha", {"zh": "甲", "ja": "阿尔法"}, qid="Q4"
+                    ),
+                    _entry_with_translations(
+                        "beta", {"zh": "乙", "ja": "ベータ"}, qid="Q5"
+                    ),
+                    _entry_with_translations(
+                        "gamma", {"zh": "伽马", "ja": "ガンマ"}, qid="Q6"
+                    ),
+                ],
+                torch.tensor([[4.0, 40.0], [5.0, 50.0], [6.0, 60.0]]),
+            )
+            topup = _write_pair(
+                root,
+                "distractor",
+                [
+                    _entry_with_translations(
+                        "ALPHA", {"zh": "阿尔法", "ja": "アルファ"}, qid="Q7"
+                    ),
+                    _entry_with_translations(
+                        "BETA", {"zh": "乙", "ja": "ベータ", "de": "Beta"}, qid="Q8"
+                    ),
+                    _entry("Delta", "丁", qid="Q9"),
+                ],
+                torch.tensor([[7.0, 70.0], [8.0, 80.0], [9.0, 90.0]]),
+            )
+            topup = SourceSpec(
+                topup.role,
+                topup.glossary_path,
+                topup.index_path,
+                kind="topup",
+            )
+
+            pure_out = root / "pure"
+            pure_report = build_deduped_merged_index(
+                sources=[first, second],
+                topup_source=None,
+                target_size=None,
+                out_dir=pure_out,
+                preset_id="pure_base",
+                language_pair="en-zh",
+                embedding_checkpoint=checkpoint,
+            )
+            topped_out = root / "topped"
+            topped_report = build_deduped_merged_index(
+                sources=[first, second],
+                topup_source=topup,
+                target_size=4,
+                out_dir=topped_out,
+                preset_id="topped_base",
+                language_pair="en-zh",
+                embedding_checkpoint=checkpoint,
+            )
+
+            base_report_fields = (
+                "base_input_rows",
+                "base_unique_terms",
+                "base_duplicate_rows",
+                "base_duplicate_term_count",
+                "base_target_variant_conflict_term_count",
+                "base_translation_map_conflict_term_count",
+                "base_pair_overlap_term_counts",
+            )
+            self.assertEqual(
+                {field: pure_report[field] for field in base_report_fields},
+                {field: topped_report[field] for field in base_report_fields},
+            )
+            self.assertEqual(pure_report["base_target_variant_conflict_term_count"], 1)
+            self.assertEqual(pure_report["base_translation_map_conflict_term_count"], 2)
+            self.assertEqual(topped_report["all_target_variant_conflict_term_count"], 2)
+
+            pure_audit = json.loads(
+                (pure_out / "duplicate_audit.json").read_text(encoding="utf-8")
+            )
+            topped_audit = json.loads(
+                (topped_out / "duplicate_audit.json").read_text(encoding="utf-8")
+            )
+
+            def base_occurrences(payload: dict) -> dict[str, list[dict]]:
+                return {
+                    item["normalized_source"]: [
+                        row for row in item["occurrences"] if row["source_kind"] == "base"
+                    ]
+                    for item in payload["duplicate_terms"]
+                    if any(row["source_kind"] == "base" for row in item["occurrences"])
+                }
+
+            self.assertEqual(base_occurrences(pure_audit), base_occurrences(topped_audit))
+
+            pure_payload = torch.load(
+                pure_out / "maxsim.pt", map_location="cpu", weights_only=True
+            )
+            topped_payload = torch.load(
+                topped_out / "maxsim.pt", map_location="cpu", weights_only=True
+            )
+            pure_rows = pure_payload["text_embs"].shape[0]
+            self.assertEqual(
+                topped_payload["term_list"][:pure_rows], pure_payload["term_list"]
+            )
+            self.assertTrue(
+                torch.equal(
+                    topped_payload["text_embs"][:pure_rows], pure_payload["text_embs"]
+                )
+            )
+            self.assertEqual(topped_payload["term_list"][-1]["term"], "Delta")
+            self.assertTrue(
+                torch.equal(topped_payload["text_embs"][-1], torch.tensor([9.0, 90.0]))
+            )
 
     def test_rejects_misaligned_index_term_list(self) -> None:
         with tempfile.TemporaryDirectory() as raw_dir:

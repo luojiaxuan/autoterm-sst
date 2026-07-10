@@ -16,6 +16,7 @@ import json
 import math
 import random
 import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 import wave
@@ -65,6 +66,16 @@ class AudioBlockSpan:
     @property
     def end_s(self) -> float:
         return self.end_sample / TARGET_SAMPLE_RATE
+
+
+@dataclass(frozen=True)
+class OracleChunkPlan:
+    chunk_index: int
+    start_sample: int
+    future_cursor_samples: int
+    expected_domain: str
+    glossary_preset: str
+    chunk: np.ndarray
 
 
 def read_acl_audio_blocks(
@@ -273,6 +284,144 @@ def _ws_base(base_url: str) -> str:
     return _http_base(base_url).replace("http://", "ws://").replace("https://", "wss://")
 
 
+def parse_oracle_preset_map(raw: str) -> Dict[str, str]:
+    mapping: Dict[str, str] = {}
+    for item in str(raw or "").split(","):
+        item = item.strip()
+        if not item:
+            continue
+        if item.count("=") != 1:
+            raise ValueError(
+                "oracle preset entries must use DOMAIN=PRESET, "
+                f"got {item!r}"
+            )
+        raw_domain, raw_preset = item.split("=", 1)
+        domain = raw_domain.strip().lower()
+        preset = raw_preset.strip()
+        if not domain or not preset:
+            raise ValueError(
+                "oracle preset entries must use non-empty DOMAIN=PRESET, "
+                f"got {item!r}"
+            )
+        if domain in mapping and mapping[domain] != preset:
+            raise ValueError(
+                f"oracle domain {domain!r} maps to both {mapping[domain]!r} and {preset!r}"
+            )
+        mapping[domain] = preset
+    return mapping
+
+
+def validate_oracle_preset_map(
+    oracle_preset_map: Dict[str, str],
+    spans: Sequence[AudioBlockSpan],
+) -> None:
+    if not oracle_preset_map:
+        return
+    required_domains = sorted(
+        {
+            str(span.expected_domain).strip().lower()
+            for span in spans
+            if int(span.sample_count) > 0 and str(span.expected_domain).strip()
+        }
+    )
+    missing = [domain for domain in required_domains if domain not in oracle_preset_map]
+    if missing:
+        raise ValueError(
+            "oracle preset map is missing playlist domain(s): " + ", ".join(missing)
+        )
+
+
+def iter_oracle_chunk_plan(
+    chunks: Iterable[np.ndarray],
+    *,
+    spans: Sequence[AudioBlockSpan],
+    oracle_preset_map: Dict[str, str],
+) -> Iterator[OracleChunkPlan]:
+    cursor_samples = 0
+    for chunk_index, chunk in enumerate(chunks, start=1):
+        sample_count = int(chunk.shape[0])
+        future_cursor_samples = cursor_samples + sample_count
+        expected_domain = expected_domain_at(spans, future_cursor_samples).strip().lower()
+        preset = str(oracle_preset_map.get(expected_domain) or "")
+        if oracle_preset_map and not preset:
+            raise RuntimeError(
+                f"oracle preset map has no preset for domain {expected_domain!r} "
+                f"at future cursor {future_cursor_samples}"
+            )
+        yield OracleChunkPlan(
+            chunk_index=chunk_index,
+            start_sample=cursor_samples,
+            future_cursor_samples=future_cursor_samples,
+            expected_domain=expected_domain,
+            glossary_preset=preset,
+            chunk=chunk,
+        )
+        cursor_samples = future_cursor_samples
+
+
+def switch_session_glossary(
+    base_url: str,
+    session_id: str,
+    glossary_preset: str,
+    *,
+    language_pair: str,
+    timeout_sec: float = 120.0,
+) -> Dict[str, Any]:
+    body = json.dumps(
+        {
+            "session_id": session_id,
+            "glossary_preset": glossary_preset,
+            "language_pair": language_pair,
+        }
+    ).encode("utf-8")
+    request = urllib.request.Request(
+        f"{_http_base(base_url)}/glossary/build",
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=max(1.0, float(timeout_sec))) as response:
+            result = json.load(response)
+    except urllib.error.HTTPError as exc:
+        try:
+            detail = exc.read().decode("utf-8", errors="replace")
+        except Exception:  # noqa: BLE001
+            detail = ""
+        raise RuntimeError(
+            f"oracle glossary switch to {glossary_preset!r} failed with "
+            f"HTTP {exc.code}: {detail or exc.reason}"
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(
+            f"oracle glossary switch to {glossary_preset!r} failed: {exc.reason}"
+        ) from exc
+    if not isinstance(result, dict):
+        raise RuntimeError(
+            f"oracle glossary switch to {glossary_preset!r} returned a non-object response"
+        )
+    if result.get("success") is not True:
+        raise RuntimeError(
+            f"oracle glossary switch to {glossary_preset!r} was rejected: "
+            f"{result.get('error') or result.get('detail') or result}"
+        )
+    if result.get("session_updated") is not True:
+        raise RuntimeError(
+            f"oracle glossary switch to {glossary_preset!r} did not update session {session_id!r}"
+        )
+    active_preset = str(result.get("active_glossary_preset") or "")
+    if active_preset != glossary_preset:
+        raise RuntimeError(
+            f"oracle glossary switch requested {glossary_preset!r} but server activated "
+            f"{active_preset or '<missing>'!r}"
+        )
+    if result.get("auto_glossary_enabled") is True:
+        raise RuntimeError(
+            f"oracle glossary switch to {glossary_preset!r} left automatic routing enabled"
+        )
+    return result
+
+
 def init_session(base_url: str, language_pair: str, preset: str, latency_multiplier: int) -> Dict[str, Any]:
     q = urllib.parse.urlencode(
         {
@@ -325,6 +474,9 @@ class CursorBackpressure:
         self.partial_cursor_event_count = 0
         self.status_cursor_event_count = 0
         self.timeout_release_samples = 0
+        self.cursor_barrier_wait_count = 0
+        self.cursor_barrier_wait_seconds = 0.0
+        self.cursor_barrier_timeout_count = 0
         self._condition = asyncio.Condition()
 
     @property
@@ -395,6 +547,43 @@ class CursorBackpressure:
                 self.cursor_advance_event_count += 1
                 self._condition.notify_all()
 
+    async def wait_until_cursor(
+        self,
+        target_cursor_samples: int,
+        *,
+        timeout_sec: float,
+        reason: str,
+    ) -> None:
+        target = max(0, int(target_cursor_samples))
+        if target <= self.acknowledged_cursor_samples:
+            return
+        if float(timeout_sec) <= 0:
+            raise ValueError("cursor barrier timeout must be positive")
+        loop = asyncio.get_running_loop()
+        started = loop.time()
+        deadline = started + float(timeout_sec)
+        self.cursor_barrier_wait_count += 1
+        async with self._condition:
+            while self.acknowledged_cursor_samples < target:
+                remaining = deadline - loop.time()
+                if remaining <= 0:
+                    self.cursor_barrier_timeout_count += 1
+                    self.cursor_barrier_wait_seconds += max(0.0, loop.time() - started)
+                    raise RuntimeError(
+                        f"{reason} timed out waiting for server cursor {target}; "
+                        f"latest cursor is {self.acknowledged_cursor_samples}"
+                    )
+                try:
+                    await asyncio.wait_for(self._condition.wait(), timeout=remaining)
+                except asyncio.TimeoutError as exc:
+                    self.cursor_barrier_timeout_count += 1
+                    self.cursor_barrier_wait_seconds += max(0.0, loop.time() - started)
+                    raise RuntimeError(
+                        f"{reason} timed out waiting for server cursor {target}; "
+                        f"latest cursor is {self.acknowledged_cursor_samples}"
+                    ) from exc
+        self.cursor_barrier_wait_seconds += max(0.0, loop.time() - started)
+
     def snapshot(self) -> Dict[str, Any]:
         final_unacked = self._unacked_samples()
         return {
@@ -419,6 +608,9 @@ class CursorBackpressure:
             "partial_cursor_event_count": self.partial_cursor_event_count,
             "status_cursor_event_count": self.status_cursor_event_count,
             "timeout_release_samples": self.timeout_release_samples,
+            "cursor_barrier_wait_count": self.cursor_barrier_wait_count,
+            "cursor_barrier_wait_seconds": round(self.cursor_barrier_wait_seconds, 6),
+            "cursor_barrier_timeout_count": self.cursor_barrier_timeout_count,
         }
 
 
@@ -438,19 +630,74 @@ async def run_streaming_eval(
     require_router_meta: bool = True,
     max_unacked_chunks: int = 0,
     backpressure_stall_timeout_sec: float = 60.0,
+    oracle_preset_map: Optional[Dict[str, str]] = None,
+    oracle_switch_timeout_sec: float = 120.0,
 ) -> Dict[str, Any]:
     import websockets  # noqa: PLC0415 - optional dependency for CLI path only
 
-    info = init_session(base_url, language_pair, preset, latency_multiplier)
+    oracle_map = {
+        str(domain).strip().lower(): str(mapped_preset).strip()
+        for domain, mapped_preset in (oracle_preset_map or {}).items()
+        if str(domain).strip() and str(mapped_preset).strip()
+    }
+    validate_oracle_preset_map(oracle_map, spans)
+    first_span = next(
+        (
+            span
+            for span in spans
+            if int(
+                getattr(
+                    span,
+                    "sample_count",
+                    int(span.end_sample) - int(span.start_sample),
+                )
+            )
+            > 0
+        ),
+        None,
+    )
+    initial_oracle_domain = str(first_span.expected_domain).strip().lower() if first_span else ""
+    effective_initial_preset = oracle_map.get(initial_oracle_domain, preset)
+    info = init_session(base_url, language_pair, effective_initial_preset, latency_multiplier)
     session_id = str(info["session_id"])
     records: List[Dict[str, Any]] = []
     events_seen = 0
+    oracle_switches: List[Dict[str, Any]] = []
     pacing = CursorBackpressure(
         chunk_samples=chunk_samples,
         max_unacked_chunks=max_unacked_chunks,
         stall_timeout_sec=backpressure_stall_timeout_sec,
     )
     try:
+        if oracle_map:
+            active_preset = str(info.get("active_glossary_preset") or "")
+            if active_preset != effective_initial_preset:
+                raise RuntimeError(
+                    f"blockwise oracle requested initial preset {effective_initial_preset!r} "
+                    f"but server activated {active_preset or '<missing>'!r}"
+                )
+            if info.get("auto_glossary_enabled") is True:
+                raise RuntimeError(
+                    "blockwise oracle initial session unexpectedly left automatic routing enabled"
+                )
+            oracle_switches.append(
+                {
+                    "action": "initial",
+                    "switch_index": 0,
+                    "before_chunk_index": 1,
+                    "from_domain": "",
+                    "from_preset": "",
+                    "to_domain": initial_oracle_domain,
+                    "to_preset": effective_initial_preset,
+                    "prior_sent_samples": 0,
+                    "future_cursor_samples": 0,
+                    "acknowledged_cursor_samples": 0,
+                    "session_updated": True,
+                    "server_active_domain": str(info.get("active_domain") or ""),
+                    "server_active_preset": active_preset,
+                    "success": True,
+                }
+            )
         async with websockets.connect(f"{_ws_base(base_url)}/wss/{session_id}?event_format=json", max_size=None) as ws:
             initial_message = await ws.recv()
             try:
@@ -463,10 +710,64 @@ async def run_streaming_eval(
             async def feed() -> None:
                 # Server websocket input follows the existing eval_auto_glossary
                 # client convention: raw float32 PCM samples in [-1, 1).
-                for chunk in iter_pcm_chunks(blocks, chunk_samples=chunk_samples, max_seconds_per_item=max_seconds_per_item):
-                    timeout_released = await pacing.wait_to_send(int(chunk.shape[0]))
-                    await ws.send(chunk.tobytes())
-                    pacing.record_sent(int(chunk.shape[0]), timeout_released=timeout_released)
+                chunks = iter_pcm_chunks(
+                    blocks,
+                    chunk_samples=chunk_samples,
+                    max_seconds_per_item=max_seconds_per_item,
+                )
+                current_domain = initial_oracle_domain
+                current_preset = effective_initial_preset
+                for plan in iter_oracle_chunk_plan(
+                    chunks,
+                    spans=spans,
+                    oracle_preset_map=oracle_map,
+                ):
+                    if oracle_map and (
+                        plan.expected_domain != current_domain
+                        or plan.glossary_preset != current_preset
+                    ):
+                        await pacing.wait_until_cursor(
+                            plan.start_sample,
+                            timeout_sec=oracle_switch_timeout_sec,
+                            reason=(
+                                f"oracle switch {current_domain or '<none>'} -> "
+                                f"{plan.expected_domain or '<none>'} before chunk {plan.chunk_index}"
+                            ),
+                        )
+                        started = asyncio.get_running_loop().time()
+                        result = await asyncio.to_thread(
+                            switch_session_glossary,
+                            base_url,
+                            session_id,
+                            plan.glossary_preset,
+                            language_pair=language_pair,
+                            timeout_sec=oracle_switch_timeout_sec,
+                        )
+                        switch_seconds = max(0.0, asyncio.get_running_loop().time() - started)
+                        oracle_switches.append(
+                            {
+                                "action": "switch",
+                                "switch_index": len(oracle_switches),
+                                "before_chunk_index": plan.chunk_index,
+                                "from_domain": current_domain,
+                                "from_preset": current_preset,
+                                "to_domain": plan.expected_domain,
+                                "to_preset": plan.glossary_preset,
+                                "prior_sent_samples": plan.start_sample,
+                                "future_cursor_samples": plan.future_cursor_samples,
+                                "acknowledged_cursor_samples": pacing.acknowledged_cursor_samples,
+                                "session_updated": bool(result.get("session_updated")),
+                                "server_active_domain": str(result.get("active_domain") or ""),
+                                "server_active_preset": str(result.get("active_glossary_preset") or ""),
+                                "switch_seconds": round(switch_seconds, 6),
+                                "success": True,
+                            }
+                        )
+                        current_domain = plan.expected_domain
+                        current_preset = plan.glossary_preset
+                    timeout_released = await pacing.wait_to_send(int(plan.chunk.shape[0]))
+                    await ws.send(plan.chunk.tobytes())
+                    pacing.record_sent(int(plan.chunk.shape[0]), timeout_released=timeout_released)
                     if float(feed_sleep) > 0:
                         await asyncio.sleep(float(feed_sleep))
                 await ws.send("EOF")
@@ -501,7 +802,18 @@ async def run_streaming_eval(
         "session": {
             "session_id": session_id,
             "initial_active_glossary": info.get("active_glossary_preset"),
+            "requested_initial_preset": preset,
+            "effective_initial_preset": effective_initial_preset,
             "preset_terms": info.get("preset_terms"),
+        },
+        "oracle": {
+            "enabled": bool(oracle_map),
+            "preset_map": dict(oracle_map),
+            "initial_domain": initial_oracle_domain if oracle_map else "",
+            "initial_preset": effective_initial_preset if oracle_map else "",
+            "switch_count": max(0, len(oracle_switches) - 1),
+            "all_switches_succeeded": all(item.get("success") is True for item in oracle_switches),
+            "switches": oracle_switches,
         },
         "pacing": pacing.snapshot(),
         "records": records,
@@ -591,6 +903,7 @@ def summarize_run(
     chunk_samples: int,
     max_switch_events: int,
     pacing: Optional[Dict[str, Any]] = None,
+    oracle: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     expected_records = [item for item in records if item.get("expected_domain")]
     active_correct = sum(1 for item in expected_records if item.get("active_domain") == item.get("expected_domain"))
@@ -643,6 +956,14 @@ def summarize_run(
     }
     if pacing is not None:
         summary["backpressure"] = dict(pacing)
+    if oracle is not None:
+        summary["oracle"] = {
+            "enabled": bool(oracle.get("enabled")),
+            "initial_domain": str(oracle.get("initial_domain") or ""),
+            "initial_preset": str(oracle.get("initial_preset") or ""),
+            "switch_count": int(oracle.get("switch_count") or 0),
+            "all_switches_succeeded": bool(oracle.get("all_switches_succeeded")),
+        }
     return summary
 
 
@@ -784,6 +1105,16 @@ def write_markdown(payload: Dict[str, Any], out_path: str) -> None:
             "timeout_release_count",
         ):
             lines.append(f"- backpressure_{key}: `{pacing.get(key)}`")
+    oracle = summary.get("oracle") or {}
+    if isinstance(oracle, dict) and oracle.get("enabled"):
+        for key in (
+            "enabled",
+            "initial_domain",
+            "initial_preset",
+            "switch_count",
+            "all_switches_succeeded",
+        ):
+            lines.append(f"- oracle_{key}: `{oracle.get(key)}`")
     lines.extend(["", "## Transitions", "", "| from | to | boundary_s | latency_events | latency_s | pass |", "|---|---|---:|---:|---:|---|"])
     for item in payload.get("domain_transitions", []):
         lines.append(
@@ -825,6 +1156,21 @@ def main() -> None:
     )
     ap.add_argument("--seed", type=int, default=20260707)
     ap.add_argument("--preset", default="auto_working")
+    ap.add_argument(
+        "--oracle-preset-map",
+        default="",
+        help=(
+            "enable blockwise Oracle routing with comma-separated DOMAIN=PRESET entries; "
+            "the session starts on the first block's mapped preset and switches through "
+            "/glossary/build before each cross-domain chunk"
+        ),
+    )
+    ap.add_argument(
+        "--oracle-switch-timeout-sec",
+        type=float,
+        default=120.0,
+        help="timeout for draining the prior cursor and applying each Oracle preset switch",
+    )
     ap.add_argument("--language-pair", default="English -> Chinese")
     ap.add_argument("--latency-multiplier", type=int, default=2)
     ap.add_argument("--base-segment-sec", type=float, default=0.96)
@@ -862,6 +1208,12 @@ def main() -> None:
         ap.error("--max-unacked-chunks must be non-negative")
     if args.max_unacked_chunks > 0 and args.backpressure_stall_timeout_sec <= 0:
         ap.error("--backpressure-stall-timeout-sec must be positive when backpressure is enabled")
+    if args.oracle_switch_timeout_sec <= 0:
+        ap.error("--oracle-switch-timeout-sec must be positive")
+    try:
+        oracle_preset_map = parse_oracle_preset_map(args.oracle_preset_map)
+    except ValueError as exc:
+        ap.error(str(exc))
 
     acl_blocks = read_acl_audio_blocks(
         args.acl_root,
@@ -881,11 +1233,28 @@ def main() -> None:
     chunk_samples = resolve_chunk_samples(args.chunk, args.base_segment_sec, args.latency_multiplier)
     max_switch_events = resolve_max_switch_events(args.max_switch_events, args.max_switch_seconds, chunk_samples)
     spans = build_spans(blocks, max_seconds_per_item=args.max_seconds_per_item)
+    try:
+        validate_oracle_preset_map(oracle_preset_map, spans)
+    except ValueError as exc:
+        ap.error(str(exc))
+    first_domain = next(
+        (
+            str(span.expected_domain).strip().lower()
+            for span in spans
+            if span.sample_count > 0
+        ),
+        "",
+    )
+    effective_initial_preset = oracle_preset_map.get(first_domain, args.preset)
     payload: Dict[str, Any] = {
         "config": {
             "schedule": args.schedule,
             "seed": args.seed,
             "preset": args.preset,
+            "effective_initial_preset": effective_initial_preset,
+            "oracle_enabled": bool(oracle_preset_map),
+            "oracle_preset_map": dict(oracle_preset_map),
+            "oracle_switch_timeout_sec": args.oracle_switch_timeout_sec,
             "language_pair": args.language_pair,
             "latency_multiplier": args.latency_multiplier,
             "chunk_samples": chunk_samples,
@@ -908,6 +1277,15 @@ def main() -> None:
         "block_spans": [span.__dict__ for span in spans],
         "summary": {},
         "domain_transitions": [],
+        "oracle": {
+            "enabled": bool(oracle_preset_map),
+            "preset_map": dict(oracle_preset_map),
+            "initial_domain": first_domain if oracle_preset_map else "",
+            "initial_preset": effective_initial_preset if oracle_preset_map else "",
+            "switch_count": 0,
+            "all_switches_succeeded": True,
+            "switches": [],
+        },
         "records": [],
     }
     if not args.dry_run:
@@ -927,10 +1305,13 @@ def main() -> None:
                 require_router_meta=not args.allow_missing_router_meta,
                 max_unacked_chunks=args.max_unacked_chunks,
                 backpressure_stall_timeout_sec=args.backpressure_stall_timeout_sec,
+                oracle_preset_map=oracle_preset_map,
+                oracle_switch_timeout_sec=args.oracle_switch_timeout_sec,
             )
         )
         payload["session"] = stream_payload["session"]
         payload["pacing"] = stream_payload["pacing"]
+        payload["oracle"] = stream_payload["oracle"]
         payload["records"] = stream_payload["records"]
         payload["domain_transitions"] = domain_transitions(
             spans,
@@ -945,6 +1326,7 @@ def main() -> None:
             chunk_samples=chunk_samples,
             max_switch_events=max_switch_events,
             pacing=stream_payload["pacing"],
+            oracle=stream_payload["oracle"],
         )
     else:
         payload["summary"] = {
@@ -958,6 +1340,13 @@ def main() -> None:
                 "max_unacked_chunks": args.max_unacked_chunks,
                 "max_unacked_samples": args.max_unacked_chunks * chunk_samples,
                 "stall_timeout_sec": args.backpressure_stall_timeout_sec,
+            },
+            "oracle": {
+                "enabled": bool(oracle_preset_map),
+                "initial_domain": first_domain if oracle_preset_map else "",
+                "initial_preset": effective_initial_preset if oracle_preset_map else "",
+                "switch_count": 0,
+                "all_switches_succeeded": True,
             },
         }
 

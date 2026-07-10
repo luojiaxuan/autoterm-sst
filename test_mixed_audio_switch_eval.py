@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import sys
 import unittest
+import urllib.error
 import wave
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -15,17 +17,22 @@ import numpy as np
 from eval.streaming_sst.eval_mixed_audio_switch import (
     TARGET_SAMPLE_RATE,
     AudioBlock,
+    AudioBlockSpan,
     CursorBackpressure,
     build_schedule,
     build_spans,
     domain_transitions,
     extract_record,
     expected_domain_at,
+    iter_oracle_chunk_plan,
+    parse_oracle_preset_map,
     read_acl_audio_blocks,
     read_medicine_audio_blocks,
     resolve_max_switch_events,
     run_streaming_eval,
     summarize_run,
+    switch_session_glossary,
+    validate_oracle_preset_map,
 )
 
 
@@ -40,6 +47,65 @@ def _write_wav(path: Path, frames: int) -> None:
 
 
 class MixedAudioSwitchEvalTests(unittest.TestCase):
+    def test_oracle_preset_map_parser_and_missing_domain_validation(self) -> None:
+        mapping = parse_oracle_preset_map(
+            "nlp=nlp_core_10k, medicine=medicine_core_10k"
+        )
+        spans = [
+            AudioBlockSpan(1, "acl", "acl", "nlp", 0, 16, 16, 1),
+            AudioBlockSpan(2, "med", "medicine", "medicine", 16, 32, 16, 1),
+        ]
+
+        validate_oracle_preset_map(mapping, spans)
+        with self.assertRaisesRegex(ValueError, "medicine"):
+            validate_oracle_preset_map({"nlp": "nlp_core_10k"}, spans)
+        with self.assertRaisesRegex(ValueError, "DOMAIN=PRESET"):
+            parse_oracle_preset_map("nlp_core_10k")
+
+    def test_oracle_chunk_plan_preserves_acl_medicine_acl_chunk_sequence(self) -> None:
+        chunks = [
+            np.full((16,), 1.0, dtype=np.float32),
+            np.full((16,), 2.0, dtype=np.float32),
+            np.full((16,), 3.0, dtype=np.float32),
+        ]
+        spans = [
+            AudioBlockSpan(1, "acl-a", "acl", "nlp", 0, 16, 16, 1),
+            AudioBlockSpan(2, "med", "medicine", "medicine", 16, 32, 16, 1),
+            AudioBlockSpan(3, "acl-b", "acl", "nlp", 32, 48, 16, 1),
+        ]
+        mapping = {"nlp": "nlp_core_10k", "medicine": "medicine_core_10k"}
+
+        plans = list(iter_oracle_chunk_plan(iter(chunks), spans=spans, oracle_preset_map=mapping))
+
+        self.assertEqual([plan.expected_domain for plan in plans], ["nlp", "medicine", "nlp"])
+        self.assertEqual(
+            [plan.glossary_preset for plan in plans],
+            ["nlp_core_10k", "medicine_core_10k", "nlp_core_10k"],
+        )
+        self.assertEqual([plan.future_cursor_samples for plan in plans], [16, 32, 48])
+        for original, plan in zip(chunks, plans):
+            self.assertIs(plan.chunk, original)
+            np.testing.assert_array_equal(plan.chunk, original)
+
+    def test_oracle_glossary_http_failure_names_requested_preset(self) -> None:
+        error = urllib.error.HTTPError(
+            "http://127.0.0.1:8012/glossary/build",
+            400,
+            "Bad Request",
+            {},
+            io.BytesIO(b'{"detail":"unknown preset"}'),
+        )
+        with (
+            patch("urllib.request.urlopen", side_effect=error),
+            self.assertRaisesRegex(RuntimeError, "medicine_core_10k.*HTTP 400"),
+        ):
+            switch_session_glossary(
+                "http://127.0.0.1:8012",
+                "session-1",
+                "medicine_core_10k",
+                language_pair="English -> Chinese",
+            )
+
     def test_cursor_backpressure_waits_for_status_or_partial_cursor(self) -> None:
         async def scenario():
             pacing = CursorBackpressure(
@@ -317,6 +383,163 @@ class MixedAudioSwitchEvalTests(unittest.TestCase):
         self.assertEqual(fixed_record["router_target_domain"], "general")
         with self.assertRaisesRegex(RuntimeError, "topic_router"):
             extract_record(fixed_event, event_idx=1, spans=spans)
+
+    def test_streaming_oracle_switches_acl_medicine_acl_before_sending_chunks(self) -> None:
+        chunks = [
+            np.full((16,), 1.0, dtype=np.float32),
+            np.full((16,), 2.0, dtype=np.float32),
+            np.full((16,), 3.0, dtype=np.float32),
+        ]
+        blocks = [
+            AudioBlock("acl-a", "nlp", "acl", ["mock-a.wav"]),
+            AudioBlock("med", "medicine", "medicine", ["mock-b.wav"]),
+            AudioBlock("acl-b", "nlp", "acl", ["mock-c.wav"]),
+        ]
+        spans = [
+            AudioBlockSpan(1, "acl-a", "acl", "nlp", 0, 16, 16, 1),
+            AudioBlockSpan(2, "med", "medicine", "medicine", 16, 32, 16, 1),
+            AudioBlockSpan(3, "acl-b", "acl", "nlp", 32, 48, 16, 1),
+        ]
+        partial = {
+            "type": "partial",
+            "text": "done",
+            "meta": {
+                "cursor_samples": 48,
+                "topic": {
+                    "active_domain": "nlp",
+                    "active_glossary_preset": "nlp_core_10k",
+                    "switch_count": 0,
+                },
+                "router_text_source": "none",
+                "prompt_reference_count": 0,
+                "fixed_prompt_k": 10,
+                "candidate_pool_count": 100,
+            },
+        }
+
+        class FakeWebSocket:
+            def __init__(self) -> None:
+                self.sent = []
+                self.initial_sent = False
+                self.status_16_sent = False
+                self.status_32_sent = False
+                self.partial_sent = False
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+            async def send(self, payload):
+                self.sent.append(payload)
+
+            async def recv(self):
+                if not self.initial_sent:
+                    self.initial_sent = True
+                    return json.dumps({"type": "status", "text": "READY"})
+                while not self.partial_sent:
+                    binary_count = sum(isinstance(item, bytes) for item in self.sent)
+                    if binary_count >= 1 and not self.status_16_sent:
+                        self.status_16_sent = True
+                        return json.dumps(
+                            {"type": "status", "text": "ACK", "meta": {"cursor_samples": 16}}
+                        )
+                    if binary_count >= 2 and not self.status_32_sent:
+                        self.status_32_sent = True
+                        return json.dumps(
+                            {"type": "status", "text": "ACK", "meta": {"cursor_samples": 32}}
+                        )
+                    if binary_count >= 3:
+                        self.partial_sent = True
+                        return json.dumps(partial)
+                    await asyncio.sleep(0.001)
+                await asyncio.sleep(1.0)
+                return json.dumps({"type": "status", "text": "unused"})
+
+        fake_ws = FakeWebSocket()
+        fake_module = SimpleNamespace(connect=lambda *args, **kwargs: fake_ws)
+        previous_module = sys.modules.get("websockets")
+        sys.modules["websockets"] = fake_module
+
+        def fake_switch(base_url, session_id, glossary_preset, **kwargs):
+            domain = "medicine" if glossary_preset == "medicine_core_10k" else "nlp"
+            return {
+                "success": True,
+                "session_updated": True,
+                "active_domain": domain,
+                "active_glossary_preset": glossary_preset,
+                "auto_glossary_enabled": False,
+            }
+
+        try:
+            with (
+                patch(
+                    "eval.streaming_sst.eval_mixed_audio_switch.init_session",
+                    return_value={
+                        "session_id": "s1",
+                        "active_domain": "nlp",
+                        "active_glossary_preset": "nlp_core_10k",
+                        "auto_glossary_enabled": False,
+                    },
+                ) as init_mock,
+                patch("eval.streaming_sst.eval_mixed_audio_switch.delete_session"),
+                patch(
+                    "eval.streaming_sst.eval_mixed_audio_switch.iter_pcm_chunks",
+                    return_value=iter(chunks),
+                ),
+                patch(
+                    "eval.streaming_sst.eval_mixed_audio_switch.switch_session_glossary",
+                    side_effect=fake_switch,
+                ) as switch_mock,
+            ):
+                payload = asyncio.run(
+                    run_streaming_eval(
+                        base_url="http://127.0.0.1:8012",
+                        language_pair="English -> Chinese",
+                        preset="auto_working",
+                        blocks=blocks,
+                        spans=spans,
+                        chunk_samples=16,
+                        feed_sleep=0.0,
+                        latency_multiplier=2,
+                        idle_timeout_sec=0.02,
+                        idle_timeouts_after_eof=1,
+                        require_router_meta=False,
+                        max_unacked_chunks=1,
+                        backpressure_stall_timeout_sec=1.0,
+                        oracle_preset_map={
+                            "nlp": "nlp_core_10k",
+                            "medicine": "medicine_core_10k",
+                        },
+                        oracle_switch_timeout_sec=1.0,
+                    )
+                )
+        finally:
+            if previous_module is None:
+                sys.modules.pop("websockets", None)
+            else:
+                sys.modules["websockets"] = previous_module
+
+        init_mock.assert_called_once_with(
+            "http://127.0.0.1:8012",
+            "English -> Chinese",
+            "nlp_core_10k",
+            2,
+        )
+        self.assertEqual(
+            [call.args[2] for call in switch_mock.call_args_list],
+            ["medicine_core_10k", "nlp_core_10k"],
+        )
+        self.assertEqual(fake_ws.sent[:3], [chunk.tobytes() for chunk in chunks])
+        self.assertEqual(fake_ws.sent[-1], "EOF")
+        self.assertTrue(payload["oracle"]["enabled"])
+        self.assertEqual(payload["oracle"]["switch_count"], 2)
+        self.assertEqual(
+            [row["to_domain"] for row in payload["oracle"]["switches"]],
+            ["nlp", "medicine", "nlp"],
+        )
+        self.assertEqual(payload["pacing"]["cursor_barrier_timeout_count"], 0)
 
     def test_streaming_eval_drains_partials_after_processing_complete(self) -> None:
         blocks = [AudioBlock("acl", "nlp", "acl", ["mock-a.wav"])]

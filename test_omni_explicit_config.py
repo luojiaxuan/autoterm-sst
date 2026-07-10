@@ -23,6 +23,7 @@ class OmniExplicitConfigTest(unittest.TestCase):
             nccl_p2p_disable=1,
             nccl_ib_disable=1,
             torch_nccl_enable_monitoring=0,
+            vllm_compat_dir=Path("/tmp/vllm-compat"),
         )
         with patch.dict(os.environ, {}, clear=True):
             configure_vllm_runtime(args)
@@ -31,6 +32,10 @@ class OmniExplicitConfigTest(unittest.TestCase):
             self.assertEqual(os.environ["VLLM_WORKER_MULTIPROC_METHOD"], "spawn")
             self.assertEqual(os.environ["NCCL_P2P_DISABLE"], "1")
             self.assertEqual(os.environ["NCCL_IB_DISABLE"], "1")
+            self.assertEqual(
+                os.environ["PYTHONPATH"],
+                os.pathsep.join(["/tmp/vllm-compat", str(Path(__file__).resolve().parent)]),
+            )
 
     def test_agent_uses_injected_config_and_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

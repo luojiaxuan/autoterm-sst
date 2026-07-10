@@ -11,6 +11,8 @@ from eval.streaming_sst.score_prompt_precision import (
     build_report,
     normalise_source_term,
     score_payload,
+    timing_signature,
+    timing_signature_sha256,
     validate_same_playlist,
 )
 from eval.streaming_sst.score_time_aligned_terms import TimedOccurrence
@@ -144,6 +146,17 @@ class PromptPrecisionTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "does not share"):
             validate_same_playlist([first, second])
+
+    def test_timing_signature_detects_different_chunk_coalescing(self) -> None:
+        first = payload(
+            [{"start_sample": 0, "cursor_samples": 32000}]
+        )
+        second = payload(
+            [{"start_sample": 0, "cursor_samples": 64000}]
+        )
+
+        self.assertNotEqual(timing_signature(first), timing_signature(second))
+        self.assertNotEqual(timing_signature_sha256(first), timing_signature_sha256(second))
 
     def test_build_report_uses_medicine_timed_gold(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

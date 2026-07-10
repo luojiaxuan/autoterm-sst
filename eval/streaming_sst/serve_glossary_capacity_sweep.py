@@ -19,6 +19,7 @@ from framework.router import AgentRouter
 
 
 DEFAULT_PRESETS = "acl_tagged_gs10k,acl_tagged_gs100k,acl_tagged_gs500k,acl_tagged_gs1m"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -46,6 +47,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--nccl-p2p-disable", type=int, choices=(0, 1), default=1)
     parser.add_argument("--nccl-ib-disable", type=int, choices=(0, 1), default=1)
     parser.add_argument("--torch-nccl-enable-monitoring", type=int, choices=(0, 1), default=0)
+    parser.add_argument("--vllm-compat-dir", type=Path, default=PROJECT_ROOT / "serve" / "vllm_compat")
     parser.add_argument("--scheduler-batch-size", type=int, default=8)
     parser.add_argument("--max-inflight-batches", type=int, default=2)
     parser.add_argument("--max-new-tokens", type=int, default=40)
@@ -63,6 +65,10 @@ def _required_presets(raw: str) -> list[str]:
 
 
 def configure_vllm_runtime(args: argparse.Namespace) -> None:
+    python_paths = [str(args.vllm_compat_dir), str(PROJECT_ROOT)]
+    existing_pythonpath = os.environ.get("PYTHONPATH", "").strip()
+    if existing_pythonpath:
+        python_paths.append(existing_pythonpath)
     values = {
         "VLLM_USE_V1": args.vllm_use_v1,
         "VLLM_ENABLE_V1_MULTIPROCESSING": args.vllm_enable_v1_multiprocessing,
@@ -73,6 +79,8 @@ def configure_vllm_runtime(args: argparse.Namespace) -> None:
         "NCCL_IB_DISABLE": args.nccl_ib_disable,
         "TORCH_NCCL_ENABLE_MONITORING": args.torch_nccl_enable_monitoring,
         "TOKENIZERS_PARALLELISM": "false",
+        "PYTHONNOUSERSITE": "1",
+        "PYTHONPATH": os.pathsep.join(python_paths),
     }
     for key, value in values.items():
         os.environ[key] = str(value)

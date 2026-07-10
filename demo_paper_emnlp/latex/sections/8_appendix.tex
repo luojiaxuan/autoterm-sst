@@ -135,10 +135,10 @@ transient extra switch (steady-state active-domain accuracy 0.982); eight of
 nine switches land within 13.6--55.4s, and one delayed medicine-to-ACL switch
 takes 304s over a generic talk opening. A truncated three-block probe
 (ACL\,$\rightarrow$\,medicine\,$\rightarrow$\,ACL, 600s per block) shows the
-same ordering --- Automatic 0.916/0.912 combined versus 0.839/0.867 (fixed
-NLP) and 0.825/0.819 (fixed medicine), with switches 37.4s/25.0s after the
+same ordering --- Automatic 0.909/0.907 combined versus 0.818/0.854 (fixed
+NLP) and 0.811/0.810 (fixed medicine), with switches 37.4s/25.0s after the
 boundaries --- and a gold-only 212-term medicine inventory without fillers
-reaches just 0.811, confirming that compact curated slices need distractor
+reaches just 0.790, confirming that compact curated slices need distractor
 mass to be a realistic comparison.
 
 \begin{table}[ht]
@@ -149,10 +149,10 @@ mass to be a realistic comparison.
 \toprule
 Setting & Acc\textsubscript{tech} & Acc\textsubscript{raw} & ACL & Med. & Med.\ types & BLEU & M-BLEU \\
 \midrule
-None & 0.744 & 0.754 & 0.782 & 0.733 & 92/196 & 58.84 & 57.46 \\
-Fixed NLP & 0.744 & 0.777 & 0.907 & 0.698 & 86/196 & 59.18 & 57.85 \\
-Fixed medicine & 0.901 & 0.881 & 0.772 & 0.937 & 168/196 & \textbf{59.63} & 57.53 \\
-Automatic & \textbf{0.936} & \textbf{0.933} & \textbf{0.912} & \textbf{0.943} & \textbf{170/196} & 58.10 & 56.22 \\
+None & 0.659 & 0.684 & 0.782 & 0.625 & 92/196 & 58.84 & 57.46 \\
+Fixed NLP & 0.674 & 0.720 & 0.907 & 0.609 & 86/196 & 59.18 & 57.85 \\
+Fixed medicine & 0.863 & 0.850 & 0.772 & 0.889 & 168/196 & \textbf{59.63} & 57.53 \\
+Automatic & \textbf{0.905} & \textbf{0.908} & \textbf{0.912} & \textbf{0.903} & \textbf{170/196} & 58.10 & 56.22 \\
 \bottomrule
 \end{tabular}}
 \caption{Full detail for the ten-talk run.
@@ -174,9 +174,11 @@ language pair selects the per-language demo model. Table~\ref{tab:jade} repeats
 the mixed
 full-length ACL\,$\rightarrow$\,medicine\,$\rightarrow$\,ACL comparison for
 En$\rightarrow$Ja and En$\rightarrow$De. Automatic routing, with no
-session-time glossary input, has the best combined term accuracy in every
-language under both gold denominators, with zero wrong switches and
-steady-state active-domain accuracy 1.0. With the
+session-time glossary input, has the best combined term accuracy in Japanese
+under both gold denominators; in German it leads under the raw gold and
+trails the fixed-medicine expert by 1.1 points under the technical gold.
+Both languages show zero wrong switches and steady-state active-domain
+accuracy 1.0. With the
 released ja/de topic keywords, switches land within 29--52s
 (ja 28.9/33.5s; de 52.0/33.5s; zh 37.4/25.0s). An ablation without
 language-tuned keywords degrades first-switch latency to 115.3s (ja) and
@@ -188,9 +190,10 @@ casefolded with light stem tolerance (exact matching undercounts under
 inflection); short variants keep strict word boundaries. The medicine
 references differ in provenance: German uses human reference translations,
 whereas Chinese and Japanese medicine references are model-generated (the ACL
-segments use the shared-task human references in all three). Automatic routing
-gives the best combined term accuracy under the human-referenced German setting
-as well, so the ordering is not an artifact of generated references.
+segments use the shared-task human references in all three). Under the
+human-referenced German setting, automatic routing still leads on the raw
+gold and stays within 1.1 points of the in-domain expert on the technical
+gold without any session-time setup.
 
 \begin{table}[ht]
 \centering
@@ -201,16 +204,16 @@ as well, so the ordering is not an artifact of generated references.
  & Setting & Acc\textsubscript{tech} & Acc\textsubscript{raw} & ACL & Med. & Med.\ types & BLEU & M-BLEU \\
 \midrule
 \multirow{4}{*}{Ja}
- & None & 0.703 & 0.720 & 0.730 & 0.687 & 25/53 & 43.55 & 41.60 \\
- & Fixed NLP & 0.718 & 0.760 & 0.900 & 0.608 & 21/53 & 44.19 & 42.21 \\
- & Fixed medicine & 0.861 & 0.837 & 0.720 & \textbf{0.946} & \textbf{48/53} & \textbf{44.90} & \textbf{42.83} \\
- & Automatic & \textbf{0.910} & \textbf{0.900} & \textbf{0.910} & 0.910 & 45/53 & 40.10 & 38.01 \\
+ & None & 0.635 & 0.669 & 0.730 & 0.578 & 25/53 & 43.55 & 41.60 \\
+ & Fixed NLP & 0.643 & 0.703 & 0.900 & 0.488 & 21/53 & 44.19 & 42.21 \\
+ & Fixed medicine & 0.827 & 0.811 & 0.720 & \textbf{0.892} & \textbf{48/53} & \textbf{44.90} & \textbf{42.83} \\
+ & Automatic & \textbf{0.857} & \textbf{0.860} & \textbf{0.930} & 0.813 & 43/53 & 39.68 & 37.67 \\
 \midrule
 \multirow{4}{*}{De}
- & None & 0.745 & 0.740 & 0.740 & 0.747 & 24/49 & 37.52 & 37.47 \\
- & Fixed NLP & 0.762 & 0.768 & 0.840 & 0.720 & 23/49 & 37.21 & 36.91 \\
- & Fixed medicine & 0.840 & 0.812 & 0.670 & \textbf{0.934} & \textbf{43/49} & \textbf{37.63} & \textbf{37.18} \\
- & Automatic & \textbf{0.911} & \textbf{0.880} & \textbf{0.890} & 0.923 & 41/49 & 36.97 & 36.17 \\
+ & None & 0.653 & 0.669 & 0.740 & 0.604 & 24/49 & 37.52 & 37.47 \\
+ & Fixed NLP & 0.667 & 0.694 & 0.840 & 0.571 & 23/49 & 37.21 & 36.91 \\
+ & Fixed medicine & \textbf{0.812} & 0.790 & 0.670 & \textbf{0.890} & \textbf{43/49} & \textbf{37.63} & \textbf{37.18} \\
+ & Automatic & 0.801 & \textbf{0.795} & \textbf{0.880} & 0.758 & 38/49 & 35.90 & 35.37 \\
 \bottomrule
 \end{tabular}}
 \caption{En$\rightarrow$Ja/De mixed-domain comparison; columns as in

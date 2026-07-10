@@ -16,7 +16,9 @@ streaming stress test.
 
 \paragraph{Metrics.}
 For terminology quality, term accuracy is the fraction of annotated target-term
-occurrences found in the output. The controlled comparison contains 875
+occurrences found in the output; occurrences are scored independently, so
+\(k\) annotated occurrences of a term within a talk require \(k\) distinct
+appearances in that talk's output (count clipping). The controlled comparison contains 875
 technical occurrences: 193 from ACL and 682 from medicine, the latter spanning
 196 block-local medicine term types. Masked BLEU deletes annotated target-term strings from
 both hypothesis and reference before scoring, and is used only as a
@@ -45,10 +47,10 @@ StreamLAAL \citep{papi2024streamatt}.
 \toprule
 Setting & Session setup & Term acc. & ACL & Med. & BLEU \\
 \midrule
-No memory & None & 0.744 & 0.782 & 0.733 & 58.84 \\
-Fixed NLP & Select NLP & 0.744 & 0.907 & 0.698 & 59.18 \\
-Fixed medicine & Select med. & 0.901 & 0.772 & 0.937 & \textbf{59.63} \\
-Automatic & None & \textbf{0.936} & \textbf{0.912} & \textbf{0.943} & 58.10 \\
+No memory & None & 0.659 & 0.782 & 0.625 & 58.84 \\
+Fixed NLP & Select NLP & 0.674 & 0.907 & 0.609 & 59.18 \\
+Fixed medicine & Select med. & 0.863 & 0.772 & 0.889 & \textbf{59.63} \\
+Automatic & None & \textbf{0.905} & \textbf{0.912} & \textbf{0.903} & 58.10 \\
 \bottomrule
 \end{tabular}}
 \caption{Term accuracy on the ten-talk alternating ACL/medicine stream
@@ -63,9 +65,9 @@ covers its own domain's gold terms.}
 Table~\ref{tab:quality} compares equal-sized domain inventories that fully cover
 the gold terms in their matching domain. It therefore tests whether routing can
 compose domain-specific resources across a stream, rather than evaluating
-open-world terminology mining. Automatic mode reaches 0.936 combined term
-accuracy, exceeding both fixed inventories and matching each domain expert
-within its own domain (ACL 0.912 vs.\ 0.907; medicine 0.943 vs.\ 0.937), at
+open-world terminology mining. Automatic mode reaches 0.905 combined term
+accuracy, exceeding both fixed inventories overall and each domain expert
+within its own domain (ACL 0.912 vs.\ 0.907; medicine 0.903 vs.\ 0.889), at
 a 1--1.5 BLEU cost from switch windows. Appendix~\ref{app:mixed} adds
 raw-gold, type-level, and masked-BLEU detail plus a three-block probe. A five-talk sweep shows stable term accuracy (0.965--0.979) while
 retrieval precision falls 0.48\,$\rightarrow$\,0.14 as distractors grow

@@ -13,9 +13,9 @@ speech-centroid evidence, and retrieved-term metadata, without running a
 separate ASR or source-transcript classifier in the production path. The demo
 exposes retrieved terms, active slices, router decisions, and retrieval
 latency in a live evidence panel.
-On a ten-talk alternating ACL/medicine stream, automatic mode reaches 0.936
-combined term accuracy, compared with 0.744 and 0.901 for fixed NLP and medicine
-inventories. Scale probes show warm MaxSim retrieval stays near 60--105 ms
+On a ten-talk alternating ACL/medicine stream, automatic mode reaches 0.905
+combined term accuracy, compared with 0.674 and 0.863 for fixed NLP and medicine
+inventories, and exceeds each fixed inventory inside its own domain. Scale probes show warm MaxSim retrieval stays near 60--105 ms
 (p50--p95) for memories of up to one million terms. Across the ten-talk stream,
 the router reaches the correct glossary after all nine domain transitions,
 with one transient, self-correcting excursion. The released implementation

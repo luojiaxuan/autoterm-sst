@@ -31,6 +31,7 @@ from eval.streaming_sst.eval_mixed_audio_switch import (
     resolve_max_switch_events,
     run_streaming_eval,
     summarize_run,
+    translation_record_event,
     switch_session_glossary,
     validate_oracle_preset_map,
 )
@@ -47,6 +48,23 @@ def _write_wav(path: Path, frames: int) -> None:
 
 
 class MixedAudioSwitchEvalTests(unittest.TestCase):
+    def test_empty_translation_status_becomes_an_empty_chunk_record(self) -> None:
+        event = {
+            "type": "status",
+            "text": "EMPTY_TRANSLATION",
+            "meta": {"cursor_status_reason": "empty_translation"},
+        }
+
+        record_event = translation_record_event(event)
+
+        self.assertIsNotNone(record_event)
+        self.assertEqual(record_event["text"], "")
+        self.assertIsNone(
+            translation_record_event(
+                {"type": "status", "text": "PROCESSING_COMPLETE", "meta": {}}
+            )
+        )
+
     def test_oracle_preset_map_parser_and_missing_domain_validation(self) -> None:
         mapping = parse_oracle_preset_map(
             "nlp=nlp_core_10k, medicine=medicine_core_10k"

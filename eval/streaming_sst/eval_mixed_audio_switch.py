@@ -790,13 +790,14 @@ async def run_streaming_eval(
                 await pacing.observe_event(event_type, event.get("meta"))
                 if event_type == "status" and event_text.startswith("PROCESSING_COMPLETE") and feed_task.done():
                     continue
-                if event_type != "partial":
+                record_event = translation_record_event(event)
+                if record_event is None:
                     continue
                 idle_after_eof = 0
                 events_seen += 1
                 records.append(
                     extract_record(
-                        event,
+                        record_event,
                         event_idx=events_seen,
                         spans=spans,
                         require_router_meta=require_router_meta,
@@ -829,6 +830,23 @@ async def run_streaming_eval(
         "pacing": pacing.snapshot(),
         "records": records,
     }
+
+
+def translation_record_event(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    event_type = str(event.get("type") or "").casefold()
+    if event_type == "partial":
+        return event
+    meta = event.get("meta")
+    reason = (
+        str(meta.get("cursor_status_reason") or "").strip()
+        if isinstance(meta, dict)
+        else ""
+    )
+    if event_type != "status" or not reason:
+        return None
+    record_event = dict(event)
+    record_event["text"] = ""
+    return record_event
 
 
 def extract_record(
@@ -866,6 +884,7 @@ def extract_record(
             round(float(emitted_wall_s), 6) if emitted_wall_s is not None else None
         ),
         "expected_domain": expected,
+        "translation_status": str(meta.get("cursor_status_reason") or "partial"),
         "active_domain": str(topic["active_domain"]),
         "active_preset": str(topic["active_glossary_preset"]),
         "switch_count": int(topic["switch_count"]),

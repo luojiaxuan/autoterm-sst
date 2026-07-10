@@ -35,18 +35,26 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         agent._emit = events.append
         session = SimpleNamespace(session_id="empty-output", segment_idx=7)
 
-        agent._emit_cursor_status(
-            session,
-            text="EMPTY_TRANSLATION",
-            start_sample=10,
-            cursor_samples=20,
-        )
+        with patch.object(
+            agent,
+            "_event_meta",
+            return_value={"start_sample": 10, "cursor_samples": 20},
+        ):
+            agent._emit_cursor_status(
+                session,
+                text="EMPTY_TRANSLATION",
+                start_sample=10,
+                cursor_samples=20,
+                retrieve_s=0.1,
+                references=[],
+            )
 
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0].type, "status")
         self.assertEqual(events[0].text, "EMPTY_TRANSLATION")
         self.assertEqual(events[0].meta["start_sample"], 10)
         self.assertEqual(events[0].meta["cursor_samples"], 20)
+        self.assertEqual(events[0].meta["cursor_status_reason"], "empty_translation")
 
     def test_autoterm_yaml_hysteresis_defaults_reach_omni_config(self) -> None:
         with patch.dict(os.environ, {}, clear=True):

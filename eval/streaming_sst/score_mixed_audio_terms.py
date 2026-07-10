@@ -91,6 +91,75 @@ def latin_translation_hit(output: str, variant: str) -> bool:
     return False
 
 
+def count_variant_occurrences(output: str, variant: str) -> int:
+    """Non-overlapping occurrence count under output_contains_variant semantics."""
+    variant = normalise_space(variant)
+    if not variant:
+        return 0
+    if _ALNUM_TERM_RE.fullmatch(variant):
+        return len(
+            re.findall(r"(?<![A-Za-z0-9])" + re.escape(variant) + r"(?![A-Za-z0-9])", output, re.IGNORECASE)
+        )
+    return output.count(variant)
+
+
+def count_latin_translation_occurrences(output: str, variant: str) -> int:
+    """Non-overlapping count under latin_translation_hit semantics."""
+    variant = normalise_space(variant)
+    if not variant:
+        return 0
+    if len(variant) < 4:
+        return len(
+            re.findall(r"(?<![A-Za-z0-9])" + re.escape(variant) + r"(?![A-Za-z0-9])", output, re.IGNORECASE)
+        )
+    out_cf = output.casefold()
+    direct = out_cf.count(variant.casefold())
+    if direct:
+        return direct
+    stems = [_latin_stem(w) for w in variant.casefold().split()]
+    if stems and all(len(s) >= 4 for s in stems):
+        counts = [out_cf.count(s) for s in stems]
+        return min(counts) if all(counts) else 0
+    return 0
+
+
+def count_output_hits(
+    term: str, variants: Sequence[str], output: str, target_lang: str = "zh"
+) -> tuple[int, str | None, str | None]:
+    """Count how many gold occurrences of this term the output can support.
+
+    Mirrors classify_output_hit's variant precedence, but counts distinct
+    (non-overlapping) appearances instead of testing mere presence, so k gold
+    occurrences need k appearances to all score as hits.
+    """
+    latin_target = target_lang in _LATIN_TRANSLATION_TARGETS
+    best = 0
+    best_variant: str | None = None
+    best_kind: str | None = None
+    for variant in variants:
+        if contains_cjk_or_kana(variant):
+            n = count_variant_occurrences(output, variant)
+            kind = "zh_translation"
+        elif (
+            latin_target
+            and normalise_space(variant).casefold() != normalise_space(term).casefold()
+        ):
+            n = count_latin_translation_occurrences(output, variant)
+            kind = "latin_translation"
+        else:
+            continue
+        if n > best:
+            best, best_variant, best_kind = n, variant, kind
+    if best == 0 and allowed_identity_retention_source(term):
+        for variant in variants:
+            if not contains_cjk_or_kana(variant):
+                n = count_variant_occurrences(output, variant)
+                if n > best:
+                    kind = "acronym_retention" if term.upper() == term else "identity_retention"
+                    best, best_variant, best_kind = n, variant, kind
+    return best, best_variant, best_kind
+
+
 def classify_output_hit(
     term: str, variants: Sequence[str], output: str, target_lang: str = "zh"
 ) -> tuple[bool, str | None, str | None]:
@@ -371,9 +440,19 @@ def score_occurrences(payload: Dict[str, Any], gold: Sequence[GoldOccurrence], t
     by_domain: Dict[str, List[int]] = defaultdict(list)
     by_source: Dict[str, List[int]] = defaultdict(list)
     by_type: Dict[tuple[int, str, str, str, tuple[str, ...]], List[int]] = defaultdict(list)
+    # Occurrence-level scoring: k gold occurrences of a term in a block are
+    # matched against distinct appearances in that block's output, so a term
+    # rendered once can satisfy at most one gold occurrence (count clipping).
+    group_counts: Dict[tuple[int, str, tuple[str, ...]], tuple[int, str | None, str | None]] = {}
+    group_used: Dict[tuple[int, str, tuple[str, ...]], int] = defaultdict(int)
     for occ in gold:
-        output = outputs.get(occ.block_index, "")
-        ok, variant, kind = classify_output_hit(occ.term, occ.variants, output, target_lang=target_lang)
+        gkey = (occ.block_index, occ.term, tuple(occ.variants))
+        if gkey not in group_counts:
+            output = outputs.get(occ.block_index, "")
+            group_counts[gkey] = count_output_hits(occ.term, occ.variants, output, target_lang=target_lang)
+        available, variant, kind = group_counts[gkey]
+        ok = group_used[gkey] < available
+        group_used[gkey] += 1
         hit += int(ok)
         by_domain[occ.domain].append(int(ok))
         by_source[occ.source].append(int(ok))
@@ -387,8 +466,9 @@ def score_occurrences(payload: Dict[str, Any], gold: Sequence[GoldOccurrence], t
                 "variants": list(occ.variants),
                 "source": occ.source,
                 "hit": bool(ok),
-                "hit_variant": variant,
-                "hit_kind": kind,
+                "hit_variant": variant if ok else None,
+                "hit_kind": kind if ok else None,
+                "output_occurrences": available,
             }
         )
     total = len(gold)

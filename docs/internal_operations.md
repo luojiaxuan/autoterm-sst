@@ -12,7 +12,11 @@ paths refer to lab machines and are meaningless outside the group.
   `docs/auto_glossary_mixed_switch_20260707.md`, and
   `docs/auto_glossary_routing_probe_20260707.md`. The aligned-window
   AutoTerm-10k vs merged-40k xCOMET-lite sensitivity and its local artifact
-  checksums are in `docs/autoterm_40k_xcomet_eval_20260710.md`.
+  checksums are in `docs/autoterm_40k_xcomet_eval_20260710.md`. The provisional
+  10-domain AutoTerm top-4/40k vs raw merged-100k stress result, including the
+  negative quality result and router slice-coverage failure, is in
+  `docs/autoterm_100k_stress_eval_20260710.md`; its machine-readable lightweight
+  record is `runtime/eval_20260710/autoterm_100k_3talk_summary.json`.
 - Lightweight ACL 60/60 and ESO medicine MFA TextGrid annotations are tracked
   in Git under `eval/streaming_sst/mfa_alignments/`; that directory records the
   original Taurus paths and SHA-256 checksums. Audio and large derived chunk

@@ -1,0 +1,166 @@
+{
+  "schema_version": "autoterm_100k_3talk_summary.v1",
+  "created_at": "2026-07-10",
+  "status": "provisional_raw_union_comparison",
+  "headline_conclusion": "AutoTerm top-4/40k improves prompt sparsity and prompt precision but does not outperform raw merged-100k on MFA term accuracy, BLEU, or masked BLEU.",
+  "code": {
+    "branch": "explore/multidomain-routing",
+    "commit": "89f4fc4198d3cad721d75facd151b95516c0d6ab"
+  },
+  "catalog": {
+    "domains": [
+      "nlp",
+      "medicine",
+      "education",
+      "finance",
+      "legal",
+      "environment",
+      "entertainment",
+      "science",
+      "sports",
+      "art"
+    ],
+    "slice_rows": 10000,
+    "merged_rows": 100000,
+    "merged_unique_source_terms": 88622,
+    "cross_slice_overlap_term_types": 9802,
+    "multi_target_variant_term_types": 594,
+    "domain_inference_from_substrings": false,
+    "extra_eight_domains_are_stress_distractors_only": true,
+    "catalog_report_sha256": "35dbcf9e9ae023f911157d5599a97a8450d838bca1102f1d0f279eecd2c9d908",
+    "manifest_sha256": "384d69da7bbf4b7683cd510172fb7ffeae27e8a81ce16a8e0525b84eb277f334"
+  },
+  "playlist": {
+    "items": [
+      "2022.acl-long.268",
+      "medicine_545006",
+      "2022.acl-long.367"
+    ],
+    "audio_seconds": 2538.689,
+    "chunk_seconds": 1.92,
+    "sample_rate": 16000,
+    "gold_occurrences": {
+      "technical_plus_medicine": 432,
+      "raw_plus_medicine": 881
+    }
+  },
+  "systems": {
+    "autoterm_top4_40k": {
+      "term_budget": 40000,
+      "max_active_slices": 4,
+      "context_window_chunks": 12,
+      "prompt_top_k": 10,
+      "event_count": 1295,
+      "server_batches": 1323,
+      "generation_failures": 0,
+      "mfa_term_accuracy": {
+        "technical_plus_medicine": 0.8773,
+        "raw_plus_medicine": 0.8581,
+        "nlp_technical": 0.8734,
+        "nlp_raw": 0.8555,
+        "medicine": 0.9189
+      },
+      "quality": {
+        "bleu": 54.3763,
+        "technical_masked_bleu": 51.9039,
+        "raw_masked_bleu": 50.5896
+      },
+      "prompt": {
+        "technical_precision": 0.094898,
+        "raw_precision": 0.167365,
+        "references_per_chunk": 3.132819,
+        "evaluated_references": 4057
+      },
+      "routing": {
+        "wrong_switches": 0,
+        "steady_state_active_domain_accuracy": 0.974,
+        "expected_slice_coverage": 0.854054,
+        "nlp_slice_coverage": 0.728507,
+        "medicine_slice_coverage": 0.985759,
+        "nlp_to_medicine_active_switch_latency_s": 38.517,
+        "medicine_to_nlp_active_switch_latency_s": 124.184,
+        "nlp_to_medicine_slice_inclusion_latency_s": 0.117,
+        "medicine_to_nlp_slice_inclusion_latency_s": 18.584
+      },
+      "latency_ms": {
+        "retrieval_p50": 89.68,
+        "retrieval_p95": 2203.98,
+        "last_100_retrieval_p50": 163.07,
+        "last_100_retrieval_p95": 4811.08,
+        "retrieval_max": 11899.29
+      },
+      "backpressure": {
+        "max_unacked_chunks_configured": 1,
+        "max_observed_unacked_chunks": 3.0,
+        "timeout_release_count": 28,
+        "timeout_release_samples": 860160
+      },
+      "sha256": {
+        "run_json": "beb829d45a886dfb0cc3c4383cf9cd96d13ce9f30b6b52fe87ff25eb3b12fdcf",
+        "mfa_json": "9037a5b1edf97e7d49e944c9527075349e807ef3a157919d0ce79af61173192e",
+        "quality_json": "44daefefe327862d6a2db1861ddc98e3cbce4206208942c2bf5e356ca02eacb0",
+        "prompt_json": "bd487202de7c521be01d74000ee8f474ac7e73ddd0be7792f17bed3a3721630c",
+        "server_log": "b02c5d8799f8ee25309514b77168786568d526707e7440f5d573f9dd624777ef"
+      }
+    },
+    "raw_merged_100k": {
+      "rows": 100000,
+      "unique_source_terms": 88622,
+      "event_count": 1037,
+      "mfa_term_accuracy": {
+        "technical_plus_medicine": 0.9236,
+        "raw_plus_medicine": 0.9047,
+        "nlp_technical": 0.9266,
+        "nlp_raw": 0.9052,
+        "medicine": 0.8919
+      },
+      "quality": {
+        "bleu": 54.9718,
+        "technical_masked_bleu": 52.4203,
+        "raw_masked_bleu": 50.7813
+      },
+      "prompt": {
+        "technical_precision": 0.079357,
+        "raw_precision": 0.151259,
+        "references_per_chunk": 5.820636,
+        "evaluated_references": 6036
+      },
+      "latency_ms": {
+        "retrieval_p50": 64.74,
+        "retrieval_p95": 208.57
+      },
+      "sha256": {
+        "run_json": "42d2245a83e0adf3a4ad28e43364ab3faa8461bd3a8fb2e254a448f3b465487c",
+        "mfa_json": "8d6aa813c8a11cc12d7434bc172bcbe16e20a6fd5bc7dff21baba291a7e3c0ca",
+        "quality_json": "9a654233f44e26a5c5ceff849530a4abe485ed582bf86ed4ae95f5df75021e63",
+        "prompt_json": "8fe8b162b9f10042a440e6d237e31ed1ce2e27b47dd4bf4195648ede47c9922b"
+      }
+    }
+  },
+  "autoterm_minus_merged": {
+    "mfa_technical_plus_medicine": -0.0463,
+    "mfa_raw_plus_medicine": -0.0466,
+    "bleu": -0.5955,
+    "technical_masked_bleu": -0.5164,
+    "raw_masked_bleu": -0.1917,
+    "technical_prompt_precision": 0.015541,
+    "raw_prompt_precision": 0.016106,
+    "references_per_chunk": -2.687817,
+    "retrieval_p95_ms": 1995.41
+  },
+  "excluded_failed_attempt": {
+    "valid_result": false,
+    "failure": "Engine core proc EngineCore_DP0 died unexpectedly",
+    "server_batch": 847,
+    "formal_batches_before_failure": 815,
+    "server_log_sha256": "e9723371122a9e1b944d798bb0ea27ceddf22d156c593d10b0e48eddca845eb6"
+  },
+  "artifact_status": {
+    "git_summary": "canonical after this file is committed to main",
+    "canonical_input_dataset": "https://huggingface.co/datasets/gavinlaw/rasst-main-result-data",
+    "canonical_input_revision_note": "medicine compact GT recorded at revision 204ba141",
+    "raw_outputs": "Taurus local staging only; pending Hugging Face destination",
+    "catalogs_and_indexes": "Taurus local staging only; pending Hugging Face destination",
+    "dedup_topup_100k_baseline": "built but not yet run"
+  }
+}

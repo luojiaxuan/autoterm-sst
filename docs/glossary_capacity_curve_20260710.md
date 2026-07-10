@@ -103,7 +103,11 @@ Hyper00 paused staging（2026-07-10）：
   copied Conda runtime file count 与 Taurus source 同为 92,523。
 - Smoke：`outputs/smoke-10k` 已完成 60.0s / 28 emitted events，health 显示
   `active_terms=10000`，`tail_gap_samples=0`，保存的 112 条 prompt references 与
-  `prompt_reference_count` 完全一致。
+  `prompt_reference_count` 完全一致。现有 score 仅作 pipeline diagnostics：
+  technical/raw MFA term accuracy 为 `11/12` / `38/43`，BLEU 为 `58.2218`，
+  technical/raw masked BLEU 为 `55.1601` / `50.4862`，strict technical/raw
+  Prompt Precision 为 `0.116071` / `0.428571`，refs/chunk 为 `4.0`。这些数值不是
+  full-run 结果，不能用于论文主表。
 - Full run：按用户要求已暂停并释放 GPU。`outputs/full-zh` 的 10k / 100k
   controller 分别在 1,172 / 1,171 batches 时收到 SIGTERM；
   `run_manifest_{a,b}.json` 明确记录
@@ -123,6 +127,17 @@ Hyper00 paused staging（2026-07-10）：
 - 一个共享机 failure mode：首次 preflight 后 GPU 0/1 被已有的他人容器恢复任务
   抢占，两个 server 在 health 前因显存不足失败；失败输出隔离在 `outputs/full`，
   不进入正式结果。重新 preflight 后正式任务使用 GPU 2/3。
+
+当前 Hyper staging 总计约 90 GiB，其中 `models` 70 GiB、`runtime` 12 GiB、
+`term_memory` 6.8 GiB、`hf_cache` 1.3 GiB，其余 code/eval/inputs/outputs 均小于
+100 MiB（`outputs` 约 1.5 MiB）。输出目录边界如下：
+
+| path | 状态 | 后续处理 |
+|---|---|---|
+| `outputs/smoke-10k` | complete | 仅验证 pipeline 与 scorer；保留 |
+| `outputs/full` | failed before health gate | 仅作共享 GPU race failure log；不评分 |
+| `outputs/full-zh` | user-paused partial 10k/100k | 保留 manifest/log；不评分、不续接 |
+| `outputs/full-zh-rerun-<date>` | 尚不存在 | 后续四档完整重跑时新建 |
 
 ### Restart note
 

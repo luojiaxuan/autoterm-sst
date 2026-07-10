@@ -203,12 +203,45 @@ class TimedOccurrence:
     t_end: float
 
 
+def load_acl_segment_map(acl_root: str) -> Dict[str, List[tuple[float, float, float]]]:
+    """Per talk: list of (orig_offset, orig_offset+duration, played_start) in play order.
+
+    The playlist concatenates the talk's segment wavs back-to-back (gaps
+    removed), so a TextGrid time (original-talk seconds) maps to played seconds
+    only through the segment it falls in.
+    """
+    meta_path = Path(acl_root) / "segments.meta.jsonl"
+    rows = [json.loads(l) for l in meta_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    by_talk: Dict[str, List[dict]] = {}
+    for r in rows:
+        by_talk.setdefault(str(r.get("talk")), []).append(r)
+    out: Dict[str, List[tuple[float, float, float]]] = {}
+    for talk, segs in by_talk.items():
+        segs.sort(key=lambda r: int(r.get("index", 0)))
+        played = 0.0
+        spans: List[tuple[float, float, float]] = []
+        for r in segs:
+            off = float(r["offset"]); dur = float(r["duration"])
+            spans.append((off, off + dur, played))
+            played += float(r.get("seg_duration") or dur)
+        out[talk] = spans
+    return out
+
+
+def map_orig_to_played(spans: List[tuple[float, float, float]], t_orig: float) -> float | None:
+    for off, end, played_start in spans:
+        if off <= t_orig < end:
+            return played_start + (t_orig - off)
+    return None
+
+
 def build_timed_gold(payload: Dict[str, Any], args: argparse.Namespace) -> Dict[str, List[TimedOccurrence]]:
     blocks = payload.get("blocks") or []
     spans = {int(s["block_index"]): s for s in payload.get("block_spans") or []}
     acl_tech = load_gold_entries(args.acl_technical_gold, target_lang=args.target_lang)
     acl_raw = load_gold_entries(args.acl_raw_glossary, target_lang=args.target_lang)
     mfa_root = Path(args.mfa_root)
+    seg_map = load_acl_segment_map(args.acl_root)
     gold: Dict[str, List[TimedOccurrence]] = {"technical_plus_medicine": [], "raw_plus_medicine": []}
     for block_index, block in enumerate(blocks, start=1):
         span = spans[block_index]
@@ -218,13 +251,20 @@ def build_timed_gold(payload: Dict[str, Any], args: argparse.Namespace) -> Dict[
         if block.get("corpus") == "acl":
             tg = mfa_root / "acl6060" / item / f"{item}.TextGrid"
             words = parse_textgrid_words(tg)
+            talk_spans = seg_map.get(item, [])
             for gold_key, entries in (("technical_plus_medicine", acl_tech), ("raw_plus_medicine", acl_raw)):
                 for term, variants in entries:
                     for ts, te in find_term_occurrences(words, term):
-                        if ts >= duration:
+                        ps = map_orig_to_played(talk_spans, ts)
+                        pe = map_orig_to_played(talk_spans, te)
+                        if ps is None:  # word fell in a removed inter-segment gap
+                            continue
+                        if pe is None:
+                            pe = ps
+                        if ps >= duration:
                             continue
                         gold[gold_key].append(
-                            TimedOccurrence("nlp", block_index, term, variants, block_start + ts, block_start + te)
+                            TimedOccurrence("nlp", block_index, term, variants, block_start + ps, block_start + pe)
                         )
         elif block.get("corpus") == "medicine":
             mid = item.removeprefix("medicine_")
@@ -290,6 +330,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--run", action="append", required=True, metavar="NAME=PATH")
     ap.add_argument("--mfa-root", required=True)
+    ap.add_argument("--acl-root", required=True, help="dir with segments.meta.jsonl (segment offsets)")
     ap.add_argument("--acl-technical-gold", required=True)
     ap.add_argument("--acl-raw-glossary", required=True)
     ap.add_argument("--medicine-oracle-dir", required=True)

@@ -11,6 +11,10 @@ paths refer to lab machines and are meaningless outside the group.
   `docs/adaptive_working_glossary_eval.md`,
   `docs/auto_glossary_mixed_switch_20260707.md`, and
   `docs/auto_glossary_routing_probe_20260707.md`.
+- Lightweight ACL 60/60 and ESO medicine MFA TextGrid annotations are tracked
+  in Git under `eval/streaming_sst/mfa_alignments/`; that directory records the
+  original Taurus paths and SHA-256 checksums. Audio and large derived chunk
+  datasets are not vendored.
 - Current Taurus local staging for real E2E mixed-router outputs:
   `/mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_hybrid_8012`.
   These raw JSON/MD outputs are local staging artifacts, not reusable canonical

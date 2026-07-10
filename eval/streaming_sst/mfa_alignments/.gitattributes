@@ -1,0 +1,4 @@
+*.TextGrid -text -diff
+alignment_analysis.csv -text -diff
+README.md text eol=lf
+SHA256SUMS text eol=lf

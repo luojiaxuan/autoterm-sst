@@ -179,7 +179,9 @@ GLOSSARY_PRESETS: Dict[str, Dict[str, Any]] = {
         "path": str(ACL_RAW_GLOSSARY),
         "domain": "acl6060",
         "index_paths": {
-            "zh": _main_result_index(
+            # RASST_INDEX_ZH_ACL lets a demo host boot its warmup retriever on
+            # a curated slice; eval hosts leave it unset and keep this default.
+            "zh": os.environ.get("RASST_INDEX_ZH_ACL") or _main_result_index(
                 "acl_tagged_raw", "zh", 2,
                 "maxsim_acl6060_tagged_gt_raw_min_norm2_ebc26806ed693f1a_tr128_ta256.pt",
             ),

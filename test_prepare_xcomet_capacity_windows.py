@@ -4,7 +4,6 @@ import argparse
 import json
 import tempfile
 import unittest
-import wave
 from pathlib import Path
 
 from eval.streaming_sst.prepare_xcomet_capacity_windows import prepare_windows
@@ -14,21 +13,30 @@ class PrepareXcometCapacityWindowsTest(unittest.TestCase):
     def test_prepares_pair_from_chunk_cursors(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            audio_dir = root / "audio"
-            audio_dir.mkdir()
             talk = "2022.acl-long.268"
-            with wave.open(str(audio_dir / f"{talk}.wav"), "wb") as handle:
-                handle.setnchannels(1)
-                handle.setsampwidth(2)
-                handle.setframerate(16000)
-                handle.writeframes(b"\0\0" * 16000 * 10)
             (root / "source.txt").write_text("source one\nsource two\n", encoding="utf-8")
             (root / "reference.txt").write_text("参考一\n参考二\n", encoding="utf-8")
             (root / "meta.jsonl").write_text(
                 "\n".join(
                     [
-                        json.dumps({"index": 0, "talk": talk, "offset": 0.0, "duration": 4.0}),
-                        json.dumps({"index": 1, "talk": talk, "offset": 4.0, "duration": 4.0}),
+                        json.dumps(
+                            {
+                                "index": 0,
+                                "talk": talk,
+                                "offset": 10.0,
+                                "duration": 4.0,
+                                "seg_duration": 4.0,
+                            }
+                        ),
+                        json.dumps(
+                            {
+                                "index": 1,
+                                "talk": talk,
+                                "offset": 40.0,
+                                "duration": 4.0,
+                                "seg_duration": 4.0,
+                            }
+                        ),
                     ]
                 )
                 + "\n",
@@ -64,7 +72,7 @@ class PrepareXcometCapacityWindowsTest(unittest.TestCase):
                 acl_meta=root / "meta.jsonl",
                 acl_source_text=root / "source.txt",
                 acl_reference_text=root / "reference.txt",
-                audio_dir=audio_dir,
+                audio_dir=None,
                 talks=talk,
                 window_sec=3.0,
                 out_jsonl=root / "unused.jsonl",
@@ -77,6 +85,8 @@ class PrepareXcometCapacityWindowsTest(unittest.TestCase):
             self.assertEqual(rows[0]["merged_hypothesis"], "丙")
             self.assertEqual(rows[1]["auto_hypothesis"], "乙")
             self.assertEqual(rows[1]["reference"], "参考二")
+            self.assertEqual(rows[1]["local_start_s"], 4.0)
+            self.assertEqual(rows[1]["local_end_s"], 8.0)
 
 
 if __name__ == "__main__":

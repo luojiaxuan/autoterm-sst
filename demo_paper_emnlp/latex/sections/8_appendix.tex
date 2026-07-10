@@ -125,6 +125,13 @@ byte-identical gold glossary (238 ACL / 212 hard-medicine terms) plus
 seeded wiki fillers, mirroring the recipe of Appendix~\ref{app:sweep}
 (gold coverage 142/142 and 54/54).
 
+Occurrences are anchored to source-audio seconds by Montreal Forced Aligner
+word alignments (ACL, through the played segment offsets) or oracle span times
+(medicine); a hit needs a distinct target variant within a $[-2,+30]$\,s
+window, matched one-to-one. Alignments ship with the code
+(\texttt{eval/streaming\_sst/mfa\_alignments}) and the lead is stable for
+15--45\,s windows.
+
 Table~\ref{tab:mixed} gives the full detail for the ten-talk run of
 Table~\ref{tab:quality} (five ACL and five medicine talks alternating,
 16,848s streamed live in real time through one session): raw-gold and
@@ -135,11 +142,12 @@ transient extra switch (steady-state active-domain accuracy 0.982); eight of
 nine switches land within 13.6--55.4s, and one delayed medicine-to-ACL switch
 takes 304s over a generic talk opening. A truncated three-block probe
 (ACL\,$\rightarrow$\,medicine\,$\rightarrow$\,ACL, 600s per block) shows the
-same ordering --- Automatic 0.909/0.907 combined versus 0.818/0.854 (fixed
-NLP) and 0.811/0.810 (fixed medicine), with switches 37.4s/25.0s after the
+same ordering --- Automatic 0.908/0.888 combined versus 0.888/0.874 (fixed
+NLP) and 0.738/0.727 (fixed medicine), with switches 37.4s/25.0s after the
 boundaries --- and a gold-only 212-term medicine inventory without fillers
-reaches just 0.790, confirming that compact curated slices need distractor
-mass to be a realistic comparison.
+reaches just 0.738, confirming that compact curated slices need distractor
+mass to be a realistic comparison. This probe is ACL-heavy (367 of 412
+technical occurrences), so the fixed-NLP inventory is a close runner-up.
 
 \begin{table}[ht]
 \centering
@@ -149,16 +157,16 @@ mass to be a realistic comparison.
 \toprule
 Setting & Acc\textsubscript{tech} & Acc\textsubscript{raw} & ACL & Med. & Med.\ types & BLEU & M-BLEU \\
 \midrule
-None & 0.659 & 0.684 & 0.782 & 0.625 & 92/196 & 58.84 & 57.46 \\
-Fixed NLP & 0.674 & 0.720 & 0.907 & 0.609 & 86/196 & 59.18 & 57.85 \\
-Fixed medicine & 0.863 & 0.850 & 0.772 & 0.889 & 168/196 & \textbf{59.63} & 57.53 \\
-Automatic & \textbf{0.905} & \textbf{0.908} & \textbf{0.912} & \textbf{0.903} & \textbf{170/196} & 58.10 & 56.22 \\
+None & 0.670 & 0.706 & 0.767 & 0.559 & 92/196 & 58.84 & 57.46 \\
+Fixed NLP & 0.679 & 0.746 & 0.797 & 0.544 & 86/196 & 59.18 & 57.85 \\
+Fixed medicine & 0.805 & 0.784 & 0.764 & 0.852 & 168/196 & \textbf{59.63} & 57.53 \\
+Automatic & \textbf{0.874} & \textbf{0.868} & \textbf{0.890} & \textbf{0.856} & \textbf{170/196} & 58.10 & 56.22 \\
 \bottomrule
 \end{tabular}}
 \caption{Full detail for the ten-talk run.
 Acc\textsubscript{tech}/Acc\textsubscript{raw} = term accuracy under the
-curated technical gold (875 occurrences) and the raw annotation gold
-(1{,}064); ACL/Med.\ = per-domain accuracy under the technical gold;
+curated technical gold (1{,}462 occurrences) and the raw annotation gold
+(2{,}551); ACL/Med.\ = per-domain accuracy under the technical gold;
 Med.\ types = medicine term types hit at least once (of 196); M-BLEU as in
 Table~\ref{tab:sweep}.}
 \label{tab:mixed}
@@ -174,11 +182,12 @@ language pair selects the per-language demo model. Table~\ref{tab:jade} repeats
 the mixed
 full-length ACL\,$\rightarrow$\,medicine\,$\rightarrow$\,ACL comparison for
 En$\rightarrow$Ja and En$\rightarrow$De. Automatic routing, with no
-session-time glossary input, has the best combined term accuracy in Japanese
-under both gold denominators; in German it leads under the raw gold and
-trails the fixed-medicine expert by 1.1 points under the technical gold.
-Both languages show zero wrong switches and steady-state active-domain
-accuracy 1.0. With the
+session-time glossary input, has the best combined term accuracy in both
+languages under both gold denominators, with zero wrong switches and
+steady-state active-domain accuracy 1.0. Both languages route ACL better than
+the fixed-NLP inventory and reach medicine coverage without a medicine
+glossary, so the combined lead comes from balanced cross-domain coverage
+rather than winning either domain outright. With the
 released ja/de topic keywords, switches land within 29--52s
 (ja 28.9/33.5s; de 52.0/33.5s; zh 37.4/25.0s). An ablation without
 language-tuned keywords degrades first-switch latency to 115.3s (ja) and

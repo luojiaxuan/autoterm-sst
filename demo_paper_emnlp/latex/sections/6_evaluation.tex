@@ -16,10 +16,12 @@ streaming stress test.
 
 \paragraph{Metrics.}
 For terminology quality, term accuracy is the fraction of annotated target-term
-occurrences found in the output; occurrences are scored independently, so
-\(k\) annotated occurrences of a term within a talk require \(k\) distinct
-appearances in that talk's output (count clipping). The controlled comparison contains 875
-technical occurrences: 193 from ACL and 682 from medicine, the latter spanning
+occurrences translated. Each occurrence is anchored to source-audio seconds by forced alignment and
+counts as a hit only when a distinct target variant appears in the output
+within a $[-2,+30]$\,s window, so repeated occurrences are scored
+independently rather than crediting a talk for one appearance
+(Appendix~\ref{app:mixed}). The controlled comparison contains 1{,}462
+technical occurrences: 780 from ACL and 682 from medicine, the latter spanning
 196 block-local medicine term types. Masked BLEU deletes annotated target-term strings from
 both hypothesis and reference before scoring, and is used only as a
 non-terminology sanity check. For runtime, we report prompt references per
@@ -47,14 +49,14 @@ StreamLAAL \citep{papi2024streamatt}.
 \toprule
 Setting & Session setup & Term acc. & ACL & Med. & BLEU \\
 \midrule
-No memory & None & 0.659 & 0.782 & 0.625 & 58.84 \\
-Fixed NLP & Select NLP & 0.674 & 0.907 & 0.609 & 59.18 \\
-Fixed medicine & Select med. & 0.863 & 0.772 & 0.889 & \textbf{59.63} \\
-Automatic & None & \textbf{0.905} & \textbf{0.912} & \textbf{0.903} & 58.10 \\
+No memory & None & 0.670 & 0.767 & 0.559 & 58.84 \\
+Fixed NLP & Select NLP & 0.679 & 0.797 & 0.544 & 59.18 \\
+Fixed medicine & Select med. & 0.805 & 0.764 & 0.852 & \textbf{59.63} \\
+Automatic & None & \textbf{0.874} & \textbf{0.890} & \textbf{0.856} & 58.10 \\
 \bottomrule
 \end{tabular}}
 \caption{Term accuracy on the ten-talk alternating ACL/medicine stream
-(16{,}848s, one live session; 875 gold occurrences: 193 ACL + 682 medicine).
+(16{,}848s, one live session; 1{,}462 gold occurrences: 780 ACL + 682 medicine).
 ACL/Med.\ = term accuracy within each domain's talks. Session setup = what
 the user does at session time. Every inventory is a 10k-term union that fully
 covers its own domain's gold terms.}
@@ -65,9 +67,9 @@ covers its own domain's gold terms.}
 Table~\ref{tab:quality} compares equal-sized domain inventories that fully cover
 the gold terms in their matching domain. It therefore tests whether routing can
 compose domain-specific resources across a stream, rather than evaluating
-open-world terminology mining. Automatic mode reaches 0.905 combined term
+open-world terminology mining. Automatic mode reaches 0.874 combined term
 accuracy, exceeding both fixed inventories overall and each domain expert
-within its own domain (ACL 0.912 vs.\ 0.907; medicine 0.903 vs.\ 0.889), at
+within its own domain (ACL 0.890 vs.\ 0.797; medicine 0.856 vs.\ 0.852), at
 a 1--1.5 BLEU cost from switch windows. Appendix~\ref{app:mixed} adds
 raw-gold, type-level, and masked-BLEU detail plus a three-block probe. A five-talk sweep shows stable term accuracy (0.965--0.979) while
 retrieval precision falls 0.48\,$\rightarrow$\,0.14 as distractors grow

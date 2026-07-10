@@ -1,10 +1,16 @@
-# Multi-domain routing & the multilingual precision–fluency trade-off
+# Multi-domain routing, and a merged-glossary confound worth recording
 
 Exploration branch, folded to main for the record. Goal: test whether the
 training-free router stays correct as more terminology domains are registered,
 and whether a single flat "merged" glossary can replace routed domain slices.
-The most transferable result is **multilingual**: a flat merged glossary looks
-harmless in Chinese but visibly degrades German.
+
+Two things worth keeping: (1) the router's 4-way falsification passes cleanly,
+and (2) a cautionary result — an early "merged hurts German" reading turned out
+to be a **glossary-completeness confound**, not a precision effect. Once the
+merged glossary is complete in the target language, a flat 42k inventory matches
+or beats routing on end-to-end quality at this scale; the routing advantage
+lives in retrieval precision and at larger sizes, not here. Recorded so the
+mistake isn't repeated.
 
 All runs are 4-talk alternating ACL/medicine streams (2 ACL + 2 medicine:
 talks 268/367, medicine 545006/606) at latency multiplier 2, one live session
@@ -51,25 +57,35 @@ via the count-clipped scorer:
 | Chinese (strong model) | term_acc | BLEU | masked-BLEU |
 |---|---:|---:|---:|
 | AutoTerm | 0.881 | 57.56 | 55.10 |
-| merged-42k | **0.896** (+1.5) | 57.34 (−0.22) | 54.86 (**−0.24**) |
+| merged-42k | 0.896 (+1.5) | 57.34 (−0.22) | 54.86 (−0.24) |
 
 | German (weaker model, human-verified refs) | term_acc | BLEU | masked-BLEU |
 |---|---:|---:|---:|
 | AutoTerm | 0.733 | 34.01 | 33.58 |
-| merged-42k* | **0.793** (+6.0) | 33.38 (−0.63) | 32.79 (**−0.79**) |
+| merged-42k (finance/legal not de-translated) | 0.793 | 33.38 (−0.63) | 32.79 (−0.79) |
+| **merged-42k (de-complete)** | **0.837** | **34.44** (+0.43) | **33.98** (+0.40) |
 
-`*` German merged used the first-pass glossary (finance/legal not yet
-de-translated); a clean-merged rerun (de coverage 84%) and the Japanese
-condition were queued and will be appended when they land.
+**Reading (with a self-correction).** A first pass suggested merged hurt German
+fluency (masked-BLEU −0.79). That was a **confound, not an effect**: the
+first-pass finance/legal glossary had no German, so the merged index injected
+English/blank strings into German prompts. Once finance/legal carry German
+labels (the de-complete row), the penalty disappears — merged is actually
+slightly *better* than AutoTerm on all three German metrics.
 
-**Reading:** merged always *raises* term accuracy — with every term available
-it retrieves more — but pays in fluency. In Chinese the cost is negligible
-(masked-BLEU −0.24); the strong Chinese model shrugs off the 42k of
-cross-domain distractors. In German the same merge costs ~3× more
-(masked-BLEU −0.79, BLEU −0.63): the weaker model, judged against human
-references, is far less robust to a diluted, noisy term map. This is exactly
-why routing matters and why a Chinese-only evaluation would miss it — routed
-slices keep the compact, precise inventory that a naive merge throws away.
+So at this 42k scale, a **complete** flat glossary matches or beats routing on
+end-to-end term_acc/BLEU/masked-BLEU in both Chinese and German. This 4-talk
+end-to-end comparison does **not** expose a merged-vs-routed penalty; the
+routing argument (compact slices preserve retrieval precision) lives in
+retrieval precision (Prec@10) and at much larger merged sizes — see the paper's
+scale sweep where precision collapses 0.48→0.14 as the inventory grows to 100k,
+while term accuracy stays flat. The honest reading here is that 42k is not yet
+large enough for the flat merge to cost end-to-end quality.
+
+Japanese was attempted but is **not reported**: the ja host repeatedly failed
+with WebSocket keepalive (1011) timeouts, the one completed parallel run used a
+glossary with only ~75% Japanese coverage (same English-injection confound as
+the first-pass German), and two solo re-runs to control for it also failed. No
+trustworthy Japanese number was obtained.
 
 ## 4. Slice size: 10k is oversized; ~1k is enough (Chinese)
 

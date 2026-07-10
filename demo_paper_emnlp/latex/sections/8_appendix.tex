@@ -183,7 +183,12 @@ coincide with lower medicine coverage and BLEU while switch directions stay
 correct; the keyword
 lists are small, high-precision regex sets per domain. German term matching is
 casefolded with light stem tolerance (exact matching undercounts under
-inflection); short variants keep strict word boundaries.
+inflection); short variants keep strict word boundaries. The medicine
+references differ in provenance: German uses human reference translations,
+whereas Chinese and Japanese medicine references are model-generated (the ACL
+segments use the shared-task human references in all three). Automatic routing
+gives the best combined term accuracy under the human-referenced German setting
+as well, so the ordering is not an artifact of generated references.
 
 \begin{table}[ht]
 \centering

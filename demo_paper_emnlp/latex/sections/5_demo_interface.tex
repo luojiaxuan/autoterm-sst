@@ -10,13 +10,15 @@ live GPU mode with Qwen3-Omni and MaxSim retrieval.
 \begin{figure*}[t]
   \centering
   \includegraphics[width=0.72\textwidth]{ui_evidence_panel.png}
-  \caption{AutoTerm-SST web UI with live terminology evidence. The same
-  interface controls model, latency, and terminology mode while rendering
-  translated text, retrieved term evidence, active glossary status, router
-  confidence, active term count, and retrieval/generation latency from the JSON
-  WebSocket metadata. The captured session uses the diagnostic common-terms
-  slice to illustrate the evidence schema; automatic production sessions start
-  from domain-specific slices.}
+  \caption{Web UI during a live session. The top row sets language pair,
+  latency multiplier, and terminology mode (Auto or Fixed); the chips and the
+  panel below render the JSON evidence stream: active glossary, router
+  confidence, retrieved term pairs with retrieval scores, and per-chunk
+  retrieval/generation latency.
+  % TODO(recapture): screenshot still shows the old common-terms session;
+  % replace per docs/demo_screencast_script.md, then delete this note.
+  The shown session uses a diagnostic slice; production sessions start from
+  domain slices.}
   \label{fig:ui}
 \end{figure*}
 

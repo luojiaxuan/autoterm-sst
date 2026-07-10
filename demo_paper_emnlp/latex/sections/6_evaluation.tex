@@ -30,13 +30,11 @@ StreamLAAL \citep{papi2024streamatt}.
 \begin{figure*}[t]
   \centering
   \includegraphics[width=0.92\textwidth]{routing_timeline_10talk.png}
-  \caption{Active-glossary routing over the ten-talk alternating run of
-  Table~\ref{tab:quality} (16,848s streamed end-to-end through one live
-  session). All nine domain transitions switch in the correct direction;
-  eight land 13.6--55.4s after the boundary and one medicine-to-ACL switch
-  (amber) is delayed 304s over a generic talk opening. A single 35s
-  transient wrong switch self-corrects; steady-state active-domain accuracy
-  is 0.982 outside 30s transition grace windows.}
+  \caption{Active-slice routing over the ten-talk run of
+  Table~\ref{tab:quality}. Vertical lines mark true domain boundaries; chips
+  give the switch delay after each boundary. The amber switch crosses a
+  generic talk opening; the one transient wrong switch (35s, self-corrected)
+  is the thin blue sliver near 800s.}
   \label{fig:routing}
 \end{figure*}
 
@@ -54,12 +52,11 @@ Fixed medicine & Select med. & 0.901 & 0.772 & 0.937 & \textbf{59.63} \\
 Automatic & None & \textbf{0.936} & \textbf{0.912} & \textbf{0.943} & 58.10 \\
 \bottomrule
 \end{tabular}}
-\caption{Ten-talk alternating ACL/medicine comparison (16{,}848s streamed
-live through one session) under equal-sized benchmark-aligned union
-inventories. Each fixed domain inventory fully covers the gold terms for its
-matching domain; Automatic switches between the two inventories without
-session-specific glossary input or a domain choice. Term accuracy scores 875
-occurrences (193 ACL and 682 medicine).}
+\caption{Term accuracy on the ten-talk alternating ACL/medicine stream
+(16{,}848s, one live session; 875 gold occurrences: 193 ACL + 682 medicine).
+ACL/Med.\ = term accuracy within each domain's talks. Session setup = what
+the user does at session time. Every inventory is a 10k-term union that fully
+covers its own domain's gold terms.}
 \label{tab:quality}
 \end{table}
 

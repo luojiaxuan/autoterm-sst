@@ -14,13 +14,12 @@ never changes the prompt already used for chunk \(t\).
 \begin{figure*}[t]
 \centering
 \includegraphics[width=0.98\textwidth]{autoterm_architecture.pdf}
-\caption{Architecture of AutoTerm-SST on a mixed NLP-to-medicine stream. The
-RASST backbone encodes each chunk and injects at most 10 bilingual term pairs
-from the active slice into Qwen3-Omni. Earlier, \emph{SRL} comes
-from the NLP slice; after accumulated evidence confirms a domain shift, a later
-chunk uses \emph{rectal cancer} from the medicine slice. The training-free
-router uses sliding-window context similarity to select the active glossary,
-and switches affect later chunks only.}
+\caption{AutoTerm-SST on a stream that moves from NLP to medicine. Each
+speech chunk is encoded by the RASST backbone, and at most 10 bilingual term
+pairs retrieved from the \emph{active slice} are injected into the Qwen3-Omni
+prompt. The router switches the active slice only after accumulated evidence
+confirms the domain shift, so \emph{SRL} is served from the NLP slice early
+and \emph{rectal cancer} from the medicine slice later.}
 \label{fig:architecture}
 \end{figure*}
 

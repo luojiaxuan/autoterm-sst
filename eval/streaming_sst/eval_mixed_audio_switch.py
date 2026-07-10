@@ -835,6 +835,12 @@ def extract_record(
     expected = expected_domain_at(spans, cursor_samples)
     topic = meta["topic"]
     router = meta.get("topic_router") or {}
+    router_evidence = router.get("evidence") or {}
+    if not isinstance(router_evidence, dict):
+        router_evidence = {}
+    slice_selection = router_evidence.get("slice_selection") or {}
+    if not isinstance(slice_selection, dict):
+        slice_selection = {}
     probe_scores = meta.get("domain_probe_scores") or {}
     target_domain = str(router.get("to_domain") or "")
     if not target_domain:
@@ -853,6 +859,13 @@ def extract_record(
         "router_target_domain": target_domain,
         "router_confidence": router.get("confidence"),
         "router_margin": router.get("margin"),
+        "selected_slice_presets": [
+            str(item)
+            for item in (slice_selection.get("selected_slice_presets") or [])
+            if str(item)
+        ],
+        "selected_slice_count": int(slice_selection.get("selected_slice_count") or 0),
+        "selected_term_count": int(slice_selection.get("selected_term_count") or 0),
         "domain_probe_top_domain": domain_probe_top_domain(probe_scores),
         "domain_probe_scores": probe_scores,
         "router_text_source": str(meta["router_text_source"]),
@@ -860,6 +873,7 @@ def extract_record(
         "prompt_reference_count": int(meta["prompt_reference_count"]),
         "fixed_prompt_k": int(meta["fixed_prompt_k"]),
         "candidate_pool_count": int(meta["candidate_pool_count"]),
+        "retrieval_candidate_cost": dict(meta.get("retrieval_candidate_cost") or {}),
         "references": [dict(item) for item in (meta.get("references") or []) if isinstance(item, dict)],
         "retrieve_s": meta.get("retrieve_s"),
         "domain_probe_s": meta.get("domain_probe_s"),

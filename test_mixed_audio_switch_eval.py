@@ -346,6 +346,16 @@ class MixedAudioSwitchEvalTests(unittest.TestCase):
                     "to_preset": "nlp_core_10k",
                     "confidence": 0.9,
                     "margin": 0.5,
+                    "evidence": {
+                        "slice_selection": {
+                            "selected_slice_presets": [
+                                "nlp_core_10k",
+                                "science_core_10k",
+                            ],
+                            "selected_slice_count": 2,
+                            "selected_term_count": 20000,
+                        }
+                    },
                 },
                 "domain_probe_scores": {
                     "nlp": 0.8,
@@ -354,6 +364,11 @@ class MixedAudioSwitchEvalTests(unittest.TestCase):
                 "prompt_reference_count": 10,
                 "fixed_prompt_k": 10,
                 "candidate_pool_count": 50,
+                "retrieval_candidate_cost": {
+                    "candidate_budget": 100,
+                    "index_query_count": 2,
+                    "scored_inventory_terms": 20000,
+                },
                 "references": [
                     {"term": "SRL", "translation": "语义角色标注", "score": 0.91},
                 ],
@@ -367,6 +382,13 @@ class MixedAudioSwitchEvalTests(unittest.TestCase):
         self.assertEqual(record["domain_probe_top_domain"], "nlp")
         self.assertEqual(record["start_sample"], TARGET_SAMPLE_RATE // 2)
         self.assertEqual(record["references"][0]["term"], "SRL")
+        self.assertEqual(
+            record["selected_slice_presets"],
+            ["nlp_core_10k", "science_core_10k"],
+        )
+        self.assertEqual(record["selected_slice_count"], 2)
+        self.assertEqual(record["selected_term_count"], 20000)
+        self.assertEqual(record["retrieval_candidate_cost"]["candidate_budget"], 100)
 
         bad = dict(event)
         bad["meta"] = dict(event["meta"])

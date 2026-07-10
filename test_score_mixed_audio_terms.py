@@ -55,7 +55,7 @@ class MixedAudioTermScorerTests(unittest.TestCase):
 
         self.assertEqual(reference, "ACL参考一\nACL参考二\n医学参考\n")
 
-    def test_reports_occurrence_and_unique_type_accuracy(self) -> None:
+    def test_clips_occurrence_hits_to_distinct_output_mentions(self) -> None:
         payload = {
             "block_spans": [
                 {
@@ -80,11 +80,15 @@ class MixedAudioTermScorerTests(unittest.TestCase):
         metrics = score_occurrences(payload, gold)
         medicine = metrics["by_domain"]["medicine"]
 
-        self.assertEqual(metrics["hits"], 2)
+        self.assertEqual(metrics["hits"], 1)
         self.assertEqual(metrics["gold_occurrences"], 3)
+        self.assertEqual(metrics["term_acc"], 0.3333)
         self.assertEqual(metrics["unique_term_types"], 2)
         self.assertEqual(metrics["type_hits_any"], 1)
         self.assertEqual(metrics["type_acc_any"], 0.5)
+        self.assertEqual([row["hit"] for row in metrics["traces"]], [True, False, False])
+        self.assertEqual(metrics["traces"][0]["output_occurrences"], 1)
+        self.assertEqual(metrics["traces"][1]["output_occurrences"], 1)
         self.assertEqual(medicine["unique_term_types"], 2)
         self.assertEqual(medicine["type_hits_any"], 1)
 

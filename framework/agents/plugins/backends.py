@@ -22,6 +22,7 @@ per-request backends keep ``batched = False`` and use ``generate``.
 from __future__ import annotations
 
 import asyncio
+import base64
 import logging
 import os
 import re
@@ -245,6 +246,101 @@ class SGLangHTTPBackend(ModelBackend):
                 data = await resp.json()
                 data["http_status"] = resp.status
                 return data
+        except Exception as exc:  # noqa: BLE001
+            return {"status": "error", "error": str(exc)}
+
+    async def stop(self) -> None:
+        if self._session is not None:
+            await self._session.close()
+            self._session = None
+
+
+class VLLMServeBackend(ModelBackend):
+    """OpenAI chat backend for an external ``vllm serve`` process.
+
+    Per-request (``batched = False``): each ready session posts one
+    chat-completions request, so the vLLM engine admits and continuously
+    batches concurrent sessions itself (true continuous batching), unlike the
+    in-process offline :class:`VLLMBackend`. Audio is inlined as OpenAI
+    ``input_audio`` base64; the running chat history is carried as text turns
+    (the audio increment is not resent), matching the streaming policy.
+    """
+
+    def __init__(self, template: "ModelTemplate", base_url: str, timeout_sec: float = 900.0) -> None:
+        self.template = template
+        self.base_url = base_url.rstrip("/")
+        self.timeout_sec = timeout_sec
+        self._session: Any = None
+
+    async def start(self) -> None:
+        import aiohttp  # noqa: WPS433
+
+        self._session = aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=float(self.timeout_sec))
+        )
+
+    @staticmethod
+    def _wav_b64(path: str) -> str:
+        with open(path, "rb") as handle:
+            return base64.b64encode(handle.read()).decode("ascii")
+
+    def _openai_messages(
+        self, messages: List[Dict[str, Any]], audios: Sequence[str]
+    ) -> List[Dict[str, Any]]:
+        # History turns pass through as text; only the current (last) user turn
+        # carries the new audio, inlined as OpenAI input_audio base64.
+        out: List[Dict[str, Any]] = list(messages[:-1])
+        last = messages[-1]
+        content: List[Dict[str, Any]] = []
+        if audios:
+            content.append(
+                {"type": "input_audio", "input_audio": {"data": self._wav_b64(audios[0]), "format": "wav"}}
+            )
+        text = last.get("content")
+        if isinstance(text, str) and text:
+            content.append({"type": "text", "text": text})
+        elif isinstance(text, list):
+            content.extend(part for part in text if part.get("type") == "text")
+        out.append({"role": "user", "content": content})
+        return out
+
+    async def generate(
+        self,
+        *,
+        messages: List[Dict[str, Any]],
+        audios: Sequence[str],
+        sampling: Sampling,
+        request_id: str,
+    ) -> str:
+        if self._session is None:
+            raise RuntimeError("VLLMServeBackend not started")
+        payload: Dict[str, Any] = {
+            "model": self.template.served_model_name,
+            "messages": self._openai_messages(messages, audios),
+            "max_tokens": int(sampling.max_tokens),
+            "temperature": float(sampling.temperature),
+            "top_p": float(sampling.top_p),
+            "top_k": int(sampling.top_k),
+            "seed": int(sampling.seed),
+            "stream": False,
+        }
+        async with self._session.post(
+            f"{self.base_url}/v1/chat/completions", json=payload
+        ) as resp:
+            data = await resp.json()
+            if resp.status >= 400:
+                raise RuntimeError(f"vllm_serve status={resp.status} body={data}")
+        return str(
+            data.get("choices", [{}])[0].get("message", {}).get("content", "") or ""
+        ).strip()
+
+    async def health(self) -> Dict[str, Any]:
+        if self._session is None:
+            return {"status": "starting"}
+        try:
+            async with self._session.get(f"{self.base_url}/v1/models") as resp:
+                ok = resp.status < 400
+                return {"status": "ready" if ok else "error", "http_status": resp.status}
         except Exception as exc:  # noqa: BLE001
             return {"status": "error", "error": str(exc)}
 
@@ -571,6 +667,7 @@ def build_backend(
     mock: bool = False,
     sglang_base_url: str = "http://127.0.0.1:8100",
     sglang_timeout_sec: float = 900.0,
+    vllm_serve_base_url: str = "http://127.0.0.1:8200",
     vllm_config: Optional[Dict[str, Any]] = None,
     hf_model_path: str = "",
     hf_device: str = "cuda:0",
@@ -579,6 +676,8 @@ def build_backend(
         return MockBackend(template)
     if template.backend_kind == "vllm":
         return VLLMBackend(template, **(vllm_config or {}))
+    if template.backend_kind == "vllm_serve":
+        return VLLMServeBackend(template, base_url=vllm_serve_base_url, timeout_sec=sglang_timeout_sec)
     if template.backend_kind == "sglang_http":
         return SGLangHTTPBackend(template, base_url=sglang_base_url, timeout_sec=sglang_timeout_sec)
     if template.backend_kind == "hf":

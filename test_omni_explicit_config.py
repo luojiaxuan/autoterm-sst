@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -24,8 +25,9 @@ class OmniExplicitConfigTest(unittest.TestCase):
             nccl_ib_disable=1,
             torch_nccl_enable_monitoring=0,
             vllm_compat_dir=Path("/tmp/vllm-compat"),
+            extra_python_path=[Path("/tmp/external-retriever")],
         )
-        with patch.dict(os.environ, {}, clear=True):
+        with patch.dict(os.environ, {}, clear=True), patch.object(sys, "path", list(sys.path)):
             configure_vllm_runtime(args)
             self.assertEqual(os.environ["VLLM_USE_V1"], "1")
             self.assertEqual(os.environ["VLLM_ENABLE_V1_MULTIPROCESSING"], "1")
@@ -34,8 +36,15 @@ class OmniExplicitConfigTest(unittest.TestCase):
             self.assertEqual(os.environ["NCCL_IB_DISABLE"], "1")
             self.assertEqual(
                 os.environ["PYTHONPATH"],
-                os.pathsep.join(["/tmp/vllm-compat", str(Path(__file__).resolve().parent)]),
+                os.pathsep.join(
+                    [
+                        "/tmp/vllm-compat",
+                        str(Path(__file__).resolve().parent),
+                        "/tmp/external-retriever",
+                    ]
+                ),
             )
+            self.assertEqual(sys.path[0], "/tmp/external-retriever")
 
     def test_agent_uses_injected_config_and_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

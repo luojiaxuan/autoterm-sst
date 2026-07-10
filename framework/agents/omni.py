@@ -285,6 +285,7 @@ class OmniConfig:
     rag_index_cache_max_entries: int = 16
     rag_startup_glossary_preset: str = RAG_STARTUP_GLOSSARY_PRESET
     retrieval_candidate_budget: int = 0
+    reference_ranking_policy: str = "autoterm_rerank"
 
     auto_glossary_enabled: bool = True
     auto_glossary_base_preset: str = "none"
@@ -1936,8 +1937,9 @@ class OmniAgent(Agent):
                 if top_k <= 0:
                     continue
                 if session.auto_glossary_enabled and not self.retrieval.is_index_ready(plan.index_path):
-                    self._schedule_index_preload(plan.index_path)
-                    continue
+                    await self.retrieval.preload_index(plan.index_path)
+                    if not self.retrieval.is_index_ready(plan.index_path):
+                        continue
                 self._record_retrieval_query(session, plan, top_k)
                 key = (
                     plan.index_path,
@@ -1959,10 +1961,7 @@ class OmniAgent(Agent):
             rescue_grouped: Dict[Tuple[str, int, Optional[float]], List[Tuple[int, OmniSession, RetrievalSlice]]] = {}
             for idx, session in enumerate(batch):
                 session.last_retrieval_candidate_returned = len(outputs[idx])
-                if session.auto_glossary_enabled:
-                    ranked = rank_autoterm_references(outputs[idx], active_domain=session.active_domain)
-                else:
-                    ranked = self._rank_references(outputs[idx])
+                ranked = self._rank_references_for_session(session, outputs[idx])
                 outputs[idx] = ranked
                 if not self._should_rescue_retrieval(session, ranked):
                     continue
@@ -1973,8 +1972,9 @@ class OmniAgent(Agent):
                 if rescue_top_k <= 0:
                     continue
                 if session.auto_glossary_enabled and not self.retrieval.is_index_ready(rescue.index_path):
-                    self._schedule_index_preload(rescue.index_path)
-                    continue
+                    await self.retrieval.preload_index(rescue.index_path)
+                    if not self.retrieval.is_index_ready(rescue.index_path):
+                        continue
                 session.last_rescue_triggered = True
                 session.last_retrieval_plan.append(rescue.to_meta())
                 self._record_retrieval_query(session, rescue, rescue_top_k)
@@ -2000,10 +2000,7 @@ class OmniAgent(Agent):
 
         context_scores_by_session = await self._context_similarity_scores_batch(batch)
         for idx, session in enumerate(batch):
-            if session.auto_glossary_enabled:
-                outputs[idx] = rank_autoterm_references(outputs[idx], active_domain=session.active_domain)
-            else:
-                outputs[idx] = self._rank_references(outputs[idx])
+            outputs[idx] = self._rank_references_for_session(session, outputs[idx])
             session.last_candidate_pool_count = len(outputs[idx])
             if session.auto_glossary_enabled:
                 observer_refs = self._prompt_references(session, outputs[idx])
@@ -2122,9 +2119,19 @@ class OmniAgent(Agent):
                 if source in {"", "rag", "wikidata", "glossary"}:
                     item["source"] = f"preset:{session.glossary_preset}"
             annotated.append(item)
-        if session.auto_glossary_enabled:
-            return rank_autoterm_references(annotated, active_domain=session.active_domain)
-        return self._rank_references(annotated)
+        return self._rank_references_for_session(session, annotated)
+
+    def _rank_references_for_session(
+        self,
+        session: OmniSession,
+        references: Sequence[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        policy = str(self.config.reference_ranking_policy or "autoterm_rerank")
+        if policy == "dense_pair" or not session.auto_glossary_enabled:
+            return self._rank_references(references)
+        if policy != "autoterm_rerank":
+            raise ValueError(f"unsupported reference ranking policy: {policy}")
+        return rank_autoterm_references(references, active_domain=session.active_domain)
 
     def _rank_references(self, references: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
         def _priority(ref: Dict[str, Any]) -> Tuple[int, float]:

@@ -66,6 +66,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--rag-score-threshold", type=float, default=0.78)
     parser.add_argument("--retrieval-candidate-budget", type=int, default=0)
     parser.add_argument(
+        "--reference-ranking-policy",
+        choices=("autoterm_rerank", "dense_pair"),
+        default="dense_pair",
+    )
+    parser.add_argument(
         "--autoterm-policy",
         choices=("fixed", "hard_top1", "budgeted_top_slices"),
         default="fixed",
@@ -187,6 +192,7 @@ def build_agent(
             0,
             int(getattr(args, "retrieval_candidate_budget", 0)),
         ),
+        reference_ranking_policy=str(args.reference_ranking_policy),
         auto_glossary_enabled=autoterm_enabled,
         auto_glossary_default_preset=default_preset,
         auto_glossary_presets=",".join(presets),

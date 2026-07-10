@@ -1100,6 +1100,9 @@ class OmniAgent(Agent):
         end_sample: int,
         query_embedding: Any = None,
     ) -> Dict[str, DomainProbeScore]:
+        if float(self.config.router_domain_probe_weight) <= 0.0:
+            self._clear_domain_probe_meta(session)
+            return {}
         mode = (self.config.router_mode or "embedding_refs").strip().lower()
         if mode != "hybrid_window_topic" or not self.retrieval.enabled:
             self._clear_domain_probe_meta(session)

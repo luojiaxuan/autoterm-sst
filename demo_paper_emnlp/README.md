@@ -1,7 +1,7 @@
 # EMNLP 2026 System Demonstrations — Paper Source
 
-Paper: **AutoTerm-SST: Zero-Setup Adaptive Terminology Memory for Streaming
-Speech Translation**.
+Paper: **AutoTerm-SST: Adaptive Terminology Memory with Zero Session-Time Setup
+for Streaming Speech Translation**.
 
 ## Build
 

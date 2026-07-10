@@ -21,10 +21,10 @@ terms and named entities are also a known weakness of speech translation
 \citep{gaido2021moby}. Retrieval-augmented generation offers another way to
 expose non-parametric memory at generation time
 \citep{lewis2020retrieval,khandelwal2021nearest}. Many of these workflows assume
-that the domain or terminology is known before translation begins. RASST couples
-a speech-side MaxSim retriever with prompt-injected terminology
-\citep{luo2026rasst}; AutoTerm-SST builds on this mechanism by adapting the
-active terminology context from evidence observed during streaming.
+that the domain or terminology is known before translation begins. RASST
+retrieves from a glossary fixed before streaming \citep{luo2026rasst};
+AutoTerm-SST selects the active glossary online from accumulated streaming
+evidence while keeping the retriever and translation model unchanged.
 
 \paragraph{LLM serving and demo systems.}
 Modern LLM serving systems provide continuous batching and efficient generation

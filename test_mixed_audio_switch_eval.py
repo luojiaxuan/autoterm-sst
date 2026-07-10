@@ -216,6 +216,7 @@ class MixedAudioSwitchEvalTests(unittest.TestCase):
             "text": "测试",
             "meta": {
                 "cursor_samples": TARGET_SAMPLE_RATE,
+                "start_sample": TARGET_SAMPLE_RATE // 2,
                 "topic": {
                     "active_domain": "nlp",
                     "active_glossary_preset": "nlp_core_10k",
@@ -234,6 +235,9 @@ class MixedAudioSwitchEvalTests(unittest.TestCase):
                 "prompt_reference_count": 10,
                 "fixed_prompt_k": 10,
                 "candidate_pool_count": 50,
+                "references": [
+                    {"term": "SRL", "translation": "语义角色标注", "score": 0.91},
+                ],
             },
         }
 
@@ -242,6 +246,8 @@ class MixedAudioSwitchEvalTests(unittest.TestCase):
         self.assertEqual(record["expected_domain"], "nlp")
         self.assertEqual(record["router_target_domain"], "nlp")
         self.assertEqual(record["domain_probe_top_domain"], "nlp")
+        self.assertEqual(record["start_sample"], TARGET_SAMPLE_RATE // 2)
+        self.assertEqual(record["references"][0]["term"], "SRL")
 
         bad = dict(event)
         bad["meta"] = dict(event["meta"])

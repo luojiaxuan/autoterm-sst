@@ -385,6 +385,7 @@ def extract_record(
     return {
         "event_idx": int(event_idx),
         "cursor_samples": cursor_samples,
+        "start_sample": int(meta.get("start_sample") or 0),
         "cursor_s": round(cursor_samples / TARGET_SAMPLE_RATE, 3),
         "expected_domain": expected,
         "active_domain": str(topic["active_domain"]),
@@ -402,6 +403,7 @@ def extract_record(
         "prompt_reference_count": int(meta["prompt_reference_count"]),
         "fixed_prompt_k": int(meta["fixed_prompt_k"]),
         "candidate_pool_count": int(meta["candidate_pool_count"]),
+        "references": [dict(item) for item in (meta.get("references") or []) if isinstance(item, dict)],
         "retrieve_s": meta.get("retrieve_s"),
         "domain_probe_s": meta.get("domain_probe_s"),
         "text": strip_tags(str(event.get("text") or "")),

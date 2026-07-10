@@ -188,6 +188,7 @@ def build_character_latency_series(
     *,
     source_length_samples: int,
     sample_rate: int = DEFAULT_SAMPLE_RATE,
+    require_wall_timing: bool = True,
 ) -> CharacterLatencySeries:
     records = payload.get("records") or []
     if not isinstance(records, list) or not records:
@@ -208,7 +209,7 @@ def build_character_latency_series(
             raise ValueError(f"record {record_index} is not an object")
         if "cursor_samples" not in raw_record:
             raise ValueError(f"record {record_index} lacks cursor_samples")
-        if "emitted_wall_s" not in raw_record:
+        if require_wall_timing and "emitted_wall_s" not in raw_record:
             raise ValueError(f"record {record_index} lacks emitted_wall_s")
         if "text" not in raw_record:
             raise ValueError(
@@ -216,10 +217,14 @@ def build_character_latency_series(
             )
 
         cursor = int(raw_record["cursor_samples"])
-        wall_s = _finite_float(
-            raw_record["emitted_wall_s"],
-            field="emitted_wall_s",
-            record_index=record_index,
+        wall_s = (
+            _finite_float(
+                raw_record["emitted_wall_s"],
+                field="emitted_wall_s",
+                record_index=record_index,
+            )
+            if require_wall_timing and "emitted_wall_s" in raw_record
+            else None
         )
         if cursor < 0 or cursor < previous_cursor:
             raise ValueError(
@@ -231,7 +236,7 @@ def build_character_latency_series(
                 f"record {record_index} cursor_samples={cursor} exceeds playlist "
                 f"length {source_length_samples}"
             )
-        if wall_s < 0.0 or wall_s < previous_wall_s:
+        if wall_s is not None and (wall_s < 0.0 or wall_s < previous_wall_s):
             raise ValueError(
                 f"record {record_index} has non-monotonic emitted_wall_s={wall_s}; "
                 f"previous={previous_wall_s}"
@@ -247,24 +252,31 @@ def build_character_latency_series(
             records_with_only_whitespace += 1
         character_count = len(text)
         delay_ms = 1000.0 * cursor / sample_rate
-        elapsed_ms = 1000.0 * wall_s
+        elapsed_ms = 1000.0 * wall_s if wall_s is not None else None
         delays_ms.extend([delay_ms] * character_count)
-        raw_elapsed_ms.extend([elapsed_ms] * character_count)
+        if elapsed_ms is not None:
+            raw_elapsed_ms.extend([elapsed_ms] * character_count)
         previous_cursor = cursor
-        previous_wall_s = wall_s
+        if wall_s is not None:
+            previous_wall_s = wall_s
 
     raw_prediction = "".join(prediction_parts)
     left = len(raw_prediction) - len(raw_prediction.lstrip())
     right = len(raw_prediction.rstrip())
     prediction = raw_prediction[left:right]
     delays_ms = delays_ms[left:right]
-    raw_elapsed_ms = raw_elapsed_ms[left:right]
+    if raw_elapsed_ms:
+        raw_elapsed_ms = raw_elapsed_ms[left:right]
     if not prediction:
         raise ValueError("mixed-run payload has no non-whitespace emitted characters")
-    if len(prediction) != len(delays_ms) or len(prediction) != len(raw_elapsed_ms):
+    if len(prediction) != len(delays_ms) or (
+        raw_elapsed_ms and len(prediction) != len(raw_elapsed_ms)
+    ):
         raise RuntimeError("prediction/timestamp alignment failed")
 
-    stream_elapsed_ms = fbk_stream_elapsed(delays_ms, raw_elapsed_ms)
+    stream_elapsed_ms = (
+        fbk_stream_elapsed(delays_ms, raw_elapsed_ms) if raw_elapsed_ms else []
+    )
     return CharacterLatencySeries(
         prediction=prediction,
         delays_ms=tuple(delays_ms),
@@ -334,6 +346,7 @@ def score_payload(
     reference_text: str,
     sample_rate: int = DEFAULT_SAMPLE_RATE,
     expected_block_count: int = 0,
+    standard_only: bool = False,
 ) -> Dict[str, Any]:
     reference = "".join(line.strip() for line in str(reference_text).splitlines()).strip()
     if not reference:
@@ -346,6 +359,7 @@ def score_payload(
         payload,
         source_length_samples=source_length_samples,
         sample_rate=sample_rate,
+        require_wall_timing=not standard_only,
     )
     source_length_ms = 1000.0 * source_length_samples / sample_rate
     reference_length = len(reference)
@@ -354,17 +368,25 @@ def score_payload(
         source_length_ms=source_length_ms,
         reference_length=reference_length,
     )
-    computation_aware = compute_laal(
-        series.stream_elapsed_ms,
-        source_length_ms=source_length_ms,
-        reference_length=reference_length,
+    computation_aware = (
+        None
+        if standard_only
+        else compute_laal(
+            series.stream_elapsed_ms,
+            source_length_ms=source_length_ms,
+            reference_length=reference_length,
+        )
     )
     last_cursor_samples = int((payload.get("records") or [])[-1]["cursor_samples"])
     event_signature = [
         {
             "cursor_samples": int(record["cursor_samples"]),
             "text": str(record["text"]),
-            "emitted_wall_s": float(record["emitted_wall_s"]),
+            "emitted_wall_s": (
+                float(record["emitted_wall_s"])
+                if "emitted_wall_s" in record
+                else None
+            ),
         }
         for record in payload.get("records") or []
     ]
@@ -376,6 +398,7 @@ def score_payload(
             "timestamp_unit": "milliseconds",
             "source_delay": "record.cursor_samples / sample_rate",
             "raw_elapsed": "record.emitted_wall_s from one client-relative origin",
+            "computation_aware_enabled": not standard_only,
             "computation_aware_transform": "FBK stream_laal_term.py v2.2 SegmentLevelDelayElapsed",
             "laal_definition": (
                 "mean over t<=tau of timestamp[t] - t*source_length/"
@@ -413,16 +436,30 @@ def score_payload(
             "event_signature_sha256": _stable_sha256(event_signature),
             "first_cursor_ms": series.delays_ms[0],
             "last_cursor_ms": series.delays_ms[-1],
-            "first_raw_elapsed_ms": series.raw_elapsed_ms[0],
-            "last_raw_elapsed_ms": series.raw_elapsed_ms[-1],
-            "first_stream_elapsed_ms": series.stream_elapsed_ms[0],
-            "last_stream_elapsed_ms": series.stream_elapsed_ms[-1],
+            "first_raw_elapsed_ms": (
+                series.raw_elapsed_ms[0] if series.raw_elapsed_ms else None
+            ),
+            "last_raw_elapsed_ms": (
+                series.raw_elapsed_ms[-1] if series.raw_elapsed_ms else None
+            ),
+            "first_stream_elapsed_ms": (
+                series.stream_elapsed_ms[0] if series.stream_elapsed_ms else None
+            ),
+            "last_stream_elapsed_ms": (
+                series.stream_elapsed_ms[-1] if series.stream_elapsed_ms else None
+            ),
         },
         "metrics": {
             "stream_laal_ms": standard["score_ms"],
             "stream_laal_s": standard["score_ms"] / 1000.0,
-            "stream_laal_ca_ms": computation_aware["score_ms"],
-            "stream_laal_ca_s": computation_aware["score_ms"] / 1000.0,
+            "stream_laal_ca_ms": (
+                computation_aware["score_ms"] if computation_aware else None
+            ),
+            "stream_laal_ca_s": (
+                computation_aware["score_ms"] / 1000.0
+                if computation_aware
+                else None
+            ),
             "standard_diagnostics": standard,
             "computation_aware_diagnostics": computation_aware,
         },
@@ -458,6 +495,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--reference-text-file", required=True, type=Path)
     parser.add_argument("--sample-rate", type=int, default=DEFAULT_SAMPLE_RATE)
     parser.add_argument("--expected-block-count", type=int, default=0)
+    parser.add_argument(
+        "--standard-only",
+        action="store_true",
+        help="explicitly omit computation-aware scoring when wall timestamps are unavailable",
+    )
     parser.add_argument("--out-json", type=Path)
     parser.add_argument("--out-markdown", type=Path)
     args = parser.parse_args(argv)
@@ -479,6 +521,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         reference_text=reference_text,
         sample_rate=args.sample_rate,
         expected_block_count=args.expected_block_count,
+        standard_only=args.standard_only,
     )
     report["inputs"] = {
         "run_json": str(args.run_json.resolve()),

@@ -108,6 +108,23 @@ class MixedStreamLAALTest(unittest.TestCase):
                 sample_rate=1000,
             )
 
+    def test_standard_only_explicitly_allows_missing_wall_timestamps(self) -> None:
+        report = score_payload(
+            _payload(
+                [
+                    {"cursor_samples": 400, "text": "甲"},
+                    {"cursor_samples": 1000, "text": "乙"},
+                ]
+            ),
+            reference_text="甲乙",
+            sample_rate=1000,
+            standard_only=True,
+        )
+
+        self.assertIsNotNone(report["metrics"]["stream_laal_ms"])
+        self.assertIsNone(report["metrics"]["stream_laal_ca_ms"])
+        self.assertFalse(report["protocol"]["computation_aware_enabled"])
+
     def test_non_monotonic_cursor_or_wall_time_fails(self) -> None:
         bad_cursor = _payload(
             [

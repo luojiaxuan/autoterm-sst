@@ -50,10 +50,9 @@ Parameter & Default \\
 \quad cap \texttt{PROMPT\_K} / score threshold & 10 / 0.78 \\
 \bottomrule
 \end{tabular}}
-\caption{Default hybrid router configuration. Active inventory slices are
-typed: two configurable domain slices (NLP and medicine), a
-100k open-memory fallback pool, a curated 238-term oracle (evaluation only),
-and a diagnostic common-terms slice.}
+\caption{Released hybrid-router defaults. Signal weights are renormalized
+over the signals present in each window; the three consistent-window counts
+apply per evidence path (manifest text / generated target / audio-only).}
 \label{tab:router-config}
 \end{table}
 
@@ -73,10 +72,10 @@ Open & 100k & 64.1 / 82.6 & 4.89 \\
 Stress & 1M & 78 / 95 & 9.62 \\
 \bottomrule
 \end{tabular}
-\caption{Warm steady-state MaxSim retrieval latency across terminology memory
-sizes. Cold loading grows with index size (about 0.5s for 238 terms, 6.8s for
-100k, and over 30s for 1M), so AutoTerm-SST preloads candidate working indexes
-outside the streaming batch path.}
+\caption{Warm per-chunk MaxSim retrieval latency (p50/p95) and surviving
+prompt references per chunk (Refs) by memory size. The cost that scales is
+cold index loading (0.5s at 238 terms, 6.8s at 100k, over 30s at 1M), which
+AutoTerm-SST does off the streaming path.}
 \label{tab:scale}
 \end{table}
 
@@ -105,11 +104,12 @@ Curated ACL & 238 & 0.972 & 58.27 & 53.10 & 0.972 & 0.480 & 1.53 \\
 +AI broad 100k & 100{,}238 & 0.965 & 58.83 & 53.32 & 0.979 & 0.137 & 5.03 \\
 \bottomrule
 \end{tabular}}
-\caption{Five-talk streaming sweep (latency multiplier 2) against the 142-term
-technical gold set. Gold@10 is the fraction of gold terms surfaced within the
-top-10 retrieval cap; Prec@10 is retrieval precision; Refs is surviving prompt
-references per chunk. At latency multiplier 1 the same pattern holds (term
-accuracy 0.944--0.958; precision 0.479 \(\rightarrow\) 0.133).}
+\caption{Five-talk streaming sweep (latency multiplier 2) against the
+142-term technical gold set. Gold@10 = fraction of gold terms surfaced within
+the top-10 prompt cap; Prec@10 = retrieval precision at 10; Refs = surviving
+prompt references per chunk; M-BLEU = BLEU after deleting gold term strings
+from hypothesis and reference. At latency multiplier 1 the pattern holds
+(term accuracy 0.944--0.958; precision 0.479 \(\rightarrow\) 0.133).}
 \label{tab:sweep}
 \end{table}
 
@@ -155,10 +155,12 @@ Fixed medicine & 0.901 & 0.881 & 0.772 & 0.937 & 168/196 & \textbf{59.63} & 57.5
 Automatic & \textbf{0.936} & \textbf{0.933} & \textbf{0.912} & \textbf{0.943} & \textbf{170/196} & 58.10 & 56.22 \\
 \bottomrule
 \end{tabular}}
-\caption{Ten-talk mixed-domain streaming detail (875 technical / 1{,}064 raw
-gold occurrences; 196 medicine type occurrences). Per-domain columns and
-M-BLEU use the technical gold. Automatic routing matches each single-domain
-expert on its own domain and exceeds both on the combined gold.}
+\caption{Full detail for the ten-talk run.
+Acc\textsubscript{tech}/Acc\textsubscript{raw} = term accuracy under the
+curated technical gold (875 occurrences) and the raw annotation gold
+(1{,}064); ACL/Med.\ = per-domain accuracy under the technical gold;
+Med.\ types = medicine term types hit at least once (of 196); M-BLEU as in
+Table~\ref{tab:sweep}.}
 \label{tab:mixed}
 \end{table}
 
@@ -211,10 +213,9 @@ as well, so the ordering is not an artifact of generated references.
  & Automatic & \textbf{0.911} & \textbf{0.880} & \textbf{0.890} & 0.923 & 41/49 & 36.97 & 36.17 \\
 \bottomrule
 \end{tabular}}
-\caption{En$\rightarrow$Ja/De mixed-domain comparison (full-length playlist;
-ja: 266/350 technical/raw gold occurrences, 53 medicine types; de: 282/366,
-49 types). Automatic rows use the released configuration with ja/de topic
-keywords. Automatic routing has the highest combined term accuracy in both
-languages, while its BLEU remains below the fixed-medicine setting.}
+\caption{En$\rightarrow$Ja/De mixed-domain comparison; columns as in
+Table~\ref{tab:mixed} (ja: 266/350 technical/raw gold occurrences, 53
+medicine types; de: 282/366, 49). All runs use the released configuration
+with the ja/de topic keywords.}
 \label{tab:jade}
 \end{table}

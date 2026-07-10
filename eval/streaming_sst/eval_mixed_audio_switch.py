@@ -663,6 +663,7 @@ async def run_streaming_eval(
     records: List[Dict[str, Any]] = []
     events_seen = 0
     oracle_switches: List[Dict[str, Any]] = []
+    session_started_s = asyncio.get_running_loop().time()
     pacing = CursorBackpressure(
         chunk_samples=chunk_samples,
         max_unacked_chunks=max_unacked_chunks,
@@ -793,7 +794,17 @@ async def run_streaming_eval(
                     continue
                 idle_after_eof = 0
                 events_seen += 1
-                records.append(extract_record(event, event_idx=events_seen, spans=spans, require_router_meta=require_router_meta))
+                records.append(
+                    extract_record(
+                        event,
+                        event_idx=events_seen,
+                        spans=spans,
+                        require_router_meta=require_router_meta,
+                        emitted_wall_s=(
+                            asyncio.get_running_loop().time() - session_started_s
+                        ),
+                    )
+                )
             await feed_task
     finally:
         delete_session(base_url, session_id)
@@ -826,6 +837,7 @@ def extract_record(
     event_idx: int,
     spans: Sequence[AudioBlockSpan],
     require_router_meta: bool = True,
+    emitted_wall_s: Optional[float] = None,
 ) -> Dict[str, Any]:
     meta = event.get("meta")
     if not isinstance(meta, dict):
@@ -850,6 +862,9 @@ def extract_record(
         "cursor_samples": cursor_samples,
         "start_sample": int(meta.get("start_sample") or 0),
         "cursor_s": round(cursor_samples / TARGET_SAMPLE_RATE, 3),
+        "emitted_wall_s": (
+            round(float(emitted_wall_s), 6) if emitted_wall_s is not None else None
+        ),
         "expected_domain": expected,
         "active_domain": str(topic["active_domain"]),
         "active_preset": str(topic["active_glossary_preset"]),

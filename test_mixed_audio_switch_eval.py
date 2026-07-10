@@ -375,12 +375,18 @@ class MixedAudioSwitchEvalTests(unittest.TestCase):
             },
         }
 
-        record = extract_record(event, event_idx=1, spans=spans)
+        record = extract_record(
+            event,
+            event_idx=1,
+            spans=spans,
+            emitted_wall_s=12.3456789,
+        )
         self.assertEqual(record["cursor_samples"], TARGET_SAMPLE_RATE)
         self.assertEqual(record["expected_domain"], "nlp")
         self.assertEqual(record["router_target_domain"], "nlp")
         self.assertEqual(record["domain_probe_top_domain"], "nlp")
         self.assertEqual(record["start_sample"], TARGET_SAMPLE_RATE // 2)
+        self.assertEqual(record["emitted_wall_s"], 12.345679)
         self.assertEqual(record["references"][0]["term"], "SRL")
         self.assertEqual(
             record["selected_slice_presets"],

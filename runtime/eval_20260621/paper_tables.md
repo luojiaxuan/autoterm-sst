@@ -14,22 +14,33 @@ The screenshot uses the AutoTerm-SST web UI plus a captured diagnostic
 glossary state, active term count, and retrieve/generate latency; the released
 automatic path starts from domain-specific slices.
 
-## Table 1: Current mixed-domain comparison
+## Table 1: Current ten-talk mixed-domain comparison
 
-The paper's main table uses the benchmark-aligned union evaluation, not the
-legacy smoke artifact below. Technical-gold scores are 143 occurrences (98 ACL
-and 45 medicine); raw-gold scores are 226 (181 ACL and 45 medicine). The
-current source-of-truth artifact is staged on Taurus at
-`/mnt/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260708_union_truncated_8013/term_acc_compare_v2.json`
-and `auto_working_v2.json`; these runtime files are local-only staging and have
-not been uploaded to Hugging Face.
+The paper's main table uses the full ten-talk benchmark-aligned union
+evaluation: five ACL and five medicine talks streamed alternately through one
+session. The technical-gold score covers 875 occurrences (193 ACL and 682
+medicine). The source-of-truth artifact is staged on Aries at
+`/mnt/data3/jiaxuanluo/eval_out/10talk_zh/term_acc_10talk.json`; it is a
+local-only evaluation artifact and has not been uploaded to Hugging Face. The
+Git-tracked result summary and provenance are in
+`docs/auto_glossary_mixed_switch_20260707.md`.
 
 | setting | session setup | combined term acc. | ACL | medicine | BLEU |
 |---|---|---:|---:|---:|---:|
-| no memory | none | 0.769 | 0.806 | 0.689 | 23.14 |
-| fixed NLP | select NLP | 0.839 | 0.888 | 0.733 | 23.37 |
-| fixed medicine | select medicine | 0.825 | 0.776 | 0.933 | 22.92 |
-| Automatic | none | **0.916** | **0.898** | **0.956** | **24.07** |
+| no memory | none | 0.744 | 0.782 | 0.733 | 58.84 |
+| fixed NLP | select NLP | 0.744 | 0.907 | 0.698 | 59.18 |
+| fixed medicine | select medicine | 0.901 | 0.772 | 0.937 | **59.63** |
+| Automatic | none | **0.936** | **0.912** | **0.943** | 58.10 |
+
+### Earlier truncated three-talk comparison (provenance only)
+
+The earlier ACL$\rightarrow$medicine$\rightarrow$ACL result covered 143
+technical-gold occurrences and produced 0.916 combined term accuracy for
+Automatic, versus 0.839 for fixed NLP and 0.825 for fixed medicine. Its local
+staging artifacts are
+`/mnt/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260708_union_truncated_8013/term_acc_compare_v2.json`
+and `auto_working_v2.json`. The paper retains this result only as the explicitly
+labelled truncated three-block probe in the appendix.
 
 ## Legacy smoke artifact: historical quality / user-effort comparison
 

@@ -1,0 +1,61 @@
+{
+  "taxonomy_id": "autoterm-topic-taxonomy-example-v1",
+  "expected_topic_count": 3,
+  "slice_capacity": 10000,
+  "topics": [
+    {
+      "domain_id": "finance_banking",
+      "preset_id": "topic_finance_banking_10k",
+      "domain_description": "Banking, deposits, loans, credit, payments, and financial institutions.",
+      "priority": 20,
+      "primary_match": [
+        {
+          "category_any": [
+            "Category:Banking"
+          ]
+        }
+      ],
+      "filler_match": [
+        {
+          "category_any": [
+            "Category:Financial services"
+          ]
+        }
+      ]
+    },
+    {
+      "domain_id": "medicine_oncology",
+      "preset_id": "topic_medicine_oncology_10k",
+      "domain_description": "Oncology, tumors, cancer diagnosis, treatment, and clinical care.",
+      "priority": 20,
+      "primary_match": [
+        {
+          "category_any": [
+            "Category:Oncology"
+          ]
+        }
+      ]
+    },
+    {
+      "domain_id": "science_astronomy",
+      "preset_id": "topic_science_astronomy_10k",
+      "domain_description": "Astronomy, celestial objects, observation, cosmology, and space science.",
+      "priority": 10,
+      "primary_match": [
+        {
+          "wikidata_type_qid_any": [
+            "Q6999"
+          ]
+        },
+        {
+          "category_path_prefix_any": [
+            [
+              "Category:Science",
+              "Category:Astronomy"
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}

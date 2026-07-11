@@ -1,0 +1,6 @@
+setting	session_input	active_terms	term_hits	term_total	term_acc_pct	nlp_hits	nlp_total	nlp_term_acc_pct	medicine_hits	medicine_total	medicine_term_acc_pct	bleu	mt_bleu	prompt_precision_pct	refs_per_chunk
+infinisst_no_rag	none	0	1046	2047	51.10	687	1368	50.22	359	679	52.87	39.260961	36.704376	0.0000	0.000000
+known_domain_1k	domain	1000	1803	2047	88.08	1215	1368	88.82	588	679	86.60	45.193848	42.388966	48.6833	0.692343
+autoterm_1kx4	none	4000_max	1808	2047	88.32	1222	1368	89.33	586	679	86.30	45.090898	42.282655	34.7816	0.944166
+merged_100k	none	100000	1797	2047	87.79	1223	1368	89.40	574	679	84.54	43.721209	40.925677	6.8482	4.955105
+merged_1m	none	1000000	1728	2047	84.42	1192	1368	87.13	536	679	78.94	42.791173	39.948758	3.4446	8.700091

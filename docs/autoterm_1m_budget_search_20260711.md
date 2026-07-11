@@ -1,199 +1,128 @@
-# AutoTerm active-budget 与 merged glossary 正式比较（2026-07-11）
+# AutoTerm 十 talk 主结果与 StreamLAAL 指标真源（2026-07-11）
 
 ## 结论
 
-最终主结果在同一条完整十 talk 流上比较 Known-domain、AutoTerm、Merged-100k
-和 Merged-1M。结果支持一个有边界的系统结论：100k merged glossary 仍是可用、
-可信的中间 baseline，但已经出现 prompt crowding；扩展到 1M 后，固定候选与
-prompt evidence budget 明显失效，TERM_ACC、BLEU 和 masked BLEU 同时下降。
-AutoTerm 只激活至多 4k terms，TERM_ACC 与需要 domain metadata 的 Known-domain
-reference 相差 0.24 points，并且相对两个 merged baselines 显著提高 prompt
-precision。
+同一条 5 个 ACL talk 与 5 个 medicine talk 交替流支持如下系统叙事：
 
-因此论文不声称“大 glossary 必然更差”，而是强调：RASST 的 glossary RAG
-解决了 OOD term exposure，但 universal glossary 会随 catalog 扩张持续增加
-ranking/prompt noise。AutoTerm 在其上增加一个无需 session-time domain input 的
-budgeted multi-slice working set。
+1. InfiniSST no-RAG 明显弱于所有 terminology-retrieval 条件，说明 RASST 的
+   glossary RAG 有实际价值。
+2. AutoTerm-1k×4 不需要 session-time domain/glossary input，但与已知正确 domain
+   的 Known-domain-1k 基本持平。
+3. Merged-100k 仍是可用的中间 baseline；扩展到 Merged-1M 后，固定 retrieval 与
+   prompt budget 中的无关 evidence 增多，TERM_ACC、BLEU 和 MT-BLEU 同时下降。
 
-## 四 talk 探索设置（非最终主结果）
+因此论文不声称“大 glossary 必然失败”，也不把 100k 作为普适阈值。核心贡献是
+用 recent streaming translation context 管理一个 budgeted multi-slice working set，
+在 catalog 持续扩展时避免让用户上传 glossary 或选择 domain。
 
-- Playlist：ACL 268、Medicine 545006、ACL 367、Medicine 606；总长
-  5,381.508 秒。
-- 共同 decoder timing：2,803 个完整 windows；四个条件逐 window 相同。
-- Known-domain-2.5k：已知 talk domain，激活对应 2.5k slice。
-- AutoTerm-1k×4：10 个 1k slices，最近 4 个 streaming translation chunks 与
-  bilingual prototypes 做 BGE-M3 cosine similarity，激活 semantic top-4。
-- Merged-100k：Merged-1M 的严格嵌套前缀，89,216 个 target-bearing mappings
-  加 10,784 个 general distractors。
-- Merged-1M：同一 target-bearing prefix 加 general distractors 到 1M。
-- 所有条件：retrieval candidate budget 100、MaxSim threshold 0.78、prompt top-10。
-- 跨 domain 的同 source、不同 translation mappings 全部保留；只移除完全相同的
-  source-target pair duplicates。
+## 唯一可用于论文的指标协议
 
-## TERM_ACC scorer 修复
+- **TERM_ACC**：固定 2,047 个 raw tagged occurrences（NLP 1,368；medicine
+  679）。2,551 个 raw annotation rows 只在 domain、block、精确 audio span 和
+  normalized target variants 完全相同时合并 source aliases；不同 target、嵌套术语
+  和跨 domain translation 均保留。所有条件使用同一分母。
+- **BLEU**：每个 talk 的 streaming hypothesis 先经过 RASST/StreamLAAL 的
+  `mwerSegmenter` 对齐到 reference sentences，再在全部 1,905 个句子上计算 corpus
+  sacreBLEU，不能平均 ACL/medicine 两个 BLEU，也不能对整段字符串直接算 BLEU。
+- **MT-BLEU**：使用同一 StreamLAAL/mWER pipeline，并分别按 ACL raw glossary 与
+  medicine raw glossary 屏蔽 target translations。不报告基于 UI 高亮
+  technical/display subset 的第二个 masked-BLEU。
+- **Prompt precision**：注入 prompt 的 references 中，与当前 time-local raw source
+  occurrence 重叠的比例；**Refs/chunk** 是每个 decoder window 实际注入条数均值。
 
-旧 gold builder 对每个 glossary source term 使用轻量单复数容错，因此同一个
-spoken token 会同时生成 `model` 和 `models` 两条 annotation。旧 scorer 又按
-source term 建独立 one-to-one pool，使同一译文可以重复得分。1079 raw annotation
-rows 中有 231 条属于这种 alias excess。
+旧四-talk scorecard 中的 concatenated BLEU 和两种非 canonical masked variants
+全部为已废弃探索指标，不能再进入论文、README 或后续表格。
 
-commit `7dc4ac0` 将 headline occurrence 定义修正为：仅当 domain、block、精确
-audio span 和 NFKC/space/case-normalized target variant set 全部相同时，合并
-source aliases。不同 target variants、嵌套术语和同一 source 的 domain-dependent
-translations 仍分别计数。原始 source aliases 继续用于 prompt precision。
+## 正式设置
 
-- Raw headline：1,079 annotation rows → 848 occurrences（615 NLP，233 Medicine）
-- Technical：630 annotation rows → 561 occurrences
-- Headline fingerprint：
-  `aedee99367569f6b1b92b47d99259bf9678ed792a86404f5f9b831e5af80498c`
+- Playlist：5 ACL + 5 medicine complete talks，交替排列；约 4.7 小时。
+- Chunk/stride：1.92 秒；每个 RAG 条件精确 8,776 个 decoder windows，timing
+  signature 相同：
+  `7c0be6da5557cb99b3276967f3e575c353a03515e68d64489bffada22b2dfa7c`。
+- Known-domain-1k：使用 talk 的正确 1k slice，需要 domain input。
+- AutoTerm-1k×4：十个 1k topic slices；最近四个 generated target chunks 与
+  bilingual prototypes 做 BGE-M3 cosine similarity；最多激活四个 slices / 4k terms。
+- Merged-100k 与 Merged-1M：严格前缀嵌套 universal glossaries。仅去除完全相同的
+  source-target pair；跨 domain 的同 source、不同 translation mappings 保留。
+- 所有 RAG 条件：100 retrieval candidates、MaxSim threshold 0.78、prompt top-10。
+- 这是 controlled routing/retrieval-competition evaluation：NLP 与 medicine 1k
+  slices 包含 benchmark terminology，不是 held-out glossary induction。
 
-该修复后的四 talk 结果为 Known-domain 724 hits、AutoTerm 723 hits；两者只差
-1/848。Known-domain 是固定正确 domain slice 的参考策略，不是逐项选择最优输出的
-数学 oracle，因此与 AutoTerm 之间很小的正负波动本身不构成 bug。
+## 正式结果
 
-## 完整四 talk 探索结果（已由十 talk 主结果取代）
+机器可读版本：[`autoterm_10talk_streamlaal_20260711.tsv`](autoterm_10talk_streamlaal_20260711.tsv)。
 
-| Setting | TERM_ACC | NLP | Medicine | BLEU | T-MBLEU | R-MBLEU | Prompt precision | Refs/chunk |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Known-domain-2.5k | 85.38 (724/848) | 86.67 | 81.97 | 53.77 | 51.01 | 50.20 | 39.39 | 1.12 |
-| AutoTerm-1k×4 | 85.26 (723/848) | 87.32 | 79.83 | **54.03** | **51.26** | **50.46** | 39.29 | 1.12 |
-| Merged-100k | **86.32 (732/848)** | **88.46** | 80.69 | 53.94 | 51.16 | 50.41 | 8.83 | 5.00 |
-| Merged-1M | 83.02 (704/848) | 86.67 | 73.39 | 52.12 | 49.36 | 48.59 | 4.37 | 8.79 |
-
-关键解释：
-
-- Merged-100k 的 TERM_ACC 最好，说明 100k 仍是可信、可承受的 baseline；论文
-  不应把它描述为失败。
-- 100k 已需要约 4.5 倍于 AutoTerm 的 references/chunk，prompt precision 从
-  39.29% 降到 8.83%，但整体质量尚未明显下降。
-- 1M 时 prompt precision 进一步降到 4.37%，TERM_ACC 相对 AutoTerm 低 2.24
-  points，BLEU / T-MBLEU / R-MBLEU 分别低 1.91 / 1.90 / 1.88。
-- AutoTerm 与 Known-domain TERM_ACC 相差 0.12 points；不能声称显著优于
-  Known-domain，应使用 `matches` 或 `within 0.12 points`。
-
-## Selected-window tuning 协议
-
-参数搜索只使用固定四窗口、570 秒的开发协议，不能作为论文 headline。scorer
-修复后该协议版本化为 `frozen4_selected_window_v2`：179 raw rows → 142
-alias-dedup occurrences，fingerprint 为
-`4589ea5ebb87e4fb0cf59cfd4888034d46db547fbe9dbbde53dc9121a59e90c1`。
-
-冻结的三系统 tuning 复算如下：
-
-| Setting | TERM_ACC | BLEU | T-MBLEU | R-MBLEU | Prompt precision | Refs/chunk |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Known-domain-2.5k | 77.46 (110/142) | 45.46 | 42.73 | 40.98 | 47.57 | 1.52 |
-| AutoTerm-1k×4 | 77.46 (110/142) | 45.53 | 43.13 | 41.84 | 51.94 | 1.30 |
-| Merged-1M | 75.35 (107/142) | 42.78 | 40.91 | 39.10 | 7.35 | 8.97 |
-
-## Router 机制与边界
-
-当前路由不是 source transcript classifier。它对最近四个 streaming target chunks
-与每个 slice 的 description/bilingual prototypes 做 semantic similarity，并在总
-active-term budget 内选择 top-K slices。top-4 的作用是缓解 top-1 domain lag：四
-talk 探索流上 correct-slice inclusion 为 98.64%，而 top-1 active-domain accuracy
-为 96.97%。
-三次 domain boundary 的 top-1 switch 仍需 40.4 / 43.5 / 82.1 秒，这是依赖
-generated target context 的已知限制。
-
-## 完整十 talk 正式结果
-
-论文主表使用一条完整的 10-talk alternating stream：
-
-```text
-ACL 268 → Medicine 404 → ACL 367 → Medicine 606 → ACL 590
-→ Medicine 545006 → ACL 110 → Medicine 596001 → ACL 117
-→ Medicine 605000
-```
-
-- 总音频为 269,569,844 samples / 16,848.115 秒；chunk 为 30,720 samples，
-  每个条件必须精确产生 8,776 个 decoder windows。
-- ACL metadata 共有 468 个 segment。两台执行机器只重写旧 Taurus 绝对路径的
-  prefix，WAV 顺序和内容不变；canonical playlist SHA-256 为
-  `6c8d08949efd91a843fbf6c13f2fa0196f848242742709023c51792c6c12a6e7`。
-- headline TERM_ACC 固定为 2,047 个 alias-dedup occurrences（NLP 1,368，
-  medicine 679），来自 2,551 个 raw annotation rows；gold fingerprint 为
-  `a5513f8194cab5378ab95fab0ed386d88f36cc676c5dfde900f55dfc1c6b1b69`。
-- 四个条件为 Known-domain-1k、AutoTerm-1k×4、Merged-100k、Merged-1M。
-  Known-domain 直接选择 AutoTerm 使用的同一个正确 1k slice；每个 1k slice
-  已覆盖对应 domain 的全部 gold source-target pairs，2.5k 只会增加 distractors。
-- 这不是 held-out evaluation。NLP 1k 以 ACL technical glossary 为前缀，medicine
-  1k 也包含五个 medicine talks 的人工审核术语。该实验隔离的是 routing、retrieval
-  ranking 和固定 prompt budget 的行为，不评估 glossary induction/generalization。
-
-正式运行采用 exact code commit `3b7a39a`，并强制以下 gate：10 blocks、全部音频
-路径存在、8,776 windows、首批 retrieval 的 scored inventory 分别为 1k / 4k /
-100k / 1M、四条件 timing signature 完全一致，以及 raw denominator 精确为 2,047。
-commit `4a6449e` 又给 mixed-audio evaluator 增加了 fail-fast 输入校验，后续请求的
-ACL/medicine item 未全部加载时会在启动网络/GPU 评测前失败。
-
-四个同硬件 audited run 已在 Hyper00 全部完成并通过 gate；B200 的 Known/Auto
-冗余复跑也完整落盘，但论文表只使用同一台 Hyper00 的四个条件，避免把跨芯片
-差异混入比较。所有更早的 missing-import、重复 client、错误 preset 和
-medicine-only 尝试均已隔离为 `.invalid_*` 或独立 smoke 文件，不能进入 scorer。
-正式 local staging 根目录为：
-
-```text
-B200:   /data02/jaxan/autoterm-10talk-budget-20260711/b200/
-Hyper:  /data02/jaxan/autoterm-10talk-budget-20260711/hyper/
-```
-
-四条件使用同一 8,776-window timing SHA
-`7c0be6da5557cb99b3276967f3e575c353a03515e68d64489bffada22b2dfa7c`。
-最终结果如下；TERM_ACC 分母固定为 2,047：
-
-| Setting | TERM_ACC | NLP | Medicine | BLEU | T-MBLEU | R-MBLEU | Prompt precision | Refs/chunk |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Known-domain-1k | 88.08 (1,803/2,047) | 88.82 | **86.60** | **58.50** | **56.65** | **56.05** | **48.68** | **0.69** |
-| AutoTerm-1k×4 | **88.32 (1,808/2,047)** | 89.33 | 86.30 | 58.41 | 56.55 | 55.98 | 34.78 | 0.94 |
-| Merged-100k | 87.79 (1,797/2,047) | **89.40** | 84.54 | 57.34 | 55.38 | 54.80 | 6.85 | 4.96 |
-| Merged-1M | 84.42 (1,728/2,047) | 87.13 | 78.94 | 56.30 | 54.24 | 53.63 | 3.44 | 8.70 |
+| Setting | TERM_ACC | NLP | Medicine | BLEU | MT-BLEU | Prompt precision | Refs/chunk |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| InfiniSST (no RAG) | 51.10 (1,046/2,047) | 50.22 | 52.87 | 39.26 | 36.70 | 0.00 | 0.00 |
+| Known-domain-1k | 88.08 (1,803/2,047) | 88.82 | **86.60** | **45.19** | **42.39** | **48.68** | **0.69** |
+| AutoTerm-1k×4 | **88.32 (1,808/2,047)** | 89.33 | 86.30 | 45.09 | 42.28 | 34.78 | 0.94 |
+| Merged-100k | 87.79 (1,797/2,047) | **89.40** | 84.54 | 43.72 | 40.93 | 6.85 | 4.96 |
+| Merged-1M | 84.42 (1,728/2,047) | 87.13 | 78.94 | 42.79 | 39.95 | 3.44 | 8.70 |
 
 关键差值：
 
-- AutoTerm 与 Known-domain 只差 5/2,047 hits（+0.24 TERM_ACC points），而
-  Known-domain BLEU 高 0.09；论文表述为 `matches`，不称 AutoTerm 超过 oracle。
-- 相对 Merged-100k，AutoTerm 提高 0.54 TERM_ACC points、1.07 BLEU、1.18
-  T-MBLEU 和 1.18 R-MBLEU；prompt precision 为 34.78% vs. 6.85%，每 chunk
-  references 为 0.94 vs. 4.96。
-- 相对 Merged-1M，AutoTerm 提高 3.91 TERM_ACC points、2.11 BLEU、2.31
-  T-MBLEU 和 2.35 R-MBLEU；prompt precision 为 34.78% vs. 3.44%，每 chunk
-  references 为 0.94 vs. 8.70。
-- 这条结果既保留了“100k 尚可承受”的可信中间点，也显示 universal glossary
-  长期扩展到 1M 时的 ranking/prompt-noise 问题。
+- AutoTerm vs no RAG：+37.22 TERM_ACC points、+5.83 BLEU、+5.58 MT-BLEU。
+- AutoTerm vs Known-domain：+0.24 TERM_ACC points、-0.10 BLEU、-0.11 MT-BLEU；
+  论文只能写 `matches`，不能写严格优于 oracle/reference。
+- AutoTerm vs Merged-100k：+0.54 TERM_ACC、+1.37 BLEU、+1.36 MT-BLEU；100k
+  在 NLP 仍略好，但 medicine 已落后 1.76 points。
+- AutoTerm vs Merged-1M：+3.91 TERM_ACC、+2.30 BLEU、+2.33 MT-BLEU；prompt
+  precision 为 34.78% vs 3.44%，Refs/chunk 为 0.94 vs 8.70。
 
-路由时间轴使用同一条 AutoTerm 输出：pinned active-domain agreement 为 88.5%，
-但正确 slice 在 top-4 working set 中的覆盖率为 96.93%（8,507/8,776）；九个
-domain boundaries 的正确 slice admission delay 最大为 29.45 秒。这个差距说明
-multi-slice budget 比 hard top-1 router 更符合系统目标。
+MT-BLEU 已屏蔽被评测术语本身，AutoTerm 对 1M 仍有 2.33 points 优势，说明无关
+prompt evidence 不只影响 tagged-term copy，也会影响周边翻译质量。
 
-最终聚合 JSON/scorecard/timeline 应上传到稳定的 Hugging Face dataset；repo 与
-revision 当前仍为 TBD，以上路径只是 active local staging。
+## No-RAG baseline provenance
+
+InfiniSST hypotheses 来自 `LeiLiLab/RASST` PR #1：
+`agent/add-masked-bleu-results`，commit
+`e0682eaa094c00004192cae0045fae8b6ffacca4`，使用与主实验相同的十 talks 与
+1.92 秒 policy。这里没有直接平均 PR 中 ACL/medicine 的旧表格，而是把 hypotheses
+重新 materialize 到当前共同 references，用同一 mWER、MT-BLEU 和 2,047-occurrence
+TERM scorer 重算。No-RAG prompt precision 与 Refs/chunk 按定义为 0。
+
+## Router 与错误分析
+
+- 同一 AutoTerm run 中，正确 slice 在 four-slice working set 内的覆盖率为
+  96.93%（8,507/8,776 windows）；Figure 3 只展示 talk domain、selected slice 和
+  correct-slice inclusion，不展示内部 talk ID 或重复 metric cards。
+- ACL→medicine 边界后，旧 context 曾让 medicine slice 短暂缺席，随后进入 working
+  set。这是 generated-target causal routing 的已知边界。
+- 在一个讨论 scientific papers 的 medicine 段落，Merged-1M 同时检索出
+  `paper→论文` 与 `paper→纸`，AutoTerm 只保留 context-appropriate mapping。该例
+  说明 routing 减少但不能完全消除 ambiguous evidence。
 
 ## Source of Truth 与 artifact status
 
 | 内容 | 位置 / SHA-256 | 状态 |
 | --- | --- | --- |
-| scorer/router/timeline code | GitHub `luojiaxuan/autoterm-sst`, branch `explore/multidomain-routing` | 已 commit 并 push；以本页所在最新 revision 为准 |
-| Merged-100k glossary | Hyper00 `.../merged_pair_general_100k/`；glossary `31bf1e79...a8`，index `fdb214be...74ec` | local staging；HF pending |
-| Known-domain run | `full4_oracle2p5k_same_hyper_edd7.json`；`d21817fe...154f5` | local staging；HF pending |
-| AutoTerm run | `full4_auto1k_k4_w4_bilingual_edd7.json`；`d7ccd1ba...9b39c` | local staging；HF pending |
-| Merged-100k run | `full4_merged100k_nested_edd7.json`；`8c8dfe19...0c19` | local staging；HF pending |
-| Merged-1M run | `full4_merged1m_edd7.json`；`16ee87fa...7d8` | local staging；HF pending |
-| 100k scorecard | `full4_same_hyper_story_100k_alias_dedup_score.json`；`ac8e8cc8...3d0` | local staging；HF pending |
-| 1M scorecard | `full4_same_hyper_story_1m_alias_dedup_score.json`；`91e405f3...eaa` | local staging；HF pending |
-| 10-talk Known-domain run | Hyper `ten_talk_known1k_hyper_redundant_audited.json`；`8104be3d...8e93` | complete local staging；HF pending |
-| 10-talk AutoTerm run | Hyper `ten_talk_autoterm1kx4_hyper_redundant_audited.json`；`3b4fbb01...b30f` | complete local staging；HF pending |
-| 10-talk Merged-100k run | Hyper `ten_talk_merged100k_audited.json`；`dd03b4f7...b58e` | complete local staging；HF pending |
-| 10-talk Merged-1M run | Hyper `ten_talk_merged1m_audited.json`；`a3ad7235...cee` | complete local staging；HF pending |
-| 10-talk 100k scorecard | Hyper `ten_talk_story_100k_alias_dedup_score.json`；`a23eafa6...29ed` | complete local staging；HF pending |
-| 10-talk 1M scorecard | Hyper `ten_talk_story_1m_alias_dedup_score.json`；`925d9525...129f` | complete local staging；HF pending |
+| scorer / bundle code | GitHub `luojiaxuan/autoterm-sst`, branch `explore/multidomain-routing` | 已 commit/push；以本页所在 revision 为准 |
+| no-RAG run | Taurus `.../runs/norag.json`; `ff68d613...f9b2a4` | local staging；HF pending |
+| Known run | `8104be3d...8e93` | complete local staging；HF pending |
+| AutoTerm run | `3b4fbb01...32b30f` | complete local staging；HF pending |
+| Merged-100k run | `dd03b4f7...3b58e` | complete local staging；HF pending |
+| Merged-1M run | `a3ad7235...9a0cee` | complete local staging；HF pending |
+| fixed TERM score | `scores/mfa_term_all.json`; `e46a5aa5...6d219d` | complete local staging；HF pending |
+| common source / reference | `63783f4a...159a0` / `1c1477dc...745880` | 1,905 aligned sentences；HF pending |
+| raw MT mask glossary | `1f093f79...d276a` | 450 stored mappings; per-domain masking in scorer |
+| mWERSegmenter | `09da1798...57a157` | pinned executable |
 
-上述四 talk artifacts 使用相同 playlist SHA
-`a91adef64273f210b28d898b4f9b91bf30ae006e6c363aee079c2a79258ae40e`
-和 timing SHA
-`cf8f28cb400166af7fc950dd798939ff279828f0af9f5ff7e8a9d64e25834ac7`。
+Taurus staging root：
+`/mnt/data1/jiaxuanluo/autoterm_streamlaal_20260711/`。
 
-这些 JSON、glossary 和 indexes 目前仍是 Hyper local staging，不是 canonical
-release artifact。论文 release 前应上传聚合 artifacts 到稳定 Hugging Face dataset
-repo，并将 repo URL 与 revision 回填到本页和 README。
+完整 runs、bundles、per-sentence outputs 和 score JSON 尚不是 canonical release
+artifact。预定 Hugging Face dataset repo：
+`luojiaxuan/autoterm-sst-10talk-streamlaal-zh`，当前状态 **upload pending**。上传后需
+在本页与顶层 README 回填 repo URL、revision/tag、schema 和生成命令。
+
+## 复现入口
+
+- bundle/source materialization：`eval/streaming_sst/materialize_mixed_streamlaal.py`
+- StreamLAAL BLEU：`eval/streaming_sst/score_streamlaal.sh`
+- per-domain raw MT-BLEU：`eval/streaming_sst/score_resegmented_masked_bleu.py`
+- fixed-denominator TERM_ACC：`eval/streaming_sst/score_time_aligned_terms.py`
+- Figure 3：`eval/streaming_sst/render_budgeted_routing_timeline.py`
+
+当前校验：materializer 与 MT-BLEU 单元测试通过；五个 conditions 共用 source、
+reference、mask glossary 和 1,905-sentence denominator。

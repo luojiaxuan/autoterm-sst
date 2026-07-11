@@ -93,6 +93,50 @@ active-term budget 内选择 top-K slices。top-4 的作用是缓解 top-1 domai
 三次 domain boundary 的 top-1 switch 仍需 40.4 / 43.5 / 82.1 秒，这是依赖
 generated target context 的已知限制。
 
+## 10-talk 扩展协议与运行状态
+
+论文主表正在扩展到一条完整的 10-talk alternating stream：
+
+```text
+ACL 268 → Medicine 404 → ACL 367 → Medicine 606 → ACL 590
+→ Medicine 545006 → ACL 110 → Medicine 596001 → ACL 117
+→ Medicine 605000
+```
+
+- 总音频为 269,569,844 samples / 16,848.115 秒；chunk 为 30,720 samples，
+  每个条件必须精确产生 8,776 个 decoder windows。
+- ACL metadata 共有 468 个 segment。两台执行机器只重写旧 Taurus 绝对路径的
+  prefix，WAV 顺序和内容不变；canonical playlist SHA-256 为
+  `6c8d08949efd91a843fbf6c13f2fa0196f848242742709023c51792c6c12a6e7`。
+- headline TERM_ACC 固定为 2,047 个 alias-dedup occurrences（NLP 1,368，
+  medicine 679），来自 2,551 个 raw annotation rows；gold fingerprint 为
+  `a5513f8194cab5378ab95fab0ed386d88f36cc676c5dfde900f55dfc1c6b1b69`。
+- 四个条件为 Known-domain-1k、AutoTerm-1k×4、Merged-100k、Merged-1M。
+  Known-domain 直接选择 AutoTerm 使用的同一个正确 1k slice；每个 1k slice
+  已覆盖对应 domain 的全部 gold source-target pairs，2.5k 只会增加 distractors。
+- 这不是 held-out evaluation。NLP 1k 以 ACL technical glossary 为前缀，medicine
+  1k 也包含五个 medicine talks 的人工审核术语。该实验隔离的是 routing、retrieval
+  ranking 和固定 prompt budget 的行为，不评估 glossary induction/generalization。
+
+正式运行采用 exact code commit `3b7a39a`，并强制以下 gate：10 blocks、全部音频
+路径存在、8,776 windows、首批 retrieval 的 scored inventory 分别为 1k / 4k /
+100k / 1M、四条件 timing signature 完全一致，以及 raw denominator 精确为 2,047。
+commit `4a6449e` 又给 mixed-audio evaluator 增加了 fail-fast 输入校验，后续请求的
+ACL/medicine item 未全部加载时会在启动网络/GPU 评测前失败。
+
+截至本记录，六条 audited run（B200 上 Known/Auto，Hyper00 上四条件，其中
+Known/Auto 是冗余同硬件复跑）仍在运行。所有更早的 missing-import、重复 client、
+错误 preset 和 medicine-only 尝试均已隔离为 `.invalid_*` 或独立 smoke 文件，不能
+进入 scorer。正式 local staging 根目录为：
+
+```text
+B200:   /data02/jaxan/autoterm-10talk-budget-20260711/b200/
+Hyper:  /data02/jaxan/autoterm-10talk-budget-20260711/hyper/
+```
+
+最终聚合 JSON/scorecard/timeline 应上传到稳定的 Hugging Face dataset；repo 与
+revision 当前仍为 TBD，以上路径只是 active local staging。
+
 ## Source of Truth 与 artifact status
 
 | 内容 | 位置 / SHA-256 | 状态 |

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1800" height="760" viewBox="0 0 1800 760" role="img" aria-labelledby="title desc">
   <title id="title">AutoTerm-SST architecture illustrated with an NLP-to-medicine stream</title>
-  <desc id="desc">A RASST-style example-driven architecture. Earlier speech about SRL retrieves an NLP term, while a later medical segment retrieves rectal cancer after AutoTerm switches the active glossary from NLP to medicine using sliding-window context similarity.</desc>
+  <desc id="desc">A RASST-style example-driven architecture. Earlier speech about SRL and a later medical segment retrieve terms from a budgeted multi-slice working set selected from a larger glossary catalog using sliding-window context similarity.</desc>
   <defs>
     <marker id="arrow-ink" markerWidth="4.5" markerHeight="3.5" refX="4.2" refY="1.75" orient="auto" markerUnits="strokeWidth">
       <path d="M0,0 L4.5,1.75 L0,3.5 Z" fill="#222222"/>
@@ -25,18 +25,23 @@
       .translation { font-size: 34px; }
       .domain { font-size: 25px; font-weight: 700; }
       .term { font-size: 24px; font-weight: 600; }
+      .slice-label { font-size: 21px; font-weight: 700; }
+      .slice-term { font-size: 21px; font-weight: 600; }
+      .budget-label { font-size: 20px; font-weight: 700; fill: #B85120; }
       .box { fill: #FFFFFF; stroke: #222222; stroke-width: 2.6; }
       .feature-box { fill: #FFFFFF; stroke: #1682AD; stroke-width: 2.5; }
       .term-box { fill: #FFFFFF; stroke: #84257F; stroke-width: 2.5; }
       .autoterm-box { fill: #FFFBF7; stroke: #C86A32; stroke-width: 2.8; }
       .nlp-box { fill: #F1F8FC; stroke: #1682AD; stroke-width: 2.4; }
       .medicine-box { fill: #FFF6EF; stroke: #C86A32; stroke-width: 2.4; }
+      .catalog-box { fill: #F7F7F7; stroke: #9AA1AA; stroke-width: 2.2; stroke-dasharray: 7 5; }
       .forward { fill: none; stroke: #222222; stroke-width: 3; marker-end: url(#arrow-ink); }
       .feature-line { fill: none; stroke: #1682AD; stroke-width: 3; marker-end: url(#arrow-blue); }
       .term-line { fill: none; stroke: #84257F; stroke-width: 3; marker-end: url(#arrow-purple); }
       .control-line { fill: none; stroke: #C86A32; stroke-width: 3; marker-end: url(#arrow-orange); }
       .output-line { fill: none; stroke: #C86A32; stroke-width: 2.5; marker-end: url(#arrow-orange); }
       .feedback-line { fill: none; stroke: #C86A32; stroke-width: 2.7; stroke-dasharray: 9 7; marker-end: url(#arrow-orange); }
+      .selection-line { fill: none; stroke: #C86A32; stroke-width: 2.2; marker-end: url(#arrow-orange); }
       .thin { fill: none; stroke: #667085; stroke-width: 2.2; }
     </style>
   </defs>
@@ -92,9 +97,9 @@
 
   <!-- Earlier and later chunks are separated by an omitted interval; no immediate t-to-t+1 switch is implied. -->
   <rect x="105" y="520" width="380" height="43" class="feature-box"/>
-  <text x="295" y="550" class="domain" text-anchor="middle" fill="#116E93"><tspan>Chunk</tspan><tspan baseline-shift="sub" font-size="18">t</tspan><tspan> · NLP active</tspan></text>
+  <text x="295" y="550" class="domain" text-anchor="middle" fill="#116E93"><tspan>Chunk</tspan><tspan baseline-shift="sub" font-size="18">t</tspan><tspan> · NLP-focused set</tspan></text>
   <rect x="595" y="520" width="500" height="43" class="medicine-box"/>
-  <text x="845" y="550" class="domain" text-anchor="middle" fill="#B85120"><tspan>Chunk</tspan><tspan baseline-shift="sub" font-size="18">t+k</tspan><tspan> · Medicine active</tspan></text>
+  <text x="845" y="550" class="domain" text-anchor="middle" fill="#B85120"><tspan>Chunk</tspan><tspan baseline-shift="sub" font-size="18">t+k</tspan><tspan> · Medicine-focused set</tspan></text>
 
   <path d="M250 520 V431" class="forward"/>
   <path d="M770 520 V497 H500 V431" class="forward"/>
@@ -146,26 +151,37 @@
   <text x="530" y="603" class="example" text-anchor="middle" fill="#667085">…</text>
   <text x="530" y="637" class="small" text-anchor="middle">domain shift</text>
 
-  <!-- AutoTerm selects the active glossary from sliding-window context similarity. -->
-  <rect x="1160" y="320" width="530" height="365" class="autoterm-box"/>
-  <text x="1190" y="365" class="component-title" fill="#B85120">AutoTerm</text>
+  <!-- AutoTerm forms a budgeted multi-slice working set from the registered catalog. -->
+  <rect x="1145" y="320" width="555" height="365" class="autoterm-box"/>
+  <text x="1175" y="365" class="component-title" fill="#B85120">AutoTerm</text>
 
-  <rect x="1190" y="390" width="470" height="94" fill="#FFFFFF" stroke="#C86A32" stroke-width="2.2"/>
-  <text x="1425" y="447" class="domain" text-anchor="middle">Sliding-window context similarity</text>
+  <rect x="1175" y="386" width="495" height="70" fill="#FFFFFF" stroke="#C86A32" stroke-width="2.2"/>
+  <text x="1425" y="428" class="domain" text-anchor="middle">Sliding-window context similarity</text>
 
-  <rect x="1190" y="510" width="215" height="143" class="nlp-box"/>
-  <text x="1298" y="543" class="domain" text-anchor="middle" fill="#116E93">NLP Glossary</text>
-  <line x1="1210" y1="556" x2="1385" y2="556" stroke="#AFCFDE" stroke-width="2"/>
-  <text x="1298" y="587" class="term" text-anchor="middle">SRL</text>
-  <text x="1298" y="621" class="term" text-anchor="middle" fill="#84257F">→ 语义角色标注</text>
+  <rect x="1225" y="470" width="400" height="38" rx="19" fill="#FFF3E8" stroke="#C86A32" stroke-width="2"/>
+  <text x="1425" y="496" class="budget-label" text-anchor="middle">Budgeted active slices · top-K, B terms</text>
 
-  <rect x="1435" y="510" width="225" height="143" class="medicine-box"/>
-  <text x="1548" y="543" class="domain" text-anchor="middle" fill="#B85120">Medicine Glossary</text>
-  <line x1="1455" y1="556" x2="1640" y2="556" stroke="#EDC6AC" stroke-width="2"/>
-  <text x="1548" y="587" class="term" text-anchor="middle">rectal cancer</text>
-  <text x="1548" y="621" class="term" text-anchor="middle" fill="#84257F">→ 直肠癌</text>
+  <path d="M1425 508 V520 H1255 V532" class="selection-line"/>
+  <path d="M1425 520 H1435 V532" class="selection-line"/>
 
-  <path d="M1408 582 H1432" class="control-line"/>
+  <rect x="1175" y="535" width="160" height="118" class="nlp-box"/>
+  <text x="1255" y="564" class="slice-label" text-anchor="middle" fill="#116E93">NLP Glossary</text>
+  <line x1="1191" y1="576" x2="1319" y2="576" stroke="#AFCFDE" stroke-width="2"/>
+  <text x="1255" y="604" class="term" text-anchor="middle">SRL</text>
+  <text x="1255" y="634" class="slice-term" text-anchor="middle" fill="#84257F">→ 语义角色标注</text>
 
-  <path d="M1160 389 H1118" class="control-line"/>
+  <rect x="1347" y="535" width="175" height="118" class="medicine-box"/>
+  <text x="1435" y="564" class="slice-label" text-anchor="middle" fill="#B85120">Medicine Glossary</text>
+  <line x1="1363" y1="576" x2="1506" y2="576" stroke="#EDC6AC" stroke-width="2"/>
+  <text x="1435" y="604" class="slice-term" text-anchor="middle">rectal cancer</text>
+  <text x="1435" y="634" class="slice-term" text-anchor="middle" fill="#84257F">→ 直肠癌</text>
+
+  <rect x="1534" y="535" width="136" height="118" class="catalog-box"/>
+  <g fill="#7B818A">
+    <circle cx="1582" cy="594" r="5"/>
+    <circle cx="1602" cy="594" r="5"/>
+    <circle cx="1622" cy="594" r="5"/>
+  </g>
+
+  <path d="M1145 389 H1118" class="control-line"/>
 </svg>

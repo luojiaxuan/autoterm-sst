@@ -7,8 +7,9 @@ main system contribution is the adaptive terminology loop inside the live agent
 control requests, streams audio over WebSockets, tracks session lifecycle, and
 routes each session by \texttt{agent\_type}; it does not own model prompts,
 retrieval, batching, KV cache, or terminology resources. For chunk \(t\), the
-agent retrieves from the current slice before decoding. The resulting streaming
-evidence may update the slice for a later chunk, no earlier than \(t+1\), but
+agent retrieves from the current budgeted working set before decoding. The
+generated translation may update that working set for a later chunk, no earlier
+than \(t+1\), but
 never changes the prompt already used for chunk \(t\).
 
 \begin{figure*}[t]
@@ -16,10 +17,12 @@ never changes the prompt already used for chunk \(t\).
 \includegraphics[width=0.98\textwidth]{autoterm_architecture.pdf}
 \caption{AutoTerm-SST on a stream that moves from NLP to medicine. Each
 speech chunk is encoded by the RASST backbone, and at most 10 bilingual term
-pairs retrieved from the \emph{active slice} are injected into the Qwen3-Omni
-prompt. The router switches the active slice only after accumulated evidence
-confirms the domain shift, so \emph{SRL} is served from the NLP slice early
-and \emph{rectal cancer} from the medicine slice later.}
+    pairs retrieved from the \emph{active slices} are injected into the
+language-model prompt. Sliding-window translation context ranks bilingual
+slice prototypes under a fixed term budget, so \emph{SRL} is served from the
+NLP glossary early and \emph{rectal cancer} from the medicine glossary later.
+The working set may hold several slices; the ellipsis denotes additional
+registered glossaries.}
 \label{fig:architecture}
 \end{figure*}
 
@@ -36,11 +39,11 @@ and the same protocol can serve external SGLang-compatible backends
 UI.
 
 \paragraph{Streaming agent.}
-For each audio chunk, the OmniAgent runs MaxSim terminology retrieval over the
-active slice and collects routing-only domain-probe evidence. Before decoding,
-the hybrid router combines current speech/retrieval evidence with target-text
-history from earlier chunks; an accepted switch affects only later retrieval.
-The agent filters and reranks candidates, caps prompt references at 10, and lets
+For each audio chunk, the OmniAgent scores the accumulated target-text window
+against offline bilingual slice prototypes. It selects the highest-similarity
+slices that fit the active-term budget, then runs MaxSim retrieval across that
+working set. The agent filters and jointly reranks candidates, caps prompt
+references at 10, and lets
 the PromptBuilder format the \texttt{term\_map} before calling the in-process
 vLLM backend. After decoding, \(y_t\) is appended to the target history for a
 later routing tick. The agent emits partial translations and

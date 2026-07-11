@@ -1,60 +1,47 @@
 \appendix
 
-\section{Router Configuration and Guards}
+\section{Budgeted Semantic Router Configuration}
 \label{app:router}
 
-Table~\ref{tab:router-config} lists the default production configuration of
-the hybrid active-glossary router as released in
-\texttt{configs/autoterm\_slices.yaml}; deployment-specific configurations can
-override individual values explicitly. Guards are evaluated in order: warmup,
-update interval, target-equals-active, index readiness, probe floors,
-confidence, top-vs-runner-up margin, target-vs-current margin, post-switch
-cooldown, and consecutive-window consistency. Uncertain windows keep the
-current slice. The released configuration uses two consistent generated-target
-windows and a 0.30 target-vs-current margin; the two 640-window proxy tests in
-Section~\ref{sec:evaluation} used three generated-target windows.
-
-The weights are hand-set on the proxy schedules, not fitted to the audio
-evaluation runs. A proxy weight sweep (\(\lambda_t\) from 0.25 to 0.80,
-including dropping the centroid and metadata terms) leaves switching
-unchanged: every mixed-signal configuration completes all 16
-alternating/random transitions with zero wrong switches, at a latency fixed
-by the three-window consistency guard. Setting \(\lambda_t{=}1\) (no probe
-channel) blocks most switches (1/9 and 2/7), so the speech probe is a
-required corroborating guard even though it is too noisy to lead
-(Section~\ref{sec:evaluation}).
+Table~\ref{tab:router-config} gives the frozen configuration used for the main
+comparison. The context encoder is used only for slice routing; MaxSim remains
+the speech--term retriever. Descriptions and bilingual prototype examples are
+encoded once, averaged within each topic, and normalized. At runtime, the
+normalized embedding of the accumulated target-text window is compared with
+these centroids by cosine similarity.
 
 \begin{table}[ht]
 \centering
 \small
-\resizebox{\columnwidth}{!}{%
+\setlength{\tabcolsep}{5.5pt}
 \begin{tabular}{lr}
 \toprule
-Parameter & Default \\
+Parameter & Value \\
 \midrule
-\multicolumn{2}{l}{\emph{Signal weights (renormalized per window)}} \\
-\quad generated-target topic \(\lambda_t\) & 0.60 \\
-\quad speech-window domain probe \(\lambda_p\) & 0.25 \\
-\quad speech centroid \(\lambda_c\) & 0.10 \\
-\quad reference metadata \(\lambda_m\) & 0.05 \\
-\midrule
-\multicolumn{2}{l}{\emph{Switch thresholds}} \\
-\quad activation confidence & 0.60 \\
-\quad top-vs-runner-up margin & 0.15 \\
-\quad target-vs-current margin & 0.30 \\
-\quad consistent windows (text / gen.\ target / audio) & 2 / 2 / 3 \\
-\midrule
-\multicolumn{2}{l}{\emph{Audio-probe floors / schedule / retrieval}} \\
-\quad probe top score / margin / positive domains & 0.50 / 0.08 / 2 \\
-\quad warmup / update / cooldown / staleness & 20s / 10s / 30s / 120s \\
-\quad cap \texttt{PROMPT\_K} / score threshold & 10 / 0.78 \\
+Router context & latest 4 translation chunks \\
+Semantic encoder & BAAI/bge-m3 \\
+Candidate slices & 10 \\
+Terms per slice & 1,000 \\
+Maximum active slices (K) & 4 \\
+Total active-term budget (B) & 4,000 \\
+Pin current best slice & yes \\
+Shared retrieval candidates & 100 \\
+MaxSim threshold & 0.78 \\
+Prompt references & at most 10 \\
 \bottomrule
-\end{tabular}}
-\caption{Released hybrid-router defaults. Signal weights are renormalized
-over the signals present in each window; the three consistent-window counts
-apply per evidence path (manifest text / generated target / audio-only).}
+\end{tabular}
+\caption{Frozen AutoTerm configuration for Table~\ref{tab:quality}. Retrieval
+candidates share one total budget rather than receiving a separate budget per
+slice.}
 \label{tab:router-config}
 \end{table}
+
+The top-1 topic label changes conservatively and can lag a domain boundary. The
+retrieval policy is less brittle than that label: up to four high-scoring
+slices remain in the working set, so the correct inventory may be available
+before it becomes top-1. On the full stream, the three top-1 transitions took
+40.4, 43.5, and 82.1 seconds and made no wrong-direction switch. These delays
+are a limitation of target-context routing, not hidden domain metadata.
 
 \section{Glossary-Scale Streaming Sweep}
 \label{app:sweep}
@@ -72,22 +59,18 @@ Open & 100k & 64.1 / 82.6 & 4.89 \\
 Stress & 1M & 78 / 95 & 9.62 \\
 \bottomrule
 \end{tabular}
-\caption{Warm per-chunk MaxSim retrieval latency (p50/p95) and surviving
-prompt references per chunk (Refs) by memory size. The cost that scales is
-cold index loading (0.5s at 238 terms, 6.8s at 100k, over 30s at 1M), which
-AutoTerm-SST does off the streaming path.}
+\caption{Warm per-chunk MaxSim retrieval latency and surviving prompt
+references by memory size. Cold loading, performed off the streaming path,
+costs substantially more as the index grows.}
 \label{tab:scale}
 \end{table}
 
-Table~\ref{tab:sweep} reports the five-talk streaming sweep referenced in
-Section~\ref{sec:evaluation}: five concatenated ACL 60-60 talks (3{,}442s of
-audio) streamed through the live JSON WebSocket at latency multiplier 2, scored
-against a curated 142-term technical gold set. Each inventory always contains
-the full 238-entry curated ACL glossary; larger rows add Wikidata-mined AI/CS
-candidates as distractors. These are manual-preset runs isolating inventory
-scale (not \texttt{auto\_working} runs). Term accuracy, BLEU, and masked
-BLEU stay in a narrow band up to 100k terms while retrieval precision
-collapses, motivating compact routed active slices.
+To locate the onset of retrieval noise, we also stream five concatenated ACL
+60/60 talks (3,442 seconds) through manually selected nested inventories. Every
+row retains the same 238-entry ACL glossary and only adds distractors. Up to
+100k, TERM\_ACC and translation quality remain in a narrow band even as prompt
+precision falls (Table~\ref{tab:sweep}). This is why 100k is not presented as a
+failure case in the main paper; Merged-1M is the capacity stress condition.
 
 \begin{table}[ht]
 \centering
@@ -98,136 +81,52 @@ collapses, motivating compact routed active slices.
 Inventory & Terms & Term acc. & BLEU & M-BLEU & Gold@10 & Prec@10 & Refs \\
 \midrule
 Curated ACL & 238 & 0.972 & 58.27 & 53.10 & 0.972 & 0.480 & 1.53 \\
-+AI transl.\ 10k & 10{,}238 & 0.965 & 58.72 & 53.35 & 0.972 & 0.234 & 3.09 \\
-+AI broad 10k & 10{,}238 & 0.972 & 58.38 & 52.75 & 0.979 & 0.367 & 2.00 \\
-+AI broad 50k & 50{,}238 & 0.979 & 58.65 & 53.24 & 0.979 & 0.196 & 3.64 \\
-+AI broad 100k & 100{,}238 & 0.965 & 58.83 & 53.32 & 0.979 & 0.137 & 5.03 \\
++AI transl. & 10,238 & 0.965 & 58.72 & 53.35 & 0.972 & 0.234 & 3.09 \\
++AI broad & 10,238 & 0.972 & 58.38 & 52.75 & 0.979 & 0.367 & 2.00 \\
++AI broad & 50,238 & 0.979 & 58.65 & 53.24 & 0.979 & 0.196 & 3.64 \\
++AI broad & 100,238 & 0.965 & 58.83 & 53.32 & 0.979 & 0.137 & 5.03 \\
 \bottomrule
 \end{tabular}}
-\caption{Five-talk streaming sweep (latency multiplier 2) against the
-142-term technical gold set. Gold@10 = fraction of gold terms surfaced within
-the top-10 prompt cap; Prec@10 = retrieval precision at 10; Refs = surviving
-prompt references per chunk; M-BLEU = BLEU after deleting gold term strings
-from hypothesis and reference. At latency multiplier 1 the pattern holds
-(term accuracy 0.944--0.958; precision 0.479 \(\rightarrow\) 0.133).}
+\caption{Controlled ACL capacity sweep. Gold@10 is gold-term coverage within
+the prompt cap; Prec@10 is retrieval precision; M-BLEU masks technical terms.}
 \label{tab:sweep}
 \end{table}
 
-\section{Mixed-Domain Terminology under Union Inventories}
+\section{Four-Talk Active-Budget Comparison}
 \label{app:mixed}
-
-A glossary-channel comparison is only meaningful when the gold terms are
-inside the retrieval inventory: the broad wiki slices cover 29/142 of the ACL
-technical gold and 1/54 of the \texttt{medicine\_606} gold, so their term
-accuracy mostly measures base-model retention. We therefore evaluate with
-\emph{benchmark-aligned union inventories} at a fixed 10k inventory size: the
-byte-identical gold glossary (238 ACL / 212 hard-medicine terms) plus
-seeded wiki fillers, mirroring the recipe of Appendix~\ref{app:sweep}
-(gold coverage 142/142 and 54/54).
-
-Occurrences are anchored to source-audio seconds by Montreal Forced Aligner
-word alignments (ACL, through the played segment offsets) or oracle span times
-(medicine); a hit needs a distinct target variant within a $[-2,+30]$\,s
-window, matched one-to-one. Alignments ship with the code
-(\texttt{eval/streaming\_sst/mfa\_alignments}) and the lead is stable for
-15--45\,s windows.
-
-Table~\ref{tab:mixed} gives the full detail for the ten-talk run of
-Table~\ref{tab:quality} (five ACL and five medicine talks alternating,
-16,848s streamed live in real time through one session): raw-gold and
-type-level term accuracy plus masked BLEU. Automatic mode requires no
-session-time glossary input or domain choice but relies on inventories built
-offline. All nine domain transitions switch in the correct direction with one
-transient extra switch (steady-state active-domain accuracy 0.982); eight of
-nine switches land within 13.6--55.4s, and one delayed medicine-to-ACL switch
-takes 304s over a generic talk opening. A truncated three-block probe
-(ACL\,$\rightarrow$\,medicine\,$\rightarrow$\,ACL, 600s per block) shows the
-same ordering --- Automatic 0.908/0.888 combined versus 0.888/0.874 (fixed
-NLP) and 0.738/0.727 (fixed medicine), with switches 37.4s/25.0s after the
-boundaries --- and a gold-only 212-term medicine inventory without fillers
-reaches just 0.738, confirming that compact curated slices need distractor
-mass to be a realistic comparison. This probe is ACL-heavy (367 of 412
-technical occurrences), so the fixed-NLP inventory is a close runner-up.
 
 \begin{table}[ht]
 \centering
 \scriptsize
 \resizebox{\columnwidth}{!}{%
-\begin{tabular}{lrrrrrrr}
+\begin{tabular}{lrrrrrr}
 \toprule
-Setting & Acc\textsubscript{tech} & Acc\textsubscript{raw} & ACL & Med. & Med.\ types & BLEU & M-BLEU \\
+Setting & Hits & TERM\_ACC & NLP & Med. & Prompt prec. & Refs \\
 \midrule
-None & 0.670 & 0.706 & 0.767 & 0.559 & 92/196 & 58.84 & 57.46 \\
-Fixed NLP & 0.679 & 0.746 & 0.797 & 0.544 & 86/196 & 59.18 & 57.85 \\
-Fixed medicine & 0.805 & 0.784 & 0.764 & 0.852 & 168/196 & \textbf{59.63} & 57.53 \\
-Automatic & \textbf{0.874} & \textbf{0.868} & \textbf{0.890} & \textbf{0.856} & \textbf{170/196} & 58.10 & 56.22 \\
+Known-domain-2.5k & 724 & 0.854 & 0.867 & \textbf{0.820} & \textbf{0.394} & \textbf{1.12} \\
+AutoTerm-1k$\times$4 & 723 & 0.853 & 0.873 & 0.798 & 0.393 & \textbf{1.12} \\
+Merged-100k & 732 & \textbf{0.863} & \textbf{0.885} & 0.807 & 0.088 & 5.00 \\
+Merged-1M & 704 & 0.830 & 0.867 & 0.734 & 0.044 & 8.79 \\
 \bottomrule
 \end{tabular}}
-\caption{Full detail for the ten-talk run.
-Acc\textsubscript{tech}/Acc\textsubscript{raw} = term accuracy under the
-curated technical gold (1{,}462 occurrences) and the raw annotation gold
-(2{,}551); ACL/Med.\ = per-domain accuracy under the technical gold;
-Med.\ types = medicine term types hit at least once (of 196); M-BLEU as in
-Table~\ref{tab:sweep}.}
+\caption{Domain breakdown and prompt evidence for the full stream. Hits and
+TERM\_ACC use 848 spoken occurrences (615 NLP, 233 medicine).}
 \label{tab:mixed}
 \end{table}
 
-\section{\texorpdfstring{Multilingual Terminology (En\,$\rightarrow$\,Ja/De)}{Multilingual Terminology (En to Ja/De)}}
-\label{app:multilingual}
+The main comparison preserves domain ambiguity rather than deduplicating it
+away. We remove only exact source--target pair duplicates; when one source term
+has different translations in different domains, all mappings remain. The
+merged baselines combine the target-bearing pool with general distractors to
+exactly 100,000 and 1,000,000 mappings; the former is a strict prefix of the
+latter. These extra distractors need not be assigned to
+artificial topic slices: they model the universal-glossary alternative. AutoTerm
+uses ten 1k topic slices, and the known-domain reference uses the matching 2.5k NLP or medicine
+slice. All four policies receive 100 total retrieval candidates, threshold
+0.78, and at most 10 prompt references.
 
-The terminology resources provide three target-language translations: the gold
-glossaries carry zh/ja/de values, a single MaxSim index serves every target
-language (translations are resolved from the term list at prompt time), and the
-language pair selects the per-language demo model. Table~\ref{tab:jade} repeats
-the mixed
-full-length ACL\,$\rightarrow$\,medicine\,$\rightarrow$\,ACL comparison for
-En$\rightarrow$Ja and En$\rightarrow$De. Automatic routing, with no
-session-time glossary input, has the best combined term accuracy in both
-languages under both gold denominators, with zero wrong switches and
-steady-state active-domain accuracy 1.0. Both languages route ACL better than
-the fixed-NLP inventory and reach medicine coverage without a medicine
-glossary, so the combined lead comes from balanced cross-domain coverage
-rather than winning either domain outright. With the
-released ja/de topic keywords, switches land within 29--52s
-(ja 28.9/33.5s; de 52.0/33.5s; zh 37.4/25.0s). An ablation without
-language-tuned keywords degrades first-switch latency to 115.3s (ja) and
-875.6s (de), when routing leans on the slower probe channel. These delays
-coincide with lower medicine coverage and BLEU while switch directions stay
-correct; the keyword
-lists are small, high-precision regex sets per domain. German term matching is
-casefolded with light stem tolerance (exact matching undercounts under
-inflection); short variants keep strict word boundaries. The medicine
-references differ in provenance: German uses human reference translations,
-whereas Chinese and Japanese medicine references are model-generated (the ACL
-segments use the shared-task human references in all three). Under the
-human-referenced German setting, automatic routing still leads on the raw
-gold and stays within 1.1 points of the in-domain expert on the technical
-gold without any session-time setup.
-
-\begin{table}[ht]
-\centering
-\scriptsize
-\resizebox{\columnwidth}{!}{%
-\begin{tabular}{llrrrrrrr}
-\toprule
- & Setting & Acc\textsubscript{tech} & Acc\textsubscript{raw} & ACL & Med. & Med.\ types & BLEU & M-BLEU \\
-\midrule
-\multirow{4}{*}{Ja}
- & None & 0.635 & 0.669 & 0.730 & 0.578 & 25/53 & 43.55 & 41.60 \\
- & Fixed NLP & 0.643 & 0.703 & 0.900 & 0.488 & 21/53 & 44.19 & 42.21 \\
- & Fixed medicine & 0.827 & 0.811 & 0.720 & \textbf{0.892} & \textbf{48/53} & \textbf{44.90} & \textbf{42.83} \\
- & Automatic & \textbf{0.857} & \textbf{0.860} & \textbf{0.930} & 0.813 & 43/53 & 39.68 & 37.67 \\
-\midrule
-\multirow{4}{*}{De}
- & None & 0.653 & 0.669 & 0.740 & 0.604 & 24/49 & 37.52 & 37.47 \\
- & Fixed NLP & 0.667 & 0.694 & 0.840 & 0.571 & 23/49 & 37.21 & 36.91 \\
- & Fixed medicine & \textbf{0.812} & 0.790 & 0.670 & \textbf{0.890} & \textbf{43/49} & \textbf{37.63} & \textbf{37.18} \\
- & Automatic & 0.801 & \textbf{0.795} & \textbf{0.880} & 0.758 & 38/49 & 35.90 & 35.37 \\
-\bottomrule
-\end{tabular}}
-\caption{En$\rightarrow$Ja/De mixed-domain comparison; columns as in
-Table~\ref{tab:mixed} (ja: 266/350 technical/raw gold occurrences, 53
-medicine types; de: 282/366, 49). All runs use the released configuration
-with the ja/de topic keywords.}
-\label{tab:jade}
-\end{table}
+We selected slice size, $K$, and context length on four fixed development
+windows totaling 570 seconds, then froze the setting before running all four
+talks. These windows come from the same talks and are configuration-search
+data, not a held-out evaluation; only the untouched 5,381.508-second run and
+its 848-occurrence denominator appear in the headline table.

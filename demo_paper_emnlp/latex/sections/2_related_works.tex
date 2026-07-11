@@ -22,9 +22,12 @@ terms and named entities are also a known weakness of speech translation
 expose non-parametric memory at generation time
 \citep{lewis2020retrieval,khandelwal2021nearest}. Many of these workflows assume
 that the domain or terminology is known before translation begins. RASST
-retrieves from a glossary fixed before streaming \citep{luo2026rasst};
-AutoTerm-SST selects the active glossary online from accumulated streaming
-evidence while keeping the retriever and translation model unchanged.
+retrieves glossary evidence for out-of-distribution terms before LLM decoding,
+but its glossary is fixed before streaming \citep{luo2026rasst}. AutoTerm-SST
+keeps the RASST retriever and translation model unchanged and instead manages a
+budgeted cache of topic slices online. This moves domain selection from user
+setup into the streaming system and prevents an expanding offline catalog from
+placing every term in the same ranking competition.
 
 \paragraph{LLM serving and demo systems.}
 Modern LLM serving systems provide continuous batching and efficient generation

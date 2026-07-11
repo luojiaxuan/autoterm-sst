@@ -1,76 +1,49 @@
 \section{Adaptive Terminology Memory}
 \label{sec:adaptive-memory}
 
-AutoTerm-SST separates terminology inventory from the prompt interface. Its
-\emph{terminology memory} is a collection of prebuilt inventories derived from
-Wikidata/Wikipedia and curated glossaries. At any time, the \emph{active slice}
-is the compact domain inventory queried for each chunk; a broad \emph{open
-memory} can be consulted as an optional fallback. The online system retains at
-most 10 score-filtered references for each prompt.
+AutoTerm-SST separates the offline terminology catalog from the small working
+glossary exposed to the language model. The catalog may contain many topic
+slices and substantially more entries than should be searched or placed in a
+streaming prompt at once. Each slice stores term--translation pairs, lightweight
+topic metadata, and a prebuilt MaxSim index. Exact duplicate pairs may be
+removed, but the same source term with different domain-dependent translations
+is retained.
 
-\paragraph{Open memory snapshots.}
-Each snapshot maps a preset identifier to term files, metadata, and a MaxSim
-index. The
-runtime never stores large indexes in the code repository; instead, manifests
-point to a runtime root on the demo host. The released configuration provides
-NLP and medicine slices. A curated 238-term ACL glossary is
-used only as an evaluation oracle; the 100k open memory is an optional fallback,
-and the 1M memory is used for scale diagnostics.
-
-\paragraph{Hybrid active glossary router.}
-The default live router is \texttt{hybrid\_window\_topic}. It is not a trained
-topic classifier and does not run a separate ASR path or source-transcript
-classifier in production. Instead, it combines signals available within the
-streaming agent: windows of recent generated target text, routing-only
-speech-window domain probes, weak speech-centroid evidence, and
-retrieved-reference metadata:
+\paragraph{Budgeted semantic routing.}
+Users neither upload a glossary nor choose a domain. At chunk $t$, the router
+concatenates the most recent $w$ generated translation chunks into a
+sliding-window context $c_t$. Each slice $d$ has an offline bilingual
+prototype set $P_d$, consisting of a short description and representative
+source/target terminology. With a multilingual sentence encoder $E$, the
+router computes
 \begin{equation}
-\begin{split}
-score(d) = & \lambda_t\,\mathrm{topic}_d(y_{\mathrm{recent}}) \\
-           & + \lambda_p\,\mathrm{probe}_d(x_{\mathrm{speech}}) \\
-           & + \lambda_c\,\cos(\mathrm{EMA}(q_{\mathrm{speech}}), c_d) \\
-           & + \lambda_m\,\mathrm{vote}_d(\mathrm{references}),
-\end{split}
+  \begin{aligned}
+  \bar p_d &=
+  \operatorname{norm}\!\left(\frac{1}{|P_d|}
+  \sum_{p\in P_d} E(p)\right),\\
+  s(d\mid c_t) &= \cos\!\left(E(c_t),\bar p_d\right).
+  \end{aligned}
 \end{equation}
-where \(y_{\mathrm{recent}}\) is the recent generated translation window,
-\(x_{\mathrm{speech}}\) is the recent speech window used for a routing-only
-domain probe, \(q_{\mathrm{speech}}\) is the pooled speech query embedding,
-\(c_d\) is a domain centroid built offline from a slice's MaxSim text
-embeddings, and reference votes come from metadata such as source preset and
-domain. Here, \(\mathrm{topic}_d\) is a weighted keyword/regex score over the
-generated target window, while \(\mathrm{probe}_d\) aggregates top-\(k\) MaxSim
-scores between the speech window and each candidate domain index. The weights
-and switch thresholds are hand-set: ``training-free'' refers only to the router
-and does not imply that the base model or retriever is untrained. The default
-weights are \(\lambda_t=0.60\), \(\lambda_p=0.25\), \(\lambda_c=0.10\), and
-\(\lambda_m=0.05\); they are renormalized over the signals available in a
-window, so routing already works before the first target text is generated. The
-production schedule evaluates switch decisions every 10s after a 20s warmup and
-caches probe scores between refreshes (Appendix~\ref{app:router}). The older
-\texttt{embedding\_refs} router remains available as a compatibility policy.
+It ranks slices by this similarity and activates the highest-scoring slices
+that fit a term budget $B$, up to $K$ slices. This is training-free and
+allows several plausible topics to remain available: a single wrong top-1
+decision need not remove the correct terminology from retrieval. The current
+best slice is pinned when possible to avoid oscillation at a topic boundary.
 
-\paragraph{Conservative switching.}
-The router is a policy for selecting active domain slices, not an open-world
-topic detector. It switches only after warmup, minimum update interval,
-confidence threshold, top-vs-runner-up margin, repeated consistent windows,
-domain-probe guards, and target index readiness. A switch supported by generated
-target text requires multiple consecutive consistent windows; audio/probe-only
-switching uses stricter raw-probe floors (Appendix~\ref{app:router}). Generated
-target text without positive topic evidence receives no topic weight, so it
-cannot dilute a strong probe or turn a weak probe into a high-confidence switch.
-Cold index loads are non-blocking: the agent preloads a target index in the
-background and activates it only after the retrieval plugin reports that the
-index is ready.
+\paragraph{Fixed evidence budget.}
+For every chunk, the active indexes share one retrieval candidate budget; the
+surviving candidates are jointly ranked and at most 10 references enter the
+language-model prompt. Thus increasing $K$ does not grant AutoTerm more
+retrieval candidates. In our main comparison, AutoTerm ranks ten 1k slices,
+uses $w{=}4$, $K{=}4$, and $B{=}4{,}000$; the 100 retrieval candidates
+are divided across the active slices before the common score threshold and
+top-10 prompt cap. The known-domain reference instead searches one 2.5k slice,
+while the merged baselines search nested 100k- and 1M-entry indexes under the
+same candidate and prompt budgets (Section~\ref{sec:evaluation}).
 
-\paragraph{Capped prompt candidates.}
-Automatic mode retrieves and score-filters up to 10 candidates from the active
-slice. Under low-confidence fallback conditions, it may query
-\texttt{open\_wiki\_100k} separately, then merge, deduplicate, and rerank the
-two result sets. The prompt receives at most \(\texttt{PROMPT\_K}=10\)
-references, with no filler terms when fewer survive. Slice size therefore
-trades coverage against ranking difficulty within the top-10 prompt cap. The
-controlled comparison uses 10k inventories as an evaluation choice, not a
-system limit; broader inventories remain available as fallback pools and scale
-diagnostics (Appendix~\ref{app:sweep}). The live evidence metadata records
-active slices, candidate-pool size, prompt-reference counts, fallback events,
-and retrieval-quality metrics.
+The 1M index is not assumed to be computationally infeasible. The comparison
+tests a different systems question: as an offline catalog grows, can a compact
+semantic working set preserve relevant prompt evidence without session-time
+setup? Broad indexes can still be retained as background resources or rescue
+pools; AutoTerm controls how much of that resource competes for each streaming
+prompt.

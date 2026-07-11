@@ -1,22 +1,26 @@
 \section{Limitations and Conclusion}
 \label{sec:limitations}
 
-AutoTerm-SST is a live terminology-aware SST system, not a new foundation
-model or topic classifier. The live demo serves En$\rightarrow$Zh/Ja/De;
-routing depends partly on small, hand-written target-language keyword lists, so
-unsupported languages or domains may switch more slowly
-(Appendix~\ref{app:multilingual}). Large open memories can expand coverage but
-reduce retrieval precision under the 10-reference cap, so the 100k memory is
-queried only through a guarded fallback. The hybrid router is intentionally
-conservative and may retain the initial slice when evidence is ambiguous. Our
-evaluations are single-run system probes, and the matched-union comparison uses
-full-coverage benchmark inventories; neither establishes open-world or
-corpus-level significance. The retrieval-latency sweep excludes the routing-only domain probes,
-whose cost the runtime records separately. Finally, the real backend needs
-high-end NVIDIA GPUs and external model/retriever artifacts; mock mode covers
-UI and protocol testing without them.
+AutoTerm-SST is a terminology-aware streaming system, not a new foundation
+model or an open-world topic classifier. Semantic routing depends on short
+offline slice descriptions and bilingual prototypes; a novel or ambiguous
+topic may therefore receive a poor working set. Because the strongest routing
+evidence is recent generated translation, the top-ranked slice can lag after a
+domain boundary, although activating several slices reduces the cost of a
+single wrong top-1 choice. The main comparison covers one En$\rightarrow$Zh
+four-talk stream and ten candidate slices. It is a controlled system result,
+not evidence that every million-entry glossary or language pair will degrade by
+the same amount. In particular, Merged-100k remains competitive in both the
+controlled ACL sweep and the four-talk comparison, and a 1M MaxSim index is
+computationally usable; the observed failure is ranking and prompt crowding
+under a fixed evidence budget. The hosted live backend also
+requires high-end NVIDIA GPUs and external model/retriever artifacts, while mock
+mode covers UI and protocol testing without them.
 
-We presented AutoTerm-SST, a terminology-memory workbench that needs no
-per-session glossary upload or domain choice: it keeps broad resources off the
-default path, routes active slices from streaming evidence, and caps each
-prompt at 10 score-filtered references.
+We presented AutoTerm-SST, which removes per-session glossary upload and domain
+selection by routing a compact multi-slice working glossary from streaming
+context. On the frozen four-talk comparison, this working set improves term and
+translation quality over a merged 1M glossary while injecting substantially
+cleaner prompt evidence. The architecture also provides a practical expansion
+path: new topic slices can be registered offline without forcing every session
+to search one ever-growing universal glossary.

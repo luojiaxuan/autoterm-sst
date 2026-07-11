@@ -11,9 +11,10 @@ live GPU mode with Qwen3-Omni and MaxSim retrieval.
   \centering
   \includegraphics[width=0.72\textwidth]{ui_evidence_panel.png}
   \caption{Web UI during a live En$\rightarrow$Zh session, moments after the
-  automatic switch to the medicine slice. The translucent panel renders the
+  automatic transition to a medicine-focused working set. The translucent panel renders the
   JSON evidence stream over the settings card: retrieved term pairs with
-  retrieval scores and their source slice (\texttt{auto:medicine\_core\_10k}),
+  retrieval scores and their source slice (here
+  \texttt{auto:medicine\_core\_10k}),
   per-chunk retrieval latency, and the streaming translation with retrieved
   terminology hits highlighted inline. The latency multiplier was changed
   live mid-session (status chip).}
@@ -24,10 +25,13 @@ live GPU mode with Qwen3-Omni and MaxSim retrieval.
 Users choose a model agent, language pair, latency multiplier, and terminology
 mode. In \texttt{auto\_working} mode, the session starts from a configured
 default slice without requiring the user to identify the domain, and it may
-switch to another domain slice; every chunk uses the same top-10 prompt cap.
-The hosted demo serves a lightly curated variant of the two slices (generic
-single-word entries removed, session proper nouns added); all evaluation
-numbers use the unmodified union inventories of Section~\ref{sec:evaluation}.
+activate other domain slices within its working-set budget; every chunk uses
+the same top-10 prompt cap.
+The hosted demo currently exposes lightly curated NLP and medicine glossaries
+(generic single-word entries removed and session proper nouns added). The
+stress evaluation uses its own frozen ten-slice registry and unmodified
+inventories, so the hosted UI resources are not used to construct
+Table~\ref{tab:quality}.
 Manual presets and ad-hoc term overrides remain available as advanced options;
 they affect the prompt but do not bias the router.
 
@@ -36,7 +40,7 @@ For each partial translation, the UI renders the latest non-empty retrieved
 references as term-translation pairs with scores and source labels. A status
 line reports active memory backend, term count, and retrieval/generation
 latency; the adaptive row adds mode, inferred topic, confidence, active
-glossary, switch count, and router action. This makes terminology behavior
+glossaries, switch count, and router action. This makes terminology behavior
 visible rather than hidden inside the model prompt.
 
 \paragraph{Packaging.}

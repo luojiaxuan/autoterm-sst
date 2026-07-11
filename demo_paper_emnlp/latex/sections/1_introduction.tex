@@ -15,19 +15,22 @@ live use. A user may not know the exact topic before a talk starts, and asking
 every speaker or viewer to upload a domain glossary or select a domain creates
 friction. At deployment time, operators register modular, pre-indexed
 terminology resources for different domains. At session time, users neither
-upload a glossary nor select a domain: AutoTerm-SST selects the active resource
-from streaming evidence and injects at most 10 retrieved terms into each LLM
-prompt. This allows new domains to be added without retraining the translation
-model or collapsing all terminology resources into a single monolithic
-inventory.
+upload a glossary nor select a domain: AutoTerm-SST maintains a small active
+working set from streaming evidence and injects at most 10 retrieved terms into
+each LLM prompt. This allows new domains to be added without retraining the
+translation model or collapsing all terminology resources into a single
+monolithic inventory.
 
 AutoTerm-SST treats terminology control as an active-inventory and ranking
-problem. Its motivation is not that million-term retrieval is computationally
-infeasible, but that modular domain resources are easier to maintain, update,
-attribute, and keep relevant under a fixed prompt-evidence budget. Automatic
-mode starts from a deployment-configured default slice, and a training-free
-router switches among domain slices when streaming evidence is strong. Broad
-open memory is used only as an optional low-confidence fallback pool.
+problem. RASST uses glossary retrieval to expose out-of-distribution terms to
+the language model, but the retriever and prompt have finite ranking capacity:
+as a universal glossary grows, more irrelevant and conflicting references
+compete for the same evidence budget. AutoTerm adds a cache-like management
+layer above the unchanged retriever. Semantic similarity admits promising
+slices, the current slice receives recency-style pinning, and low-priority
+slices leave the working set when its term budget is full. The motivation is
+not that million-term retrieval is computationally infeasible, but that a small
+active set remains more relevant as the offline catalog expands.
 
 The result is an interactive streaming SST workbench rather than a new
 translation model. The framework handles REST/WebSocket transport, session
@@ -43,10 +46,9 @@ Our contributions are:
     evidence panel for retrieved terminology, active glossary state, router
     decisions, and latency.
     \item We introduce zero session-time terminology setup: users neither
-    upload a glossary nor select a domain, while a training-free router selects
-    among prebuilt domain slices and sends at most 10 score-filtered candidates
-    to the prompt.
-    \item We evaluate terminology recall, retrieval latency and scale up to
-    million-term memories, mixed-domain routing, and 32-session concurrent
-    streaming.
+    upload a glossary nor select a domain, while a training-free, budgeted
+    active-slice cache keeps multiple plausible topic glossaries available.
+    \item On a frozen four-talk stream, we compare the working set with nested
+    100k/1M merged glossaries and a known-domain reference, alongside retrieval
+    scale and 32-session concurrent serving.
 \end{itemize}

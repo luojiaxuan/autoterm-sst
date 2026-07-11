@@ -7,8 +7,8 @@ AutoTerm-SST is an interactive simultaneous speech-translation (SST) system for
 term-dense vertical domains (academic, medical, legal, financial). It streams
 speech in, runs a swappable translation **agent**, and streams translated text
 back — with an **adaptive terminology memory** (AutoTerm) that retrieves up to
-10 score-filtered glossary candidates per chunk from an automatically routed,
-domain-specific active slice, so the model gets specialized vocabulary right
+10 prompt glossary references per chunk from an automatically routed,
+budgeted multi-slice working set, so the model gets specialized vocabulary right
 without a per-session glossary upload or domain choice. Domain resources are
 prebuilt and registered by the deployment operator.
 
@@ -22,6 +22,8 @@ of that internally.
 - 📄 Paper: *AutoTerm-SST: Adaptive Terminology Memory with Zero Session-Time
   Setup for Streaming Speech Translation* (EMNLP 2026 System Demonstrations, under review) —
   source in [`demo_paper_emnlp/`](demo_paper_emnlp/).
+- 📊 Evaluation source of truth: [ten-talk StreamLAAL audit](https://github.com/luojiaxuan/autoterm-sst/blob/explore/multidomain-routing/docs/autoterm_1m_budget_search_20260711.md)
+  and [`docs/system_scaling.md`](docs/system_scaling.md).
 - 🎬 Screencast video: [docs/demo_screencast.mp4](https://github.com/luojiaxuan/autoterm-sst/blob/main/docs/demo_screencast.mp4) (2.5 min).
 - 🌐 Hosted live demo: <https://luojiaxuan.github.io/autoterm-sst/> (stable
   entry page; redirects to the current GPU-backed tunnel).

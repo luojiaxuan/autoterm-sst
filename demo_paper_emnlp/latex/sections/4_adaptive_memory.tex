@@ -28,6 +28,32 @@ $P_d$ and multilingual sentence encoder $E$, it computes
   s(d\mid c_t) &= \cos\!\left(E(c_t),\bar p_d\right).
 \end{aligned}
 \end{equation}
+
+\begin{table*}[t]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{llrrrrrrrr}
+\toprule
+Setting & Input & Active & \multicolumn{3}{c}{TERM\_ACC (\%)} & BLEU & MT-BLEU & Prec. (\%) & Refs \\
+\cmidrule(lr){4-6}
+& & & NLP & Med. & All & & & & \\
+\midrule
+No RAG (InfiniSST) & None & 0 & 50.2 & 52.9 & 51.1 & 39.26 & 36.70 & 0.0 & 0.00 \\
+Known-domain-1k & Domain & 1k & 88.8 & \textbf{86.6} & \textbf{88.1} & \textbf{45.19} & \textbf{42.39} & \textbf{48.7} & \textbf{0.69} \\
+AutoTerm-1k$\times$4 & None & $\leq$4k & 89.3 & 86.3 & \textbf{88.3} & 45.09 & 42.28 & 34.8 & 0.94 \\
+Merged-100k & None & 100k & \textbf{89.4} & 84.5 & 87.8 & 43.72 & 40.93 & 6.8 & 4.96 \\
+Merged-1M & None & 1M & 87.1 & 78.9 & 84.4 & 42.79 & 39.95 & 3.4 & 8.70 \\
+\bottomrule
+\end{tabular}
+\caption{Ten-talk comparison under a fixed retrieval/prompt budget. BLEU and
+MT-BLEU use StreamLAAL-compatible mWER resegmentation. TERM\_ACC uses the same
+2,047 raw-term occurrences for every row (1,368 NLP; 679 medicine). Prec. is
+prompt precision. No RAG injects no references, so its prompt quantities are
+zero.}
+\label{tab:quality}
+\end{table*}
+
 We use BGE-M3 for $E$. Prototypes contain a short bilingual description and
 representative terms, so Chinese generated context and English topic metadata
 share one embedding space. The routing path is therefore a direct semantic
@@ -58,10 +84,10 @@ scores fall. Candidate indexes are preloaded and selections change only
 between decoding steps.
 
 \paragraph{Fixed evidence budget.}
-All active slices share 100 retrieval candidates and a common top-10 prompt
-cap. Increasing $K$ therefore changes the composition of the search space, not
-the amount of evidence available to AutoTerm. In the evaluated configuration,
-the router considers ten 1k slices, uses the latest four translation chunks,
+All active slices share a top-100 returned-candidate budget and a common top-10
+prompt cap. Increasing $K$ therefore changes the composition of the search
+space, not the amount of evidence available to AutoTerm. In the evaluated
+configuration, the router considers ten 1k slices, uses the latest four translation chunks,
 and activates at most four slices ($B{=}4{,}000$). The known-domain reference
 searches the matching 1k slice; universal baselines search nested 100k and 1M
 indexes under exactly the same retrieval and prompt limits.

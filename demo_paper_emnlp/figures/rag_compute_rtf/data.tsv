@@ -1,0 +1,5 @@
+lm	cadence_sec	retriever_input_span_sec	streamlaal_sec	rag_calls	rag_mean_ms	rag_median_ms	rag_mean_rtf_pct	rag_median_rtf_pct
+1	0.96	2.88	1.1401	14315	53.644	36.957	5.5879	3.8497
+2	1.92	3.84	1.7724	7159	63.977	42.345	3.3322	2.2055
+3	2.88	4.80	2.3205	4774	68.892	42.560	2.3921	1.4778
+4	3.84	5.76	2.8217	3581	58.286	43.645	1.5179	1.1366

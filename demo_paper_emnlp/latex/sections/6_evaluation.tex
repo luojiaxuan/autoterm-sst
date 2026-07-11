@@ -1,31 +1,6 @@
 \section{Evaluation}
 \label{sec:evaluation}
 
-\begin{table*}[t]
-\centering
-\footnotesize
-\setlength{\tabcolsep}{3.5pt}
-\begin{tabular}{llrrrrrrrr}
-\toprule
-Setting & Input & Active & \multicolumn{3}{c}{TERM\_ACC (\%)} & BLEU & MT-BLEU & Prec. (\%) & Refs \\
-\cmidrule(lr){4-6}
-& & & NLP & Med. & All & & & & \\
-\midrule
-InfiniSST (no RAG) & None & 0 & 50.2 & 52.9 & 51.1 & 39.26 & 36.70 & 0.0 & 0.00 \\
-Known-domain-1k & Domain & 1k & 88.8 & \textbf{86.6} & \textbf{88.1} & \textbf{45.19} & \textbf{42.39} & \textbf{48.7} & \textbf{0.69} \\
-AutoTerm-1k$\times$4 & None & $\leq$4k & 89.3 & 86.3 & \textbf{88.3} & 45.09 & 42.28 & 34.8 & 0.94 \\
-Merged-100k & None & 100k & \textbf{89.4} & 84.5 & 87.8 & 43.72 & 40.93 & 6.8 & 4.96 \\
-Merged-1M & None & 1M & 87.1 & 78.9 & 84.4 & 42.79 & 39.95 & 3.4 & 8.70 \\
-\bottomrule
-\end{tabular}
-\caption{Ten-talk comparison under a fixed retrieval/prompt budget. BLEU and
-MT-BLEU use StreamLAAL-compatible mWER resegmentation. TERM\_ACC uses the same
-2,047 raw-term occurrences for every row (1,368 NLP; 679 medicine). Prec. is
-prompt precision. No RAG injects no references, so its prompt quantities are
-zero.}
-\label{tab:quality}
-\end{table*}
-
 \begin{figure*}[t]
   \centering
   \includegraphics[width=0.96\textwidth]{routing_timeline_10talk.png}
@@ -38,12 +13,12 @@ zero.}
 
 \paragraph{Setup.}
 We stream five complete ACL talks and five medicine talks through one
-alternating En$\rightarrow$Zh session (approximately 4.7 hours). The four RAG
-policies use 1.92s chunks, Qwen3-Omni, the same MaxSim retriever,
-100 retrieval candidates, score threshold 0.78, and at most ten prompt
-references. We compare:
-\emph{InfiniSST (no RAG)}, historical no-retrieval outputs on the same talks at
-the same chunk size \citep{ouyang2025infinisst};
+alternating En$\rightarrow$Zh session (approximately 4.7 hours). All five
+conditions use the same Qwen3-Omni streaming stack and 1.92s chunks.
+\emph{InfiniSST} is the retained name for the no-RAG condition, which disables
+MaxSim retrieval and term-map injection. The four RAG conditions use the same
+retriever, shared top-100 returned-candidate budget, score threshold 0.78, and
+at most ten prompt references. We compare the no-RAG condition;
 \emph{Known-domain-1k}, which requires the talk domain;
 \emph{AutoTerm-1k$\times$4}, which requires no session input; and
 \emph{Merged-100k/1M}, two nested universal glossaries.
@@ -59,9 +34,10 @@ this is a controlled routing and retrieval-competition evaluation, not a
 held-out glossary-induction test.
 
 \paragraph{Comparison provenance.}
-The no-RAG row reuses InfiniSST hypotheses archived in the RASST repository for
-these exact ten talks and the matching 1.92s policy; it does not require another
-model run. We resegment those hypotheses against the same references and
+The no-RAG row reuses RASST outputs for these exact ten talks and the matching
+1.92s policy. Retrieval and term-map injection are the only disabled
+components, making it a direct retrieval ablation. We resegment those
+hypotheses against the same references and
 rescore all 2,047 term occurrences used by the RAG conditions. The other four
 rows come from one audited run per policy with identical audio order and chunk
 boundaries. Corpus BLEU is computed after pooling the resegmented sentences,
@@ -83,10 +59,8 @@ is the full raw tagged set, not a curated subset used for interface highlights;
 we do not report a second filtered masked-BLEU variant.
 
 \paragraph{From no RAG to an adaptive working set.}
-First, AutoTerm exceeds the InfiniSST no-RAG reference by 37.2 TERM\_ACC points
-and 5.83 BLEU. Because the two systems use different base models, this is a
-systems reference rather than a controlled retrieval ablation. Second,
-automatic routing removes setup at negligible quality cost: AutoTerm is within
+First, disabling retrieval reduces TERM\_ACC by 37.2 points and BLEU by 5.83.
+Second, automatic routing removes setup at negligible quality cost: AutoTerm is within
 0.24 TERM\_ACC points and 0.11 BLEU/MT-BLEU of the known-domain reference.
 Third, a universal glossary is usable at 100k but degrades as it grows. Relative
 to Merged-100k, AutoTerm gains 1.37 BLEU and provides much cleaner evidence
@@ -131,32 +105,19 @@ for physical paper, whereas AutoTerm retained only the context-appropriate
 first sense. The example illustrates that routing reduces, rather than
 eliminates, ambiguous prompt evidence.
 
-\begin{table}[t]
+\begin{figure}[t]
 \centering
-\small
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{rrrr}
-\toprule
-Sessions & p50 (ms) & p95 (ms) & p95/stride \\
-\midrule
-8  & 482 & 805 & 0.42 \\
-16 & 420 & 826 & 0.43 \\
-24 & 471 & 894 & 0.47 \\
-32 & 519 & 820 & 0.43 \\
-\bottomrule
-\end{tabular}
-\caption{End-to-end WebSocket serving on 2$\times$A6000 (TP=2). The
-service-time/1.92s-stride ratio stays below 0.5 through 32 sessions.}
-\label{tab:serving}
-\end{table}
+\includegraphics[width=0.90\columnwidth]{rag_compute_rtf_compact.pdf}
+\caption{MaxSim compute on En$\rightarrow$Zh medicine. LM 1--4 use a
+0.96--3.84 s cadence; mean RTF is mean retrieval time/cadence. Calls also
+encode a 1.92 s lookback; LLM decoding and the AutoTerm router are excluded.}
+\label{fig:rag-rtf}
+\end{figure}
 
-\paragraph{Concurrent serving.}
-The hosted backend uses vLLM continuous batching. In an end-to-end real-time
-feed through the framework and WebSocket protocol, each client sends audio at
-the 1.92s input cadence and all 32 sessions complete without failure. The test
-includes scheduler admission, model generation, and WebSocket delivery; its
-generation p95 remains 0.82s at 32 sessions, or 0.43 of the input stride
-(Table~\ref{tab:serving}). The nearly flat p95 from 8 to 32 clients is the
-expected continuous-batching behavior. We report this directly measured
-service-time ratio rather than inferring an end-to-end real-time factor from
-engine-only throughput.
+\paragraph{Retrieval and serving scale.}
+Figure~\ref{fig:rag-rtf} shows median MaxSim calls of 36.96--43.65 ms and mean
+compute RTF falling from 5.59\% to 1.52\%. The complete AutoTerm run records
+203 ms for routing plus four-slice retrieval, or 10.6\% of its 1.92 s stride.
+With vLLM batching, generation p95 stays within 0.81--0.89 s from 8 to 32
+real-time WebSocket clients (0.82 s at 32). These are measured stage/stride
+ratios, not inferred end-to-end RTF \citep{luo2026rasst}.

@@ -4,7 +4,10 @@
 AutoTerm-SST wraps the RASST speech encoder, MaxSim term retriever, and
 Qwen3-Omni language model with an adaptive terminology loop
 (Figure~\ref{fig:architecture}). For chunk $t$, the speech encoder produces
-$h_t$ and the retriever searches only the current working set. At most ten
+$h_t$ and the retriever\footnote{RASST pre-encodes each source term as a
+normalized BGE-M3 vector $z_i$. For speech-window vectors $q_w$, it scores
+$r_i=\max_{w\in\mathcal W_t}q_w^\top z_i$, then attaches the stored target
+translation.} searches only the current working set. At most ten
 source--target term pairs are placed in the language-model prompt. After
 decoding, the new translation is appended to a short context window and may
 change the working set for a later chunk.

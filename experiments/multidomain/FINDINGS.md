@@ -81,11 +81,28 @@ scale sweep where precision collapses 0.48→0.14 as the inventory grows to 100k
 while term accuracy stays flat. The honest reading here is that 42k is not yet
 large enough for the flat merge to cost end-to-end quality.
 
-Japanese was attempted but is **not reported**: the ja host repeatedly failed
-with WebSocket keepalive (1011) timeouts, the one completed parallel run used a
-glossary with only ~75% Japanese coverage (same English-injection confound as
-the first-pass German), and two solo re-runs to control for it also failed. No
-trustworthy Japanese number was obtained.
+Japanese confirms the same picture, but only after two artifacts were removed.
+A parallel 4-condition run first suggested merged *craters* Japanese (BLEU
+34.0 vs 22.3). That was **contention, not an effect**: four eval streams on one
+host degraded every run's generation quality — AutoTerm itself dropped from a
+clean 41.8 BLEU to 34.0, and merged dropped more. Re-run **solo** on a fresh
+host:
+
+| Japanese (solo, clean host) | term_acc | BLEU | masked-BLEU |
+|---|---:|---:|---:|
+| AutoTerm | 0.863 | 41.84 | 40.02 |
+| merged-42k | 0.846 | 42.12 (+0.28) | 40.44 (+0.42) |
+
+merged again matches AutoTerm (marginally better on BLEU/masked-BLEU). So all
+three languages agree: at 42k a complete flat glossary carries no end-to-end
+penalty.
+
+**Method lesson worth keeping:** running several eval streams concurrently on
+one host does not just risk 1011 keepalive failures — it silently lowers output
+*quality* on the runs that survive, and unevenly. Comparison conditions must be
+run one-at-a-time (or on separate hosts) at a matched feed rate, or a
+contention artifact masquerades as a real effect. The earlier zh/de parallel
+batches happened to degrade evenly; the ja batch did not.
 
 ## 4. Slice size: 10k is oversized; ~1k is enough (Chinese)
 

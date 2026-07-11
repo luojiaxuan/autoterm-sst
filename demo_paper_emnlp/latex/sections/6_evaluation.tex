@@ -12,10 +12,11 @@
 \end{figure*}
 
 \paragraph{Setup.}
-We stream five complete ACL talks and five medicine talks through one
-alternating En$\rightarrow$Zh session (approximately 4.7 hours). All conditions
-use RASST's Qwen3-Omni streaming formulation and 1.92 s chunks.
-\emph{InfiniSST}~\citep{ouyang2025infinisst}, here RASST without RAG, uses a
+We alternate five complete ACL talks with five long-form English oncology
+training videos from the European School of Oncology (ESO) test
+set~\citep{iranzosanchez2025eso} in one 4.7-hour En$\rightarrow$Zh session. All
+conditions use RASST's Qwen3-Omni streaming formulation and 1.92 s chunks.
+\emph{InfiniSST}~\citep{ouyang2025infinisst} uses a
 Qwen3-Omni speech model after supervised fine-tuning for multi-turn, chunkwise
 streaming translation; MaxSim and term-map injection are disabled. The four
 RAG conditions share the retriever, top-100 returned-candidate budget,
@@ -35,8 +36,8 @@ this is a controlled routing and retrieval-competition evaluation, not a
 held-out glossary-induction test.
 
 \paragraph{Comparison provenance.}
-The no-RAG row reuses RASST/InfiniSST outputs for these exact ten talks and the
-matching 1.92 s policy. It is the no-RAG system ablation, not a separate legacy
+The InfiniSST row reuses archived outputs for these exact ten talks and the
+matching 1.92 s policy. It is the system retrieval ablation, not a separate legacy
 architecture. We retain its canonical five-talk ACL and medicine scores and
 macro-average the two corpus reports. The other four
 rows come from one audited run per policy with identical audio order and chunk
@@ -48,7 +49,7 @@ For the four RAG policies, \textbf{TERM\_ACC} uses one fixed set of 2,047
 time-aligned occurrences from
 the raw ACL tagged glossary and medicine hard/raw glossary. Exact-span source
 aliases with identical target variants are one spoken occurrence; nested terms
-and different translations remain separate. The no-RAG row retains the
+and different translations remain separate. The InfiniSST row retains the
 canonical raw-term scorers of its ACL and medicine reports.
 \textbf{BLEU} follows the RASST/StreamLAAL pipeline: each talk hypothesis is
 resegmented to reference sentences with mWERSegmenter before corpus
@@ -59,36 +60,26 @@ Refs is the mean number of references injected per chunk. The masking inventory
 is the full raw tagged set, not a curated subset used for interface highlights;
 we do not report a second filtered masked-BLEU variant.
 
-\paragraph{From no RAG to an adaptive working set.}
-First, AutoTerm exceeds InfiniSST by 26.9 TERM\_ACC points, 3.25 BLEU, and
-3.96 MT-BLEU.
-Second, automatic routing removes setup at negligible quality cost: AutoTerm is within
-0.24 TERM\_ACC points and 0.11 BLEU/MT-BLEU of the known-domain reference.
-Third, a universal glossary is usable at 100k but degrades as it grows. Relative
-to Merged-100k, AutoTerm gains 1.37 BLEU and provides much cleaner evidence
-(34.8\% vs. 6.8\% prompt precision). At 1M, its advantage grows to 3.91
-TERM\_ACC points and 2.30 BLEU, while the merged baseline fills nearly the
-entire top-10 prompt with low-precision references.
+\paragraph{From InfiniSST to an adaptive working set.}
+AutoTerm exceeds InfiniSST by 26.9 TERM\_ACC points, 3.25 BLEU, and 3.96
+MT-BLEU, yet remains within 0.24 TERM\_ACC and 0.11 BLEU/MT-BLEU of the
+known-domain reference. Merged-100k remains usable, but AutoTerm gains 1.37
+BLEU and has 34.8\% rather than 6.8\% prompt precision. At 1M, its advantage
+grows to 3.91 TERM\_ACC and 2.30 BLEU points.
 
 \paragraph{Where does the scale loss occur?}
-The domain columns in Table~\ref{tab:quality} prevent the aggregate result from
-hiding a useful qualification. Merged-100k is still competitive on NLP and loses only 1.8
-points to AutoTerm on medicine. At 1M, however, the medicine gap expands to 7.4
-points and an NLP gap also appears. Thus the result does not claim that every
-large index immediately fails. It shows that, under fixed retrieval and prompt
-capacity, the universal strategy becomes increasingly sensitive to the term
-distribution and ambiguity of each domain; a compact routed working set avoids
-that exposure.
+Merged-100k remains competitive on NLP and trails AutoTerm by only 1.8 points
+on medicine. At 1M, the medicine gap grows to 7.4 points and an NLP gap also
+appears. Thus Table~\ref{tab:quality} does not claim every large index fails;
+under fixed retrieval and prompt capacity, scale increases sensitivity to
+domain distribution and ambiguity, which a compact routed set avoids.
 
 \paragraph{Why does translation quality move?}
-Prompt evidence exposes the mechanism behind the aggregate scores. AutoTerm
-injects fewer than one reference per chunk on average at 34.8\% precision.
-Merged-100k injects 4.96 at 6.8\%, and Merged-1M injects 8.70 at only 3.4\%.
-Under the same threshold, the larger indexes fill a fixed prompt with more
-low-value mappings. MT-BLEU masks the evaluated term translations, yet AutoTerm
-still leads Merged-1M by 2.33 points; irrelevant evidence therefore affects
-surrounding translation, not only tagged terms. Prompt precision exposes the
-mechanism, while TERM\_ACC and MT-BLEU measure its consequences.
+AutoTerm injects 0.94 references per chunk at 34.8\% precision, versus 4.96 at
+6.8\% for Merged-100k and 8.70 at 3.4\% for Merged-1M. Larger indexes therefore
+fill a fixed prompt with more low-value mappings. AutoTerm still leads 1M by
+2.33 MT-BLEU points after masking evaluated term translations, showing that
+noise also affects surrounding translation.
 
 \paragraph{Routing behavior.}
 Figure~\ref{fig:routing} illustrates why AutoTerm uses a multi-slice working

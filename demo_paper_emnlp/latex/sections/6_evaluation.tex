@@ -12,9 +12,13 @@
 \end{figure*}
 
 \paragraph{Setup.}
-We alternate five complete ACL talks with five long-form English oncology
-training videos from the European School of Oncology (ESO) test
-set~\citep{iranzosanchez2025eso} in one 4.7-hour En$\rightarrow$Zh session. All
+We alternate five English ACL 60/60 dev talks with human-annotated
+terminology~\citep{salesky-etal-2023-evaluating} and five long-form English
+oncology videos from the European School of Oncology (ESO) test
+set~\citep{iranzosanchez2025eso} in one 4.7-hour En$\rightarrow$Zh stream.
+Following RASST~\citep{luo2026rasst}, we reuse its
+\href{https://developers.openai.com/api/docs/models/gpt-5.4}{GPT-5.4}-generated
+Chinese ESO references and GPT-extracted, manually verified terminology. All
 conditions use RASST's Qwen3-Omni streaming formulation and 1.92 s chunks.
 \emph{InfiniSST}~\citep{ouyang2025infinisst} uses a
 Qwen3-Omni speech model after supervised fine-tuning for multi-turn, chunkwise
@@ -38,27 +42,27 @@ held-out glossary-induction test.
 \paragraph{Comparison provenance.}
 The InfiniSST row reuses archived outputs for these exact ten talks and the
 matching 1.92 s policy. It is the system retrieval ablation, not a separate legacy
-architecture. We retain its canonical five-talk ACL and medicine scores and
+architecture. We retain its canonical five-talk ACL and ESO scores and
 macro-average the two corpus reports. The other four
 rows come from one audited run per policy with identical audio order and chunk
 boundaries. Corpus BLEU is computed after pooling the resegmented sentences,
 rather than by averaging the ACL and medicine BLEU scores.
 
 \paragraph{Metrics.}
-For the four RAG policies, \textbf{TERM\_ACC} uses one fixed set of 2,047
-time-aligned occurrences from
-the raw ACL tagged glossary and medicine hard/raw glossary. Exact-span source
-aliases with identical target variants are one spoken occurrence; nested terms
-and different translations remain separate. The InfiniSST row retains the
-canonical raw-term scorers of its ACL and medicine reports.
-\textbf{BLEU} follows the RASST/StreamLAAL pipeline: each talk hypothesis is
-resegmented to reference sentences with mWERSegmenter before corpus
-sacreBLEU. \textbf{MT-BLEU} applies the same pipeline after masking target
-translations from the corresponding corpus's raw glossary. Prompt precision is
+Following RASST~\citep{luo2026rasst}, \textbf{TERM\_ACC} is the exact-match rate
+of target translations in aligned hypotheses over a fixed raw-term denominator: 2,047
+time-aligned occurrences (1,368 NLP; 679 medicine) for every RAG policy. Source
+aliases sharing target variants count once; nested terms and distinct
+translations remain separate. InfiniSST retains its canonical raw-term scorers.
+\textbf{BLEU} is corpus SacreBLEU~\citep{papineni-etal-2002-bleu,post-2018-call}
+after mWERSegmenter~\citep{matusov-etal-2005-evaluating} resegments each talk to
+StreamLAAL-compatible reference boundaries~\citep{papi2024streamatt}.
+\textbf{Masked-term BLEU (MT-BLEU)} repeats this scoring after masking the full
+corpus raw target inventory in both hypothesis and reference, not the UI
+highlight subset. Prompt precision is
 the fraction of injected references that overlap a local raw-term occurrence;
 Refs is the mean number of references injected per chunk. The masking inventory
-is the full raw tagged set, not a curated subset used for interface highlights;
-we do not report a second filtered masked-BLEU variant.
+is fixed across policies.
 
 \paragraph{From InfiniSST to an adaptive working set.}
 AutoTerm exceeds InfiniSST by 26.9 TERM\_ACC points, 3.25 BLEU, and 3.96

@@ -1,7 +1,8 @@
 \section{System Overview}
 \label{sec:system}
 
-AutoTerm-SST wraps the RASST speech encoder, MaxSim term retriever, and
+AutoTerm-SST wraps the RASST speech encoder and MaxSim term
+retriever~\citep{luo2026rasst}, together with the
 Qwen3-Omni language model with an adaptive terminology loop
 (Figure~\ref{fig:architecture}). For chunk $t$, the speech encoder produces
 $h_t$ and the retriever\footnote{RASST pre-encodes each source term as a

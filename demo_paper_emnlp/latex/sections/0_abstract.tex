@@ -9,13 +9,13 @@ scoring slices within a fixed term budget; each chunk injects at most 10
 score-filtered references into the language-model prompt. No separate ASR or
 source-transcript topic classifier is required.
 
-On a complete four-talk ACL/medicine stream with 848 forced-aligned term
-occurrences, AutoTerm reaches 0.853 term accuracy, within 0.12 points of a
-0.854 known-domain reference. A merged 100k glossary remains competitive at
-0.863, but at one million entries accuracy falls to 0.830; AutoTerm also
-improves BLEU by 1.91 and raw masked BLEU by 1.88 over this 1M baseline. It
-raises strict time-local prompt precision from 4.4\% to 39.3\% while reducing
-references per chunk from 8.79 to 1.12. These results show that a small
+On a complete ten-talk ACL/medicine stream with 2,047 forced-aligned term
+occurrences, AutoTerm reaches 0.883 term accuracy, within 0.24 points of a
+0.881 known-domain reference. It outperforms merged 100k and one-million-entry
+glossaries by 1.07/2.11 BLEU and 1.18/2.35 raw masked BLEU, respectively. At
+one million entries, term accuracy falls to 0.844; AutoTerm reaches 0.883 while
+raising strict time-local prompt precision from 3.4\% to 34.8\% and reducing
+references per chunk from 8.70 to 0.94. These results show that a small
 multi-slice working set preserves useful prompt evidence as the offline catalog
 grows, without requiring session-time setup. The demo exposes active slices,
 retrieved terms, and routing evidence in a live interface.

@@ -36,12 +36,13 @@ slice.}
 \label{tab:router-config}
 \end{table}
 
-The top-1 topic label changes conservatively and can lag a domain boundary. The
-retrieval policy is less brittle than that label: up to four high-scoring
+The pinned topic label can lag a domain boundary or make a transient excursion.
+The retrieval policy is less brittle than that label: up to four high-scoring
 slices remain in the working set, so the correct inventory may be available
-before it becomes top-1. On the full stream, the three top-1 transitions took
-40.4, 43.5, and 82.1 seconds and made no wrong-direction switch. These delays
-are a limitation of target-context routing, not hidden domain metadata.
+before it becomes pinned. Across the ten-talk stream, active-domain agreement
+is 88.5\%, whereas the correct slice is present in 96.9\% of windows and is
+admitted within 29.5 seconds at every boundary. This gap motivates the
+multi-slice budget rather than a hard top-1 router.
 
 \section{Glossary-Scale Streaming Sweep}
 \label{app:sweep}
@@ -92,7 +93,7 @@ the prompt cap; Prec@10 is retrieval precision; M-BLEU masks technical terms.}
 \label{tab:sweep}
 \end{table}
 
-\section{Four-Talk Active-Budget Comparison}
+\section{Ten-Talk Active-Budget Comparison}
 \label{app:mixed}
 
 \begin{table}[ht]
@@ -103,14 +104,14 @@ the prompt cap; Prec@10 is retrieval precision; M-BLEU masks technical terms.}
 \toprule
 Setting & Hits & TERM\_ACC & NLP & Med. & Prompt prec. & Refs \\
 \midrule
-Known-domain-2.5k & 724 & 0.854 & 0.867 & \textbf{0.820} & \textbf{0.394} & \textbf{1.12} \\
-AutoTerm-1k$\times$4 & 723 & 0.853 & 0.873 & 0.798 & 0.393 & \textbf{1.12} \\
-Merged-100k & 732 & \textbf{0.863} & \textbf{0.885} & 0.807 & 0.088 & 5.00 \\
-Merged-1M & 704 & 0.830 & 0.867 & 0.734 & 0.044 & 8.79 \\
+Known-domain-1k & 1,803 & 0.881 & 0.888 & \textbf{0.866} & \textbf{0.487} & \textbf{0.69} \\
+AutoTerm-1k$\times$4 & 1,808 & \textbf{0.883} & 0.893 & 0.863 & 0.348 & 0.94 \\
+Merged-100k & 1,797 & 0.878 & \textbf{0.894} & 0.845 & 0.068 & 4.96 \\
+Merged-1M & 1,728 & 0.844 & 0.871 & 0.789 & 0.034 & 8.70 \\
 \bottomrule
 \end{tabular}}
 \caption{Domain breakdown and prompt evidence for the full stream. Hits and
-TERM\_ACC use 848 spoken occurrences (615 NLP, 233 medicine).}
+TERM\_ACC use 2,047 spoken occurrences (1,368 NLP, 679 medicine).}
 \label{tab:mixed}
 \end{table}
 
@@ -121,12 +122,14 @@ merged baselines combine the target-bearing pool with general distractors to
 exactly 100,000 and 1,000,000 mappings; the former is a strict prefix of the
 latter. These extra distractors need not be assigned to
 artificial topic slices: they model the universal-glossary alternative. AutoTerm
-uses ten 1k topic slices, and the known-domain reference uses the matching 2.5k NLP or medicine
+uses ten 1k topic slices, and the known-domain reference uses the matching 1k NLP or medicine
 slice. All four policies receive 100 total retrieval candidates, threshold
 0.78, and at most 10 prompt references.
 
 We selected slice size, $K$, and context length on four fixed development
-windows totaling 570 seconds, then froze the setting before running all four
-talks. These windows come from the same talks and are configuration-search
-data, not a held-out evaluation; only the untouched 5,381.508-second run and
-its 848-occurrence denominator appear in the headline table.
+windows totaling 570 seconds, then froze the setting before running the full
+ten-talk stream. These windows and the registered 1k glossaries include
+benchmark terminology, so the result is not held out; it tests session-level
+routing and retrieval competition under a fixed evidence budget. Only the
+complete 16,848.115-second run and its 2,047-occurrence denominator appear in
+the headline table.

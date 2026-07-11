@@ -5,13 +5,15 @@ AutoTerm-SST is a terminology-aware streaming system, not a new foundation
 model or an open-world topic classifier. Semantic routing depends on short
 offline slice descriptions and bilingual prototypes; a novel or ambiguous
 topic may therefore receive a poor working set. Because the strongest routing
-evidence is recent generated translation, the top-ranked slice can lag after a
+evidence is recent generated translation, the pinned slice can lag after a
 domain boundary, although activating several slices reduces the cost of a
 single wrong top-1 choice. The main comparison covers one En$\rightarrow$Zh
-four-talk stream and ten candidate slices. It is a controlled system result,
+ten-talk stream and ten candidate slices. The registered 1k slices contain the
+benchmark terminology, so this is a controlled routing and ranking result, not
+a held-out test of glossary induction. It is also
 not evidence that every million-entry glossary or language pair will degrade by
-the same amount. In particular, Merged-100k remains competitive in both the
-controlled ACL sweep and the four-talk comparison, and a 1M MaxSim index is
+the same amount. In particular, Merged-100k remains usable and the controlled
+ACL sweep stays stable through 100k, while a 1M MaxSim index is
 computationally usable; the observed failure is ranking and prompt crowding
 under a fixed evidence budget. The hosted live backend also
 requires A6000-class NVIDIA GPUs and external model/retriever artifacts, while mock
@@ -19,8 +21,9 @@ mode covers UI and protocol testing without them.
 
 We presented AutoTerm-SST, which removes per-session glossary upload and domain
 selection by routing a compact multi-slice working glossary from streaming
-context. On the frozen four-talk comparison, this working set improves term and
-translation quality over a merged 1M glossary while injecting substantially
-cleaner prompt evidence. The architecture also provides a practical expansion
+context. On the complete ten-talk comparison, this working set matches the
+known-domain reference and improves term and translation quality over both
+merged baselines while injecting substantially cleaner prompt evidence. The
+architecture also provides a practical expansion
 path: new topic slices can be registered offline without forcing every session
 to search one ever-growing universal glossary.

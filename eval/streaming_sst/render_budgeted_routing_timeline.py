@@ -112,7 +112,7 @@ def render(payload: dict[str, Any], output: Path, *, title: str) -> None:
     draw.text((70, 38), title, font=title_font, fill="#172033")
     draw.text(
         (72, 91),
-        "The multi-slice working set can retain the correct glossary even while its top-ranked slice adapts.",
+        "The multi-slice working set can retain the correct glossary even while its pinned active slice adapts.",
         font=subtitle_font,
         fill="#556176",
     )

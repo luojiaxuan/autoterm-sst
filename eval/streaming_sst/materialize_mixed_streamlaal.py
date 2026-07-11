@@ -152,11 +152,12 @@ def _select_acl_rows(
 
 def _medicine_files(
     medicine_dir: Path, item_id: str, target_lang: str
-) -> tuple[Path, Path]:
+) -> tuple[Path, Path, Path]:
     medicine_id = item_id.removeprefix("medicine_")
     return (
         medicine_dir / f"medicine.audio__medicine_{medicine_id}.yaml",
         medicine_dir / f"medicine.ref.{target_lang}__medicine_{medicine_id}.txt",
+        medicine_dir / f"medicine.source_text.en__medicine_{medicine_id}.txt",
     )
 
 
@@ -168,11 +169,17 @@ def materialize_bundle(args: argparse.Namespace) -> dict[str, Any]:
 
     acl_audio = yaml.safe_load(args.acl_audio_yaml.read_text(encoding="utf-8"))
     acl_refs = args.acl_reference.read_text(encoding="utf-8").splitlines()
-    if not isinstance(acl_audio, list) or len(acl_audio) != len(acl_refs):
-        raise ValueError("ACL audio/reference rows must align")
+    acl_sources = args.acl_source.read_text(encoding="utf-8").splitlines()
+    if (
+        not isinstance(acl_audio, list)
+        or len(acl_audio) != len(acl_refs)
+        or len(acl_refs) != len(acl_sources)
+    ):
+        raise ValueError("ACL audio/source/reference rows must align")
 
     out_audio: list[dict[str, Any]] = []
     out_refs: list[str] = []
+    out_sources: list[str] = []
     instances: list[dict[str, Any]] = []
     block_manifest: list[dict[str, Any]] = []
 
@@ -186,14 +193,26 @@ def materialize_bundle(args: argparse.Namespace) -> dict[str, Any]:
                 audio_rows=acl_audio,
                 references=acl_refs,
             )
+            _, block_sources = _select_acl_rows(
+                item_id=item_id,
+                audio_rows=acl_audio,
+                references=acl_sources,
+            )
         elif corpus == "medicine":
-            audio_path, ref_path = _medicine_files(
+            audio_path, ref_path, source_path = _medicine_files(
                 args.medicine_input_dir, item_id, args.target_lang
             )
             block_audio = yaml.safe_load(audio_path.read_text(encoding="utf-8"))
             block_refs = ref_path.read_text(encoding="utf-8").splitlines()
-            if not isinstance(block_audio, list) or len(block_audio) != len(block_refs):
-                raise ValueError(f"medicine audio/reference rows do not align: {item_id}")
+            block_sources = source_path.read_text(encoding="utf-8").splitlines()
+            if (
+                not isinstance(block_audio, list)
+                or len(block_audio) != len(block_refs)
+                or len(block_refs) != len(block_sources)
+            ):
+                raise ValueError(
+                    f"medicine audio/source/reference rows do not align: {item_id}"
+                )
         else:
             raise ValueError(f"unsupported corpus for block {block_index}: {corpus}")
 
@@ -233,6 +252,7 @@ def materialize_bundle(args: argparse.Namespace) -> dict[str, Any]:
         )
         out_audio.extend(dict(row) for row in block_audio)
         out_refs.extend(block_refs)
+        out_sources.extend(block_sources)
         block_manifest.append(
             {
                 "block_index": block_index,
@@ -248,14 +268,18 @@ def materialize_bundle(args: argparse.Namespace) -> dict[str, Any]:
     args.out_dir.mkdir(parents=True, exist_ok=True)
     instances_path = args.out_dir / "instances.log"
     audio_path = args.out_dir / "audio.yaml"
+    audio_json_path = args.out_dir / "audio.json"
     reference_path = args.out_dir / "ref.txt"
+    source_path = args.out_dir / "source.txt"
     glossary_path = args.out_dir / "raw_mask_glossary.json"
     _write_jsonl(instances_path, instances)
     audio_path.write_text(
         yaml.safe_dump(out_audio, allow_unicode=True, sort_keys=False),
         encoding="utf-8",
     )
+    _write_json(audio_json_path, out_audio)
     reference_path.write_text("\n".join(out_refs) + "\n", encoding="utf-8")
+    source_path.write_text("\n".join(out_sources) + "\n", encoding="utf-8")
     _write_json(
         glossary_path,
         merge_mask_glossaries(args.mask_glossary, target_lang=args.target_lang),
@@ -272,7 +296,14 @@ def materialize_bundle(args: argparse.Namespace) -> dict[str, Any]:
         "mask_glossary_entries": len(_read_json(glossary_path)),
         "artifacts": {
             path.name: _sha256(path)
-            for path in (instances_path, audio_path, reference_path, glossary_path)
+            for path in (
+                instances_path,
+                audio_path,
+                audio_json_path,
+                source_path,
+                reference_path,
+                glossary_path,
+            )
         },
     }
     _write_json(args.out_dir / "manifest.json", manifest)
@@ -378,6 +409,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     export = subparsers.add_parser("export", help="export StreamLAAL/mWER inputs")
     export.add_argument("--run-json", type=Path, required=True)
     export.add_argument("--acl-audio-yaml", type=Path, required=True)
+    export.add_argument("--acl-source", type=Path, required=True)
     export.add_argument("--acl-reference", type=Path, required=True)
     export.add_argument("--medicine-input-dir", type=Path, required=True)
     export.add_argument("--mask-glossary", type=Path, action="append", required=True)

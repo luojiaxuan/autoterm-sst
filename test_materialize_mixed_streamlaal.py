@@ -44,6 +44,8 @@ def test_materialize_bundle_preserves_endpoint_assignment(tmp_path: Path) -> Non
     )
     acl_ref_path = tmp_path / "acl.ref"
     acl_ref_path.write_text("参考一\n", encoding="utf-8")
+    acl_source_path = tmp_path / "acl.source"
+    acl_source_path.write_text("source one\n", encoding="utf-8")
     med_dir = tmp_path / "med"
     med_dir.mkdir()
     (med_dir / "medicine.audio__medicine_7.yaml").write_text(
@@ -53,12 +55,16 @@ def test_materialize_bundle_preserves_endpoint_assignment(tmp_path: Path) -> Non
     (med_dir / "medicine.ref.zh__medicine_7.txt").write_text(
         "参考二\n", encoding="utf-8"
     )
+    (med_dir / "medicine.source_text.en__medicine_7.txt").write_text(
+        "source two\n", encoding="utf-8"
+    )
     g1 = _write_json(tmp_path / "g1.json", [{"term": "x", "translation": "甲"}])
     g2 = _write_json(tmp_path / "g2.json", [{"term": "y", "translation": "乙"}])
     out_dir = tmp_path / "out"
     args = argparse.Namespace(
         run_json=run_path,
         acl_audio_yaml=acl_audio_path,
+        acl_source=acl_source_path,
         acl_reference=acl_ref_path,
         medicine_input_dir=med_dir,
         mask_glossary=[g1, g2],
@@ -73,6 +79,10 @@ def test_materialize_bundle_preserves_endpoint_assignment(tmp_path: Path) -> Non
     assert instances[1]["delays"] == [1.25]
     assert manifest["reference_segments"] == 2
     assert manifest["mask_glossary_entries"] == 2
+    assert (out_dir / "source.txt").read_text().splitlines() == [
+        "source one",
+        "source two",
+    ]
 
 
 def test_import_norag_reconstructs_mixed_records(tmp_path: Path) -> None:

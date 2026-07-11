@@ -16,7 +16,6 @@
 <div id="strip">
   <button id="bLoad">1 LOAD SAMPLE</button>
   <button id="bPlay">2 PLAY</button>
-  <button id="bLat">3 LATENCY 1x</button>
   <button id="bReset">RESET</button>
 </div>
 <iframe id="frame" src="/"></iframe>
@@ -27,43 +26,94 @@
   const W = () => frame.contentWindow;
   const media = () => D() && D().querySelector('#mediaContainer audio, #mediaContainer video, audio, video');
   let phase = 'boot';
+  let staged = false;
 
-  const byLabel = lbl => {
+  // Shot staging: scroll the page title off-screen so the settings card sits at
+  // the top, then pin the translation panel BELOW the adaptive-status chips so
+  // Auto Topic / Confidence / Active Glossary stay visible for the whole take.
+  const stage = () => {
     try {
-      const el = [...D().querySelectorAll('*')].find(e => e.children.length === 0 && e.textContent.trim() === lbl);
-      return el ? el.parentElement.textContent.replace(lbl, '').trim() : null;
-    } catch (e) { return null; }
+      const doc = D(), win = W();
+      const chips = doc.getElementById('adaptiveStatus');
+      const lang = doc.getElementById('languagePair');
+      if (!chips || !lang) return false;
+      const card = lang.closest('.control-group');
+      const cardTop = (card || lang).getBoundingClientRect().top + win.scrollY;
+      win.scrollTo(0, Math.max(0, Math.round(cardTop - 16)));
+      const chB = Math.round(chips.getBoundingClientRect().bottom);
+      const style = doc.createElement('style');
+      style.id = 'dirStage';
+      style.textContent = [
+        `.translation-panel{top:${chB + 10}px !important;bottom:14px !important;`,
+        'display:flex;flex-direction:column;}',
+        '.translation-content{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;}',
+        '.translation-output{flex:1 1 auto;max-height:none !important;min-height:70px;}',
+        '.evidence-panel{flex:0 0 auto;}',
+        '.evidence-list{max-height:92px !important;}'
+      ].join('');
+      const old = doc.getElementById('dirStage');
+      if (old) old.remove();
+      doc.head.appendChild(style);
+      win.scrollTo(0, Math.max(0, Math.round(cardTop - 16)));
+      return true;
+    } catch (e) { return false; }
+  };
+  frame.addEventListener('load', () => { staged = false; });
+  setInterval(() => { if (!staged) staged = stage(); }, 700);
+
+  const txt = id => {
+    try { return (D().getElementById(id) || {}).textContent?.trim() || ''; } catch (e) { return ''; }
   };
 
   // Telemetry via title: readable from AppleScript without any JS permission.
   setInterval(() => {
     const m = media();
     const chromeH = window.outerHeight - window.innerHeight;
+    const sx = r => Math.round(window.screenX + r.x + r.width / 2);
+    const sy = r => Math.round(window.screenY + chromeH + r.y + r.height / 2);
     const pt = el => {
       if (!el) return null;
       const r = el.getBoundingClientRect();
-      return [Math.round(window.screenX + r.x + r.width / 2), Math.round(window.screenY + chromeH + r.y + r.height / 2)];
+      if (!r.width && !r.height) return null;
+      return [sx(r), sy(r)];
     };
-    const btns = (() => {
-      try {
-        const doc = D();
-        return {
-          load: pt(doc.querySelector('.sample-btn-primary')),
-          play: pt(doc.getElementById('playBtn')),
-          lat: pt(doc.getElementById('latencySelect') || [...doc.querySelectorAll('select')].find(x => [...x.options].some(o => /2x/.test(o.textContent)))),
-          upd: pt([...doc.querySelectorAll('button')].find(b => /update session/i.test(b.textContent)))
-        };
-      } catch (e) { return null; }
-    })();
+    let btns = null, box = null;
+    try {
+      const doc = D();
+      btns = {
+        load: pt(doc.querySelector('.sample-btn-primary')),
+        play: pt(doc.getElementById('playBtn')),
+        lang: pt(doc.getElementById('languagePair')),
+        lat: pt(doc.getElementById('latencySelect')),
+        term: pt(doc.getElementById('modeAutoBtn')),
+        topic: pt(doc.getElementById('adaptiveTopic')),
+        gloss: pt(doc.getElementById('adaptiveGlossary'))
+      };
+      // Screen-space rect spanning the Auto Topic .. Active Glossary chips, for
+      // the post-production callout box at the switch moment.
+      const a = doc.getElementById('adaptiveTopic')?.closest('.adaptive-cell');
+      const b = doc.getElementById('adaptiveGlossary')?.closest('.adaptive-cell');
+      if (a && b) {
+        const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+        const x0 = Math.min(ra.left, rb.left), y0 = Math.min(ra.top, rb.top);
+        const x1 = Math.max(ra.right, rb.right), y1 = Math.max(ra.bottom, rb.bottom);
+        box = [Math.round(window.screenX + x0), Math.round(window.screenY + chromeH + y0),
+               Math.round(x1 - x0), Math.round(y1 - y0)];
+      }
+    } catch (e) {}
     const st = {
       p: phase,
+      stg: staged ? 1 : 0,
       btn: btns,
+      box: box,
       geo: [window.screenX, window.screenY, window.outerWidth, window.outerHeight, window.innerWidth, window.innerHeight].join(','),
       rs: m ? m.readyState : -1,
       t: m ? +m.currentTime.toFixed(1) : -1,
-      gl: (byLabel('Active Glossary') || '').slice(0, 24),
-      sw: byLabel('Switch Count') || '',
-      status: (() => { try { return (D().getElementById('statusText') || {}).textContent?.trim().slice(0, 40) || ''; } catch (e) { return ''; } })()
+      topic: txt('adaptiveTopic').slice(0, 16),
+      conf: txt('adaptiveConfidence').slice(0, 6),
+      gl: txt('adaptiveGlossary').slice(0, 24),
+      sw: txt('adaptiveSwitches').slice(0, 4),
+      status: txt('statusText').slice(0, 40)
     };
     document.title = 'DIR|' + JSON.stringify(st);
   }, 1000);
@@ -84,44 +134,12 @@
     try { await m.play(); } catch (e) { phase = 'playerr:' + (e && e.name); }
   };
 
-  // Transparent always-on-top hotspot pinned over the latency select, so a
-  // real cursor click there triggers the scripted latency change even when
-  // the translation panel overlaps the settings card.
-  const latHot = document.createElement('div');
-  latHot.style.cssText = 'position:fixed;z-index:2147483647;opacity:0.001;cursor:pointer;display:none';
-  document.body.appendChild(latHot);
-  setInterval(() => {
-    try {
-      const sel = D().getElementById('latencySelect') ||
-        [...D().querySelectorAll('select')].find(x => [...x.options].some(o => /2x/.test(o.textContent)));
-      if (!sel) { latHot.style.display = 'none'; return; }
-      const r = sel.getBoundingClientRect();
-      latHot.style.display = 'block';
-      latHot.style.left = r.x + 'px'; latHot.style.top = r.y + 'px';
-      latHot.style.width = r.width + 'px'; latHot.style.height = r.height + 'px';
-    } catch (e) { latHot.style.display = 'none'; }
-  }, 1000);
-  latHot.onclick = () => document.getElementById('bLat').onclick();
-
   // Click-landing probe: driver clicks this corner hotspot to verify its
   // synthetic clicks reach THIS page (screen-front check) before recording.
   const pingHot = document.createElement('div');
   pingHot.style.cssText = 'position:fixed;top:8px;right:6px;width:48px;height:28px;z-index:2147483647;opacity:0.001;cursor:default';
   document.body.appendChild(pingHot);
   pingHot.onclick = () => { phase = 'ping' + Date.now() % 100000; };
-
-  document.getElementById('bLat').onclick = () => {
-    phase = 'latency';
-    const sel = D().getElementById('latencySelect') ||
-      [...D().querySelectorAll('select')].find(s => [...s.options].some(o => /1x/i.test(o.textContent)));
-    if (!sel) { phase = 'lat:noselect'; return; }
-    const opt = [...sel.options].find(o => /1x/i.test(o.textContent));
-    sel.value = opt.value;
-    sel.dispatchEvent(new Event('change', { bubbles: true }));
-    const btn = [...D().querySelectorAll('button')].find(b => /update session/i.test(b.textContent));
-    if (btn) btn.click();
-    phase = 'lat:done';
-  };
 
   document.getElementById('bReset').onclick = () => { W().location.reload(); phase = 'reset'; };
 })();

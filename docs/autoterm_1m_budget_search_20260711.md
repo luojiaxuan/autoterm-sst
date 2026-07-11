@@ -4,8 +4,8 @@
 
 同一条 5 个 ACL talk 与 5 个 medicine talk 交替流支持如下系统叙事：
 
-1. InfiniSST no-RAG 明显弱于所有 terminology-retrieval 条件，说明 RASST 的
-   glossary RAG 有实际价值。
+1. InfiniSST no-RAG 提供一个系统级 no-retrieval reference，但它与 RAG 条件使用
+   不同 base model，因此不能把全部差值解释为 controlled retrieval ablation。
 2. AutoTerm-1k×4 不需要 session-time domain/glossary input，但与已知正确 domain
    的 Known-domain-1k 基本持平。
 3. Merged-100k 仍是可用的中间 baseline；扩展到 Merged-1M 后，固定 retrieval 与
@@ -81,6 +81,8 @@ InfiniSST hypotheses 来自 `LeiLiLab/RASST` PR #1：
 1.92 秒 policy。这里没有直接平均 PR 中 ACL/medicine 的旧表格，而是把 hypotheses
 重新 materialize 到当前共同 references，用同一 mWER、MT-BLEU 和 2,047-occurrence
 TERM scorer 重算。No-RAG prompt precision 与 Refs/chunk 按定义为 0。
+该 row 使用 InfiniSST，而四个 RAG rows 使用 Qwen3-Omni；论文只能称其为系统级
+reference，不能用它单独证明 retrieval 的因果增益。
 
 ## Router 与错误分析
 

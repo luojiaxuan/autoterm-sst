@@ -57,6 +57,41 @@ class PromptPrecisionTests(unittest.TestCase):
         self.assertEqual(normalise_source_term("  DATA-set  "), "data set")
         self.assertEqual(normalise_source_term("ＮＬＰ task"), "nlp task")
 
+    def test_prompt_precision_retains_pre_dedup_source_aliases(self) -> None:
+        run = payload(
+            [
+                {
+                    "start_sample": 0,
+                    "cursor_samples": 32000,
+                    "prompt_reference_count": 1,
+                    "references": [{"term": "models"}],
+                }
+            ]
+        )
+        alias_dedup_gold = TimedOccurrence(
+            domain="nlp",
+            block_index=1,
+            term="model",
+            variants=["模型"],
+            t_start=0.5,
+            t_end=0.8,
+            source_aliases=("models",),
+            raw_annotation_rows=2,
+        )
+
+        result = score_payload(
+            run,
+            {"raw_plus_medicine": [alias_dedup_gold]},
+            lookback_s=0.0,
+            tolerance_s=0.0,
+        )
+
+        raw = result["raw_plus_medicine"]
+        self.assertEqual(raw["prompt_precision"], 1.0)
+        self.assertEqual(raw["gold_occurrences"], 1)
+        self.assertEqual(raw["raw_annotation_rows"], 2)
+        self.assertEqual(raw["gold_source_term_types"], 2)
+
     def test_scores_technical_raw_precision_and_refs_per_chunk(self) -> None:
         run = payload(
             [

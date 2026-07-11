@@ -6,8 +6,11 @@ from dataclasses import asdict, dataclass
 from typing import Any, Dict, Mapping
 
 TARGET_SAMPLE_RATE = 16_000
-PROTOCOL_ID = "frozen4_selected_window_v1"
-EXPECTED_RAW_DENOMINATOR = 179
+PROTOCOL_ID = "frozen4_selected_window_v2"
+EXPECTED_RAW_ANNOTATION_ROWS = 179
+EXPECTED_RAW_DENOMINATOR = 142
+EXPECTED_RAW_GOLD_SHA256 = "4589ea5ebb87e4fb0cf59cfd4888034d46db547fbe9dbbde53dc9121a59e90c1"
+ALIAS_DEDUP_RULE_ID = "exact_span_same_normalized_target_variants_v1"
 
 
 @dataclass(frozen=True)
@@ -78,7 +81,10 @@ def protocol_manifest() -> Dict[str, Any]:
     return {
         "protocol_id": PROTOCOL_ID,
         "sample_rate": TARGET_SAMPLE_RATE,
+        "expected_raw_annotation_rows": EXPECTED_RAW_ANNOTATION_ROWS,
         "expected_raw_denominator": EXPECTED_RAW_DENOMINATOR,
+        "expected_raw_gold_sha256": EXPECTED_RAW_GOLD_SHA256,
+        "alias_dedup_rule_id": ALIAS_DEDUP_RULE_ID,
         "windows": [window.as_dict() for window in FROZEN4_WINDOWS],
     }
 

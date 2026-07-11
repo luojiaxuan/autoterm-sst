@@ -2,13 +2,15 @@
 """Time-aligned occurrence-level term accuracy using MFA alignments.
 
 Protocol (see eval/streaming_sst/mfa_alignments/README.md): every gold term
-occurrence is anchored to source-audio seconds — ACL occurrences by matching
-the term's token sequence in the MFA ``words`` tier, medicine occurrences by
-the oracle rows' start/end seconds. A hit requires a distinct appearance of an
-acceptable target variant inside the streaming output emitted for the window
-[t_start - PRE_S, t_end + POST_S]; output appearances are assigned greedily
-one-to-one in time order, so a translation rendered once can satisfy at most
-one occurrence regardless of how the windows overlap.
+annotation is anchored to source-audio seconds — ACL annotations by matching
+the term's token sequence in the MFA ``words`` tier, medicine annotations by
+the oracle rows' start/end seconds. Exact-span source aliases with the same
+normalized target variants are one spoken occurrence in the TERM_ACC
+denominator. A hit requires a distinct appearance of an acceptable target
+variant inside the streaming output emitted for the window [t_start - PRE_S,
+t_end + POST_S]; output appearances are assigned greedily one-to-one in time
+order, so a translation rendered once can satisfy at most one occurrence
+regardless of how the windows overlap.
 """
 
 from __future__ import annotations
@@ -17,8 +19,9 @@ import argparse
 import json
 import re
 import sys
+import unicodedata
 from bisect import bisect_right
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Dict, List, Sequence
 
@@ -37,6 +40,11 @@ from eval.streaming_sst.score_mixed_audio_terms import (  # noqa: E402
 TARGET_SAMPLE_RATE = 16000
 PRE_S = 2.0
 POST_S = 30.0
+ALIAS_DEDUP_RULE_ID = "exact_span_same_normalized_target_variants_v1"
+ALIAS_DEDUP_RULE = (
+    "collapse annotations with identical domain, block_index, exact t_start/t_end, "
+    "and normalized sorted target variants; preserve all source aliases"
+)
 
 
 # --------------------------------------------------------------------------- TextGrid
@@ -201,6 +209,86 @@ class TimedOccurrence:
     variants: Sequence[str]
     t_start: float  # global playlist seconds
     t_end: float
+    source_aliases: Sequence[str] = ()
+    raw_annotation_rows: int = 1
+
+
+def _normalised_target_variants(variants: Sequence[str]) -> tuple[str, ...]:
+    return tuple(
+        sorted(
+            {
+                normalise_space(unicodedata.normalize("NFKC", variant)).casefold()
+                for variant in variants
+                if normalise_space(unicodedata.normalize("NFKC", variant))
+            }
+        )
+    )
+
+
+def _normalised_source_aliases(occurrence: TimedOccurrence) -> tuple[str, ...]:
+    terms = (occurrence.term, *occurrence.source_aliases)
+    by_key: Dict[str, str] = {}
+    for term in terms:
+        normalized = normalise_space(unicodedata.normalize("NFKC", term))
+        if normalized:
+            by_key.setdefault(normalized.casefold(), normalized)
+    canonical_key = normalise_space(
+        unicodedata.normalize("NFKC", occurrence.term)
+    ).casefold()
+    return tuple(
+        by_key[key]
+        for key in sorted(by_key)
+        if key != canonical_key
+    )
+
+
+def deduplicate_alias_occurrences(
+    occurrences: Sequence[TimedOccurrence],
+) -> List[TimedOccurrence]:
+    """Collapse exact-span aliases while retaining every source annotation."""
+
+    deduplicated: List[TimedOccurrence] = []
+    key_to_index: Dict[tuple[str, int, float, float, tuple[str, ...]], int] = {}
+    for occurrence in occurrences:
+        key = (
+            occurrence.domain,
+            occurrence.block_index,
+            occurrence.t_start,
+            occurrence.t_end,
+            _normalised_target_variants(occurrence.variants),
+        )
+        existing_index = key_to_index.get(key)
+        if existing_index is None:
+            key_to_index[key] = len(deduplicated)
+            deduplicated.append(
+                replace(
+                    occurrence,
+                    source_aliases=_normalised_source_aliases(occurrence),
+                )
+            )
+            continue
+
+        existing = deduplicated[existing_index]
+        merged_alias_holder = replace(
+            existing,
+            source_aliases=(
+                *existing.source_aliases,
+                occurrence.term,
+                *occurrence.source_aliases,
+            ),
+        )
+        deduplicated[existing_index] = replace(
+            existing,
+            source_aliases=_normalised_source_aliases(merged_alias_holder),
+            raw_annotation_rows=(
+                existing.raw_annotation_rows + occurrence.raw_annotation_rows
+            ),
+        )
+    return deduplicated
+
+
+def raw_annotation_count(occurrences: Sequence[TimedOccurrence]) -> int:
+    return sum(occurrence.raw_annotation_rows for occurrence in occurrences)
 
 
 def load_acl_segment_map(acl_root: str) -> Dict[str, List[tuple[float, float, float]]]:
@@ -336,11 +424,16 @@ def build_timed_gold(payload: Dict[str, Any], args: argparse.Namespace) -> Dict[
                         )
                         gold["technical_plus_medicine"].append(occ)
                         gold["raw_plus_medicine"].append(occ)
-    return gold
+    return {
+        gold_key: deduplicate_alias_occurrences(occurrences)
+        for gold_key, occurrences in gold.items()
+    }
 
 
 # --------------------------------------------------------------------------- scoring
 def score_run(payload: Dict[str, Any], gold: Sequence[TimedOccurrence], target_lang: str) -> Dict[str, Any]:
+    gold = deduplicate_alias_occurrences(gold)
+    annotation_rows = raw_annotation_count(gold)
     by_block_term: Dict[tuple[int, str, tuple[str, ...]], List[TimedOccurrence]] = {}
     for occ in gold:
         by_block_term.setdefault((occ.block_index, occ.term, tuple(occ.variants)), []).append(occ)
@@ -370,6 +463,7 @@ def score_run(payload: Dict[str, Any], gold: Sequence[TimedOccurrence], target_l
             dom_hit[occ.domain] = dom_hit.get(occ.domain, 0) + int(got)
     total = len(gold)
     return {
+        "raw_annotation_rows": annotation_rows,
         "gold_occurrences": total,
         "hits": hits,
         "term_acc": round(hits / total, 4) if total else None,
@@ -407,7 +501,13 @@ def main() -> None:
                 doms: Dict[str, int] = {}
                 for o in occs:
                     doms[o.domain] = doms.get(o.domain, 0) + 1
-                results[f"gold_{key}"] = {"total": len(occs), **doms}
+                results[f"gold_{key}"] = {
+                    "total": len(occs),
+                    "raw_annotation_rows": raw_annotation_count(occs),
+                    "alias_dedup_denominator": len(occs),
+                    "alias_dedup_rule_id": ALIAS_DEDUP_RULE_ID,
+                    **doms,
+                }
         results["runs"][name] = {
             key: score_run(payload, occs, args.target_lang) for key, occs in gold_cache.items()
         }

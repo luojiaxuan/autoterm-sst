@@ -38,6 +38,7 @@ from eval.streaming_sst.score_time_aligned_terms import (  # noqa: E402
     TARGET_SAMPLE_RATE,
     TimedOccurrence,
     build_timed_gold,
+    raw_annotation_count,
     term_tokens,
 )
 
@@ -48,6 +49,7 @@ class OccurrenceIndex:
 
     intervals_by_term: Mapping[str, Sequence[tuple[float, float]]]
     occurrence_count: int
+    raw_annotation_rows: int
 
     @property
     def term_type_count(self) -> int:
@@ -74,13 +76,19 @@ def reference_source_term(reference: Mapping[str, Any]) -> str:
 def build_occurrence_index(occurrences: Sequence[TimedOccurrence]) -> OccurrenceIndex:
     grouped: Dict[str, list[tuple[float, float]]] = {}
     for occurrence in occurrences:
-        key = normalise_source_term(occurrence.term)
-        if not key:
-            continue
-        grouped.setdefault(key, []).append((float(occurrence.t_start), float(occurrence.t_end)))
-    for intervals in grouped.values():
-        intervals.sort()
-    return OccurrenceIndex(grouped, len(occurrences))
+        source_terms = (occurrence.term, *occurrence.source_aliases)
+        keys = {normalise_source_term(term) for term in source_terms}
+        interval = (float(occurrence.t_start), float(occurrence.t_end))
+        for key in keys:
+            if key:
+                grouped.setdefault(key, []).append(interval)
+    for key, intervals in grouped.items():
+        grouped[key] = sorted(set(intervals))
+    return OccurrenceIndex(
+        grouped,
+        len(occurrences),
+        raw_annotation_count(occurrences),
+    )
 
 
 def interval_overlaps(
@@ -258,6 +266,7 @@ def score_payload(
     for label, occurrence_index in indexes.items():
         metrics[label] = {
             "gold_occurrences": occurrence_index.occurrence_count,
+            "raw_annotation_rows": occurrence_index.raw_annotation_rows,
             "gold_source_term_types": occurrence_index.term_type_count,
             "relevant_references": relevant[label],
             "evaluated_references": total_captured_references,

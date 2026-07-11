@@ -1,0 +1,5 @@
+setting	path	audio_seconds	wall_seconds	system_rtf	throughput_xrt	routing_retrieval_seconds	routing_retrieval_stage_ratio	record_count	final_cursor_samples
+known	.codex-temp/streamlaal-10talk/known.json	16848.115000	6548.116390	0.388656	2.572971	1580.177408	0.093790	8776	269569844
+autoterm	.codex-temp/streamlaal-10talk/autoterm.json	16848.115000	6838.546432	0.405894	2.463698	1783.915352	0.105882	8776	269569844
+merged100k	.codex-temp/streamlaal-10talk/merged100k.json	16848.115000	6994.184876	0.415132	2.408875	1619.640291	0.096132	8776	269569844
+merged1m	.codex-temp/streamlaal-10talk/merged1m.json	16848.115000	7133.780016	0.423417	2.361737	1624.538000	0.096423	8776	269569844

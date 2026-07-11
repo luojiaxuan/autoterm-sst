@@ -1,15 +1,15 @@
-\section{Limitations and Conclusion}
-\label{sec:limitations}
-
-The En$\rightarrow$Zh evaluation uses registered slices containing benchmark
-terms, so it measures routing and retrieval competition rather than unseen
-glossary induction. Routing can lag a topic boundary; a multi-slice budget only
-mitigates this failure. Scale sensitivity also depends on language, retriever,
-ambiguity, and prompt budget: 100k is an intermediate point and 1M a stress
-condition, not a universal threshold. Broader multilingual validation remains
-future work.
+\section{Conclusion}
 
 AutoTerm-SST provides zero-setup terminology retrieval over a modular offline
-catalog. On mixed ACL and medicine talks, it matches known-domain quality,
-beats no RAG, avoids 1M universal-glossary noise, and makes this behavior
+catalog. On mixed ACL and ESO oncology talks, it matches known-domain quality,
+beats InfiniSST, avoids 1M universal-glossary noise, and makes this behavior
 visible in the demo.
+
+\section*{Limitations}
+\label{sec:limitations}
+
+The En$\rightarrow$Zh slices contain benchmark terms, so results measure
+retrieval competition rather than unseen-glossary induction. Routing may lag
+topic changes, and scale sensitivity depends on language and budgets; 100k and
+1M are not universal thresholds. Multilingual validation is future work.
+Following RASST, ESO Chinese references are GPT-5.4-generated, not human.

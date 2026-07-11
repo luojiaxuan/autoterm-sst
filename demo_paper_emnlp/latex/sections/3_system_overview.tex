@@ -25,7 +25,7 @@ denotes additional registered topic slices.}
 The adaptive step is outside the translation model. It neither changes the
 speech representation nor grants the retriever a larger candidate budget.
 Instead, it decides which prebuilt indexes share that budget. This separation
-keeps the system pluggable: the same streaming protocol can serve a no-RAG
+keeps the system pluggable: the same streaming protocol can serve a retrieval-free
 agent, a fixed-glossary RASST agent, or AutoTerm, while the web interface
 receives structured evidence with every partial translation.
 

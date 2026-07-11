@@ -4,8 +4,9 @@
 \paragraph{Setup.}
 We stream four complete talks through one alternating session:
 ACL~268, medicine~545006, ACL~367, and medicine~606 (5,381.508 seconds in
-total). The live En$\rightarrow$Zh agent uses Qwen3-Omni and the RASST MaxSim
-retriever with one GPU per condition. We compare four terminology policies.
+total). The live En$\rightarrow$Zh agent runs Qwen3-Omni with vLLM tensor
+parallelism and the RASST MaxSim retriever on 2$\times$A6000. We compare four
+terminology policies.
 \emph{Known-domain-2.5k} activates the matching 2.5k slice from the known talk domain
 and is a reference policy that requires domain metadata. \emph{AutoTerm-1k$\times$4}
 requires no session-time setup and activates at most four 1k slices from the

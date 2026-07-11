@@ -49,6 +49,15 @@ async def health():
     return {"status": "healthy", "proxy": True, "backends": list(BACKENDS)}
 
 
+async def _is_up(base: str) -> bool:
+    try:
+        async with httpx.AsyncClient() as c:
+            r = await c.get(base + "/health", timeout=3)
+            return r.status_code == 200
+    except Exception:
+        return False
+
+
 @app.get("/config")
 async def config():
     async with httpx.AsyncClient() as c:
@@ -57,7 +66,10 @@ async def config():
             cfg = r.json()
         except Exception:
             cfg = {}
-    cfg["language_pairs"] = [{"id": k, "label": k, "available": True} for k in BACKENDS]
+    up = await asyncio.gather(*(_is_up(BACKENDS[k]) for k in BACKENDS))
+    cfg["language_pairs"] = [
+        {"id": k, "label": k, "available": ok} for k, ok in zip(BACKENDS, up)
+    ]
     cfg["loaded_language_pair"] = DEFAULT
     return JSONResponse(cfg)
 

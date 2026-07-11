@@ -2,19 +2,20 @@
 
 ## 结论
 
-本轮在同一条完整四 talk 流上比较 Known-domain、AutoTerm、Merged-100k 和
-Merged-1M。结果支持一个有边界的系统结论：100k merged glossary 仍在当前
-retriever 的承受范围内，甚至取得最高 TERM_ACC；扩展到 1M 后，固定候选与
-prompt evidence budget 开始失效，TERM_ACC、BLEU 和 masked BLEU 同时下降。
-AutoTerm 只激活至多 4k terms，却保持与 Known-domain 几乎相同的 TERM_ACC，
-并显著提高 prompt precision。
+最终主结果在同一条完整十 talk 流上比较 Known-domain、AutoTerm、Merged-100k
+和 Merged-1M。结果支持一个有边界的系统结论：100k merged glossary 仍是可用、
+可信的中间 baseline，但已经出现 prompt crowding；扩展到 1M 后，固定候选与
+prompt evidence budget 明显失效，TERM_ACC、BLEU 和 masked BLEU 同时下降。
+AutoTerm 只激活至多 4k terms，TERM_ACC 与需要 domain metadata 的 Known-domain
+reference 相差 0.24 points，并且相对两个 merged baselines 显著提高 prompt
+precision。
 
 因此论文不声称“大 glossary 必然更差”，而是强调：RASST 的 glossary RAG
 解决了 OOD term exposure，但 universal glossary 会随 catalog 扩张持续增加
 ranking/prompt noise。AutoTerm 在其上增加一个无需 session-time domain input 的
 budgeted multi-slice working set。
 
-## 冻结设置
+## 四 talk 探索设置（非最终主结果）
 
 - Playlist：ACL 268、Medicine 545006、ACL 367、Medicine 606；总长
   5,381.508 秒。
@@ -46,10 +47,11 @@ translations 仍分别计数。原始 source aliases 继续用于 prompt precisi
 - Headline fingerprint：
   `aedee99367569f6b1b92b47d99259bf9678ed792a86404f5f9b831e5af80498c`
 
-这也修正了旧结果中 AutoTerm 表面上高于 Known-domain 的异常。新结果为
-Known-domain 724 hits、AutoTerm 723 hits；两者只差 1/848。
+该修复后的四 talk 结果为 Known-domain 724 hits、AutoTerm 723 hits；两者只差
+1/848。Known-domain 是固定正确 domain slice 的参考策略，不是逐项选择最优输出的
+数学 oracle，因此与 AutoTerm 之间很小的正负波动本身不构成 bug。
 
-## 完整四 talk 正式结果
+## 完整四 talk 探索结果（已由十 talk 主结果取代）
 
 | Setting | TERM_ACC | NLP | Medicine | BLEU | T-MBLEU | R-MBLEU | Prompt precision | Refs/chunk |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -88,14 +90,15 @@ alias-dedup occurrences，fingerprint 为
 
 当前路由不是 source transcript classifier。它对最近四个 streaming target chunks
 与每个 slice 的 description/bilingual prototypes 做 semantic similarity，并在总
-active-term budget 内选择 top-K slices。top-4 的作用是缓解 top-1 domain lag：完整
-流上 correct-slice inclusion 为 98.64%，而 top-1 active-domain accuracy 为 96.97%。
+active-term budget 内选择 top-K slices。top-4 的作用是缓解 top-1 domain lag：四
+talk 探索流上 correct-slice inclusion 为 98.64%，而 top-1 active-domain accuracy
+为 96.97%。
 三次 domain boundary 的 top-1 switch 仍需 40.4 / 43.5 / 82.1 秒，这是依赖
 generated target context 的已知限制。
 
-## 10-talk 扩展协议与运行状态
+## 完整十 talk 正式结果
 
-论文主表正在扩展到一条完整的 10-talk alternating stream：
+论文主表使用一条完整的 10-talk alternating stream：
 
 ```text
 ACL 268 → Medicine 404 → ACL 367 → Medicine 606 → ACL 590
@@ -124,15 +127,45 @@ ACL 268 → Medicine 404 → ACL 367 → Medicine 606 → ACL 590
 commit `4a6449e` 又给 mixed-audio evaluator 增加了 fail-fast 输入校验，后续请求的
 ACL/medicine item 未全部加载时会在启动网络/GPU 评测前失败。
 
-截至本记录，六条 audited run（B200 上 Known/Auto，Hyper00 上四条件，其中
-Known/Auto 是冗余同硬件复跑）仍在运行。所有更早的 missing-import、重复 client、
-错误 preset 和 medicine-only 尝试均已隔离为 `.invalid_*` 或独立 smoke 文件，不能
-进入 scorer。正式 local staging 根目录为：
+四个同硬件 audited run 已在 Hyper00 全部完成并通过 gate；B200 的 Known/Auto
+冗余复跑也完整落盘，但论文表只使用同一台 Hyper00 的四个条件，避免把跨芯片
+差异混入比较。所有更早的 missing-import、重复 client、错误 preset 和
+medicine-only 尝试均已隔离为 `.invalid_*` 或独立 smoke 文件，不能进入 scorer。
+正式 local staging 根目录为：
 
 ```text
 B200:   /data02/jaxan/autoterm-10talk-budget-20260711/b200/
 Hyper:  /data02/jaxan/autoterm-10talk-budget-20260711/hyper/
 ```
+
+四条件使用同一 8,776-window timing SHA
+`7c0be6da5557cb99b3276967f3e575c353a03515e68d64489bffada22b2dfa7c`。
+最终结果如下；TERM_ACC 分母固定为 2,047：
+
+| Setting | TERM_ACC | NLP | Medicine | BLEU | T-MBLEU | R-MBLEU | Prompt precision | Refs/chunk |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Known-domain-1k | 88.08 (1,803/2,047) | 88.82 | **86.60** | **58.50** | **56.65** | **56.05** | **48.68** | **0.69** |
+| AutoTerm-1k×4 | **88.32 (1,808/2,047)** | 89.33 | 86.30 | 58.41 | 56.55 | 55.98 | 34.78 | 0.94 |
+| Merged-100k | 87.79 (1,797/2,047) | **89.40** | 84.54 | 57.34 | 55.38 | 54.80 | 6.85 | 4.96 |
+| Merged-1M | 84.42 (1,728/2,047) | 87.13 | 78.94 | 56.30 | 54.24 | 53.63 | 3.44 | 8.70 |
+
+关键差值：
+
+- AutoTerm 与 Known-domain 只差 5/2,047 hits（+0.24 TERM_ACC points），而
+  Known-domain BLEU 高 0.09；论文表述为 `matches`，不称 AutoTerm 超过 oracle。
+- 相对 Merged-100k，AutoTerm 提高 0.54 TERM_ACC points、1.07 BLEU、1.18
+  T-MBLEU 和 1.18 R-MBLEU；prompt precision 为 34.78% vs. 6.85%，每 chunk
+  references 为 0.94 vs. 4.96。
+- 相对 Merged-1M，AutoTerm 提高 3.91 TERM_ACC points、2.11 BLEU、2.31
+  T-MBLEU 和 2.35 R-MBLEU；prompt precision 为 34.78% vs. 3.44%，每 chunk
+  references 为 0.94 vs. 8.70。
+- 这条结果既保留了“100k 尚可承受”的可信中间点，也显示 universal glossary
+  长期扩展到 1M 时的 ranking/prompt-noise 问题。
+
+路由时间轴使用同一条 AutoTerm 输出：pinned active-domain agreement 为 88.5%，
+但正确 slice 在 top-4 working set 中的覆盖率为 96.93%（8,507/8,776）；九个
+domain boundaries 的正确 slice admission delay 最大为 29.45 秒。这个差距说明
+multi-slice budget 比 hard top-1 router 更符合系统目标。
 
 最终聚合 JSON/scorecard/timeline 应上传到稳定的 Hugging Face dataset；repo 与
 revision 当前仍为 TBD，以上路径只是 active local staging。
@@ -141,7 +174,7 @@ revision 当前仍为 TBD，以上路径只是 active local staging。
 
 | 内容 | 位置 / SHA-256 | 状态 |
 | --- | --- | --- |
-| scorer/router code | GitHub `luojiaxuan/autoterm-sst`, branch `explore/multidomain-routing`, commit `7dc4ac0` | 已 commit 并 push |
+| scorer/router/timeline code | GitHub `luojiaxuan/autoterm-sst`, branch `explore/multidomain-routing` | 已 commit 并 push；以本页所在最新 revision 为准 |
 | Merged-100k glossary | Hyper00 `.../merged_pair_general_100k/`；glossary `31bf1e79...a8`，index `fdb214be...74ec` | local staging；HF pending |
 | Known-domain run | `full4_oracle2p5k_same_hyper_edd7.json`；`d21817fe...154f5` | local staging；HF pending |
 | AutoTerm run | `full4_auto1k_k4_w4_bilingual_edd7.json`；`d7ccd1ba...9b39c` | local staging；HF pending |
@@ -149,8 +182,14 @@ revision 当前仍为 TBD，以上路径只是 active local staging。
 | Merged-1M run | `full4_merged1m_edd7.json`；`16ee87fa...7d8` | local staging；HF pending |
 | 100k scorecard | `full4_same_hyper_story_100k_alias_dedup_score.json`；`ac8e8cc8...3d0` | local staging；HF pending |
 | 1M scorecard | `full4_same_hyper_story_1m_alias_dedup_score.json`；`91e405f3...eaa` | local staging；HF pending |
+| 10-talk Known-domain run | Hyper `ten_talk_known1k_hyper_redundant_audited.json`；`8104be3d...8e93` | complete local staging；HF pending |
+| 10-talk AutoTerm run | Hyper `ten_talk_autoterm1kx4_hyper_redundant_audited.json`；`3b4fbb01...b30f` | complete local staging；HF pending |
+| 10-talk Merged-100k run | Hyper `ten_talk_merged100k_audited.json`；`dd03b4f7...b58e` | complete local staging；HF pending |
+| 10-talk Merged-1M run | Hyper `ten_talk_merged1m_audited.json`；`a3ad7235...cee` | complete local staging；HF pending |
+| 10-talk 100k scorecard | Hyper `ten_talk_story_100k_alias_dedup_score.json`；`a23eafa6...29ed` | complete local staging；HF pending |
+| 10-talk 1M scorecard | Hyper `ten_talk_story_1m_alias_dedup_score.json`；`925d9525...129f` | complete local staging；HF pending |
 
-所有正式 run 使用相同 playlist SHA
+上述四 talk artifacts 使用相同 playlist SHA
 `a91adef64273f210b28d898b4f9b91bf30ae006e6c363aee079c2a79258ae40e`
 和 timing SHA
 `cf8f28cb400166af7fc950dd798939ff279828f0af9f5ff7e8a9d64e25834ac7`。

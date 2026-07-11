@@ -15,7 +15,10 @@ paths refer to lab machines and are meaningless outside the group.
   `docs/multidomain_merged_glossary_pilot_20260710.md`. The paused
   10k/100k/500k/1M controlled capacity run, artifact hashes, restart commands,
   and result-validity boundary are in
-  `docs/glossary_capacity_curve_20260710.md`.
+  `docs/glossary_capacity_curve_20260710.md`. The completed four-talk
+  Known-domain/AutoTerm/Merged-100k/Merged-1M comparison, corrected
+  alias-deduplicated TERM_ACC protocol, scorecard hashes, and local artifact
+  status are in `docs/autoterm_1m_budget_search_20260711.md`.
 - Lightweight ACL 60/60 and ESO medicine MFA TextGrid annotations are tracked
   in Git under `eval/streaming_sst/mfa_alignments/`; that directory records the
   original Taurus paths and SHA-256 checksums. Audio and large derived chunk
@@ -24,10 +27,12 @@ paths refer to lab machines and are meaningless outside the group.
   `/mnt/taurus/data1/jiaxuanluo/rasst_eval/auto_glossary_mixed_audio/20260707_hybrid_8012`.
   These raw JSON/MD outputs are local staging artifacts, not reusable canonical
   datasets yet.
-- Paused Hyper00 capacity-run staging:
-  `/data02/jaxan/autoterm-capacity-zh-20260710/`. Only the 10k smoke is complete;
-  the interrupted 10k/100k full-run logs are diagnostic-only, while 500k/1M and
-  xCOMET remain deferred.
+- Hyper00 active-budget and merged-glossary staging:
+  `/data02/jaxan/autoterm-capacity-zh-20260710/` and
+  `/data02/jaxan/autoterm-window-search-20260711/hyper/`. The complete formal
+  four-talk comparison and v2 scorecards are indexed in
+  `docs/autoterm_1m_budget_search_20260711.md`; the large artifacts remain local
+  staging pending a stable Hugging Face dataset revision.
 - Completed, unscored B200 exploratory capacity-run staging:
   `/data02/jaxan/autoterm-capacity-sweep-20260710/run/`. The four raw JSONs are
   locally checksummed and indexed by

@@ -134,7 +134,7 @@ def render(payload: dict[str, Any], output: Path, *, title: str) -> None:
         draw.rectangle((x0, y, x1, y + row_h), fill=color)
 
     draw.text((70, rows["true"] + 15), "True talk domain", font=label_font, fill="#334155")
-    draw.text((70, rows["top"] + 15), "Top-ranked slice", font=label_font, fill="#334155")
+    draw.text((70, rows["top"] + 15), "Pinned active slice", font=label_font, fill="#334155")
     draw.text((70, rows["covered"] + 4), "Correct slice in", font=label_font, fill="#334155")
     draw.text((70, rows["covered"] + 30), "top-4 working set", font=label_font, fill="#334155")
 
@@ -223,7 +223,7 @@ def render(payload: dict[str, Any], output: Path, *, title: str) -> None:
     metrics = [
         ("session", f"{len(spans)} talks / {duration_s / 3600:.2f}h"),
         ("active budget", f"{max_slices} slices / {max_terms:,} terms"),
-        ("top-1 agreement", f"{100 * top1_accuracy:.1f}%"),
+        ("active-domain agreement", f"{100 * top1_accuracy:.1f}%"),
         ("correct-slice coverage", f"{100 * coverage:.1f}%"),
         ("boundary delay", delay_value),
     ]

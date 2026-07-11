@@ -26,6 +26,7 @@
       .domain { font-size: 25px; font-weight: 700; }
       .term { font-size: 24px; font-weight: 600; }
       .slice-label { font-size: 21px; font-weight: 700; }
+      .medicine-label { font-size: 19px; }
       .slice-term { font-size: 21px; font-weight: 600; }
       .budget-label { font-size: 20px; font-weight: 700; fill: #B85120; }
       .box { fill: #FFFFFF; stroke: #222222; stroke-width: 2.6; }
@@ -171,7 +172,7 @@
   <text x="1255" y="634" class="slice-term" text-anchor="middle" fill="#84257F">→ 语义角色标注</text>
 
   <rect x="1347" y="535" width="211" height="118" class="medicine-box"/>
-  <text x="1453" y="564" class="slice-label" text-anchor="middle" fill="#B85120">Medicine Glossary</text>
+  <text x="1453" y="564" class="slice-label medicine-label" text-anchor="middle" fill="#B85120">Medicine Glossary</text>
   <line x1="1363" y1="576" x2="1542" y2="576" stroke="#EDC6AC" stroke-width="2"/>
   <text x="1453" y="604" class="slice-term" text-anchor="middle">rectal cancer</text>
   <text x="1453" y="634" class="slice-term" text-anchor="middle" fill="#84257F">→ 直肠癌</text>

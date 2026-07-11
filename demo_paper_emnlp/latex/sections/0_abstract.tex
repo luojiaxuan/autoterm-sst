@@ -13,8 +13,9 @@ under fixed retrieval and prompt budgets. On ten real ACL and medicine talks,
 AutoTerm matches a known-domain reference in terminology accuracy
 (88.3\% vs. 88.1\%) and StreamLAAL BLEU (45.09 vs. 45.19), while requiring no
 domain input. Compared with a one-million-entry merged glossary, it improves
-terminology accuracy by 3.9 points and BLEU by 2.30. The live demo exposes
-active slices and retrieved
+terminology accuracy by 3.9 points and BLEU by 2.30. Routing plus four-slice
+retrieval averages 203 ms, 10.6\% of the 1.92 s stride, and the vLLM host sustains
+32 real-time sessions. The live demo exposes active slices and retrieved
 terminology as the topic changes, providing zero-setup terminology-aware
 streaming translation.
 \end{abstract}

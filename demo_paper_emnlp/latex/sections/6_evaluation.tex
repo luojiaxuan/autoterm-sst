@@ -13,12 +13,13 @@
 
 \paragraph{Setup.}
 We stream five complete ACL talks and five medicine talks through one
-alternating En$\rightarrow$Zh session (approximately 4.7 hours). All five
-conditions use the same Qwen3-Omni streaming stack and 1.92s chunks.
-\emph{InfiniSST} is the retained name for the no-RAG condition, which disables
-MaxSim retrieval and term-map injection. The four RAG conditions use the same
-retriever, shared top-100 returned-candidate budget, score threshold 0.78, and
-at most ten prompt references. We compare the no-RAG condition;
+alternating En$\rightarrow$Zh session (approximately 4.7 hours). All conditions
+use RASST's Qwen3-Omni streaming formulation and 1.92 s chunks.
+\emph{InfiniSST}~\citep{ouyang2025infinisst}, here RASST without RAG, uses a
+Qwen3-Omni speech model after supervised fine-tuning for multi-turn, chunkwise
+streaming translation; MaxSim and term-map injection are disabled. The four
+RAG conditions share the retriever, top-100 returned-candidate budget,
+threshold 0.78, and top-10 prompt cap. We compare it with
 \emph{Known-domain-1k}, which requires the talk domain;
 \emph{AutoTerm-1k$\times$4}, which requires no session input; and
 \emph{Merged-100k/1M}, two nested universal glossaries.
@@ -34,21 +35,21 @@ this is a controlled routing and retrieval-competition evaluation, not a
 held-out glossary-induction test.
 
 \paragraph{Comparison provenance.}
-The no-RAG row reuses RASST outputs for these exact ten talks and the matching
-1.92s policy. Retrieval and term-map injection are the only disabled
-components, making it a direct retrieval ablation. We resegment those
-hypotheses against the same references and
-rescore all 2,047 term occurrences used by the RAG conditions. The other four
+The no-RAG row reuses RASST/InfiniSST outputs for these exact ten talks and the
+matching 1.92 s policy. It is the no-RAG system ablation, not a separate legacy
+architecture. We retain its canonical five-talk ACL and medicine scores and
+macro-average the two corpus reports. The other four
 rows come from one audited run per policy with identical audio order and chunk
 boundaries. Corpus BLEU is computed after pooling the resegmented sentences,
 rather than by averaging the ACL and medicine BLEU scores.
 
 \paragraph{Metrics.}
-\textbf{TERM\_ACC} uses one fixed set of 2,047 time-aligned occurrences from
+For the four RAG policies, \textbf{TERM\_ACC} uses one fixed set of 2,047
+time-aligned occurrences from
 the raw ACL tagged glossary and medicine hard/raw glossary. Exact-span source
 aliases with identical target variants are one spoken occurrence; nested terms
-and different translations remain separate. Every condition, including no
-RAG, is rescored against this same denominator.
+and different translations remain separate. The no-RAG row retains the
+canonical raw-term scorers of its ACL and medicine reports.
 \textbf{BLEU} follows the RASST/StreamLAAL pipeline: each talk hypothesis is
 resegmented to reference sentences with mWERSegmenter before corpus
 sacreBLEU. \textbf{MT-BLEU} applies the same pipeline after masking target
@@ -59,7 +60,8 @@ is the full raw tagged set, not a curated subset used for interface highlights;
 we do not report a second filtered masked-BLEU variant.
 
 \paragraph{From no RAG to an adaptive working set.}
-First, disabling retrieval reduces TERM\_ACC by 37.2 points and BLEU by 5.83.
+First, AutoTerm exceeds InfiniSST by 26.9 TERM\_ACC points, 3.25 BLEU, and
+3.96 MT-BLEU.
 Second, automatic routing removes setup at negligible quality cost: AutoTerm is within
 0.24 TERM\_ACC points and 0.11 BLEU/MT-BLEU of the known-domain reference.
 Third, a universal glossary is usable at 100k but degrades as it grows. Relative
@@ -96,28 +98,31 @@ terminology inventory. This limits the cost of delayed topic evidence in the
 generated translation context.
 
 \paragraph{Observed failure modes.}
-After one ACL-to-medicine boundary, the accumulated context retained the old
-topic for several chunks, so the medicine slice was temporarily absent before
-entering the four-slice working set. Lexical ambiguity creates a second error
-mode. In a medicine segment discussing scientific papers, Merged-1M supplied
-both the Chinese mapping for a scholarly article and an incompatible mapping
-for physical paper, whereas AutoTerm retained only the context-appropriate
-first sense. The example illustrates that routing reduces, rather than
-eliminates, ambiguous prompt evidence.
+Two audited failures clarify the limits. After an ACL-to-medicine boundary,
+stale context temporarily kept the medicine slice outside the working set. In
+a medicine segment about research papers, Merged-1M supplied mappings for both
+a scholarly article and physical paper, whereas AutoTerm retained the
+contextual sense. Routing therefore reduces, but does not eliminate, delayed
+or ambiguous evidence.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.90\columnwidth]{rag_compute_rtf_compact.pdf}
-\caption{MaxSim compute on En$\rightarrow$Zh medicine. LM 1--4 use a
-0.96--3.84 s cadence; mean RTF is mean retrieval time/cadence. Calls also
-encode a 1.92 s lookback; LLM decoding and the AutoTerm router are excluded.}
-\label{fig:rag-rtf}
+\includegraphics[width=0.96\columnwidth]{system_rtf_scaling_compact.pdf}
+\caption{Standard system RTF (wall time/audio duration; real time is below
+1). (a) RASST's LM sweep, with MaxSim inside the total. (b) Warm 4.7-hour
+ten-talk runs on one H200 at LM=2.}
+\label{fig:system-rtf}
 \end{figure}
 
-\paragraph{Retrieval and serving scale.}
-Figure~\ref{fig:rag-rtf} shows median MaxSim calls of 36.96--43.65 ms and mean
-compute RTF falling from 5.59\% to 1.52\%. The complete AutoTerm run records
-203 ms for routing plus four-slice retrieval, or 10.6\% of its 1.92 s stride.
-With vLLM batching, generation p95 stays within 0.81--0.89 s from 8 to 32
-real-time WebSocket clients (0.82 s at 32). These are measured stage/stride
-ratios, not inferred end-to-end RTF \citep{luo2026rasst}.
+\paragraph{System and serving scale.}
+System RTF is processing wall time divided by input audio. The RASST LM 1--4
+sweep yields 0.372, 0.250, 0.215, and 0.185; MaxSim is respectively 15.0\%,
+13.4\%, 11.1\%, and 8.2\% of total wall time (Figure~\ref{fig:system-rtf}(a)).
+On the current single-H200 4.7-hour stream at LM=2, known-domain, AutoTerm,
+Merged-100k, and Merged-1M obtain 0.389, 0.406, 0.415, and 0.423
+(Figure~\ref{fig:system-rtf}(b)).
+These warm measurements span WebSocket connection through the final cursor and
+include routing, retrieval, generation, scheduling, and transport. AutoTerm is
+2.46$\times$ real time; its 10.6\% routing/retrieval share is a component ratio,
+not another system RTF. On 2$\times$A6000, vLLM generation p95 remains
+0.81--0.89 s for 8--32 real-time clients.

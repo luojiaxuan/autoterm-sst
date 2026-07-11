@@ -1,0 +1,5 @@
+setting	label	audio_seconds	wall_seconds	system_rtf	throughput_xrt	routing_retrieval_stage_ratio
+known	Known	16848.115	6548.116390	0.388656	2.572971	0.093790
+autoterm	AutoTerm	16848.115	6838.546432	0.405894	2.463698	0.105882
+merged100k	Merged-100k	16848.115	6994.184876	0.415132	2.408875	0.096132
+merged1m	Merged-1M	16848.115	7133.780016	0.423417	2.361737	0.096423

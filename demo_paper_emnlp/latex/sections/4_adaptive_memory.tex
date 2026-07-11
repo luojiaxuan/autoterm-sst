@@ -39,7 +39,7 @@ Setting & Input & Active & \multicolumn{3}{c}{TERM\_ACC (\%)} & BLEU & MT-BLEU &
 \cmidrule(lr){4-6}
 & & & NLP & Med. & All & & & & \\
 \midrule
-No RAG (InfiniSST) & None & 0 & 50.2 & 52.9 & 51.1 & 39.26 & 36.70 & 0.0 & 0.00 \\
+InfiniSST (no RAG) & None & 0 & 76.6 & 46.3 & 61.4 & 41.84 & 38.32 & 0.0 & 0.00 \\
 Known-domain-1k & Domain & 1k & 88.8 & \textbf{86.6} & \textbf{88.1} & \textbf{45.19} & \textbf{42.39} & \textbf{48.7} & \textbf{0.69} \\
 AutoTerm-1k$\times$4 & None & $\leq$4k & 89.3 & 86.3 & \textbf{88.3} & 45.09 & 42.28 & 34.8 & 0.94 \\
 Merged-100k & None & 100k & \textbf{89.4} & 84.5 & 87.8 & 43.72 & 40.93 & 6.8 & 4.96 \\
@@ -47,10 +47,10 @@ Merged-1M & None & 1M & 87.1 & 78.9 & 84.4 & 42.79 & 39.95 & 3.4 & 8.70 \\
 \bottomrule
 \end{tabular}
 \caption{Ten-talk comparison under a fixed retrieval/prompt budget. BLEU and
-MT-BLEU use StreamLAAL-compatible mWER resegmentation. TERM\_ACC uses the same
-2,047 raw-term occurrences for every row (1,368 NLP; 679 medicine). Prec. is
-prompt precision. No RAG injects no references, so its prompt quantities are
-zero.}
+MT-BLEU use StreamLAAL-compatible mWER resegmentation. The four RAG rows share
+2,047 raw-term occurrences (1,368 NLP; 679 medicine). InfiniSST reports the
+canonical LM=2 five-talk scores; its All/BLEU/MT-BLEU are two-corpus macro
+means. Prec. is prompt precision; no RAG injects no references.}
 \label{tab:quality}
 \end{table*}
 

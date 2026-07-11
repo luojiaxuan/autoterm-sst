@@ -28,6 +28,20 @@ local retrieval window; Refs is the mean number of injected references per
 chunk. The scorer requires byte-identical playlists and exact equality of every
 persisted decoder window across conditions.
 
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.92\textwidth]{routing_timeline_10talk.png}
+  \caption{Active-slice routing in a separate, full-length ten-talk
+  alternating stream (five ACL and five medicine talks; 16,848s in one live
+  session). The upper row is the known talk domain and the lower row is the
+  automatically selected slice. All nine domain transitions switch in the
+  correct direction: eight within 13.6--55.4s, and one medicine-to-NLP
+  transition after 304s because of a domain-generic talk opening. The run has
+  one 35s transient wrong-slice excursion and 0.982 steady-state active-domain
+  accuracy outside 30s boundary grace windows.}
+  \label{fig:routing}
+\end{figure*}
+
 \begin{table*}[t]
 \centering
 \small
@@ -61,6 +75,9 @@ million-entry baseline is not computationally unusable; under a fixed top-10
 evidence budget, irrelevant and conflicting candidates crowd the prompt.
 AutoTerm keeps a small multi-slice working set while leaving the broad catalog
 offline.
+
+Figure~\ref{fig:routing} complements the policy comparison with a longer
+session-level trace of automatic domain transitions.
 
 Appendix~\ref{app:sweep} shows why 1M is the relevant stress point: a controlled
 ACL sweep remains stable through 100k while retrieval precision falls as

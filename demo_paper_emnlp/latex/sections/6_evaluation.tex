@@ -12,7 +12,7 @@ Setting & Input & Active & \multicolumn{3}{c}{TERM\_ACC (\%)} & BLEU & MT-BLEU &
 & & & NLP & Med. & All & & & & \\
 \midrule
 InfiniSST (no RAG) & None & 0 & 50.2 & 52.9 & 51.1 & 39.26 & 36.70 & 0.0 & 0.00 \\
-Known-domain-1k & Domain & 1k & 88.8 & \textbf{86.6} & 88.1 & \textbf{45.19} & \textbf{42.39} & \textbf{48.7} & \textbf{0.69} \\
+Known-domain-1k & Domain & 1k & 88.8 & \textbf{86.6} & \textbf{88.1} & \textbf{45.19} & \textbf{42.39} & \textbf{48.7} & \textbf{0.69} \\
 AutoTerm-1k$\times$4 & None & $\leq$4k & 89.3 & 86.3 & \textbf{88.3} & 45.09 & 42.28 & 34.8 & 0.94 \\
 Merged-100k & None & 100k & \textbf{89.4} & 84.5 & 87.8 & 43.72 & 40.93 & 6.8 & 4.96 \\
 Merged-1M & None & 1M & 87.1 & 78.9 & 84.4 & 42.79 & 39.95 & 3.4 & 8.70 \\
@@ -38,8 +38,8 @@ zero.}
 
 \paragraph{Setup.}
 We stream five complete ACL talks and five medicine talks through one
-alternating En$\rightarrow$Zh session (approximately 4.7 hours). All
-terminology policies use 1.92s chunks, Qwen3-Omni, the same MaxSim retriever,
+alternating En$\rightarrow$Zh session (approximately 4.7 hours). The four RAG
+policies use 1.92s chunks, Qwen3-Omni, the same MaxSim retriever,
 100 retrieval candidates, score threshold 0.78, and at most ten prompt
 references. We compare:
 \emph{InfiniSST (no RAG)}, historical no-retrieval outputs on the same talks at
@@ -52,13 +52,14 @@ The ten registered AutoTerm slices contain 1k entries each. The merged
 baselines combine the same target-bearing resources with distractors to exactly
 100k and 1M mappings; 100k is a strict prefix of 1M. Exact duplicate pairs are
 removed, but conflicting domain-dependent translations are retained. Router
-settings were selected on four development windows before the complete run.
+settings were selected on four windows drawn from these talks before the
+complete run.
 Because the registered NLP and medicine slices include benchmark terminology,
 this is a controlled routing and retrieval-competition evaluation, not a
 held-out glossary-induction test.
 
 \paragraph{Comparison provenance.}
-The no-RAG row reuses the public InfiniSST hypotheses released with RASST for
+The no-RAG row reuses InfiniSST hypotheses archived in the RASST repository for
 these exact ten talks and the matching 1.92s policy; it does not require another
 model run. We resegment those hypotheses against the same references and
 rescore all 2,047 term occurrences used by the RAG conditions. The other four
@@ -82,11 +83,11 @@ is the full raw tagged set, not a curated subset used for interface highlights;
 we do not report a second filtered masked-BLEU variant.
 
 \paragraph{From no RAG to an adaptive working set.}
-Table~\ref{tab:quality} answers three systems questions. First, terminology
-retrieval matters: AutoTerm improves TERM\_ACC from 51.1\% without RAG to
-88.3\%, while BLEU rises by 5.83. Second, automatic routing removes setup at
-negligible quality cost. AutoTerm is within 0.24 TERM\_ACC points and 0.11
-BLEU/MT-BLEU of the known-domain reference, despite receiving no domain input.
+First, AutoTerm exceeds the InfiniSST no-RAG reference by 37.2 TERM\_ACC points
+and 5.83 BLEU. Because the two systems use different base models, this is a
+systems reference rather than a controlled retrieval ablation. Second,
+automatic routing removes setup at negligible quality cost: AutoTerm is within
+0.24 TERM\_ACC points and 0.11 BLEU/MT-BLEU of the known-domain reference.
 Third, a universal glossary is usable at 100k but degrades as it grows. Relative
 to Merged-100k, AutoTerm gains 1.37 BLEU and provides much cleaner evidence
 (34.8\% vs. 6.8\% prompt precision). At 1M, its advantage grows to 3.91

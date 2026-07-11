@@ -221,16 +221,32 @@ def render(payload: dict[str, Any], output: Path, *, title: str) -> None:
     coverage = mean(1.0 if correct_slice_present(record) else 0.0 for record in records)
     max_slices = max(int(record.get("selected_slice_count") or 0) for record in records)
     max_terms = max(int(record.get("selected_term_count") or 0) for record in records)
-    transitions = [dict(item) for item in payload.get("domain_transitions") or []]
-    delays = [float(item["latency_s"]) for item in transitions if item.get("latency_s") is not None]
-    delay_value = f"{max(delays):.1f}s max" if delays else "n/a"
+    admission_delays: list[float] = []
+    for span in spans[1:]:
+        boundary_s = float(span.get("start_sample") or 0) / 16000.0
+        admitted = next(
+            (
+                record
+                for record in records
+                if float(record.get("cursor_s") or 0.0) >= boundary_s
+                and correct_slice_present(record)
+            ),
+            None,
+        )
+        if admitted is not None:
+            admission_delays.append(
+                max(0.0, float(admitted.get("cursor_s") or 0.0) - boundary_s)
+            )
+    admission_value = (
+        f"{max(admission_delays):.1f}s max" if admission_delays else "n/a"
+    )
 
     metrics = [
         ("session", f"{len(spans)} talks / {duration_s / 3600:.2f}h"),
         ("active budget", f"{max_slices} slices / {max_terms:,} terms"),
         ("active-domain agreement", f"{100 * top1_accuracy:.1f}%"),
         ("correct-slice coverage", f"{100 * coverage:.1f}%"),
-        ("boundary delay", delay_value),
+        ("correct-slice admission", admission_value),
     ]
     card_y, card_h = 590, 92
     card_gap = 18

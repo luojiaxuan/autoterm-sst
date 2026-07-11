@@ -119,13 +119,16 @@ def read_acl_audio_blocks(
         by_talk.setdefault(talk_id, []).append(wav_path)
 
     selected_talks: Sequence[str]
+    requested_count: int
     if talk_ids:
         selected_talks = [str(talk_id).strip() for talk_id in talk_ids]
+        requested_count = len(selected_talks)
         missing = [talk_id for talk_id in selected_talks if talk_id not in by_talk]
         if missing:
             raise FileNotFoundError(f"ACL talk id(s) not found: {', '.join(missing)}")
     else:
         selected_talks = list(by_talk)
+        requested_count = int(limit_items)
 
     blocks: List[AudioBlock] = []
     for talk_id in selected_talks:
@@ -137,6 +140,11 @@ def read_acl_audio_blocks(
             blocks.append(AudioBlock(talk_id, "nlp", "acl", selected))
         if len(blocks) >= max(0, int(limit_items)):
             break
+    if len(blocks) != requested_count:
+        raise FileNotFoundError(
+            f"requested {requested_count} ACL item(s) from {root}, but loaded "
+            f"{len(blocks)} with existing WAV files"
+        )
     return blocks
 
 
@@ -156,13 +164,15 @@ def read_medicine_audio_blocks(
     for path in paths:
         medicine_id = path.stem[:-3] if path.stem.endswith("_v2") else path.stem
         by_id[medicine_id] = path
-    if medicine_ids:
+    requested_ids = [
+        str(raw_id).strip().removeprefix("medicine_")
+        for raw_id in (medicine_ids or ())
+        if str(raw_id).strip().removeprefix("medicine_")
+    ]
+    if requested_ids:
         selected_paths: List[Path] = []
         missing: List[str] = []
-        for raw_id in medicine_ids:
-            medicine_id = str(raw_id).strip().removeprefix("medicine_")
-            if not medicine_id:
-                continue
+        for medicine_id in requested_ids:
             path = by_id.get(medicine_id)
             if path is None:
                 missing.append(medicine_id)
@@ -175,6 +185,12 @@ def read_medicine_audio_blocks(
     for path in paths[: max(0, int(limit_items))]:
         medicine_id = path.stem[:-3] if path.stem.endswith("_v2") else path.stem
         blocks.append(AudioBlock(f"medicine_{medicine_id}", "medicine", "medicine", [str(path)]))
+    requested_count = len(requested_ids) if requested_ids else int(limit_items)
+    if len(blocks) != requested_count:
+        raise FileNotFoundError(
+            f"requested {requested_count} medicine item(s) from {root}, but loaded "
+            f"{len(blocks)} WAV files"
+        )
     return blocks
 
 

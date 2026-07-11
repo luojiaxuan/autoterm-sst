@@ -29,6 +29,7 @@ from eval.streaming_sst.eval_mixed_audio_switch import (
     expected_domain_at,
     iter_pcm_chunks,
     iter_oracle_chunk_plan,
+    main as mixed_audio_main,
     parse_oracle_preset_map,
     read_acl_audio_blocks,
     read_medicine_audio_blocks,
@@ -268,6 +269,85 @@ class MixedAudioSwitchEvalTests(unittest.TestCase):
             blocks = read_acl_audio_blocks(str(acl_root), limit_items=2)
 
         self.assertEqual([block.item_id for block in blocks], ["acl_a", "acl_b"])
+
+    def test_acl_reader_rejects_incomplete_requested_item_count(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            acl_root = root / "acl"
+            existing = acl_root / "seg" / "000.wav"
+            _write_wav(existing, TARGET_SAMPLE_RATE)
+            (acl_root / "segments.meta.jsonl").write_text(
+                "\n".join(
+                    [
+                        json.dumps({"talk": "acl_a", "seg_wav": str(existing)}),
+                        json.dumps(
+                            {
+                                "talk": "acl_b",
+                                "seg_wav": str(acl_root / "seg" / "missing.wav"),
+                            }
+                        ),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                FileNotFoundError,
+                r"requested 2 ACL item\(s\).*loaded 1",
+            ):
+                read_acl_audio_blocks(str(acl_root), limit_items=2)
+
+    def test_medicine_reader_rejects_incomplete_requested_item_count(self) -> None:
+        with TemporaryDirectory() as tmp:
+            med_dir = Path(tmp) / "medicine"
+            _write_wav(
+                med_dir / "sample_404_v2" / "404_v2.wav",
+                TARGET_SAMPLE_RATE,
+            )
+
+            with self.assertRaisesRegex(
+                FileNotFoundError,
+                r"requested 2 medicine item\(s\).*loaded 1",
+            ):
+                read_medicine_audio_blocks(str(med_dir), limit_items=2)
+
+    def test_dry_run_rejects_incomplete_requested_inputs(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            acl_root = root / "acl"
+            acl_wav = acl_root / "seg" / "000.wav"
+            _write_wav(acl_wav, TARGET_SAMPLE_RATE)
+            (acl_root / "segments.meta.jsonl").write_text(
+                json.dumps({"talk": "acl_a", "seg_wav": str(acl_wav)}) + "\n",
+                encoding="utf-8",
+            )
+            med_dir = root / "medicine"
+            _write_wav(
+                med_dir / "sample_404_v2" / "404_v2.wav",
+                TARGET_SAMPLE_RATE,
+            )
+            argv = [
+                "eval_mixed_audio_switch.py",
+                "--acl-root",
+                str(acl_root),
+                "--medicine-audio-dir",
+                str(med_dir),
+                "--acl-items",
+                "2",
+                "--medicine-items",
+                "1",
+                "--dry-run",
+            ]
+
+            with (
+                patch.object(sys, "argv", argv),
+                self.assertRaisesRegex(
+                    FileNotFoundError,
+                    r"requested 2 ACL item\(s\).*loaded 1",
+                ),
+            ):
+                mixed_audio_main()
 
     def test_audio_block_readers_respect_zero_limit(self) -> None:
         with TemporaryDirectory() as tmp:

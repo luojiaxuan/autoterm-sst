@@ -1,22 +1,20 @@
 \begin{abstract}
-We present AutoTerm-SST, an interactive system for terminology-aware streaming
-speech translation. Technical talks contain rare terms, but asking users to
-prepare a glossary or select a domain before every session creates substantial
-friction. AutoTerm-SST instead organizes a large offline terminology catalog
-into compact topic slices. A training-free router matches recent streaming
-translation context to bilingual slice prototypes and activates the highest
-scoring slices within a fixed term budget; each chunk injects at most 10
-score-filtered references into the language-model prompt. No separate ASR or
-source-transcript topic classifier is required.
+Retrieval-augmented speech translation improves rare terminology, but systems
+such as RASST still assume that users provide a glossary before each session.
+That assumption is inconvenient for live talks, while merging every domain into
+one growing glossary eventually places too many irrelevant terms in the same
+retrieval and prompt competition.
 
-On a complete ten-talk ACL/medicine stream with 2,047 forced-aligned term
-occurrences, AutoTerm reaches 0.883 term accuracy, within 0.24 points of a
-0.881 known-domain reference. It outperforms merged 100k and one-million-entry
-glossaries by 1.07/2.11 BLEU and 1.18/2.35 raw masked BLEU, respectively. At
-one million entries, term accuracy falls to 0.844; AutoTerm reaches 0.883 while
-raising strict time-local prompt precision from 3.4\% to 34.8\% and reducing
-references per chunk from 8.70 to 0.94. These results show that a small
-multi-slice working set preserves useful prompt evidence as the offline catalog
-grows, without requiring session-time setup. The demo exposes active slices,
-retrieved terms, and routing evidence in a live interface.
+We present AutoTerm-SST, an interactive system that removes session-time
+glossary upload and domain selection. It organizes a large offline terminology
+catalog into topic slices, matches recent streaming translation context to
+bilingual slice prototypes, and activates a compact multi-slice working set
+under fixed retrieval and prompt budgets. On ten real ACL and medicine talks,
+AutoTerm matches a known-domain reference in terminology accuracy
+(88.3\% vs. 88.1\%) and StreamLAAL BLEU (45.09 vs. 45.19), while requiring no
+domain input. It improves substantially over no terminology retrieval and
+outperforms a one-million-entry merged glossary by 3.9 terminology-accuracy
+points and 2.30 BLEU. The live demo exposes active slices and retrieved
+terminology as the topic changes, providing zero-setup terminology-aware
+streaming translation.
 \end{abstract}

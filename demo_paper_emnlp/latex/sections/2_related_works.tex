@@ -1,39 +1,30 @@
 \section{Related Work}
 
 \paragraph{Streaming speech translation.}
-SST systems must translate partial speech while balancing quality and latency.
-Prefix-to-prefix policies such as wait-\(k\) make this trade-off explicit
+SST systems translate partial speech while balancing quality and latency.
+Prefix-to-prefix policies make this trade-off explicit
 \citep{ma2019stacl}, attention-based policies refine read/write decisions
-\citep{papi2023alignatt,papi2024streamatt}, SimulEval standardizes evaluation
-\citep{ma2020simuleval}, and large-scale streaming models target direct
-simultaneous translation \citep{seamless2023,zhang2024streamspeech}. Speech
-language models make this setting more flexible
-\citep{xu2025qwen3omni,ouyang2025infinisst}, but live deployment still requires
-session management, incremental transport, and latency-aware prompting.
-AutoTerm-SST focuses on adapting terminology during a stream; its contribution
-is a system demonstration rather than a new model architecture.
+\citep{papi2023alignatt,papi2024streamatt}, and SimulEval standardizes
+streaming evaluation \citep{ma2020simuleval}. Recent speech-language models
+broaden the modeling choices for direct SST
+\citep{seamless2023,zhang2024streamspeech,xu2025qwen3omni}. AutoTerm-SST does
+not propose a new translation model; it contributes a terminology-management
+and demo layer around an existing streaming model.
 
 \paragraph{Terminology-aware translation.}
-Terminology control has long been studied in machine translation, usually
-through user-provided dictionaries, constrained decoding, or training-time
-exposure to terminology constraints \citep{hokamp2017lexically,dinu2019training};
-terms and named entities are also a known weakness of speech translation
-\citep{gaido2021moby}. Retrieval-augmented generation offers another way to
-expose non-parametric memory at generation time
-\citep{lewis2020retrieval,khandelwal2021nearest}. Many of these workflows assume
-that the domain or terminology is known before translation begins. RASST
-retrieves glossary evidence for out-of-distribution terms before LLM decoding,
-but its glossary is fixed before streaming \citep{luo2026rasst}. AutoTerm-SST
-keeps the RASST retriever and translation model unchanged and instead manages a
-budgeted cache of topic slices online. This moves domain selection from user
-setup into the streaming system and prevents an expanding offline catalog from
-placing every term in the same ranking competition.
+Terminology control is commonly implemented with user-provided dictionaries,
+constrained decoding, or training-time exposure to constraints
+\citep{hokamp2017lexically,dinu2019training}. Terms and named entities remain a
+known weakness of speech translation \citep{gaido2021moby}. Retrieval-augmented
+generation offers a non-parametric alternative
+\citep{lewis2020retrieval,khandelwal2021nearest}, and RASST applies glossary
+retrieval before streaming LLM decoding \citep{luo2026rasst}. These approaches
+normally assume that the relevant glossary is known before translation.
+AutoTerm instead manages a budgeted cache of topic slices online.
 
-\paragraph{LLM serving and demo systems.}
-Modern LLM serving systems provide continuous batching and efficient generation
-APIs \citep{kwon2023efficient,zheng2024sglang}, but a streaming speech demo also
-needs microphone/file input, WebSocket transport, session cleanup, live evidence
-rendering, and mock-mode testing. Translation Canvas
-\citep{dandekar2024translation} targets offline translation analysis;
-AutoTerm-SST provides a live serving layer while keeping model-specific code in
-swappable agents.
+\paragraph{Interactive translation systems.}
+Serving engines provide continuous batching for language models
+\citep{kwon2023efficient,zheng2024sglang}, while interactive translation tools
+make model behavior inspectable \citep{dandekar2024translation}. AutoTerm-SST
+combines streaming audio transport with a live terminology evidence view and
+automatic glossary selection.

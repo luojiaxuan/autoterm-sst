@@ -1,29 +1,19 @@
 \section{Limitations and Conclusion}
 \label{sec:limitations}
 
-AutoTerm-SST is a terminology-aware streaming system, not a new foundation
-model or an open-world topic classifier. Semantic routing depends on short
-offline slice descriptions and bilingual prototypes; a novel or ambiguous
-topic may therefore receive a poor working set. Because the strongest routing
-evidence is recent generated translation, the pinned slice can lag after a
-domain boundary, although activating several slices reduces the cost of a
-single wrong top-1 choice. The main comparison covers one En$\rightarrow$Zh
-ten-talk stream and ten candidate slices. The registered 1k slices contain the
-benchmark terminology, so this is a controlled routing and ranking result, not
-a held-out test of glossary induction. It is also
-not evidence that every million-entry glossary or language pair will degrade by
-the same amount. In particular, Merged-100k remains usable and the controlled
-ACL sweep stays stable through 100k, while a 1M MaxSim index is
-computationally usable; the observed failure is ranking and prompt crowding
-under a fixed evidence budget. The hosted live backend also
-requires A6000-class NVIDIA GPUs and external model/retriever artifacts, while mock
-mode covers UI and protocol testing without them.
+The main evaluation is En$\rightarrow$Zh and uses ten registered topic slices.
+Those slices contain the benchmark terminology, so the results measure routing
+and retrieval competition rather than unseen-glossary induction. Routing also
+depends on generated target context and can lag after a topic boundary; the
+multi-slice budget only reduces this failure mode. The degradation threshold
+also depends on the language pair, retriever, ambiguity, and prompt budget;
+100k is an intermediate point and 1M a stress condition, not a universal
+threshold. Fresh multilingual evaluation remains future work.
 
-We presented AutoTerm-SST, which removes per-session glossary upload and domain
-selection by routing a compact multi-slice working glossary from streaming
-context. On the complete ten-talk comparison, this working set matches the
-known-domain reference and improves term and translation quality over both
-merged baselines while injecting substantially cleaner prompt evidence. The
-architecture also provides a practical expansion
-path: new topic slices can be registered offline without forcing every session
-to search one ever-growing universal glossary.
+AutoTerm-SST turns terminology retrieval into a zero-session-setup system.
+Operators expand a modular offline catalog while users simply start a stream;
+recent context maintains a compact working set and RASST supplies prompt
+evidence. On mixed ACL and medicine talks, AutoTerm matches a known-domain
+reference, improves over no RAG, and avoids the quality and prompt-noise
+degradation of a 1M universal glossary. The demo makes this behavior visible
+and provides a practical path across many domains.

@@ -1,49 +1,85 @@
 \section{Adaptive Terminology Memory}
 \label{sec:adaptive-memory}
 
-AutoTerm-SST separates the offline terminology catalog from the small working
-glossary exposed to the language model. The catalog may contain many topic
-slices and substantially more entries than should be searched or placed in a
-streaming prompt at once. Each slice stores term--translation pairs, lightweight
-topic metadata, and a prebuilt MaxSim index. Exact duplicate pairs may be
-removed, but the same source term with different domain-dependent translations
-is retained.
+AutoTerm separates the broad offline catalog from the compact glossary exposed
+to a live session. Each topic slice contains term--translation pairs, a
+prebuilt MaxSim index, and a bilingual prototype formed from a short topic
+description and representative terminology. Domain-dependent mappings are
+retained: the same source term may have different translations in different
+slices.
 
-\paragraph{Budgeted semantic routing.}
-Users neither upload a glossary nor choose a domain. At chunk $t$, the router
-concatenates the most recent $w$ generated translation chunks into a
-sliding-window context $c_t$. Each slice $d$ has an offline bilingual
-prototype set $P_d$, consisting of a short description and representative
-source/target terminology. With a multilingual sentence encoder $E$, the
-router computes
+\paragraph{Offline catalog registration.}
+An operator registers each slice through a manifest containing its label, term
+count, prototype, and prebuilt index. Slices are independently replaceable;
+topic-dependent mappings remain separate. At session time the router reads the
+compact manifest and prototypes, while indexes outside the working set do not
+participate in retrieval. Catalog capacity is thereby separated from the
+terminology exposed to one decoding step.
+
+\paragraph{Semantic routing.}
+At chunk $t$, the router concatenates the most recent $w$ generated
+translation chunks into context $c_t$. For slice $d$ with prototype examples
+$P_d$ and multilingual sentence encoder $E$, it computes
 \begin{equation}
-  \begin{aligned}
+\begin{aligned}
   \bar p_d &=
   \operatorname{norm}\!\left(\frac{1}{|P_d|}
-  \sum_{p\in P_d} E(p)\right),\\
+  \sum_{p\in P_d} E(p)\right), \\
   s(d\mid c_t) &= \cos\!\left(E(c_t),\bar p_d\right).
-  \end{aligned}
+\end{aligned}
 \end{equation}
-It ranks slices by this similarity and activates the highest-scoring slices
-that fit a term budget $B$, up to $K$ slices. This is training-free and
-allows several plausible topics to remain available: a single wrong top-1
-decision need not remove the correct terminology from retrieval. The current
-best slice is pinned when possible to avoid oscillation at a topic boundary.
+We use BGE-M3 for $E$. Prototypes contain a short bilingual description and
+representative terms, so Chinese generated context and English topic metadata
+share one embedding space. The routing path is therefore a direct semantic
+similarity computation over accumulated translation context, not a classifier
+trained on the evaluation talks.
+
+\paragraph{Why generated target context?}
+The speech-language model translates audio directly, without a stable source
+transcript. Its partial target text is already available and becomes more
+topic-specific over time, enabling comparison with bilingual prototypes
+without a supervised domain model. Routing is causal: chunk $t$ only changes
+later retrieval. A generic early translation can therefore delay topic
+evidence; accumulating four chunks and retaining several slices makes this
+signal less brittle.
+
+The highest-scoring slices are admitted until either the maximum slice count
+$K$ or total active-term budget $B$ is reached. The current best slice is
+pinned when possible to reduce oscillation. Keeping multiple plausible slices
+is important: a temporary top-1 routing error need not remove the correct
+terminology from retrieval.
+
+\paragraph{Working-set update.}
+At each routing tick, AutoTerm keeps the current slice if it fits, then fills
+remaining slots in similarity order. Lower-ranked non-pinned slices stay
+outside the budget. This cache-like rule is not a hard domain switch: plausible
+topics can coexist during a transition, while stale slices disappear as their
+scores fall. Candidate indexes are preloaded and selections change only
+between decoding steps.
 
 \paragraph{Fixed evidence budget.}
-For every chunk, the active indexes share one retrieval candidate budget; the
-surviving candidates are jointly ranked and at most 10 references enter the
-language-model prompt. Thus increasing $K$ does not grant AutoTerm more
-retrieval candidates. In our main comparison, AutoTerm ranks ten 1k slices,
-uses $w{=}4$, $K{=}4$, and $B{=}4{,}000$; the 100 retrieval candidates
-are divided across the active slices before the common score threshold and
-top-10 prompt cap. The known-domain reference instead searches the matching 1k slice,
-while the merged baselines search nested 100k- and 1M-entry indexes under the
-same candidate and prompt budgets (Section~\ref{sec:evaluation}).
+All active slices share 100 retrieval candidates and a common top-10 prompt
+cap. Increasing $K$ therefore changes the composition of the search space, not
+the amount of evidence available to AutoTerm. In the evaluated configuration,
+the router considers ten 1k slices, uses the latest four translation chunks,
+and activates at most four slices ($B{=}4{,}000$). The known-domain reference
+searches the matching 1k slice; universal baselines search nested 100k and 1M
+indexes under exactly the same retrieval and prompt limits.
 
-The 1M index is not assumed to be computationally infeasible. The comparison
-tests a different systems question: as an offline catalog grows, can a compact
-semantic working set preserve relevant prompt evidence without session-time
-setup? Broad indexes can still be retained as background resources or rescue
-pools; AutoTerm controls how much of that resource competes for each streaming
-prompt.
+For a multi-slice query, the system divides the 100 candidate slots among the
+active indexes, combines their results, removes only exact duplicate
+source--target pairs, and globally reranks the remaining candidates before the
+top-10 prompt cap. Consequently, selecting four slices does not give AutoTerm
+four times the retrieval or prompt capacity. Its advantage can only come from
+placing more relevant mappings inside the same evidence budget.
+
+The context encoder scores all lightweight prototypes together, and likely
+indexes are warmed asynchronously. Each chunk retrieves from a snapshot of the
+working set installed before that chunk began; a routing update that finishes
+during generation only affects the next chunk. This keeps terminology evidence
+causal and prevents cold index loading from changing an in-flight prompt.
+
+The million-entry baseline is a capacity stress condition, not a claim that
+large-index search is computationally impossible. AutoTerm addresses a
+different problem: preserving relevant prompt evidence as an offline catalog
+grows, without requiring any session-time input from the user.

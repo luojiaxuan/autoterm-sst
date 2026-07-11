@@ -200,9 +200,14 @@ def render(payload: dict[str, Any], output: Path, *, title: str) -> None:
 
     legend_y = 138
     for idx, (label, color) in enumerate(
-        [("NLP", COLORS["nlp"]), ("Medicine", COLORS["medicine"]), ("correct slice present", COLORS["covered"])]
+        [
+            ("NLP", COLORS["nlp"]),
+            ("Medicine", COLORS["medicine"]),
+            ("Other pinned", COLORS["other"]),
+            ("correct slice present", COLORS["covered"]),
+        ]
     ):
-        xpos = 1160 + idx * 190
+        xpos = 950 + idx * 190
         draw.rounded_rectangle((xpos, legend_y, xpos + 22, legend_y + 22), radius=4, fill=color)
         draw.text((xpos + 31, legend_y - 1), label, font=small_font, fill="#475569")
 

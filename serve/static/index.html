@@ -97,8 +97,9 @@
 
         .controls-section .adaptive-status { grid-column: 1 / -1; }
 
-        .term-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-        .term-row select { flex: 1; min-width: 150px; }
+        .term-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+        .fixed-controls { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+        .fixed-controls select { flex: 1; min-width: 120px; }
 
         .glossary-meta-inline {
             font-weight: 400;
@@ -1103,10 +1104,12 @@
                             <button type="button" class="mode-pill active" data-mode="auto" id="modeAutoBtn">Auto&nbsp;<small>no session setup</small></button>
                             <button type="button" class="mode-pill" data-mode="fixed" id="modeFixedBtn">Fixed</button>
                         </div>
-                        <select id="glossaryPreset" class="dimmed" disabled>
-                            <option value="none" selected>No glossary (baseline)</option>
-                        </select>
-                        <button id="buildGlossary" class="btn btn-compact dimmed" type="button" disabled>Apply</button>
+                        <div class="fixed-controls" id="fixedPresetGroup" style="display: none;">
+                            <select id="glossaryPreset" disabled>
+                                <option value="none" selected>No glossary (baseline)</option>
+                            </select>
+                            <button id="buildGlossary" class="btn btn-compact" type="button" disabled>Apply</button>
+                        </div>
                     </div>
                     <p class="mode-hint" id="modeHint">Routed automatically from the speech.</p>
                 </div>

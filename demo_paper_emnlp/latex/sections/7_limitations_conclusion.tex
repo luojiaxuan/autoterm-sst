@@ -1,17 +1,15 @@
 \section{Limitations and Conclusion}
 \label{sec:limitations}
 
-The main evaluation is En$\rightarrow$Zh and uses ten registered topic slices.
-Those slices contain the benchmark terminology, so the results measure routing
-and retrieval competition rather than unseen-glossary induction. Routing also
-depends on generated target context and can lag after a topic boundary; the
-multi-slice budget only reduces this failure mode. The degradation threshold
-also depends on the language pair, retriever, ambiguity, and prompt budget;
-100k is an intermediate point and 1M a stress condition, not a universal
-threshold. Fresh multilingual evaluation remains future work.
+The En$\rightarrow$Zh evaluation uses registered slices containing benchmark
+terms, so it measures routing and retrieval competition rather than unseen
+glossary induction. Routing can lag a topic boundary; a multi-slice budget only
+mitigates this failure. Scale sensitivity also depends on language, retriever,
+ambiguity, and prompt budget: 100k is an intermediate point and 1M a stress
+condition, not a universal threshold. Broader multilingual validation remains
+future work.
 
-AutoTerm-SST gives users zero-setup terminology retrieval while operators
-expand a modular offline catalog. Recent context maintains a compact working
-set for RASST prompt evidence. On mixed ACL and medicine talks, it matches
-known-domain quality, beats no RAG, and avoids 1M universal-glossary noise. The
-demo makes this behavior visible.
+AutoTerm-SST provides zero-setup terminology retrieval over a modular offline
+catalog. On mixed ACL and medicine talks, it matches known-domain quality,
+beats no RAG, avoids 1M universal-glossary noise, and makes this behavior
+visible in the demo.

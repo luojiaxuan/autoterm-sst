@@ -1,9 +1,8 @@
 # System Scaling: Retrieval, Routing, and Concurrent Serving
 
 Self-contained record of AutoTerm-SST's systems results — warm-retrieval
-scaling, streaming compute RTF, and concurrent real-time serving. Hardware is
-reported per section; the frozen RASST RTF package does not record its GPU
-model, so no hardware is inferred for that result.
+scaling, standard system RTF, component timing, and concurrent real-time
+serving. Hardware is reported only where it is preserved by the source run.
 
 ---
 
@@ -28,45 +27,65 @@ while the routed active slice stays small.
 
 ---
 
-## 2. Retrieval and routing compute RTF
+## 2. Standard system RTF
+
+The paper uses the conventional system-level definition:
+
+```text
+system RTF = processing wall time / input audio duration
+```
+
+### 2.1 RASST LM sweep
 
 RASST PR #1 commit
 `adc47b8b5c0a439d4f4b74cdee02145db520054b` freezes the En→Zh Medicine
-hard/raw MaxSim compute audit used by Figure 4. The metric is:
+LM 1--4 runs. For each talk, SimulEval stores source delay and elapsed wall
+time at every nonempty target emission. We compute
+`last_elapsed - last_delay`, then micro-average over 13,740,783.6875 ms of
+source audio:
 
-```text
-retriever compute RTF = retriever call time / (0.96 s * LM)
-```
+| LM | Cadence | System RTF | MaxSim/audio | MaxSim/system wall |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 0.96 s | 0.372130 | 0.055879 | 15.02% |
+| 2 | 1.92 s | 0.249610 | 0.033322 | 13.35% |
+| 3 | 2.88 s | 0.214872 | 0.023921 | 11.13% |
+| 4 | 3.84 s | 0.184844 | 0.015179 | 8.21% |
 
-Each call encodes the current generation span plus a fixed 1.92 s lookback.
-The upstream figure plots **mean RTF** and **median call time**:
+The original attached plot labeled only `MaxSim time / cadence` as RTF. That
+quantity is useful as a component ratio but is not full system RTF. Figure 4
+instead stacks the MaxSim component inside the standard total. Because
+SimulEval records timing only on nonempty target emissions, unobserved tails
+cover 0.11%--0.16% of audio; these values are therefore system RTF to the last
+emitted target, not strict EOF-complete RTF. The source package does not record
+its GPU model, so none is inferred.
 
-| LM | Cadence | Input span | Calls | Mean call | Median call | Mean RTF |
-| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | 0.96 s | 2.88 s | 14,315 | 53.644 ms | 36.957 ms | 5.5879% |
-| 2 | 1.92 s | 3.84 s | 7,159 | 63.977 ms | 42.345 ms | 3.3322% |
-| 3 | 2.88 s | 4.80 s | 4,774 | 68.892 ms | 42.560 ms | 2.3921% |
-| 4 | 3.84 s | 5.76 s | 3,581 | 58.286 ms | 43.645 ms | 1.5179% |
+### 2.2 Current ten-talk system RTF
 
-This package measures the single-glossary MaxSim retriever only; it excludes
-LLM decoding, AutoTerm context routing, and multi-slice selection. The compact
-paper figure preserves the exact TSV values and is generated from
-`demo_paper_emnlp/figures/rag_compute_rtf/`.
+The four current runs use one Hyper H200 and the same 16,848.115 s alternating
+stream, retaining a final status event at the complete input cursor. Wall time
+starts after session initialization and ends at that final cursor, including
+routing, retrieval, generation, scheduler, WebSocket transport, and closed-loop
+backpressure. Cold index loading and teardown are excluded.
 
-The complete ten-talk AutoTerm run separately records the full
-`_retrieve_batch` interval, which includes shared speech encoding, BGE-M3
+| Setting | Wall time | System RTF | Throughput |
+| --- | ---: | ---: | ---: |
+| Known-domain-1k | 6,548.116 s | 0.388656 | 2.573× real time |
+| AutoTerm-1k×4 | 6,838.546 s | 0.405894 | 2.464× real time |
+| Merged-100k | 6,994.185 s | 0.415132 | 2.409× real time |
+| Merged-1M | 7,133.780 s | 0.423417 | 2.362× real time |
+
+AutoTerm's `_retrieve_batch` timer includes shared speech encoding, BGE-M3
 context similarity, router observation/update, and up to four active-index
-queries. Across 8,776 windows:
+queries. Its 203.272 ms mean is 10.588% of audio duration. This is reported as
+a **routing/retrieval stage-time ratio**, not a second system RTF.
 
-| Stage | Mean | p50 | p95 | Mean / 1.92 s stride |
-| --- | ---: | ---: | ---: | ---: |
-| AutoTerm routing + four-slice retrieval | 203.272 ms | 204.140 ms | 333.537 ms | 10.587% |
-
-Run SHA-256:
-`3b4fbb01c8d120c432f595bd788b950f263da93105c45e5a32ae9caba632b30f`.
-The complete JSON remains local staging at
-`/data/autoterm-10talk-budget-20260711/hyper/ten_talk_autoterm1kx4_hyper_redundant_audited.json`;
-upload to `luojiaxuan/autoterm-sst-10talk-streamlaal-zh` is pending.
+The complete AutoTerm JSON has SHA-256
+`3b4fbb01c8d120c432f595bd788b950f263da93105c45e5a32ae9caba632b30f`
+and remains local staging at
+`/data/autoterm-10talk-budget-20260711/hyper/ten_talk_autoterm1kx4_hyper_redundant_audited.json`.
+Upload to `luojiaxuan/autoterm-sst-10talk-streamlaal-zh` is pending. Figure
+sources and all four run hashes are recorded under
+`demo_paper_emnlp/figures/system_rtf/`.
 
 ---
 

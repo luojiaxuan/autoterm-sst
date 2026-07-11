@@ -2,23 +2,23 @@
 \label{sec:evaluation}
 
 \paragraph{Setup.}
-We stream four complete talks through one alternating session:
-ACL~268, medicine~545006, ACL~367, and medicine~606 (5,381.508 seconds in
-total). The live En$\rightarrow$Zh agent runs Qwen3-Omni with vLLM tensor
-parallelism and the RASST MaxSim retriever on 2$\times$A6000. We compare four
-terminology policies.
-\emph{Known-domain-2.5k} activates the matching 2.5k slice from the known talk domain
+We stream five complete ACL talks and five medicine talks through one
+alternating session (16,848.115 seconds). The En$\rightarrow$Zh agent uses
+Qwen3-Omni and the RASST MaxSim retriever; every policy runs in an independent
+single-GPU worker with the same model, retriever, and decoding configuration.
+We compare four terminology policies.
+\emph{Known-domain-1k} activates the matching 1k slice from the known talk domain
 and is a reference policy that requires domain metadata. \emph{AutoTerm-1k$\times$4}
 requires no session-time setup and activates at most four 1k slices from the
 recent four-chunk translation context. \emph{Merged-100k} and \emph{Merged-1M}
 search one universal glossary; 100k is a strict prefix of 1M. All policies use
 the same 1.92s chunks, 100 total retrieval candidates, score threshold 0.78,
-top-10 prompt cap, and 2,803 decoder windows.
+top-10 prompt cap, and 8,776 decoder windows.
 
 \paragraph{Metrics.}
-The gold builder yields 1,079 raw annotation rows. We collapse only source
+The gold builder yields 2,551 raw annotation rows. We collapse only source
 aliases with the same exact audio span and identical target variants, leaving
-a fixed set of 848 spoken occurrences (615 ACL and 233 medicine); nested terms,
+a fixed set of 2,047 spoken occurrences (1,368 ACL and 679 medicine); nested terms,
 different target variants, and domain-dependent translations remain separate.
 Each occurrence is matched one-to-one to a target variant within a
 $[-2,+30]$s output window. We also report BLEU, BLEU after masking a curated
@@ -32,14 +32,12 @@ persisted decoder window across conditions.
 \begin{figure*}[t]
   \centering
   \includegraphics[width=0.92\textwidth]{routing_timeline_10talk.png}
-  \caption{Active-slice routing in a separate, full-length ten-talk
-  alternating stream (five ACL and five medicine talks; 16,848s in one live
-  session). The upper row is the known talk domain and the lower row is the
-  automatically selected slice. All nine domain transitions switch in the
-  correct direction: eight within 13.6--55.4s, and one medicine-to-NLP
-  transition after 304s because of a domain-generic talk opening. The run has
-  one 35s transient wrong-slice excursion and 0.982 steady-state active-domain
-  accuracy outside 30s boundary grace windows.}
+  \caption{Budgeted routing on the same full ten-talk stream. The rows show the
+  true talk domain, the pinned active slice, and whether the correct domain
+  slice remains inside the four-slice working set. The pinned label has 88.5\%
+  domain agreement and makes transient excursions, but the correct slice is
+  available in 96.9\% of decoder windows and is admitted within 29.5s at every
+  domain boundary.}
   \label{fig:routing}
 \end{figure*}
 
@@ -51,34 +49,35 @@ persisted decoder window across conditions.
 \toprule
 Setting & Session setup & Active terms & TERM\_ACC & BLEU & R-MBLEU & Prompt prec. & Refs \\
 \midrule
-Known-domain-2.5k & Select domain & 2.5k & 0.854 & 53.77 & 50.20 & \textbf{0.394} & \textbf{1.12} \\
-AutoTerm-1k$\times$4 & None & $\leq$4k & 0.853 & \textbf{54.03} & \textbf{50.46} & 0.393 & \textbf{1.12} \\
-Merged-100k & None & 100k & \textbf{0.863} & 53.94 & 50.41 & 0.088 & 5.00 \\
-Merged-1M & None & 1M & 0.830 & 52.12 & 48.59 & 0.044 & 8.79 \\
+Known-domain-1k & Select domain & 1k & 0.881 & \textbf{58.50} & \textbf{56.05} & \textbf{0.487} & \textbf{0.69} \\
+AutoTerm-1k$\times$4 & None & $\leq$4k & \textbf{0.883} & 58.41 & 55.98 & 0.348 & 0.94 \\
+Merged-100k & None & 100k & 0.878 & 57.34 & 54.80 & 0.068 & 4.96 \\
+Merged-1M & None & 1M & 0.844 & 56.30 & 53.63 & 0.034 & 8.70 \\
 \bottomrule
 \end{tabular}}
-\caption{Full four-talk comparison under identical decoder windows and
-retrieval/prompt budgets. TERM\_ACC uses the same 848 time-aligned spoken
+\caption{Full ten-talk comparison under identical decoder windows and
+retrieval/prompt budgets. TERM\_ACC uses the same 2,047 time-aligned spoken
 occurrences for every row; the merged inventories are strictly nested.}
 \label{tab:quality}
 \end{table*}
 
 \paragraph{Active-budget comparison.}
 Table~\ref{tab:quality} shows that AutoTerm matches the known-domain reference:
-their TERM\_ACC differs by only 0.12 points (723 vs. 724 hits), while AutoTerm's
-BLEU is 0.26 higher. Merged-100k is not a failure case: it has the highest
-TERM\_ACC (732 hits), and its BLEU/R-MBLEU remain within 0.09/0.05 of AutoTerm.
-However, it already lowers prompt precision to 8.83\% and increases references
-per chunk to 5.00. At 1M, AutoTerm leads by 2.24 TERM\_ACC points (723 vs. 704
-hits), 1.91 BLEU, 1.90 T-MBLEU, and 1.88 R-MBLEU. Its strict prompt precision
-is 39.29\% versus 4.37\%, with 1.12 rather than 8.79 references per chunk. The
+their TERM\_ACC differs by only 0.24 points (1,808 vs. 1,803 hits), while the
+known-domain BLEU is 0.09 higher. AutoTerm also outperforms Merged-100k by
+0.54 TERM\_ACC points, 1.07 BLEU, 1.18 T-MBLEU, and 1.18 R-MBLEU. Its prompt
+precision is 34.78\% versus 6.85\%, with 0.94 rather than 4.96 references per
+chunk. At 1M, the gaps grow to 3.91 TERM\_ACC points (1,808 vs. 1,728 hits),
+2.11 BLEU, 2.31 T-MBLEU, and 2.35 R-MBLEU. Prompt precision falls to 3.44\%
+and references per chunk rise to 8.70. The
 million-entry baseline is not computationally unusable; under a fixed top-10
 evidence budget, irrelevant and conflicting candidates crowd the prompt.
 AutoTerm keeps a small multi-slice working set while leaving the broad catalog
 offline.
 
-Figure~\ref{fig:routing} complements the policy comparison with a longer
-session-level trace of automatic domain transitions.
+Figure~\ref{fig:routing} shows why hard top-1 routing accuracy understates the
+working set: several slices keep the correct inventory available while the
+pinned label catches up.
 
 Appendix~\ref{app:sweep} shows why 1M is the relevant stress point: a controlled
 ACL sweep remains stable through 100k while retrieval precision falls as

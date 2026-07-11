@@ -37,7 +37,7 @@ language-model prompt. Thus increasing $K$ does not grant AutoTerm more
 retrieval candidates. In our main comparison, AutoTerm ranks ten 1k slices,
 uses $w{=}4$, $K{=}4$, and $B{=}4{,}000$; the 100 retrieval candidates
 are divided across the active slices before the common score threshold and
-top-10 prompt cap. The known-domain reference instead searches one 2.5k slice,
+top-10 prompt cap. The known-domain reference instead searches the matching 1k slice,
 while the merged baselines search nested 100k- and 1M-entry indexes under the
 same candidate and prompt budgets (Section~\ref{sec:evaluation}).
 

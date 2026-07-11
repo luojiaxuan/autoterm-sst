@@ -1,54 +1,46 @@
 \section{Introduction}
 
-Simultaneous speech translation (SST) targets technical talks, lectures,
-meetings, and live media. Prior SST work studies the quality--latency
-trade-off of prefix translation \citep{ma2019stacl} and standardizes streaming
-evaluation \citep{ma2020simuleval}. Recent omni speech-language models broaden
-the available modeling options for long-form speech translation
-\citep{xu2025qwen3omni}, but live systems
-still struggle with term-dense content: named methods, datasets, clinical terms,
-legal phrases, and financial entities often require specialized translations
-that are difficult to infer from local acoustic context alone.
+Simultaneous speech translation (SST) is increasingly used for technical talks,
+lectures, and live media. Modern speech-language models can translate long-form
+audio directly \citep{xu2025qwen3omni,ouyang2025infinisst}, but rare methods,
+datasets, clinical concepts, and named entities remain difficult to infer from
+local acoustic context. Glossary retrieval addresses this problem by exposing
+relevant source--target term pairs to the language model before decoding.
 
-Glossaries are a practical way to control terminology, but they are awkward for
-live use. A user may not know the exact topic before a talk starts, and asking
-every speaker or viewer to upload a domain glossary or select a domain creates
-friction. At deployment time, operators register modular, pre-indexed
-terminology resources for different domains. At session time, users neither
-upload a glossary nor select a domain: AutoTerm-SST maintains a small active
-working set from streaming evidence and injects at most 10 retrieved terms into
-each LLM prompt. This allows new domains to be added without retraining the
-translation model or collapsing all terminology resources into a single
-monolithic inventory.
+RASST \citep{luo2026rasst} shows that retrieval-augmented generation can improve
+out-of-distribution terminology in streaming translation. Its glossary,
+however, is fixed before a session. In practice, a listener may not know the
+talk domain in advance, and asking every user to find, upload, or select a
+glossary creates friction. A seemingly simple alternative is to merge all
+domains into a universal glossary. This works at moderate scale, but it is not a
+sustainable catalog policy: the retriever and prompt have fixed capacity, so
+irrelevant and conflicting mappings increasingly compete with useful evidence.
 
-AutoTerm-SST treats terminology control as an active-inventory and ranking
-problem. RASST uses glossary retrieval to expose out-of-distribution terms to
-the language model, but the retriever and prompt have finite ranking capacity:
-as a universal glossary grows, more irrelevant and conflicting references
-compete for the same evidence budget. AutoTerm adds a cache-like management
-layer above the unchanged retriever. Semantic similarity admits promising
-slices, the current slice receives recency-style pinning, and low-priority
-slices leave the working set when its term budget is full. The motivation is
-not that million-term retrieval is computationally infeasible, but that a small
-active set remains more relevant as the offline catalog expands.
+We introduce \textbf{AutoTerm-SST}, a system demo that moves glossary selection
+from user setup into the streaming loop. Operators register modular topic
+slices offline. During a session, a training-free router compares recent
+generated translation with bilingual slice prototypes and keeps several
+high-scoring slices inside a fixed term budget. Retrieval and language-model
+decoding remain unchanged; AutoTerm only controls which part of the catalog is
+allowed to compete for each prompt. Users neither upload a glossary nor select
+a domain.
 
-The result is an interactive streaming SST workbench rather than a new
-translation model. The framework handles REST/WebSocket transport, session
-lifecycle, and agent routing; agents handle model inference, prompting,
-batching, and retrieval. The live agent uses Qwen3-Omni with vLLM continuous
-batching \citep{kwon2023efficient}, and the web and Electron interfaces expose
-retrieved terms, active glossary status, router decisions, and latency alongside
-translations.
+This design provides a practical expansion path. New topic resources can be
+registered without retraining the translation model or forcing every session
+to search the entire catalog. The demo makes this behavior visible: users see
+the active working set, retrieved term pairs, and terminology-highlighted
+translation while audio is streaming.
 
 Our contributions are:
 \begin{itemize}
-    \item We build AutoTerm-SST, a pluggable streaming SST demo with a live
-    evidence panel for retrieved terminology, active glossary state, router
-    decisions, and latency.
-    \item We introduce zero session-time terminology setup: users neither
-    upload a glossary nor select a domain, while a training-free, budgeted
-    active-slice cache keeps multiple plausible topic glossaries available.
-    \item On a complete ten-talk stream, we compare the working set with nested
-    100k/1M merged glossaries and a known-domain reference, alongside retrieval
-    scale and 32-session concurrent serving.
+    \item We present a zero-session-setup terminology-aware SST system built on
+    RASST, with a live interface for inspecting active glossaries and retrieved
+    evidence.
+    \item We introduce a training-free, budgeted multi-slice memory that uses
+    recent streaming translation context instead of user-provided domain
+    metadata.
+    \item On a ten-talk ACL/medicine stream, we show the complete systems
+    progression from no RAG, to known-domain and automatic working sets, to
+    100k and 1M universal glossaries; we also verify 32-session real-time
+    serving.
 \end{itemize}

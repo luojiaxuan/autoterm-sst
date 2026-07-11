@@ -1,59 +1,38 @@
 \section{System Overview}
 \label{sec:system}
 
-AutoTerm-SST uses a thin framework with swappable translation agents, while its
-main system contribution is the adaptive terminology loop inside the live agent
-(Figure~\ref{fig:architecture}). The framework serves the web UI, accepts REST
-control requests, streams audio over WebSockets, tracks session lifecycle, and
-routes each session by \texttt{agent\_type}; it does not own model prompts,
-retrieval, batching, KV cache, or terminology resources. For chunk \(t\), the
-agent retrieves from the current budgeted working set before decoding. The
-generated translation may update that working set for a later chunk, no earlier
-than \(t+1\), but
-never changes the prompt already used for chunk \(t\).
+AutoTerm-SST wraps the RASST speech encoder, MaxSim term retriever, and
+Qwen3-Omni language model with an adaptive terminology loop
+(Figure~\ref{fig:architecture}). For chunk $t$, the speech encoder produces
+$h_t$ and the retriever searches only the current working set. At most ten
+source--target term pairs are placed in the language-model prompt. After
+decoding, the new translation is appended to a short context window and may
+change the working set for a later chunk.
 
 \begin{figure*}[t]
 \centering
 \includegraphics[width=0.98\textwidth]{autoterm_architecture.pdf}
-\caption{AutoTerm-SST on a stream that moves from NLP to medicine. Each
-speech chunk is encoded by the RASST backbone, and at most 10 bilingual term
-    pairs retrieved from the \emph{active slices} are injected into the
-language-model prompt. Sliding-window translation context ranks bilingual
-slice prototypes under a fixed term budget, so \emph{SRL} is served from the
-NLP glossary early and \emph{rectal cancer} from the medicine glossary later.
-The working set may hold several slices; the ellipsis denotes additional
-registered glossaries.}
+\caption{AutoTerm-SST as a stream moves from NLP to medicine. Recent
+translation context selects several glossary slices under a fixed term budget;
+RASST retrieves prompt evidence only from this working set. The ellipsis
+denotes additional registered topic slices.}
 \label{fig:architecture}
 \end{figure*}
 
-\paragraph{Agent contract.}
-Agents implement a small contract: \texttt{open\_session},
-\texttt{submit\_audio}, \texttt{on\_control}, \texttt{close\_session},
-\texttt{describe}, and \texttt{health}. The same UI and wire protocol support a
-deterministic mock agent for development, a legacy InfiniSST scheduler agent
-\citep{ouyang2025infinisst}, or the AutoTerm-SST live agent built on
-RASST/Qwen3-Omni \citep{luo2026rasst}. The boundary is
-backend-agnostic: the live demo uses in-process vLLM \citep{kwon2023efficient},
-and the same protocol can serve external SGLang-compatible backends
-\citep{zheng2024sglang} without changing the terminology memory, router, or
-UI.
+The adaptive step is outside the translation model. It neither changes the
+speech representation nor grants the retriever a larger candidate budget.
+Instead, it decides which prebuilt indexes share that budget. This separation
+keeps the system pluggable: the same streaming protocol can serve a no-RAG
+agent, a fixed-glossary RASST agent, or AutoTerm, while the web interface
+receives structured evidence with every partial translation.
 
-\paragraph{Streaming agent.}
-For each audio chunk, the OmniAgent scores the accumulated target-text window
-against offline bilingual slice prototypes. It selects the highest-similarity
-slices that fit the active-term budget, then runs MaxSim retrieval across that
-working set. The agent filters and jointly reranks candidates, caps prompt
-references at 10, and lets
-the PromptBuilder format the \texttt{term\_map} before calling the in-process
-vLLM backend. After decoding, \(y_t\) is appended to the target history for a
-later routing tick. The agent emits partial translations and
-structured metadata, including retrieved terms, retrieval latency, active
-slices, prompt-reference counts, and router decisions.
+AutoTerm enforces three invariants: the live request contains no domain or
+glossary; catalog growth cannot increase per-chunk retrieval or prompt budgets;
+and a new topic is an offline data update, not model training. All policies
+therefore share the speech model, retriever, decoder, and streaming schedule,
+and differ only in which terminology indexes are eligible.
 
-\paragraph{Evidence protocol.}
-The default WebSocket output remains plain text for backward compatibility. A
-JSON mode returns \texttt{\{type, text, meta\}}, where
-\texttt{meta.references} drives the live evidence panel and
-\texttt{meta.topic} and \texttt{meta.topic\_router} describe the adaptive
-glossary state. This evidence protocol lets users see which terms were retrieved
-and whether the router stayed, switched, or deferred.
+The live agent emits the translated text together with retrieved term pairs,
+their source slices, retrieval latency, and the current working-set state.
+These fields drive the evidence panel in Section~\ref{sec:demo-interface} and
+make terminology behavior observable rather than hidden inside a prompt.

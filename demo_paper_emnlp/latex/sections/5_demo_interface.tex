@@ -1,63 +1,50 @@
 \section{Demo Interface}
 \label{sec:demo-interface}
 
-The demo is designed for three audiences: researchers inspecting terminology
-errors in streaming SST, lecture or conference participants who do not want to
-prepare glossaries, and developers testing new speech translation agents behind a
-stable protocol. The same interface can run in mock mode without a GPU or in
-live GPU mode with Qwen3-Omni and MaxSim retrieval.
+The demo begins like an ordinary streaming translator: the user selects a
+language pair and starts a microphone or file stream. In AutoTerm mode there is
+no glossary upload or domain selector. The system starts with a small working
+set and updates it as translation context accumulates.
+
+\paragraph{Walkthrough.}
+The page first shows live partials while context accumulates. The working-set
+badge then updates to the most similar slices, and retrieved pairs appear beside
+the partial that used them. After a topic change, old and new slices can briefly
+coexist until the sliding context reflects the new subject. The user changes no
+control throughout this progression.
 
 \begin{figure*}[t]
   \centering
   \includegraphics[width=0.72\textwidth]{ui_evidence_panel.png}
-  \caption{Web UI during a live En$\rightarrow$Zh session, moments after the
-  automatic transition to a medicine-focused working set. The translucent panel renders the
-  JSON evidence stream over the settings card: retrieved term pairs with
-  retrieval scores and their source slice (here
-  \texttt{auto:medicine\_core\_10k}),
-  per-chunk retrieval latency, and the streaming translation with retrieved
-  terminology hits highlighted inline. The latency multiplier was changed
-  live mid-session (status chip).}
+  \caption{The live En$\rightarrow$Zh interface after an automatic transition
+  to medicine. Retrieved term pairs, source slices, and translation highlights
+  expose the evidence used for each partial output.}
   \label{fig:ui}
 \end{figure*}
 
-\paragraph{Live controls.}
-Users choose a model agent, language pair, latency multiplier, and terminology
-mode. In \texttt{auto\_working} mode, the session starts from a configured
-default slice without requiring the user to identify the domain, and it may
-activate other domain slices within its working-set budget; every chunk uses
-the same top-10 prompt cap.
-The hosted demo currently exposes lightly curated NLP and medicine glossaries
-(generic single-word entries removed and session proper nouns added). The
-stress evaluation uses its own frozen ten-slice registry and unmodified
-inventories, so the hosted UI resources are not used to construct
-Table~\ref{tab:quality}.
-Manual presets and ad-hoc term overrides remain available as advanced options;
-they affect the prompt but do not bias the router.
+\paragraph{Visible terminology evidence.}
+The interface highlights retrieved terminology in the translation and lists
+the corresponding source--target mappings. A compact status row shows the
+active slices, term count, and retrieval latency. Thus a viewer can tell
+whether a mistranslation came from missing retrieval evidence, an irrelevant
+slice, or language-model decoding.
 
-\paragraph{Evidence panel.}
-For each partial translation, the UI renders the latest non-empty retrieved
-references as term-translation pairs with scores and source labels. A status
-line reports active memory backend, term count, and retrieval/generation
-latency; the adaptive row adds mode, inferred topic, confidence, active
-glossaries, switch count, and router action. This makes terminology behavior
-visible rather than hidden inside the model prompt.
+\paragraph{Extensibility.}
+Operators register or replace topic slices offline; users see the benefit in
+the next session without model training or UI changes. Fixed-glossary presets
+and ad-hoc term overrides remain available for expert users, but they are not
+needed for the zero-setup workflow.
 
-\paragraph{Packaging.}
-The repository includes a mock-friendly launcher for UI/protocol development
-and a GPU launcher for the live AutoTerm-SST agent built on RASST. Mock mode exercises the
-same REST/WebSocket flow and JSON evidence protocol, enabling reviewers to test
-the demo without model weights or GPUs. The live demo additionally uses a
-resident vLLM engine, a dedicated retriever GPU, and an optional public tunnel.
+Registration validates term pairs, builds an independent index, and adds one
+manifest entry. Existing sessions retain their current snapshot, while new
+sessions immediately see the updated candidate set. Thus an organization can
+grow or revise its catalog without restarting the translation service or
+rewriting the client application.
 
-\paragraph{Availability and licensing.}
-The demo code is released under the MIT license on the
-\href{https://github.com/luojiaxuan/autoterm-sst}{GitHub
-repository}. A source checkout is the downloadable package; in mock mode, it
-starts the same UI and protocol without GPUs. Live Qwen3-Omni mode
-requires A6000-class GPUs and the external RASST retriever checkpoint; model
-weights and Wikidata/Wikipedia-derived terminology resources retain their
-upstream licenses. The hosted demo is reachable through a stable entry
-page.\footnote{Live demo: \url{https://luojiaxuan.github.io/autoterm-sst/};
-screencast video:
-\url{https://github.com/luojiaxuan/autoterm-sst/blob/main/docs/demo\_screencast.mp4}.}
+\paragraph{Availability.}
+The MIT-licensed implementation, reviewer-friendly launcher, and screencast are
+available in the
+\href{https://github.com/luojiaxuan/autoterm-sst}{GitHub repository}. The
+hosted entry page is
+\url{https://luojiaxuan.github.io/autoterm-sst/}; live mode uses Qwen3-Omni
+with vLLM continuous batching and the RASST retriever.

@@ -1,93 +1,161 @@
 \section{Evaluation}
 \label{sec:evaluation}
 
-\paragraph{Setup.}
-We stream five complete ACL talks and five medicine talks through one
-alternating session (16,848.115 seconds). The En$\rightarrow$Zh agent uses
-Qwen3-Omni and the RASST MaxSim retriever; every policy runs in an independent
-single-GPU worker with the same model, retriever, and decoding configuration.
-We compare four terminology policies.
-\emph{Known-domain-1k} activates the matching 1k slice from the known talk domain
-and is a reference policy that requires domain metadata. \emph{AutoTerm-1k$\times$4}
-requires no session-time setup and activates at most four 1k slices from the
-recent four-chunk translation context. \emph{Merged-100k} and \emph{Merged-1M}
-search one universal glossary; 100k is a strict prefix of 1M. All policies use
-the same 1.92s chunks, 100 total retrieval candidates, score threshold 0.78,
-top-10 prompt cap, and 8,776 decoder windows.
-
-\paragraph{Metrics.}
-The gold builder yields 2,551 raw annotation rows. We collapse only source
-aliases with the same exact audio span and identical target variants, leaving
-a fixed set of 2,047 spoken occurrences (1,368 ACL and 679 medicine); nested terms,
-different target variants, and domain-dependent translations remain separate.
-Each occurrence is matched one-to-one to a target variant within a
-$[-2,+30]$s output window. We also report BLEU, BLEU after masking a curated
-technical inventory (T-MBLEU), and BLEU after masking the full raw term
-inventory (R-MBLEU). Strict prompt precision is the fraction of injected
-references whose source term overlaps a raw gold occurrence in that chunk's
-local retrieval window; Refs is the mean number of injected references per
-chunk. The scorer requires byte-identical playlists and exact equality of every
-persisted decoder window across conditions.
-
-\begin{figure*}[t]
-  \centering
-  \includegraphics[width=0.92\textwidth]{routing_timeline_10talk.png}
-  \caption{Budgeted routing on the same full ten-talk stream. The rows show the
-  true talk domain, the pinned active slice, and whether the correct domain
-  slice remains inside the four-slice working set. The pinned label has 88.5\%
-  domain agreement and makes transient excursions, but the correct slice is
-  available in 96.9\% of decoder windows and is admitted within 29.5s at every
-  domain boundary.}
-  \label{fig:routing}
-\end{figure*}
-
 \begin{table*}[t]
 \centering
-\small
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{llrrrrrr}
+\footnotesize
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{llrrrrrrrr}
 \toprule
-Setting & Session setup & Active terms & TERM\_ACC & BLEU & R-MBLEU & Prompt prec. & Refs \\
+Setting & Input & Active & \multicolumn{3}{c}{TERM\_ACC (\%)} & BLEU & MT-BLEU & Prec. (\%) & Refs \\
+\cmidrule(lr){4-6}
+& & & NLP & Med. & All & & & & \\
 \midrule
-Known-domain-1k & Select domain & 1k & 0.881 & \textbf{58.50} & \textbf{56.05} & \textbf{0.487} & \textbf{0.69} \\
-AutoTerm-1k$\times$4 & None & $\leq$4k & \textbf{0.883} & 58.41 & 55.98 & 0.348 & 0.94 \\
-Merged-100k & None & 100k & 0.878 & 57.34 & 54.80 & 0.068 & 4.96 \\
-Merged-1M & None & 1M & 0.844 & 56.30 & 53.63 & 0.034 & 8.70 \\
+InfiniSST (no RAG) & None & 0 & 50.2 & 52.9 & 51.1 & 39.26 & 36.70 & 0.0 & 0.00 \\
+Known-domain-1k & Domain & 1k & 88.8 & \textbf{86.6} & 88.1 & \textbf{45.19} & \textbf{42.39} & \textbf{48.7} & \textbf{0.69} \\
+AutoTerm-1k$\times$4 & None & $\leq$4k & 89.3 & 86.3 & \textbf{88.3} & 45.09 & 42.28 & 34.8 & 0.94 \\
+Merged-100k & None & 100k & \textbf{89.4} & 84.5 & 87.8 & 43.72 & 40.93 & 6.8 & 4.96 \\
+Merged-1M & None & 1M & 87.1 & 78.9 & 84.4 & 42.79 & 39.95 & 3.4 & 8.70 \\
 \bottomrule
-\end{tabular}}
-\caption{Full ten-talk comparison under identical decoder windows and
-retrieval/prompt budgets. TERM\_ACC uses the same 2,047 time-aligned spoken
-occurrences for every row; the merged inventories are strictly nested.}
+\end{tabular}
+\caption{Ten-talk comparison under a fixed retrieval/prompt budget. BLEU and
+MT-BLEU use StreamLAAL-compatible mWER resegmentation. TERM\_ACC uses the same
+2,047 raw-term occurrences for every row (1,368 NLP; 679 medicine). Prec. is
+prompt precision. No RAG injects no references, so its prompt quantities are
+zero.}
 \label{tab:quality}
 \end{table*}
 
-\paragraph{Active-budget comparison.}
-Table~\ref{tab:quality} shows that AutoTerm matches the known-domain reference:
-their TERM\_ACC differs by only 0.24 points (1,808 vs. 1,803 hits), while the
-known-domain BLEU is 0.09 higher. AutoTerm also outperforms Merged-100k by
-0.54 TERM\_ACC points, 1.07 BLEU, 1.18 T-MBLEU, and 1.18 R-MBLEU. Its prompt
-precision is 34.78\% versus 6.85\%, with 0.94 rather than 4.96 references per
-chunk. At 1M, the gaps grow to 3.91 TERM\_ACC points (1,808 vs. 1,728 hits),
-2.11 BLEU, 2.31 T-MBLEU, and 2.35 R-MBLEU. Prompt precision falls to 3.44\%
-and references per chunk rise to 8.70. The
-million-entry baseline is not computationally unusable; under a fixed top-10
-evidence budget, irrelevant and conflicting candidates crowd the prompt.
-AutoTerm keeps a small multi-slice working set while leaving the broad catalog
-offline.
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.96\textwidth]{routing_timeline_10talk.png}
+  \caption{AutoTerm routing across ten alternating talks. The selected slice
+  may briefly lag a topic change, but the correct glossary remains available
+  inside the four-slice working set for 96.9\% of decoder windows. Talk widths
+  are normalized for readability.}
+  \label{fig:routing}
+\end{figure*}
 
-Figure~\ref{fig:routing} shows why hard top-1 routing accuracy understates the
-working set: several slices keep the correct inventory available while the
-pinned label catches up.
+\paragraph{Setup.}
+We stream five complete ACL talks and five medicine talks through one
+alternating En$\rightarrow$Zh session (approximately 4.7 hours). All
+terminology policies use 1.92s chunks, Qwen3-Omni, the same MaxSim retriever,
+100 retrieval candidates, score threshold 0.78, and at most ten prompt
+references. We compare:
+\emph{InfiniSST (no RAG)}, historical no-retrieval outputs on the same talks at
+the same chunk size \citep{ouyang2025infinisst};
+\emph{Known-domain-1k}, which requires the talk domain;
+\emph{AutoTerm-1k$\times$4}, which requires no session input; and
+\emph{Merged-100k/1M}, two nested universal glossaries.
 
-Appendix~\ref{app:sweep} shows why 1M is the relevant stress point: a controlled
-ACL sweep remains stable through 100k while retrieval precision falls as
-distractors grow. Appendix~\ref{app:mixed} gives construction details, the
-full scorecard, and examples of top-10 crowding and domain-dependent translation
-conflicts.
+The ten registered AutoTerm slices contain 1k entries each. The merged
+baselines combine the same target-bearing resources with distractors to exactly
+100k and 1M mappings; 100k is a strict prefix of 1M. Exact duplicate pairs are
+removed, but conflicting domain-dependent translations are retained. Router
+settings were selected on four development windows before the complete run.
+Because the registered NLP and medicine slices include benchmark terminology,
+this is a controlled routing and retrieval-competition evaluation, not a
+held-out glossary-induction test.
+
+\paragraph{Comparison provenance.}
+The no-RAG row reuses the public InfiniSST hypotheses released with RASST for
+these exact ten talks and the matching 1.92s policy; it does not require another
+model run. We resegment those hypotheses against the same references and
+rescore all 2,047 term occurrences used by the RAG conditions. The other four
+rows come from one audited run per policy with identical audio order and chunk
+boundaries. Corpus BLEU is computed after pooling the resegmented sentences,
+rather than by averaging the ACL and medicine BLEU scores.
+
+\paragraph{Metrics.}
+\textbf{TERM\_ACC} uses one fixed set of 2,047 time-aligned occurrences from
+the raw ACL tagged glossary and medicine hard/raw glossary. Exact-span source
+aliases with identical target variants are one spoken occurrence; nested terms
+and different translations remain separate. Every condition, including no
+RAG, is rescored against this same denominator.
+\textbf{BLEU} follows the RASST/StreamLAAL pipeline: each talk hypothesis is
+resegmented to reference sentences with mWERSegmenter before corpus
+sacreBLEU. \textbf{MT-BLEU} applies the same pipeline after masking target
+translations from the corresponding corpus's raw glossary. Prompt precision is
+the fraction of injected references that overlap a local raw-term occurrence;
+Refs is the mean number of references injected per chunk. The masking inventory
+is the full raw tagged set, not a curated subset used for interface highlights;
+we do not report a second filtered masked-BLEU variant.
+
+\paragraph{From no RAG to an adaptive working set.}
+Table~\ref{tab:quality} answers three systems questions. First, terminology
+retrieval matters: AutoTerm improves TERM\_ACC from 51.1\% without RAG to
+88.3\%, while BLEU rises by 5.83. Second, automatic routing removes setup at
+negligible quality cost. AutoTerm is within 0.24 TERM\_ACC points and 0.11
+BLEU/MT-BLEU of the known-domain reference, despite receiving no domain input.
+Third, a universal glossary is usable at 100k but degrades as it grows. Relative
+to Merged-100k, AutoTerm gains 1.37 BLEU and provides much cleaner evidence
+(34.8\% vs. 6.8\% prompt precision). At 1M, its advantage grows to 3.91
+TERM\_ACC points and 2.30 BLEU, while the merged baseline fills nearly the
+entire top-10 prompt with low-precision references.
+
+\paragraph{Where does the scale loss occur?}
+The domain columns in Table~\ref{tab:quality} prevent the aggregate result from
+hiding a useful qualification. Merged-100k is still competitive on NLP and loses only 1.8
+points to AutoTerm on medicine. At 1M, however, the medicine gap expands to 7.4
+points and an NLP gap also appears. Thus the result does not claim that every
+large index immediately fails. It shows that, under fixed retrieval and prompt
+capacity, the universal strategy becomes increasingly sensitive to the term
+distribution and ambiguity of each domain; a compact routed working set avoids
+that exposure.
+
+\paragraph{Why does translation quality move?}
+Prompt evidence exposes the mechanism behind the aggregate scores. AutoTerm
+injects fewer than one reference per chunk on average at 34.8\% precision.
+Merged-100k injects 4.96 at 6.8\%, and Merged-1M injects 8.70 at only 3.4\%.
+Under the same threshold, the larger indexes fill a fixed prompt with more
+low-value mappings. MT-BLEU masks the evaluated term translations, yet AutoTerm
+still leads Merged-1M by 2.33 points; irrelevant evidence therefore affects
+surrounding translation, not only tagged terms. Prompt precision exposes the
+mechanism, while TERM\_ACC and MT-BLEU measure its consequences.
+
+\paragraph{Routing behavior.}
+Figure~\ref{fig:routing} illustrates why AutoTerm uses a multi-slice working
+set rather than a hard top-1 router. Transient top-slice errors occur around
+topic boundaries, yet another active slice usually preserves the correct
+terminology inventory. This limits the cost of delayed topic evidence in the
+generated translation context.
+
+\paragraph{Observed failure modes.}
+After one ACL-to-medicine boundary, the accumulated context retained the old
+topic for several chunks, so the medicine slice was temporarily absent before
+entering the four-slice working set. Lexical ambiguity creates a second error
+mode. In a medicine segment discussing scientific papers, Merged-1M supplied
+both the Chinese mapping for a scholarly article and an incompatible mapping
+for physical paper, whereas AutoTerm retained only the context-appropriate
+first sense. The example illustrates that routing reduces, rather than
+eliminates, ambiguous prompt evidence.
+
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{rrrr}
+\toprule
+Sessions & p50 (ms) & p95 (ms) & p95/stride \\
+\midrule
+8  & 482 & 805 & 0.42 \\
+16 & 420 & 826 & 0.43 \\
+24 & 471 & 894 & 0.47 \\
+32 & 519 & 820 & 0.43 \\
+\bottomrule
+\end{tabular}
+\caption{End-to-end WebSocket serving on 2$\times$A6000 (TP=2). The
+service-time/1.92s-stride ratio stays below 0.5 through 32 sessions.}
+\label{tab:serving}
+\end{table}
 
 \paragraph{Concurrent serving.}
-A single live session runs in real time (median first-output latency 0.35s).
-With vLLM continuous batching on 2$\times$A6000 (TP=2), 32 concurrent sessions
-stay real-time: 95th-percentile per-segment latency holds near 0.82s
-(8--32 sessions), below the 1.92s stride. These serving numbers characterize
-the hosted system and are separate from the terminology-policy comparison.
+The hosted backend uses vLLM continuous batching. In an end-to-end real-time
+feed through the framework and WebSocket protocol, each client sends audio at
+the 1.92s input cadence and all 32 sessions complete without failure. The test
+includes scheduler admission, model generation, and WebSocket delivery; its
+generation p95 remains 0.82s at 32 sessions, or 0.43 of the input stride
+(Table~\ref{tab:serving}). The nearly flat p95 from 8 to 32 clients is the
+expected continuous-batching behavior. We report this directly measured
+service-time ratio rather than inferring an end-to-end real-time factor from
+engine-only throughput.

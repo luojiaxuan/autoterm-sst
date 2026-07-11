@@ -36,14 +36,17 @@ from eval.streaming_sst.score_prompt_precision import (  # noqa: E402
 from eval.streaming_sst.score_terms import compute_bleu_scores  # noqa: E402
 from eval.streaming_sst.score_time_aligned_terms import TimedOccurrence  # noqa: E402
 from eval.streaming_sst.selected_window_smoke import (  # noqa: E402
+    ALIAS_DEDUP_RULE_ID as SELECTED_WINDOW_ALIAS_DEDUP_RULE_ID,
+    EXPECTED_RAW_ANNOTATION_ROWS as SELECTED_WINDOW_RAW_ANNOTATION_ROWS,
     EXPECTED_RAW_DENOMINATOR as SELECTED_WINDOW_RAW_DENOMINATOR,
+    EXPECTED_RAW_GOLD_SHA256 as SELECTED_WINDOW_RAW_GOLD_SHA256,
     PROTOCOL_ID as SELECTED_WINDOW_PROTOCOL_ID,
     protocol_manifest as selected_window_protocol_manifest,
     validate_payload as validate_selected_window_payload,
 )
 
 RUN_ROLES = ("oracle", "autoterm", "merged")
-SCHEMA_VERSION = "autoterm_story_scorecard.v1"
+SCHEMA_VERSION = "autoterm_story_scorecard.v2"
 HEADLINE_GOLD_KEY = "raw_plus_medicine"
 TECHNICAL_GOLD_KEY = "technical_plus_medicine"
 
@@ -67,9 +70,11 @@ def _occurrence_fingerprint(occurrences: Sequence[TimedOccurrence]) -> str:
             "domain": occurrence.domain,
             "block_index": occurrence.block_index,
             "term": occurrence.term,
+            "source_aliases": list(occurrence.source_aliases),
             "variants": list(occurrence.variants),
             "t_start": occurrence.t_start,
             "t_end": occurrence.t_end,
+            "raw_annotation_rows": occurrence.raw_annotation_rows,
         }
         for occurrence in occurrences
     ]
@@ -82,6 +87,7 @@ def _gold_summary(occurrences: Sequence[TimedOccurrence]) -> Dict[str, Any]:
         domains[occurrence.domain] = domains.get(occurrence.domain, 0) + 1
     return {
         "gold_occurrences": len(occurrences),
+        "raw_annotation_rows": mfa_term_scorer.raw_annotation_count(occurrences),
         "by_domain": dict(sorted(domains.items())),
         "sha256": _occurrence_fingerprint(occurrences),
     }
@@ -249,11 +255,16 @@ def assemble_scorecard(
         raise ValueError(
             f"gold_sets must contain {TECHNICAL_GOLD_KEY!r} and {HEADLINE_GOLD_KEY!r}"
         )
-    technical_gold = list(gold_sets[TECHNICAL_GOLD_KEY])
-    raw_gold = list(gold_sets[HEADLINE_GOLD_KEY])
+    technical_gold = mfa_term_scorer.deduplicate_alias_occurrences(
+        gold_sets[TECHNICAL_GOLD_KEY]
+    )
+    raw_gold = mfa_term_scorer.deduplicate_alias_occurrences(
+        gold_sets[HEADLINE_GOLD_KEY]
+    )
     if not raw_gold:
         raise ValueError("raw_plus_medicine MFA denominator is empty")
     raw_denominator = len(raw_gold)
+    raw_annotation_rows = mfa_term_scorer.raw_annotation_count(raw_gold)
     if expected_raw_denominator is not None and raw_denominator != expected_raw_denominator:
         raise ValueError(
             f"raw_plus_medicine MFA denominator is {raw_denominator}, "
@@ -284,8 +295,15 @@ def assemble_scorecard(
                 "matching": "time-local greedy one-to-one output occurrence matching",
                 "pre_s": mfa_term_scorer.PRE_S,
                 "post_s": float(post_s),
+                "raw_annotation_rows": raw_annotation_rows,
                 "fixed_denominator": raw_denominator,
                 "gold_sha256": _occurrence_fingerprint(raw_gold),
+                "alias_deduplication": {
+                    "rule_id": mfa_term_scorer.ALIAS_DEDUP_RULE_ID,
+                    "rule": mfa_term_scorer.ALIAS_DEDUP_RULE,
+                    "denominator": raw_denominator,
+                    "fingerprint_sha256": _occurrence_fingerprint(raw_gold),
+                },
                 "expected_denominator_assertion": expected_raw_denominator,
             },
             "quality": {
@@ -297,6 +315,10 @@ def assemble_scorecard(
                 "scorer": "score_prompt_precision.score_payload",
                 "strict_complete_reference_capture": True,
                 "time_local": True,
+                "gold_source_annotations": (
+                    "all pre-dedup source terms, retained as aliases on deduplicated occurrences"
+                ),
+                "raw_annotation_rows": raw_annotation_rows,
                 "lookback_s": float(prompt_lookback_s),
                 "alignment_tolerance_s": float(prompt_alignment_tolerance_s),
             },
@@ -321,6 +343,21 @@ def assemble_scorecard(
         "runs": {},
     }
     if selected_window_smoke:
+        if raw_annotation_rows != SELECTED_WINDOW_RAW_ANNOTATION_ROWS:
+            raise ValueError(
+                f"selected-window protocol has {raw_annotation_rows} raw annotation rows, "
+                f"expected {SELECTED_WINDOW_RAW_ANNOTATION_ROWS}"
+            )
+        if mfa_term_scorer.ALIAS_DEDUP_RULE_ID != SELECTED_WINDOW_ALIAS_DEDUP_RULE_ID:
+            raise ValueError(
+                "selected-window protocol alias-dedup rule does not match the active scorer"
+            )
+        actual_gold_sha256 = _occurrence_fingerprint(raw_gold)
+        if actual_gold_sha256 != SELECTED_WINDOW_RAW_GOLD_SHA256:
+            raise ValueError(
+                f"selected-window gold SHA-256 is {actual_gold_sha256}, "
+                f"expected {SELECTED_WINDOW_RAW_GOLD_SHA256}"
+            )
         report["protocol"]["selected_window_smoke"] = selected_window_protocol_manifest()
 
     original_post_s = mfa_term_scorer.POST_S
@@ -368,6 +405,8 @@ def assemble_scorecard(
                     "reference_count_mismatch_chunks": prompt["reference_count_mismatch_chunks"],
                     "raw_relevant_references": prompt[HEADLINE_GOLD_KEY]["relevant_references"],
                     "technical_relevant_references": prompt[TECHNICAL_GOLD_KEY]["relevant_references"],
+                    "raw_gold_annotation_rows": prompt[HEADLINE_GOLD_KEY]["raw_annotation_rows"],
+                    "technical_gold_annotation_rows": prompt[TECHNICAL_GOLD_KEY]["raw_annotation_rows"],
                 },
                 "timing_signature_sha256": timing_signature_sha256(payload),
             }
@@ -442,8 +481,10 @@ def markdown_report(report: Mapping[str, Any]) -> str:
         "",
         "**Headline TERM_ACC uses only MFA time-aligned `raw_plus_medicine` occurrences.**",
         "",
-        f"- Fixed TERM_ACC denominator: `{term_protocol['fixed_denominator']}` "
+        f"- Raw annotation rows: `{term_protocol['raw_annotation_rows']}`; "
+        f"exact-span alias-dedup TERM_ACC denominator: `{term_protocol['fixed_denominator']}` "
         f"(gold SHA-256: `{term_protocol['gold_sha256']}`).",
+        f"- Alias-dedup rule: {term_protocol['alias_deduplication']['rule']}.",
         *timing_lines,
         "- Excluded and not computed: legacy 419-denominator TERM_ACC and block-level count-clipping TERM_ACC.",
         "- Prompt precision is strict and time-local; captured references must exactly match the decoder prompt count.",

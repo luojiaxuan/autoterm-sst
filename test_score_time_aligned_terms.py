@@ -10,11 +10,46 @@ from unittest.mock import patch
 from eval.streaming_sst.score_time_aligned_terms import (
     TimedOccurrence,
     build_timed_gold,
+    deduplicate_alias_occurrences,
+    raw_annotation_count,
     score_run,
 )
 
 
 class TimeAlignedTermScorerTests(unittest.TestCase):
+    def test_exact_span_same_target_aliases_are_one_headline_occurrence(self) -> None:
+        annotations = [
+            TimedOccurrence("nlp", 1, "model", ["MODEL"], 1.0, 1.4),
+            TimedOccurrence("nlp", 1, "ｍｏｄｅｌｓ", [" ＭＯＤＥＬ "], 1.0, 1.4),
+        ]
+
+        deduplicated = deduplicate_alias_occurrences(annotations)
+
+        self.assertEqual(len(deduplicated), 1)
+        self.assertEqual(deduplicated[0].term, "model")
+        self.assertEqual(tuple(deduplicated[0].source_aliases), ("models",))
+        self.assertEqual(deduplicated[0].raw_annotation_rows, 2)
+        self.assertEqual(raw_annotation_count(deduplicated), 2)
+
+    def test_same_span_different_target_variants_remain_distinct(self) -> None:
+        annotations = [
+            TimedOccurrence("nlp", 1, "model", ["模型"], 1.0, 1.4),
+            TimedOccurrence("nlp", 1, "models", ["模特"], 1.0, 1.4),
+        ]
+
+        deduplicated = deduplicate_alias_occurrences(annotations)
+
+        self.assertEqual(len(deduplicated), 2)
+        self.assertEqual(raw_annotation_count(deduplicated), 2)
+
+    def test_alias_dedup_requires_exact_audio_span(self) -> None:
+        annotations = [
+            TimedOccurrence("nlp", 1, "model", ["模型"], 1.0, 1.4),
+            TimedOccurrence("nlp", 1, "models", ["模型"], 1.0, 1.400001),
+        ]
+
+        self.assertEqual(len(deduplicate_alias_occurrences(annotations)), 2)
+
     def test_selected_acl_window_filters_and_rebases_played_times(self) -> None:
         payload = {
             "blocks": [
@@ -153,6 +188,29 @@ class TimeAlignedTermScorerTests(unittest.TestCase):
         self.assertEqual(metrics["gold_occurrences"], 2)
         self.assertEqual(metrics["term_acc"], 0.5)
         self.assertEqual(metrics["by_domain"]["medicine"]["hits"], 1)
+
+    def test_score_run_defensively_deduplicates_raw_source_aliases(self) -> None:
+        payload = {
+            "block_spans": [
+                {
+                    "block_index": 1,
+                    "start_sample": 0,
+                    "end_sample": 32000,
+                }
+            ],
+            "records": [{"cursor_samples": 16000, "text": "模型"}],
+        }
+        raw_annotations = [
+            TimedOccurrence("nlp", 1, "model", ["模型"], 0.25, 0.5),
+            TimedOccurrence("nlp", 1, "models", ["模型"], 0.25, 0.5),
+        ]
+
+        metrics = score_run(payload, raw_annotations, "zh")
+
+        self.assertEqual(metrics["hits"], 1)
+        self.assertEqual(metrics["gold_occurrences"], 1)
+        self.assertEqual(metrics["raw_annotation_rows"], 2)
+        self.assertEqual(metrics["term_acc"], 1.0)
 
 
 if __name__ == "__main__":

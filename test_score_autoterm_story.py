@@ -152,16 +152,56 @@ class AutoTermStoryScorecardTests(unittest.TestCase):
         self.assertEqual(excluded["legacy 419-denominator TERM_ACC"], "not computed")
         self.assertEqual(excluded["block-level count-clipping TERM_ACC"], "not computed")
 
+    def test_protocol_records_raw_annotations_and_alias_dedup_identity(self) -> None:
+        self.gold["raw_plus_medicine"][0] = TimedOccurrence(
+            domain="nlp",
+            block_index=1,
+            term="alpha",
+            variants=["术语甲"],
+            t_start=0.5,
+            t_end=0.7,
+            source_aliases=("alphas",),
+            raw_annotation_rows=2,
+        )
+
+        report = self.build()
+
+        protocol = report["protocol"]["headline_term_accuracy"]
+        self.assertEqual(protocol["raw_annotation_rows"], 3)
+        self.assertEqual(protocol["fixed_denominator"], 2)
+        self.assertEqual(protocol["alias_deduplication"]["denominator"], 2)
+        self.assertIn("exact t_start/t_end", protocol["alias_deduplication"]["rule"])
+        self.assertEqual(
+            protocol["alias_deduplication"]["fingerprint_sha256"],
+            protocol["gold_sha256"],
+        )
+        self.assertEqual(report["gold"]["raw_plus_medicine"]["raw_annotation_rows"], 3)
+        self.assertEqual(report["runs"]["oracle"]["prompt"]["raw_gold_annotation_rows"], 3)
+
+    def test_assemble_scorecard_defensively_deduplicates_alias_rows(self) -> None:
+        self.gold["raw_plus_medicine"] = [
+            occurrence("alpha", "术语甲", 0.5),
+            occurrence("alphas", "术语甲", 0.5),
+        ]
+
+        report = self.build(expected=1)
+
+        protocol = report["protocol"]["headline_term_accuracy"]
+        self.assertEqual(protocol["raw_annotation_rows"], 2)
+        self.assertEqual(protocol["fixed_denominator"], 1)
+        self.assertEqual(report["runs"]["oracle"]["headline_term_acc"]["hits"], 1)
+        self.assertEqual(report["runs"]["oracle"]["headline_term_acc"]["term_acc"], 1.0)
+
     def test_rejects_denominator_drift_from_explicit_assertion(self) -> None:
         with self.assertRaisesRegex(ValueError, "denominator is 2, expected 3"):
             self.build(expected=3)
 
-    def test_selected_window_smoke_enforces_protocol_and_fixed_179_denominator(self) -> None:
+    def test_selected_window_smoke_enforces_protocol_and_fixed_142_denominator(self) -> None:
         with self.assertRaisesRegex(ValueError, "selected-window protocol is invalid"):
             self.build(selected_window_smoke=True)
 
         payloads = {role: selected_window_payload() for role in RUN_ROLES}
-        with self.assertRaisesRegex(ValueError, "denominator is 2, expected 179"):
+        with self.assertRaisesRegex(ValueError, "denominator is 2, expected 142"):
             self.build(
                 payloads,
                 expected=None,

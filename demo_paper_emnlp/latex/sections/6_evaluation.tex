@@ -2,107 +2,75 @@
 \label{sec:evaluation}
 
 \paragraph{Setup.}
-We evaluate terminology memory and routing in the live
-AutoTerm-SST system on A6000 GPUs. Its live agent runs Qwen3-Omni with
-in-process vLLM tensor parallelism over two GPUs and the RASST MaxSim retriever
-on a third GPU. Audio is
-from prepared ACL 60/60 English-to-Chinese and medicine segments. Unless
-otherwise stated, results use the JSON WebSocket protocol, which exposes
-translated text, retrieved references, active glossary metadata, and per-chunk
-retrieval latency. A latency multiplier of 2 corresponds to 1.92s input chunks.
-We report three complementary terminology-memory evaluations --- a controlled
-mixed-domain terminology comparison, a warm-retrieval scale sweep, and a
-mixed-domain routing probe --- alongside real-time serving under concurrent load.
+We stream four complete talks through one alternating session:
+ACL~268, medicine~545006, ACL~367, and medicine~606 (5,381.508 seconds in
+total). The live En$\rightarrow$Zh agent uses Qwen3-Omni and the RASST MaxSim
+retriever on one H200 per condition. We compare four terminology policies.
+\emph{Known-domain-2.5k} activates the matching 2.5k slice from the known talk domain
+and is a reference policy that requires domain metadata. \emph{AutoTerm-1k$\times$4}
+requires no session-time setup and activates at most four 1k slices from the
+recent four-chunk translation context. \emph{Merged-100k} and \emph{Merged-1M}
+search one universal glossary; 100k is a strict prefix of 1M. All policies use
+the same 1.92s chunks, 100 total retrieval candidates, score threshold 0.78,
+top-10 prompt cap, and 2,803 decoder windows.
 
 \paragraph{Metrics.}
-For terminology quality, term accuracy is the fraction of annotated target-term
-occurrences translated. Each occurrence is anchored to source-audio seconds by forced alignment and
-counts as a hit only when a distinct target variant appears in the output
-within a $[-2,+30]$\,s window, so repeated occurrences are scored
-independently rather than crediting a talk for one appearance
-(Appendix~\ref{app:mixed}). The controlled comparison contains 1{,}462
-technical occurrences: 780 from ACL and 682 from medicine, the latter spanning
-196 block-local medicine term types. Masked BLEU deletes annotated target-term strings from
-both hypothesis and reference before scoring, and is used only as a
-non-terminology sanity check. For runtime, we report prompt references per
-partial chunk and retrieval-latency percentiles. For routing, we report switch
-latency, wrong switches, and steady-state active-domain accuracy after transition
-grace windows. These metrics do not replace token-delay measures such as
-StreamLAAL \citep{papi2024streamatt}.
+The gold builder yields 1,079 raw annotation rows. We collapse only source
+aliases with the same exact audio span and identical target variants, leaving
+a fixed set of 848 spoken occurrences (615 ACL and 233 medicine); nested terms,
+different target variants, and domain-dependent translations remain separate.
+Each occurrence is matched one-to-one to a target variant within a
+$[-2,+30]$s output window. We also report BLEU, BLEU after masking a curated
+technical inventory (T-MBLEU), and BLEU after masking the full raw term
+inventory (R-MBLEU). Strict prompt precision is the fraction of injected
+references whose source term overlaps a raw gold occurrence in that chunk's
+local retrieval window; Refs is the mean number of injected references per
+chunk. The scorer requires byte-identical playlists and exact equality of every
+persisted decoder window across conditions.
 
-\begin{figure*}[t]
-  \centering
-  \includegraphics[width=0.92\textwidth]{routing_timeline_10talk.png}
-  \caption{Active-slice routing over the ten-talk run of
-  Table~\ref{tab:quality}: nine domain transitions, eleven switches.
-  Vertical lines mark true domain boundaries; chips give the switch delay
-  after each boundary; the amber switch crosses a generic talk opening.}
-  \label{fig:routing}
-\end{figure*}
-
-\begin{table}[t]
+\begin{table*}[t]
 \centering
-\scriptsize
-\resizebox{\columnwidth}{!}{%
-\begin{tabular}{lcrrrr}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llrrrrrr}
 \toprule
-Setting & Session setup & Term acc. & ACL & Med. & BLEU \\
+Setting & Session setup & Active terms & TERM\_ACC & BLEU & R-MBLEU & Prompt prec. & Refs \\
 \midrule
-No memory & None & 0.670 & 0.767 & 0.559 & 58.84 \\
-Fixed NLP & Select NLP & 0.679 & 0.797 & 0.544 & 59.18 \\
-Fixed medicine & Select med. & 0.805 & 0.764 & 0.852 & \textbf{59.63} \\
-Automatic & None & \textbf{0.874} & \textbf{0.890} & \textbf{0.856} & 58.10 \\
+Known-domain-2.5k & Select domain & 2.5k & 0.854 & 53.77 & 50.20 & \textbf{0.394} & \textbf{1.12} \\
+AutoTerm-1k$\times$4 & None & $\leq$4k & 0.853 & \textbf{54.03} & \textbf{50.46} & 0.393 & \textbf{1.12} \\
+Merged-100k & None & 100k & \textbf{0.863} & 53.94 & 50.41 & 0.088 & 5.00 \\
+Merged-1M & None & 1M & 0.830 & 52.12 & 48.59 & 0.044 & 8.79 \\
 \bottomrule
 \end{tabular}}
-\caption{Term accuracy on the ten-talk alternating ACL/medicine stream
-(16{,}848s, one live session; 1{,}462 gold occurrences: 780 ACL + 682 medicine).
-ACL/Med.\ = term accuracy within each domain's talks. Session setup = what
-the user does at session time. Every inventory is a 10k-term union that fully
-covers its own domain's gold terms.}
+\caption{Full four-talk comparison under identical decoder windows and
+retrieval/prompt budgets. TERM\_ACC uses the same 848 time-aligned spoken
+occurrences for every row; the merged inventories are strictly nested.}
 \label{tab:quality}
-\end{table}
+\end{table*}
 
-\paragraph{Controlled terminology comparison.}
-Table~\ref{tab:quality} compares equal-sized domain inventories that fully cover
-the gold terms in their matching domain. It therefore tests whether routing can
-compose domain-specific resources across a stream, rather than evaluating
-open-world terminology mining. Automatic mode reaches 0.874 combined term
-accuracy, exceeding both fixed inventories overall and each domain expert
-within its own domain (ACL 0.890 vs.\ 0.797; medicine 0.856 vs.\ 0.852), at
-a 1--1.5 BLEU cost from switch windows. Appendix~\ref{app:mixed} adds
-raw-gold, type-level, and masked-BLEU detail plus a three-block probe. A five-talk sweep shows stable term accuracy (0.965--0.979) while
-retrieval precision falls 0.48\,$\rightarrow$\,0.14 as distractors grow
-(Appendix~\ref{app:sweep}).
+\paragraph{Active-budget comparison.}
+Table~\ref{tab:quality} shows that AutoTerm matches the known-domain reference:
+their TERM\_ACC differs by only 0.12 points (723 vs. 724 hits), while AutoTerm's
+BLEU is 0.26 higher. Merged-100k is not a failure case: it has the highest
+TERM\_ACC (732 hits), and its BLEU/R-MBLEU remain within 0.09/0.05 of AutoTerm.
+However, it already lowers prompt precision to 8.83\% and increases references
+per chunk to 5.00. At 1M, AutoTerm leads by 2.24 TERM\_ACC points (723 vs. 704
+hits), 1.91 BLEU, 1.90 T-MBLEU, and 1.88 R-MBLEU. Its strict prompt precision
+is 39.29\% versus 4.37\%, with 1.12 rather than 8.79 references per chunk. The
+million-entry baseline is not computationally unusable; under a fixed top-10
+evidence budget, irrelevant and conflicting candidates crowd the prompt.
+AutoTerm keeps a small multi-slice working set while leaving the broad catalog
+offline.
 
-
-\paragraph{Scale and prompt noise.}
-Warm MaxSim retrieval stays near 60--105\,ms (p50--p95) from curated
-glossaries to million-term memories; the scaling costs are cold index loading
-and reference noise rather than per-chunk retrieval, which is why the active
-slice stays compact and broad memories serve as fallback pools
-(Table~\ref{tab:scale}, Appendix~\ref{app:sweep}).
-
-\paragraph{Mixed-domain routing.}
-Figure~\ref{fig:routing} traces active-slice routing across the ten-talk run
-of Table~\ref{tab:quality}: nine correct-direction transitions, one delayed
-switch over a generic talk opening, and one self-correcting 35s transient,
-with the top-10 prompt invariant held throughout
-(Appendix~\ref{app:mixed}). A shorter four-block probe (480s) behaves the
-same way: three switches 17.3--37.4s after the boundaries, zero wrong
-switches, 99.5\% steady-state accuracy.
-A medicine-only session started from the default NLP slice recovers by
-switching to the medicine slice 59.5s into the session with zero wrong
-switches, so the initial slice is a warm start rather than a hidden oracle.
-The speech probe alone is noisy (0.52 top-1 accuracy), so generated-target
-evidence leads routing and the probe acts as a guard. Two 640-window
-state-machine proxy tests, using reference-text windows and controlled probe
-evidence, cover 16 alternating/random transitions with zero wrong switches.
-Inverted- and contested-probe controls expose the expected wrong-switch and
-delayed-switch failure modes. These proxies are separate from the preceding
-end-to-end audio runs.
+Appendix~\ref{app:sweep} shows why 1M is the relevant stress point: a controlled
+ACL sweep remains stable through 100k while retrieval precision falls as
+distractors grow. Appendix~\ref{app:mixed} gives construction details, the
+full scorecard, and examples of top-10 crowding and domain-dependent translation
+conflicts.
 
 \paragraph{Concurrent serving.}
 A single live session runs in real time (median first-output latency 0.35s).
 With vLLM continuous batching on 2$\times$A6000 (TP=2), 32 concurrent sessions
 stay real-time: 95th-percentile per-segment latency holds near 0.82s
-(8--32 sessions), below the 1.92s stride.
+(8--32 sessions), below the 1.92s stride. These serving numbers characterize
+the hosted system and are separate from the terminology-policy comparison.

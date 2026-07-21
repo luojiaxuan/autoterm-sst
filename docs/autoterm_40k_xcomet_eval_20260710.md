@@ -58,7 +58,7 @@ routing error 与 glossary selection，不能把差异全部归因于 glossary s
 ## Source of truth 与 artifact 状态
 
 评分代码：`eval/streaming_sst/score_xcomet_windows.py`；单元测试：
-`test_score_xcomet_windows.py`。
+`tests/test_score_xcomet_windows.py`。
 
 原始 full-run staging：
 

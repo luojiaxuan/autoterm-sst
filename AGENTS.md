@@ -146,7 +146,7 @@ The likely contribution shape is:
 - Web/static frontend: `serve/static/`
 - Electron frontend: `electron/`
 - Old demo paper: `demo_paper_emnlp/latex/`
-- Integration tests: `test_integrated_system.py`, `test_scheduler_system.py`
+- Integration tests: `tests/` (e.g. `tests/test_integrated_system.py`, `tests/test_scheduler_system.py`)
 
 When evaluating submission readiness, inspect both the runnable demo and the
 paper draft. The submission should be judged by what a reviewer can see in the

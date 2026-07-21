@@ -7,7 +7,7 @@
   "scripts": {
     "electron": "electron .",
     "electron-dev": "ELECTRON_IS_DEV=true electron .",
-    "electron-debug": "node start-debug.js",
+    "electron-debug": "node electron/start-debug.js",
     "electron-simple": "ELECTRON_IS_DEV=true electron electron/main-simple.js",
     "build": "electron-builder",
     "dist": "electron-builder --publish=never",

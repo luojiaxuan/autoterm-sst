@@ -114,6 +114,8 @@ scripts/                   # run + smoke + SLURM scripts (see below)
 configs/autoterm_slices.yaml   # default adaptive-router thresholds
 demo_paper_emnlp/          # EMNLP system-demo paper source
 docs/                      # design notes and evaluation reports
+tests/                     # unit + integration suites (run from the repo root)
+legacy/                    # pre-AutoTerm InfiniSST launchers and pages (unused)
 start_demo.sh              # primary framework launcher (mock-friendly)
 ```
 

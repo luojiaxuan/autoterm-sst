@@ -121,7 +121,7 @@ time, substitute the paper's Appendix D table for this beat.)*
 
 ## While recording, also grab the replacement for Figure 2
 
-The paper's Figure 2 (`demo_paper_emnlp/latex/figures/ui_evidence_panel.png`)
+The paper's Figure 2 (`demo_paper_emnlp/latex/figures/ui_evidence_panel.png` (paper sources now in git history))
 is stale — it shows the old `common_terms` diagnostic glossary. During your
 take, once the session has routed to a real domain, take one clean screenshot
 of the evidence panel showing:

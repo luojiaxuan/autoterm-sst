@@ -85,7 +85,7 @@ and remains local staging at
 `/data/autoterm-10talk-budget-20260711/hyper/ten_talk_autoterm1kx4_hyper_redundant_audited.json`.
 Upload to `luojiaxuan/autoterm-sst-10talk-streamlaal-zh` is pending. Figure
 sources and all four run hashes are recorded under
-`demo_paper_emnlp/figures/system_rtf/`.
+`demo_paper_emnlp/figures/system_rtf/` (paper sources now in git history).
 
 ---
 

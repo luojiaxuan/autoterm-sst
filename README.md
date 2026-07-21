@@ -21,7 +21,7 @@ of that internally.
 
 - 📄 Paper: *AutoTerm-SST: Adaptive Terminology Memory with Zero Session-Time
   Setup for Streaming Speech Translation* (EMNLP 2026 System Demonstrations, under review) —
-  source in [`demo_paper_emnlp/`](demo_paper_emnlp/).
+  PDF: [`docs/autoterm_sst_emnlp2026_demo.pdf`](docs/autoterm_sst_emnlp2026_demo.pdf) (LaTeX sources live in git history).
 - 📊 Evaluation source of truth: [ten-talk StreamLAAL audit](https://github.com/luojiaxuan/autoterm-sst/blob/explore/multidomain-routing/docs/autoterm_1m_budget_search_20260711.md)
   and [`docs/system_scaling.md`](docs/system_scaling.md).
 - 🎬 Screencast video: [docs/demo_screencast.mp4](https://github.com/luojiaxuan/autoterm-sst/blob/main/docs/demo_screencast.mp4) (2.5 min).
@@ -112,8 +112,7 @@ electron/                  # desktop client
 eval/streaming_sst/        # terminology / routing / scale eval harnesses
 scripts/                   # run + smoke + SLURM scripts (see below)
 configs/autoterm_slices.yaml   # default adaptive-router thresholds
-demo_paper_emnlp/          # EMNLP system-demo paper source
-docs/                      # design notes and evaluation reports
+docs/                      # design notes, evaluation reports, paper PDF, screencast
 tests/                     # unit + integration suites (run from the repo root)
 legacy/                    # pre-AutoTerm InfiniSST launchers and pages (unused)
 start_demo.sh              # primary framework launcher (mock-friendly)

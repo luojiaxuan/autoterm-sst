@@ -18,7 +18,7 @@ streaming speech translation, not as a generic InfiniSST archive.
 ## Canonical Paths
 
 - Repo root: `/mnt/taurus/home/jiaxuanluo/rasst-demo`
-- Demo paper draft: `/mnt/taurus/home/jiaxuanluo/rasst-demo/demo_paper_emnlp`
+- Demo paper PDF: `docs/autoterm_sst_emnlp2026_demo.pdf` (LaTeX sources in git history)
 - Main RASST reference: `/mnt/data2/jiaxuanluo/RASST`
 - User-expected RASST home path, if later symlinked or moved:
   `/mnt/taurus/home/jiaxuanluo/RASST`
@@ -99,7 +99,7 @@ Do not plan full 30B online GRPO unless the user explicitly changes the scope.
 
 ## Paper Framing
 
-The paper in `demo_paper_emnlp` is a starting point, not a final submission.
+The submitted paper PDF is at `docs/autoterm_sst_emnlp2026_demo.pdf`; its LaTeX sources were removed from the tree after submission and live in git history.
 When revising it:
 
 - update the title away from pure high-throughput InfiniSST scheduling if the
@@ -145,7 +145,6 @@ The likely contribution shape is:
   `agents/infinisst_faster.py`
 - Web/static frontend: `serve/static/`
 - Electron frontend: `electron/`
-- Old demo paper: `demo_paper_emnlp/latex/`
 - Integration tests: `tests/` (e.g. `tests/test_integrated_system.py`, `tests/test_scheduler_system.py`)
 
 When evaluating submission readiness, inspect both the runnable demo and the

@@ -1569,7 +1569,7 @@
                     // The live single-GPU-pair host serves one checkpoint at a time;
                     // explain the greyed options instead of letting them look broken.
                     languagePair.title = anyUnavailable
-                        ? 'The live host loads one language model at a time. Other pairs are evaluated offline (see paper Appendix D).'
+                        ? 'This public host currently serves En->Zh, the pair used for the paper\'s main evaluation and the screencast. En->Ja and En->De run on the same system but are not loaded here.'
                         : '';
                 }
                 if (Array.isArray(config.glossary_presets) && config.glossary_presets.length > 0) {

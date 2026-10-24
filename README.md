@@ -20,13 +20,14 @@ of that internally.
 ## Demo
 
 - 📄 Paper: *AutoTerm-SST: Adaptive Terminology Memory with Zero Session-Time
-  Setup for Streaming Speech Translation* (EMNLP 2026 System Demonstrations, under review) —
-  PDF: [`docs/autoterm_sst_emnlp2026_demo.pdf`](docs/autoterm_sst_emnlp2026_demo.pdf) (LaTeX sources live in git history).
+  Setup for Streaming Speech Translation*, arXiv preprint
+  [arXiv:2610.26865](https://arxiv.org/abs/2610.26865) ([PDF](https://arxiv.org/pdf/2610.26865)).
 - 📊 Evaluation source of truth: [ten-talk StreamLAAL audit](https://github.com/luojiaxuan/autoterm-sst/blob/explore/multidomain-routing/docs/autoterm_1m_budget_search_20260711.md)
   and [`docs/system_scaling.md`](docs/system_scaling.md).
 - 🎬 Screencast video: [docs/demo_screencast.mp4](https://github.com/luojiaxuan/autoterm-sst/blob/main/docs/demo_screencast.mp4) (2.5 min).
 - 🌐 Hosted live demo: <https://luojiaxuan.github.io/autoterm-sst/> (stable
-  entry page; redirects to the current GPU-backed tunnel).
+  entry page; the GPU-backed demo is currently offline, so use the screencast or
+  mock mode below).
 - 🖥️ No GPU? Mock mode below runs the full UI, wire protocol, and JSON evidence
   stream on a laptop with zero model downloads.
 
@@ -389,10 +390,10 @@ respective upstream licenses.
 ## Citation
 
 ```bibtex
-@inproceedings{luo2026autoterm,
-  title  = {{AutoTerm-SST}: Adaptive Terminology Memory with Zero Session-Time Setup for Streaming Speech Translation},
-  author = {Luo, Jiaxuan and Ouyang, Siqi and Xu, Xi and Li, Lei},
-  note   = {Under review, EMNLP 2026 System Demonstrations},
-  year   = {2026}
+@article{luo2026autoterm,
+  title   = {{AutoTerm-SST}: Adaptive Terminology Memory with Zero Session-Time Setup for Streaming Speech Translation},
+  author  = {Luo, Jiaxuan and Ouyang, Siqi and Li, Lei},
+  journal = {arXiv preprint arXiv:2610.26865},
+  year    = {2026}
 }
 ```

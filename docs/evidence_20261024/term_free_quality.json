@@ -1,0 +1,56 @@
+{
+ "term_free_sentences": 935,
+ "sentences": 1905,
+ "by_domain": {
+  "acl": 47,
+  "medicine": 888
+ },
+ "autoterm_vs_merged1m": {
+  "bleu_diff": 2.1947713569967746,
+  "stratified_talk_bootstrap_ci95": [
+   0.6593375494732996,
+   3.4603059254082993
+  ],
+  "talk_permutation_p": 0.0234375,
+  "per_domain_diff": {
+   "acl": 0.19442687853061358,
+   "medicine": 2.2309449632774587
+  }
+ },
+ "autoterm_vs_merged100k": {
+  "bleu_diff": 1.6906276277484196,
+  "stratified_talk_bootstrap_ci95": [
+   1.0761083920157757,
+   2.163647665187784
+  ],
+  "talk_permutation_p": 0.01171875,
+  "per_domain_diff": {
+   "acl": -0.16683019715861036,
+   "medicine": 1.7018285284798438
+  }
+ },
+ "known_vs_merged1m": {
+  "bleu_diff": 2.3078064814987655,
+  "stratified_talk_bootstrap_ci95": [
+   1.0749350656175383,
+   3.3540294879675057
+  ],
+  "talk_permutation_p": 0.015625,
+  "per_domain_diff": {
+   "acl": 2.0294799016816327,
+   "medicine": 2.3507039294377776
+  }
+ },
+ "autoterm_vs_known": {
+  "bleu_diff": -0.11303512450199094,
+  "stratified_talk_bootstrap_ci95": [
+   -0.763878270871207,
+   0.3466830451677549
+  ],
+  "talk_permutation_p": 0.8046875,
+  "per_domain_diff": {
+   "acl": -1.8350530231510191,
+   "medicine": -0.11975896616031889
+  }
+ }
+}

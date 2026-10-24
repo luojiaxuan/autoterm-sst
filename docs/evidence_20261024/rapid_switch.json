@@ -1,0 +1,55 @@
+{
+ "variant": "original",
+ "w": 4,
+ "pieces": 40,
+ "piece=15s": {
+  "chunks_per_piece": 8,
+  "windows": 312,
+  "cover@1": 0.5673,
+  "cover@4": 0.8173,
+  "median_seconds_until_gold_in_top1": 5.76,
+  "pieces_where_gold_never_reaches_top1": 1,
+  "median_seconds_until_gold_in_top4": 1.92,
+  "pieces_where_gold_never_reaches_top4": 0
+ },
+ "piece=30s": {
+  "chunks_per_piece": 16,
+  "windows": 624,
+  "cover@1": 0.6875,
+  "cover@4": 0.8494,
+  "median_seconds_until_gold_in_top1": 5.76,
+  "pieces_where_gold_never_reaches_top1": 0,
+  "median_seconds_until_gold_in_top4": 1.92,
+  "pieces_where_gold_never_reaches_top4": 0
+ },
+ "piece=60s": {
+  "chunks_per_piece": 31,
+  "windows": 1209,
+  "cover@1": 0.7469,
+  "cover@4": 0.8677,
+  "median_seconds_until_gold_in_top1": 5.76,
+  "pieces_where_gold_never_reaches_top1": 0,
+  "median_seconds_until_gold_in_top4": 1.92,
+  "pieces_where_gold_never_reaches_top4": 0
+ },
+ "piece=120s": {
+  "chunks_per_piece": 62,
+  "windows": 2418,
+  "cover@1": 0.7159,
+  "cover@4": 0.8577,
+  "median_seconds_until_gold_in_top1": 5.76,
+  "pieces_where_gold_never_reaches_top1": 0,
+  "median_seconds_until_gold_in_top4": 1.92,
+  "pieces_where_gold_never_reaches_top4": 0
+ },
+ "piece=300s": {
+  "chunks_per_piece": 156,
+  "windows": 6084,
+  "cover@1": 0.7206,
+  "cover@4": 0.8708,
+  "median_seconds_until_gold_in_top1": 5.76,
+  "pieces_where_gold_never_reaches_top1": 0,
+  "median_seconds_until_gold_in_top4": 1.92,
+  "pieces_where_gold_never_reaches_top4": 0
+ }
+}

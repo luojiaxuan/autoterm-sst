@@ -1,0 +1,83 @@
+# 十 talk 正式结果的补充证据(2026-10-24)
+
+本页给 `docs/autoterm_1m_budget_search_20260711.md` 的十 talk 正式 run 补三类证据:配对显著性、无术语句的译文质量、以及路由的 open-loop replay。全部只用已审计的输出,不重新解码。脚本在 `eval/streaming_sst/evidence/`,结果 JSON 在本目录。
+
+## 输入
+
+- 四个 RAG run(Known-domain-1k、AutoTerm-1k×4、Merged-100k、Merged-1M)的 run JSON、bundle 与 `scores/*/segments.jsonl`,来自 Taurus `/mnt/data1/jiaxuanluo/autoterm_streamlaal_20260711/`;AutoTerm run SHA-256 `3b4fbb01c8d120c432f595bd788b950f263da93105c45e5a32ae9caba632b30f`。
+- 术语 gold:`eval/streaming_sst/mfa_alignments`、`acl_gold_technical.json`、`acl6060_tagged_gt_raw_min_norm2.json`、medicine oracle term maps;MT-BLEU 遮罩用 ACL raw glossary 与 `hard_medicine_glossary_raw_llm_judge_manual_zh215_unique212.json`。
+- 复现核对:逐出现打分后四个 run 的命中数为 1803 / 1808 / 1797 / 1728(与正式表一致);重算 MT-BLEU 为 42.39 / 42.28 / 40.93 / 39.95(一致)。
+
+## 1. 配对显著性(`paired_significance.py` → `paired_significance.json`)
+
+主推断以 talk 为单位:精确 talk 级标签互换置换检验(2^10 种组合,每种重算合并指标;10 个 talk 下可达到的最小双侧 p 是 2/1024 ≈ 0.002),以及按领域分层(每次抽 5 个 ACL + 5 个 ESO talk)的 talk 级 bootstrap 95% CI。BLEU 一律由合并的 sacreBLEU 充分统计量按 sacreBLEU 自身的打分(含 exp 平滑)计算。逐出现 McNemar 与句级 bootstrap 只作敏感性分析(它们把相关的观测当独立样本)。
+
+| 对比 | ΔTERM_ACC(点) | ΔBLEU | ΔMT-BLEU |
+|---|---|---|---|
+| AutoTerm − Known | +0.24,CI [−0.95, +1.49],p=0.86 | −0.10,CI [−0.50, +0.38],p=0.70 | −0.11,CI [−0.57, +0.39],p=0.73 |
+| AutoTerm − Merged-100k | +0.54,CI [−0.60, +1.84],p=0.48 | +1.37,CI [+0.86, +1.80],p=0.004 | +1.36,CI [+0.65, +1.81],p=0.018 |
+| AutoTerm − Merged-1M | +3.91,CI [+2.03, +5.76],p=0.012 | +2.30,CI [+1.71, +2.95],p=0.002 | +2.33,CI [+1.10, +3.06],p=0.002 |
+
+- 去掉任意一个 talk,AutoTerm − 1M 三项差值都保持为正(TERM ≥ +3.28,BLEU ≥ +2.00,MT-BLEU ≥ +1.99);AutoTerm − Known 的去一 talk 区间都跨 0 附近(TERM [−0.17, +0.77])。
+- Holm 校正若把表中 12 个对比(另加 Known − 1M)当作一个族,AutoTerm − 1M 的 TERM_ACC 校正后 p=0.082,BLEU / MT-BLEU 为 0.023;只把 "AutoTerm 优于 1M" 的三个指标当作一个族时三项校正后都 < 0.05。本分析没有预注册主终点,措辞以 CI 为准。
+- 读法:与 Known-domain 相比,在这 10 个 talk 上没有检测到差异,只能写 "no statistically detected difference",不能写 equivalent;等价性需要事先固定的 margin 和新数据。对 1M 的优势在 talk 级推断下成立。
+- 不覆盖的东西:没有新 talk、没有不同播放顺序或解码随机性;路由配置曾在这些 talk 的 4 个窗口上选过。
+
+## 2. 无术语句的译文质量(`term_free_quality.py` → `term_free_quality.json`)
+
+子集按参考译文定义:参考里不含任何 glossary 目标串的句子(935 / 1,905),不按任何系统的术语结果分组,也不需要遮罩。
+
+| 对比 | ΔBLEU(无术语句) | 分层 talk bootstrap CI | talk 置换 p | ACL / medicine |
+|---|---|---|---|---|
+| AutoTerm − Merged-1M | +2.19 | [+0.66, +3.46] | 0.023 | +0.19 / +2.23 |
+| AutoTerm − Merged-100k | +1.69 | [+1.08, +2.16] | 0.012 | −0.17 / +1.70 |
+| Known − Merged-1M | +2.31 | [+1.07, +3.35] | 0.016 | +2.03 / +2.35 |
+| AutoTerm − Known | −0.11 | [−0.76, +0.35] | 0.80 | −1.84 / −0.12 |
+
+读法:大 merged glossary 在没有术语可查的句子上也更差,差异主要来自 medicine talk。"参考里没有 glossary 串" 不等于 "没有术语",也不能证明注入的条目都无关;要把这个差异归因于 prompt 噪声,需要固定前缀、只改无关条目的干预实验。
+
+此前按 "哪个系统译对的术语更多" 分组再遮罩术语算 BLEU 的做法已弃用:分组以系统输出为条件,且遮罩只去掉正确术语串,错误译法留在对手的输出里会单方面拉低其分数。
+
+## 3. 路由 open-loop replay(`router_replay.py`、`rapid_switch_replay.py`)
+
+把正式 AutoTerm run 的生成译文固定,窗口 t 用之前 w 个 chunk 的译文做 context,按 `framework/agents/term_memory/context_similarity.py` 的方式编码(BGE-M3 CLS、128 token、左截断),与 slice prototype 算余弦并排序。不含线上 router 的平滑、切换门槛与 pin,所以是裸相似度的诊断,不能把它与线上结果的差距归给某个单独部件。prototype 由 manifest description + `DOMAIN_ROUTER_PROTOTYPES` 重建(1k slice 的 manifest 原件不在可访问的盘上,description 取同一 10k manifest)。
+
+裸排序(原始 prototype):
+
+| w(chunk) | top-1 | 前 4 覆盖 | top-1 变化次数 / 8,776 窗口 |
+|---|---|---|---|
+| 1 | 36.6% | 49.5% | 6,530 |
+| 2 | 54.4% | 68.0% | 3,889 |
+| 4 | 72.6% | 85.0% | 1,809 |
+| 8 | 84.5% | 94.8% | 792 |
+
+线上 router(w=4,平滑 + 一致性门槛 + pin)在同一 run 中:top-1 88.5%,工作集覆盖 96.9%,19 次切换(9 次真实切换)。
+
+prototype 文本变体(w=4 前 4 覆盖):原版 85.0、只英文 85.4、只中文 81.0、只 description 83.3、独立改写 89.4、只写领域名 84.0。注意各变体同时改变了语言、条数与语义范围,这是联合敏感性,不是受控的措辞鲁棒性检验。
+
+子领域测试(NLP、medicine 各拆 8 个子领域,共 24 个 prototype,w=4):同领域 slice 占前 4 槽位 78.3%(随机 33.3%);正确领域进入前 4 的 90.1% 只略高于随机的 82.9%,不能作为证据。肿瘤学讲座中 top-1 为肿瘤学或放疗的无条件比例 48.2%。只有 prototype,没有真实子领域索引,也没有对照专科的 gold,不能回答 "相近领域" 的质疑。
+
+快速切换(NLP / medicine 每 L 秒交替,40 段,裸相似度,w=4):
+
+| L | 前 4 覆盖 | top-1 覆盖 | 新话题进前 4 中位时间 | 进 top-1 中位时间 |
+|---|---|---|---|---|
+| 15 s | 81.7% | 56.7% | 1.9 s | 5.8 s |
+| 60 s | 86.8% | 74.7% | 1.9 s | 5.8 s |
+| 300 s | 87.1% | 72.1% | 1.9 s | 5.8 s |
+
+open-loop 不含 "译文 → 路由 → 检索 → 译文" 的反馈,不能替代闭环实验。
+
+## 4. 缺口窗口的术语(`gap_terms.py` → `gap_terms.json`)
+
+2,047 个术语出现中 70 个落在 "正确 slice 不在工作集" 的窗口(NLP 57、medicine 13);命中数 AutoTerm 53、Known 58、Merged-1M 51。这是描述性统计,不是路由造成的因果代价。
+
+## 仍缺的实验(按优先级)
+
+1. 同目录 catalog 的不路由基线:Merged-10k(恰好是这 10 个 1k slice 的并集)、开发集选出的静态 4-slice、随机 4-slice;同样的检索与 prompt 预算。只有两个领域、四个槽位时,静态 NLP+medicine 工作集的覆盖率按构造就是 100%。仓库里 4-domain 10k vs merged-40k 的 pilot 没有显示差异(`multidomain_merged_glossary_pilot_20260710.md`)。
+2. 全流水线并发:开着路由与检索的 1 路 / 32 路,统一时钟测首音频到首个有效译文、每 chunk 端到端 p50/p95/p99、积压与超时,并核对路由与检索确实执行。
+3. 闭环快速切换且有驱逐压力(相关 slice 多于 4 个),报告边界后 5/10/20 秒的术语准确率、最长缺席时长、不恢复的切换。
+4. 线上 router 的逐窗口复现,再做 平滑 × 门槛 × pin 的 2^3 CPU 因子消融。
+5. InfiniSST 在同一参考、重分段、术语分母、遮罩与聚合下的重打分(CPU)。
+6. ESO 参考译文的双语人工抽检(100–200 段)。
+7. merged 基线的阈值与 prompt 准入在独立开发集上调过之后再比较。
+8. 冻结配置后在新 talk 上评测;一个新语言对。

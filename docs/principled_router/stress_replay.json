@@ -1,0 +1,350 @@
+{
+ "base_params": {
+  "kappa": 20,
+  "hazard": 0.0016666666666666668,
+  "c_unknown": 0.45,
+  "tau": 0.01,
+  "budget": 4,
+  "window": 8
+ },
+ "coarse_base": {
+  "coverage": 0.9779,
+  "mean_slices": 1.231,
+  "set_changes": 156
+ },
+ "sweeps": {
+  "kappa": [
+   {
+    "kappa": 5,
+    "coverage": 0.9866,
+    "mean_slices": 1.997,
+    "set_changes": 293,
+    "unknown_mass": 0.0187
+   },
+   {
+    "kappa": 10,
+    "coverage": 0.9836,
+    "mean_slices": 1.394,
+    "set_changes": 167,
+    "unknown_mass": 0.013
+   },
+   {
+    "kappa": 20,
+    "coverage": 0.9779,
+    "mean_slices": 1.231,
+    "set_changes": 156,
+    "unknown_mass": 0.0165
+   },
+   {
+    "kappa": 40,
+    "coverage": 0.9667,
+    "mean_slices": 1.171,
+    "set_changes": 185,
+    "unknown_mass": 0.0328
+   },
+   {
+    "kappa": 80,
+    "coverage": 0.9471,
+    "mean_slices": 1.141,
+    "set_changes": 248,
+    "unknown_mass": 0.0461
+   },
+   {
+    "kappa": 160,
+    "coverage": 0.9259,
+    "mean_slices": 1.113,
+    "set_changes": 348,
+    "unknown_mass": 0.0639
+   }
+  ],
+  "hazard": [
+   {
+    "hazard": 0.06666666666666667,
+    "coverage": 0.9858,
+    "mean_slices": 4.0,
+    "set_changes": 1589,
+    "unknown_mass": 0.1048
+   },
+   {
+    "hazard": 0.016666666666666666,
+    "coverage": 0.9913,
+    "mean_slices": 3.602,
+    "set_changes": 1597,
+    "unknown_mass": 0.0624
+   },
+   {
+    "hazard": 0.0033333333333333335,
+    "coverage": 0.9839,
+    "mean_slices": 1.373,
+    "set_changes": 286,
+    "unknown_mass": 0.0263
+   },
+   {
+    "hazard": 0.0016666666666666668,
+    "coverage": 0.9779,
+    "mean_slices": 1.231,
+    "set_changes": 156,
+    "unknown_mass": 0.0165
+   },
+   {
+    "hazard": 0.0005555555555555556,
+    "coverage": 0.9692,
+    "mean_slices": 1.149,
+    "set_changes": 67,
+    "unknown_mass": 0.0072
+   },
+   {
+    "hazard": 0.00016666666666666666,
+    "coverage": 0.9643,
+    "mean_slices": 1.122,
+    "set_changes": 48,
+    "unknown_mass": 0.0027
+   }
+  ],
+  "c_unknown": [
+   {
+    "c_unknown": 0.25,
+    "coverage": 0.9779,
+    "mean_slices": 1.235,
+    "set_changes": 150,
+    "unknown_mass": 0.0004
+   },
+   {
+    "c_unknown": 0.3,
+    "coverage": 0.9779,
+    "mean_slices": 1.235,
+    "set_changes": 150,
+    "unknown_mass": 0.0005
+   },
+   {
+    "c_unknown": 0.35,
+    "coverage": 0.9779,
+    "mean_slices": 1.235,
+    "set_changes": 150,
+    "unknown_mass": 0.0008
+   },
+   {
+    "c_unknown": 0.4,
+    "coverage": 0.9779,
+    "mean_slices": 1.235,
+    "set_changes": 150,
+    "unknown_mass": 0.0014
+   },
+   {
+    "c_unknown": 0.45,
+    "coverage": 0.9779,
+    "mean_slices": 1.231,
+    "set_changes": 156,
+    "unknown_mass": 0.0165
+   },
+   {
+    "c_unknown": 0.5,
+    "coverage": 0.7265,
+    "mean_slices": 0.907,
+    "set_changes": 192,
+    "unknown_mass": 0.4473
+   },
+   {
+    "c_unknown": 0.55,
+    "coverage": 0.2749,
+    "mean_slices": 0.296,
+    "set_changes": 106,
+    "unknown_mass": 0.9333
+   }
+  ],
+  "tau": [
+   {
+    "tau": 0.001,
+    "coverage": 0.9925,
+    "mean_slices": 3.6,
+    "set_changes": 1605,
+    "unknown_mass": 0.0165
+   },
+   {
+    "tau": 0.01,
+    "coverage": 0.9779,
+    "mean_slices": 1.231,
+    "set_changes": 156,
+    "unknown_mass": 0.0165
+   },
+   {
+    "tau": 0.05,
+    "coverage": 0.9533,
+    "mean_slices": 1.094,
+    "set_changes": 62,
+    "unknown_mass": 0.0165
+   },
+   {
+    "tau": 0.1,
+    "coverage": 0.9436,
+    "mean_slices": 1.062,
+    "set_changes": 43,
+    "unknown_mass": 0.0165
+   },
+   {
+    "tau": 0.2,
+    "coverage": 0.9316,
+    "mean_slices": 1.038,
+    "set_changes": 45,
+    "unknown_mass": 0.0165
+   },
+   {
+    "tau": 0.4,
+    "coverage": 0.913,
+    "mean_slices": 1.005,
+    "set_changes": 42,
+    "unknown_mass": 0.0165
+   }
+  ],
+  "window": [
+   {
+    "window": 1,
+    "coverage": 0.5276,
+    "mean_slices": 1.387,
+    "set_changes": 1934,
+    "unknown_mass": 0.3918
+   },
+   {
+    "window": 2,
+    "coverage": 0.7948,
+    "mean_slices": 1.342,
+    "set_changes": 927,
+    "unknown_mass": 0.2283
+   },
+   {
+    "window": 4,
+    "coverage": 0.9417,
+    "mean_slices": 1.262,
+    "set_changes": 341,
+    "unknown_mass": 0.0667
+   },
+   {
+    "window": 8,
+    "coverage": 0.9779,
+    "mean_slices": 1.231,
+    "set_changes": 156,
+    "unknown_mass": 0.0165
+   }
+  ]
+ },
+ "unknown_domain": {
+  "nlp": {
+   "windows": 1617,
+   "hmm_load_nothing": 0.0031,
+   "hmm_mean_wrong_slices": 2.992,
+   "hmm_unknown_mass": 0.1207,
+   "raw_top4_mean_wrong_slices": 4.0,
+   "other_domain_coverage_hmm": 0.9909
+  },
+  "medicine": {
+   "windows": 7158,
+   "hmm_load_nothing": 0.311,
+   "hmm_mean_wrong_slices": 1.342,
+   "hmm_unknown_mass": 0.5799,
+   "raw_top4_mean_wrong_slices": 4.0,
+   "other_domain_coverage_hmm": 0.9913
+  }
+ },
+ "close_domain": {
+  "hmm_tau=0.01": {
+   "coverage": 0.6386,
+   "mean_slices": 1.85,
+   "set_changes": 330,
+   "family_coverage": 0.99
+  },
+  "hmm_tau=0.05": {
+   "coverage": 0.5772,
+   "mean_slices": 1.439,
+   "set_changes": 225,
+   "family_coverage": 0.985
+  },
+  "hmm_tau=0.1": {
+   "coverage": 0.5491,
+   "mean_slices": 1.281,
+   "set_changes": 182,
+   "family_coverage": 0.9804
+  },
+  "hmm_tau=0.2": {
+   "coverage": 0.5185,
+   "mean_slices": 1.16,
+   "set_changes": 145,
+   "family_coverage": 0.9775
+  },
+  "raw_top1": {
+   "coverage": 0.338,
+   "mean_slices": 1.0,
+   "set_changes": 2036,
+   "family_coverage": 0.9187
+  },
+  "raw_top2": {
+   "coverage": 0.5311,
+   "mean_slices": 2.0,
+   "set_changes": 3104,
+   "family_coverage": 0.9464
+  },
+  "raw_top4": {
+   "coverage": 0.7379,
+   "mean_slices": 4.0,
+   "set_changes": 4343,
+   "family_coverage": 0.9608
+  },
+  "raw_top8": {
+   "coverage": 0.9158,
+   "mean_slices": 8.0,
+   "set_changes": 5075,
+   "family_coverage": 0.982
+  },
+  "per_talk_hmm_base": {
+   "2022.acl-long.268": {
+    "gold": "nlp:syntax_semantics",
+    "coverage": 0.7107,
+    "map_top1": "nlp:syntax_semantics"
+   },
+   "medicine_404": {
+    "gold": "medicine:surgery",
+    "coverage": 0.7011,
+    "map_top1": "medicine:surgery"
+   },
+   "2022.acl-long.367": {
+    "gold": "nlp:language_models",
+    "coverage": 0.5925,
+    "map_top1": "nlp:syntax_semantics"
+   },
+   "medicine_606": {
+    "gold": "medicine:oncology",
+    "coverage": 0.3101,
+    "map_top1": "medicine:radiation_therapy"
+   },
+   "2022.acl-long.590": {
+    "gold": "nlp:language_models",
+    "coverage": 0.9519,
+    "map_top1": "nlp:language_models"
+   },
+   "medicine_545006": {
+    "gold": "medicine:oncology",
+    "coverage": 0.9829,
+    "map_top1": "medicine:oncology"
+   },
+   "2022.acl-long.110": {
+    "gold": "nlp:dialogue",
+    "coverage": 0.4895,
+    "map_top1": "nlp:language_models"
+   },
+   "medicine_596001": {
+    "gold": "medicine:radiation_therapy",
+    "coverage": 0.9914,
+    "map_top1": "medicine:radiation_therapy"
+   },
+   "2022.acl-long.117": {
+    "gold": "nlp:question_answering",
+    "coverage": 1.0,
+    "map_top1": "nlp:language_models"
+   },
+   "medicine_605000": {
+    "gold": "medicine:oncology",
+    "coverage": 0.3016,
+    "map_top1": "medicine:radiation_therapy"
+   }
+  }
+ }
+}

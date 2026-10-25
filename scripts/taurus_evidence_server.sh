@@ -28,7 +28,7 @@ case "${MODE}" in
       --autoterm-max-active-slices 4
       --autoterm-context-window-chunks 4
       --autoterm-context-model /home/jiaxuanluo/.cache/huggingface/hub/models--BAAI--bge-m3/snapshots/5617a9f61b028005a4858fdac845db406aefb181
-      --autoterm-context-device cpu
+      --autoterm-context-device "${CONTEXT_DEVICE:-cpu}"
       --autoterm-context-weight 1.0
       --autoterm-text-weight 0.0
       --autoterm-domain-probe-weight 0.0

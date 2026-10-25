@@ -1,0 +1,56 @@
+{
+ "term_free_sentences": 935,
+ "sentences": 1905,
+ "by_domain": {
+  "acl": 47,
+  "medicine": 888
+ },
+ "autoterm_taurus_vs_known_taurus": {
+  "bleu_diff": 0.9354581595073483,
+  "stratified_talk_bootstrap_ci95": [
+   0.020959052885500817,
+   2.008044023810973
+  ],
+  "talk_permutation_p": 0.21484375,
+  "per_domain_diff": {
+   "acl": 0.5345957024603081,
+   "medicine": 0.9585168910286868
+  }
+ },
+ "autoterm_taurus_vs_merged10k_taurus": {
+  "bleu_diff": 0.4885487519260039,
+  "stratified_talk_bootstrap_ci95": [
+   -0.03813639663622829,
+   1.5078386150610976
+  ],
+  "talk_permutation_p": 0.16796875,
+  "per_domain_diff": {
+   "acl": 3.129572477722917,
+   "medicine": 0.4438065943756442
+  }
+ },
+ "autoterm_taurus_vs_merged2k_taurus": {
+  "bleu_diff": -0.11129534338567737,
+  "stratified_talk_bootstrap_ci95": [
+   -0.6688661620002163,
+   1.017300123441458
+  ],
+  "talk_permutation_p": 0.79296875,
+  "per_domain_diff": {
+   "acl": 1.3170514091046144,
+   "medicine": -0.13480443600840175
+  }
+ },
+ "merged2k_taurus_vs_merged10k_taurus": {
+  "bleu_diff": 0.5998440953116813,
+  "stratified_talk_bootstrap_ci95": [
+   0.02326159730005984,
+   0.9799123528842271
+  ],
+  "talk_permutation_p": 0.103515625,
+  "per_domain_diff": {
+   "acl": 1.8125210686183024,
+   "medicine": 0.5786110303840459
+  }
+ }
+}

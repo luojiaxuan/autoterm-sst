@@ -1,0 +1,137 @@
+{
+  "protocol": {
+    "sample_rate": 16000,
+    "lookback_s": 1.92,
+    "alignment_tolerance_s": 0.0,
+    "reference_capture_required": true,
+    "relevance": "normalized reference source term matches an overlapping MFA source occurrence",
+    "refs_per_chunk_denominator": "emitted translation events; empty-output decoder ticks are not persisted",
+    "timing_signatures_identical": true
+  },
+  "runs": {
+    "autoterm_taurus": {
+      "preset": "auto_working",
+      "chunk_count": 8776,
+      "emitted_translation_chunks": 8776,
+      "chunks_with_references": 4176,
+      "prompt_reference_count": 8257,
+      "captured_reference_count": 8257,
+      "reference_count_mismatch_chunks": 0,
+      "empty_source_reference_count": 0,
+      "retrieved_references_per_chunk": 0.940861,
+      "captured_references_per_chunk": 0.940861,
+      "reference_capture_ratio": 1.0,
+      "technical_plus_medicine": {
+        "gold_occurrences": 1342,
+        "raw_annotation_rows": 1462,
+        "gold_source_term_types": 322,
+        "relevant_references": 1776,
+        "evaluated_references": 8257,
+        "prompt_precision": 0.21509
+      },
+      "raw_plus_medicine": {
+        "gold_occurrences": 2047,
+        "raw_annotation_rows": 2551,
+        "gold_source_term_types": 418,
+        "relevant_references": 2907,
+        "evaluated_references": 8257,
+        "prompt_precision": 0.352065
+      },
+      "path": "/private/tmp/claude-501/-Users-luojiaxuan-sglang-omni--claude-worktrees-autoterm-sst-media-interview-23ef8b/a0cd3833-2cc6-418c-8c54-675e54340d34/scratchpad/taurus_data/runs/autoterm_taurus.json",
+      "timing_signature_sha256": "7c0be6da5557cb99b3276967f3e575c353a03515e68d64489bffada22b2dfa7c"
+    },
+    "merged10k_taurus": {
+      "preset": "merged_10x1k",
+      "chunk_count": 8776,
+      "emitted_translation_chunks": 8776,
+      "chunks_with_references": 5024,
+      "prompt_reference_count": 11073,
+      "captured_reference_count": 11073,
+      "reference_count_mismatch_chunks": 0,
+      "empty_source_reference_count": 0,
+      "retrieved_references_per_chunk": 1.261737,
+      "captured_references_per_chunk": 1.261737,
+      "reference_capture_ratio": 1.0,
+      "technical_plus_medicine": {
+        "gold_occurrences": 1342,
+        "raw_annotation_rows": 1462,
+        "gold_source_term_types": 322,
+        "relevant_references": 1844,
+        "evaluated_references": 11073,
+        "prompt_precision": 0.166531
+      },
+      "raw_plus_medicine": {
+        "gold_occurrences": 2047,
+        "raw_annotation_rows": 2551,
+        "gold_source_term_types": 418,
+        "relevant_references": 2999,
+        "evaluated_references": 11073,
+        "prompt_precision": 0.270839
+      },
+      "path": "/private/tmp/claude-501/-Users-luojiaxuan-sglang-omni--claude-worktrees-autoterm-sst-media-interview-23ef8b/a0cd3833-2cc6-418c-8c54-675e54340d34/scratchpad/taurus_data/runs/merged10k_taurus.json",
+      "timing_signature_sha256": "7c0be6da5557cb99b3276967f3e575c353a03515e68d64489bffada22b2dfa7c"
+    },
+    "merged2k_taurus": {
+      "preset": "merged_nlp_med_2k",
+      "chunk_count": 8776,
+      "emitted_translation_chunks": 8776,
+      "chunks_with_references": 4029,
+      "prompt_reference_count": 7586,
+      "captured_reference_count": 7586,
+      "reference_count_mismatch_chunks": 0,
+      "empty_source_reference_count": 0,
+      "retrieved_references_per_chunk": 0.864403,
+      "captured_references_per_chunk": 0.864403,
+      "reference_capture_ratio": 1.0,
+      "technical_plus_medicine": {
+        "gold_occurrences": 1342,
+        "raw_annotation_rows": 1462,
+        "gold_source_term_types": 322,
+        "relevant_references": 1815,
+        "evaluated_references": 7586,
+        "prompt_precision": 0.239257
+      },
+      "raw_plus_medicine": {
+        "gold_occurrences": 2047,
+        "raw_annotation_rows": 2551,
+        "gold_source_term_types": 418,
+        "relevant_references": 2971,
+        "evaluated_references": 7586,
+        "prompt_precision": 0.391642
+      },
+      "path": "/private/tmp/claude-501/-Users-luojiaxuan-sglang-omni--claude-worktrees-autoterm-sst-media-interview-23ef8b/a0cd3833-2cc6-418c-8c54-675e54340d34/scratchpad/taurus_data/runs/merged2k_taurus.json",
+      "timing_signature_sha256": "7c0be6da5557cb99b3276967f3e575c353a03515e68d64489bffada22b2dfa7c"
+    },
+    "known_taurus": {
+      "preset": "nlp_core_1k",
+      "chunk_count": 8776,
+      "emitted_translation_chunks": 8776,
+      "chunks_with_references": 3218,
+      "prompt_reference_count": 6064,
+      "captured_reference_count": 6064,
+      "reference_count_mismatch_chunks": 0,
+      "empty_source_reference_count": 0,
+      "retrieved_references_per_chunk": 0.690975,
+      "captured_references_per_chunk": 0.690975,
+      "reference_capture_ratio": 1.0,
+      "technical_plus_medicine": {
+        "gold_occurrences": 1342,
+        "raw_annotation_rows": 1462,
+        "gold_source_term_types": 322,
+        "relevant_references": 1806,
+        "evaluated_references": 6064,
+        "prompt_precision": 0.297823
+      },
+      "raw_plus_medicine": {
+        "gold_occurrences": 2047,
+        "raw_annotation_rows": 2551,
+        "gold_source_term_types": 418,
+        "relevant_references": 2957,
+        "evaluated_references": 6064,
+        "prompt_precision": 0.487632
+      },
+      "path": "/private/tmp/claude-501/-Users-luojiaxuan-sglang-omni--claude-worktrees-autoterm-sst-media-interview-23ef8b/a0cd3833-2cc6-418c-8c54-675e54340d34/scratchpad/taurus_data/runs/known_taurus.json",
+      "timing_signature_sha256": "7c0be6da5557cb99b3276967f3e575c353a03515e68d64489bffada22b2dfa7c"
+    }
+  }
+}

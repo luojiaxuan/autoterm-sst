@@ -78,6 +78,7 @@ async def run_session(args: argparse.Namespace, pcm: np.ndarray, start_delay: fl
             await ws.send("EOF")
 
         feeder = asyncio.create_task(feed())
+        covered = -1
         while True:
             try:
                 raw = await asyncio.wait_for(ws.recv(), timeout=args.idle_timeout_sec)
@@ -93,22 +94,28 @@ async def run_session(args: argparse.Namespace, pcm: np.ndarray, start_delay: fl
             if "cursor_samples" not in meta:
                 continue
             cursor = int(meta["cursor_samples"])
-            index = cursor // chunk - 1
-            if index < 0 or index >= n_chunks or sent_at[index] == 0.0:
+            index = min(cursor // chunk - 1, n_chunks - 1)
+            if index <= covered:
                 continue
-            events.append({
-                "type": message.get("type"),
-                "chunk": index,
-                "latency_s": received - sent_at[index],
-                "has_text": bool(str(message.get("text") or "").strip()),
-                "received_rel_s": received - t0,
-                "retrieve_s": meta.get("retrieve_s"),
-                "elapsed_s": meta.get("elapsed_s"),
-                "references": len(meta.get("references") or []),
-                "selected_slices": meta.get("selected_slice_presets"),
-                "router_action": (meta.get("topic_router") or {}).get("action") if isinstance(meta.get("topic_router"), dict) else meta.get("router_action"),
-            })
-            if index == n_chunks - 1 and feeder.done():
+            router = meta.get("topic_router") or {}
+            selection = (router.get("evidence") or {}).get("slice_selection") or {}
+            # note (luojiaxuan): one output can complete several chunks when the server catches up; each chunk counts once.
+            for k in range(covered + 1, index + 1):
+                events.append({
+                    "type": message.get("type"),
+                    "chunk": k,
+                    "latency_s": received - sent_at[k],
+                    "has_text": bool(str(message.get("text") or "").strip()),
+                    "received_rel_s": received - t0,
+                    "retrieve_s": meta.get("retrieve_s") if k == index else None,
+                    "elapsed_s": meta.get("elapsed_s") if k == index else None,
+                    "references": len(meta.get("references") or []),
+                    "selected_slices": selection.get("selected_slice_presets"),
+                    "active_preset": (meta.get("topic") or {}).get("active_glossary_preset"),
+                    "router_action": router.get("action"),
+                })
+            covered = index
+            if covered == n_chunks - 1 and feeder.done():
                 break
         await feeder
     await asyncio.to_thread(delete_session, args.base_url, session_id)
@@ -168,6 +175,8 @@ async def run_level(args: argparse.Namespace, excerpts: List[np.ndarray], n: int
         "retrieve_s": {p: percentile([float(e["retrieve_s"]) for e in warm if e["retrieve_s"] is not None], q) for p, q in (("p50", 50), ("p95", 95))},
         "generation_s": {p: percentile([float(e["elapsed_s"]) for e in warm if e["elapsed_s"] is not None], q) for p, q in (("p50", 50), ("p95", 95))},
         "events_with_selected_slices": float(np.mean([bool(e["selected_slices"]) for e in text_events])) if text_events else None,
+        "mean_selected_slices": float(np.mean([len(e["selected_slices"] or []) for e in text_events])) if text_events else None,
+        "router_switches": int(sum(e["router_action"] == "switch" for e in text_events)),
         "events_with_references": float(np.mean([e["references"] > 0 for e in text_events])) if text_events else None,
         "gpu_memory_mib_max": [max(col) for col in zip(*memory)] if memory else None,
         "raw_sessions": sessions,
@@ -200,6 +209,10 @@ def main() -> None:
             offset = max(0, len(pcm) - length)
         excerpts.append(pcm[offset:offset + length])
     result = {"audio_files": files, "seconds_per_session": args.seconds_per_session, "levels": []}
+    # note (luojiaxuan): one discarded single-session pass absorbs first-request warmup.
+    warmup = asyncio.run(run_level(args, excerpts, 1))
+    result["warmup"] = {k: v for k, v in warmup.items() if k != "raw_sessions"}
+    print(json.dumps({"warmup": result["warmup"]}), flush=True)
     for n in [int(x) for x in args.levels.split(",")]:
         row = asyncio.run(run_level(args, excerpts, n))
         summary = {k: v for k, v in row.items() if k != "raw_sessions"}

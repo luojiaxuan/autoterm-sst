@@ -7,9 +7,9 @@ ROOT=/mnt/data2/jiaxuanluo/autoterm_taurus_20261024
 IO_ROOT=/home/jiaxuanluo/autoterm_taurus_20261024_io
 PYTHON_BIN=/home/jiaxuanluo/miniconda3/envs/spaCyEnv/bin/python
 
-while tmux has-session -t sst-chain 2>/dev/null; do sleep 20; done
+while tmux has-session -t =sst-chain 2>/dev/null; do sleep 20; done
 GPUS=$(head -1 "${IO_ROOT}/logs/server_8034.log" | sed 's/.*CUDA_VISIBLE_DEVICES=//')
-tmux kill-session -t sst-c2
+tmux kill-session -t =sst-c2
 for _ in $(seq 1 60); do
   used=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits -i "${GPUS}" | awk '{s+=$1} END {print s}')
   [[ "${used}" -lt 100 ]] && break
@@ -20,7 +20,7 @@ tmux new-session -d -s sst-c3 \
   "srun --jobid=${JOB} --overlap --gres=gpu:2 --ntasks=1 --cpus-per-task=12 --mem=60G env CONTEXT_DEVICE=cuda:0 ${ROOT}/code/scripts/taurus_evidence_server_vllm_serve.sh 8035 8200 > ${IO_ROOT}/logs/server_8035.log 2>&1"
 for _ in $(seq 1 400); do
   curl -fsS --max-time 3 http://127.0.0.1:8035/health >/dev/null 2>&1 && break
-  tmux has-session -t sst-c3 2>/dev/null
+  tmux has-session -t =sst-c3 2>/dev/null
   sleep 3
 done
 curl -fsS --max-time 3 http://127.0.0.1:8035/health | "${PYTHON_BIN}" -c "

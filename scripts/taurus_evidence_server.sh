@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Serve the RASST agent for the ten-talk evidence runs on Taurus.
-# Usage: taurus_evidence_server.sh <port> <routed|fixed> <max_num_seqs> <gpu_memory_utilization>
-# Run it inside a Slurm step that was granted two GPUs; the retriever shares the first one.
+# note (luojiaxuan): Serve the RASST agent for the ten-talk evidence runs on Taurus.
+# note (luojiaxuan): Usage: taurus_evidence_server.sh <port> <routed|fixed> <max_num_seqs> <gpu_memory_utilization>
+# note (luojiaxuan): Run it inside a Slurm step that was granted two GPUs; the retriever shares the first one.
 set -euo pipefail
 
 PORT="$1"

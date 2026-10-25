@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Stream the ten-talk alternating ACL/ESO playlist through one session, with the client
-# settings of the audited 2026-07-11 runs.
-# Usage: taurus_evidence_eval.sh <port> <preset> <run_name> [oracle]
+# note (luojiaxuan): Stream the ten-talk alternating ACL/ESO playlist through one session, with the client
+# note (luojiaxuan): settings of the audited 2026-07-11 runs.
+# note (luojiaxuan): Usage: taurus_evidence_eval.sh <port> <preset> <run_name> [oracle]
 set -euo pipefail
 
 PORT="$1"

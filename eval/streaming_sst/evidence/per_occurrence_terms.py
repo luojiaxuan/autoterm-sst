@@ -13,14 +13,15 @@ from pathlib import Path
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo", type=Path, required=True)
-    ap.add_argument("--staging", type=Path, required=True)
+    ap.add_argument("--gold-root", type=Path, required=True)
+    ap.add_argument("--run", action="append", required=True, metavar="NAME=RUN_JSON")
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()
 
     sys.path.insert(0, str(args.repo))
     import eval.streaming_sst.score_time_aligned_terms as st
 
-    gold_root = args.staging / "gold"
+    gold_root = args.gold_root
     ns = argparse.Namespace(
         mfa_root=str(args.repo / "eval/streaming_sst/mfa_alignments"),
         acl_root=str(gold_root / "rasst_eval/acl6060_zh_segments"),
@@ -30,9 +31,13 @@ def main() -> None:
         target_lang="zh",
         post_s=30.0,
     )
-    runs = ["known", "autoterm", "merged100k", "merged1m"]
-    payloads = {r: json.load(open(args.staging / "runs" / f"{r}.json", encoding="utf-8")) for r in runs}
-    gold = st.deduplicate_alias_occurrences(st.build_timed_gold(payloads["autoterm"], ns)["raw_plus_medicine"])
+    run_paths = dict(spec.split("=", 1) for spec in args.run)
+    runs = list(run_paths)
+    payloads = {r: json.load(open(run_paths[r], encoding="utf-8")) for r in runs}
+    gold = st.deduplicate_alias_occurrences(st.build_timed_gold(payloads[runs[0]], ns)["raw_plus_medicine"])
+    spans = [(s["start_sample"], s["end_sample"]) for s in payloads[runs[0]]["block_spans"]]
+    for r in runs[1:]:
+        assert [(s["start_sample"], s["end_sample"]) for s in payloads[r]["block_spans"]] == spans, f"{r}: block spans differ"
 
     groups = {}
     for idx, occ in enumerate(gold):

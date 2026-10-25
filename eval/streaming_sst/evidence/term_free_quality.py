@@ -17,20 +17,23 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from paired_significance import Corpus  # noqa: E402
 
-PAIRS = [("autoterm", "merged1m"), ("autoterm", "merged100k"), ("known", "merged1m"), ("autoterm", "known")]
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo", type=Path, required=True)
-    ap.add_argument("--staging", type=Path, required=True)
+    ap.add_argument("--gloss-dir", type=Path, required=True)
+    ap.add_argument("--run-data", action="append", required=True, metavar="NAME=SEGMENTS_JSONL,BUNDLE_MANIFEST")
+    ap.add_argument("--pair", action="append", required=True, metavar="A,B")
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--n-boot", type=int, default=4000)
     args = ap.parse_args()
     sys.path.insert(0, str(args.repo))
     from eval.streaming_sst.score_terms import load_target_terms_for_masking
 
-    gloss = args.staging / "gold/RASST/data/glossaries"
+    gloss = args.gloss_dir
+    run_data = {name: paths.split(",") for name, paths in (spec.split("=", 1) for spec in args.run_data)}
+    PAIRS = [tuple(spec.split(",")) for spec in args.pair]
     terms = {
         "acl": load_target_terms_for_masking(str(gloss / "acl6060_tagged_gt_raw_min_norm2.json"), "zh"),
         "medicine": load_target_terms_for_masking(str(gloss / "hard_medicine_glossary_raw_llm_judge_manual_zh215_unique212.json"), "zh"),
@@ -39,11 +42,11 @@ def main() -> None:
     runs = sorted({r for p in PAIRS for r in p})
     rows, keys, block_of_wav, domain_of_block = {}, None, {}, {}
     for r in runs:
-        manifest = json.load(open(args.staging / "bundles" / r / "manifest.json", encoding="utf-8"))
+        manifest = json.load(open(run_data[r][1], encoding="utf-8"))
         for b in manifest["blocks"]:
             block_of_wav[b["wav"]] = int(b["block_index"])
             domain_of_block[int(b["block_index"])] = b["corpus"]
-        rows[r] = [json.loads(line) for line in open(args.staging / "scores" / r / "segments.jsonl", encoding="utf-8") if line.strip()]
+        rows[r] = [json.loads(line) for line in open(run_data[r][0], encoding="utf-8") if line.strip()]
         row_keys = [(x["wav"], x["sentence_index_in_talk"], x["reference"]) for x in rows[r]]
         if keys is None:
             keys = row_keys

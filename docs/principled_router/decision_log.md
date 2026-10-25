@@ -26,3 +26,9 @@
 - 选择:talk 级单标签,ACL 按 Anthology 标题,ESO 按讲座主题(见 data_provenance.md)。
 - 理由:零成本、可复核;已在结果里注明粒度局限。
 - 回滚:`stress_eval.py` 的 `ITEM_LABEL`。
+
+## D6 2026-10-24 PT:学习版与按 slice 校准是否替换主方法
+- 选择:不替换。主方法保留裸余弦 HMM;学习版与校准作为负结果 / 分析写进文档。
+- 理由:见 `results_calibrated_20261024.md`。全目录下 logreg 只高 0.4 点覆盖却多 0.2 个 slice;未知领域前沿没有整体前移;伪上下文与真实译文存在 2σ 以上的位置偏移。
+- 回滚:`calibrated_eval.py` 已保留三种打分,改 HMM 的 emission 即可换用。
+- 外审:仍未进行(chatgpt.com 未登录),补审清单加上本条。

@@ -87,7 +87,7 @@ AutoTerm 单独占一台服务:router 的 warmup / update / cooldown 计时用�
 - 进程内 vLLM 后端在并发下排队严重,并发场景要用 vllm serve。
 - 路由用的 BGE-M3 放在 CPU 是单会话下的设置,并发时成为瓶颈(8 路检索中位数 1.31 秒);挪到 GPU 后降到 0.09 秒。
 - 首个译文稳定在 2.2–2.8 秒(冷启动那一次 13–14 秒,已作为预热丢弃)。
-- 下一步:给检索与路由单独一张卡(论文原始的三卡布局),看 32 路能否实时。
+- 给检索与路由单独一张卡(论文原始的三卡布局)的那一档没有跑成:另一个用户在 Slurm 之外起的 SGLang 服务占了本分配里的 GPU 0–3,只剩两张卡。需要时用 `scripts/taurus_evidence_chain_final.sh` 的后半段在三张空卡上重跑。
 
 ## 进度信号、告警与收尾
 
@@ -95,3 +95,9 @@ AutoTerm 单独占一台服务:router 的 warmup / update / cooldown 计时用�
 - 停滞阈值:闭环 run 期间服务日志 15 分钟没有新输出,或 tmux 会话消失、日志出现 Traceback / out of memory / Killed,即视为失败。单会话闭环 run 不能断点续跑,失败则整段重跑。
 - 告警:本 session 的监视器每 5 分钟检查一次上述信号。
 - 收尾:run 结束、结果拉回并核对后,关闭 sst-a/b/c 三个 tmux(随之结束 job step),占位作业 48285 本身保持不动。
+
+## 收尾状态(2026-10-25 UTC)
+
+- 所有 job step 与进程已结束,占位作业 48285 未改动。
+- 结果目录已从家目录挪回 `/mnt/data2/jiaxuanluo/autoterm_taurus_20261024/io/`(runs、scores、bundles、logs,176 MB;挪动前后整体哈希一致,家目录副本已删除)。
+- 汇总结果与分析输出已进 Git(本目录与 `taurus/` 子目录);原始 run JSON 含 ESO 讲座派生的中文译文,公开上传前需确认源数据许可,状态 HF pending,正本在上述 Taurus 目录。

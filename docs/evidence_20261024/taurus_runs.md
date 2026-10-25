@@ -35,6 +35,33 @@ AutoTerm 单独占一台服务:router 的 warmup / update / cooldown 计时用�
 - 闭环客户端:`scripts/taurus_evidence_eval.sh`,与 7 月审计 run 相同(alternating、seed 20260707、5 ACL + 5 ESO、1.92s chunk、backpressure 1 chunk、stall 60s、idle 5s)。
 - G1 客户端:`eval/streaming_sst/concurrency_full_pipeline.py`。每个会话用不同的真实讲座音频,按实时节奏每 1.92 秒发一个 chunk(不等回复);以 `meta.cursor_samples` 把每条输出对应回完成它的 chunk,记录 "chunk 发出 → 对应输出到达" 的延迟、首段音频到首个译文的时间、最后一个 chunk 之后的排空时间、服务端检索/生成耗时、每条输出是否带路由与检索证据、GPU 显存。各会话起始时间在一个 chunk 内错开。
 
+## 十 talk 闭环结果(同一硬件,2026-10-25 UTC)
+
+四个 run 都在 Taurus 同一批 A6000 上、同一份代码、同一条十 talk 交替流上跑,评分管线与 7 月审计 run 完全一致(先用 7 月 AutoTerm run 复核:BLEU 45.090898、MT-BLEU 42.2827、分句文件逐字节相同)。TERM_ACC 是 2,047 个术语出现的命中率,prompt precision 用论文的 raw 口径。
+
+| 设置 | 需要会话前输入 | TERM_ACC | NLP | Medicine | BLEU | MT-BLEU | Prompt precision | Refs/chunk |
+|---|---|---|---|---|---|---|---|---|
+| AutoTerm-1k×4(路由) | 无 | 87.30 | 87.94 | 86.01 | 45.15 | 42.36 | 35.2% | 0.94 |
+| Merged-10k(十个 slice 合并,不路由) | 无 | 88.13 | 89.11 | 86.16 | 44.97 | 42.19 | 27.1% | 1.26 |
+| Merged-NLP+Med-2k(两个相关 slice 常开) | 要知道会出现哪两个领域 | 87.69 | 88.89 | 85.27 | 45.18 | 42.42 | 39.2% | 0.86 |
+| Known-domain-1k(按 talk 换领域) | 要逐 talk 指定领域 | 87.98 | 88.89 | 86.16 | 44.79 | 41.94 | 48.8% | 0.69 |
+
+配对检验(talk 级置换 p,分层 talk bootstrap 95% CI):
+
+| 对比 | ΔTERM_ACC | ΔBLEU | ΔMT-BLEU |
+|---|---|---|---|
+| AutoTerm − Known | −0.68 [−1.48, +0.00],p=0.18 | +0.36 [−0.24, +1.26],p=0.69 | +0.42,p=0.66 |
+| AutoTerm − Merged-10k | −0.83 [−1.58, −0.25],p=0.084 | +0.18 [−0.18, +0.64],p=0.43 | +0.17,p=0.51 |
+| AutoTerm − Merged-2k | −0.39 [−1.29, +0.30],p=0.49 | −0.03,p=0.94 | −0.06,p=0.79 |
+
+无术语句(参考里没有 glossary 串)上的 BLEU 差:AutoTerm − Known +0.94(p=0.22)、− Merged-10k +0.49(p=0.17)、− Merged-2k −0.11(p=0.79),都不显著。
+
+读法:
+
+1. **在这个只有两个领域、十个 1k slice 的设置里,路由没有带来可测的好处**:把十个 slice 直接合并成 10k 不路由,术语准确率名义上还高 0.8 点(talk 级 p=0.084),BLEU 无差异;它往 prompt 里多塞了 34% 的条目、精度从 35% 降到 27%,但 10k 规模下这点噪声没有造成可测的质量损失。论文对 Merged-100k / 1M 的优势(尤其 1M)仍然成立,但 "路由是必要的" 这个结论需要把合并规模从 10k 推到 100k 以上、或者在同一 catalog 扩大时比较,才站得住。
+2. AutoTerm 与 Known-domain 在同一硬件上依然没有检测到差异(第二次独立 run 的结论与 7 月一致)。
+3. AutoTerm 同配置换硬件重跑:TERM_ACC 88.32 → 87.30,BLEU 45.09 → 45.15,MT-BLEU 42.28 → 42.36,工作集覆盖 96.9% → 98.0%。run 间与硬件间差异约 ±1 TERM_ACC 点,与上面各对比的量级相当。
+
 ## G1 结果:开着路由与检索的实时并发(2×A6000)
 
 每档每个会话 180 秒真实讲座音频,按 1.92 秒一块实时送入;"延迟" 是某块音频送出到对应译文到达客户端的时间(前 3 块不计);"超时占比" 是延迟超过 1.92 秒的块所占比例;"排空" 是最后一块送出后还要等多久才收到最后的译文(持续增长说明跟不上)。每档开始前有一次单会话预热,不计入。摘要见 `g1_serving_summary.json`。

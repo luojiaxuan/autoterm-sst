@@ -1,0 +1,593 @@
+{
+ "inprocess_vllm_bge_cpu": {
+  "audio_files": [
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/acl6060/2022.acl-long.110.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/acl6060/2022.acl-long.117.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/acl6060/2022.acl-long.268.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/acl6060/2022.acl-long.367.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/acl6060/2022.acl-long.590.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/medicine/sample_404_v2/404_v2.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/medicine/sample_545006_v2/545006_v2.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/medicine/sample_596001_v2/596001_v2.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/medicine/sample_605000_v2/605000_v2.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/medicine/sample_606_v2/606_v2.wav"
+  ],
+  "seconds_per_session": 180.0,
+  "warmup": {
+   "sessions": 1,
+   "chunks_per_session": 93,
+   "coverage_min": 1.0,
+   "e2e_latency_s": {
+    "p50": 0.7608921844512224,
+    "p95": 2.6567796702962347,
+    "p99": 7.075392528078518
+   },
+   "worst_session_p95_s": 2.6567796702962347,
+   "share_over_chunk_length": 0.06666666666666667,
+   "first_text_after_audio_start_s": {
+    "median": 14.41376041714102,
+    "max": 14.41376041714102
+   },
+   "drain_after_last_chunk_s": {
+    "median": 0.8198386691510677,
+    "max": 0.8198386691510677
+   },
+   "retrieve_s": {
+    "p50": 0.059191,
+    "p95": 0.6782000000000004
+   },
+   "generation_s": {
+    "p50": 0.476351,
+    "p95": 1.0159505
+   },
+   "events_with_selected_slices": 1.0,
+   "mean_selected_slices": 3.865168539325843,
+   "router_switches": 0,
+   "events_with_references": 0.7865168539325843,
+   "gpu_memory_mib_max": [
+    43759,
+    37474
+   ]
+  },
+  "levels": [
+   {
+    "sessions": 1,
+    "chunks_per_session": 93,
+    "coverage_min": 1.0,
+    "e2e_latency_s": {
+     "p50": 0.5980836336966604,
+     "p95": 1.3543305205414071,
+     "p99": 1.5672521896054967
+    },
+    "worst_session_p95_s": 1.3543305205414071,
+    "share_over_chunk_length": 0.0,
+    "first_text_after_audio_start_s": {
+     "median": 2.3035411802120507,
+     "max": 2.3035411802120507
+    },
+    "drain_after_last_chunk_s": {
+     "median": 1.6049089366570115,
+     "max": 1.6049089366570115
+    },
+    "retrieve_s": {
+     "p50": 0.0582,
+     "p95": 0.4114169499999997
+    },
+    "generation_s": {
+     "p50": 0.4119295,
+     "p95": 0.8685461499999999
+    },
+    "events_with_selected_slices": 1.0,
+    "mean_selected_slices": 4.0,
+    "router_switches": 0,
+    "events_with_references": 0.7865168539325843,
+    "gpu_memory_mib_max": [
+     39767,
+     37476
+    ]
+   },
+   {
+    "sessions": 8,
+    "chunks_per_session": 93,
+    "coverage_min": 1.0,
+    "e2e_latency_s": {
+     "p50": 3.107196014141664,
+     "p95": 4.693408086453563,
+     "p99": 5.4231380217382625
+    },
+    "worst_session_p95_s": 4.8663046637782825,
+    "share_over_chunk_length": 0.9291666666666667,
+    "first_text_after_audio_start_s": {
+     "median": 2.2666884674690664,
+     "max": 2.413747846148908
+    },
+    "drain_after_last_chunk_s": {
+     "median": 2.604314636439085,
+     "max": 3.6647498421370983
+    },
+    "retrieve_s": {
+     "p50": 0.34784,
+     "p95": 0.70237
+    },
+    "generation_s": {
+     "p50": 1.000579,
+     "p95": 1.585639
+    },
+    "events_with_selected_slices": 1.0,
+    "mean_selected_slices": 3.9914529914529915,
+    "router_switches": 3,
+    "events_with_references": 0.6866096866096866,
+    "gpu_memory_mib_max": [
+     41701,
+     39084
+    ]
+   },
+   {
+    "sessions": 16,
+    "chunks_per_session": 93,
+    "coverage_min": 1.0,
+    "e2e_latency_s": {
+     "p50": 8.513261857442558,
+     "p95": 13.808775853994302,
+     "p99": 14.699476268761789
+    },
+    "worst_session_p95_s": 14.136662422376684,
+    "share_over_chunk_length": 0.9798611111111111,
+    "first_text_after_audio_start_s": {
+     "median": 2.6492124684154987,
+     "max": 3.4044111100956798
+    },
+    "drain_after_last_chunk_s": {
+     "median": 10.287865948863328,
+     "max": 12.150511453859508
+    },
+    "retrieve_s": {
+     "p50": 0.883175,
+     "p95": 1.646256
+    },
+    "generation_s": {
+     "p50": 2.403837,
+     "p95": 4.111727
+    },
+    "events_with_selected_slices": 1.0,
+    "mean_selected_slices": 3.9958041958041957,
+    "router_switches": 16,
+    "events_with_references": 0.8321678321678322,
+    "gpu_memory_mib_max": [
+     48235,
+     48528
+    ]
+   },
+   {
+    "sessions": 32,
+    "chunks_per_session": 93,
+    "coverage_min": 1.0,
+    "e2e_latency_s": {
+     "p50": 15.861297190422192,
+     "p95": 26.563582161720827,
+     "p99": 29.25220565165859
+    },
+    "worst_session_p95_s": 27.13759787576273,
+    "share_over_chunk_length": 1.0,
+    "first_text_after_audio_start_s": {
+     "median": 3.1106109227985144,
+     "max": 3.863074252381921
+    },
+    "drain_after_last_chunk_s": {
+     "median": 19.631950526032597,
+     "max": 25.51462943200022
+    },
+    "retrieve_s": {
+     "p50": 1.8781,
+     "p95": 3.653589
+    },
+    "generation_s": {
+     "p50": 2.878302,
+     "p95": 7.809529
+    },
+    "events_with_selected_slices": 1.0,
+    "mean_selected_slices": 3.9968695652173913,
+    "router_switches": 38,
+    "events_with_references": 0.8914782608695652,
+    "gpu_memory_mib_max": [
+     47461,
+     47906
+    ]
+   }
+  ]
+ },
+ "vllm_serve_bge_cpu": {
+  "audio_files": [
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/acl6060/2022.acl-long.110.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/acl6060/2022.acl-long.117.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/acl6060/2022.acl-long.268.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/acl6060/2022.acl-long.367.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/acl6060/2022.acl-long.590.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/medicine/sample_404_v2/404_v2.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/medicine/sample_545006_v2/545006_v2.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/medicine/sample_596001_v2/596001_v2.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/medicine/sample_605000_v2/605000_v2.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/medicine/sample_606_v2/606_v2.wav"
+  ],
+  "seconds_per_session": 180.0,
+  "warmup": {
+   "sessions": 1,
+   "chunks_per_session": 93,
+   "coverage_min": 1.0,
+   "e2e_latency_s": {
+    "p50": 0.6051345355808735,
+    "p95": 1.853012256370857,
+    "p99": 5.499065190590917
+   },
+   "worst_session_p95_s": 1.853012256370857,
+   "share_over_chunk_length": 0.044444444444444446,
+   "first_text_after_audio_start_s": {
+    "median": 12.882795768789947,
+    "max": 12.882795768789947
+   },
+   "drain_after_last_chunk_s": {
+    "median": 0.4255362958647311,
+    "max": 0.4255362958647311
+   },
+   "retrieve_s": {
+    "p50": 0.058461,
+    "p95": 0.2649524999999997
+   },
+   "generation_s": {
+    "p50": 0.3915555,
+    "p95": 0.9483072999999996
+   },
+   "events_with_selected_slices": 1.0,
+   "mean_selected_slices": 3.897727272727273,
+   "router_switches": 0,
+   "events_with_references": 0.7840909090909091,
+   "gpu_memory_mib_max": [
+    40885,
+    34602
+   ]
+  },
+  "levels": [
+   {
+    "sessions": 1,
+    "chunks_per_session": 93,
+    "coverage_min": 1.0,
+    "e2e_latency_s": {
+     "p50": 0.5443366498220712,
+     "p95": 1.6529115027980874,
+     "p99": 2.463552905945107
+    },
+    "worst_session_p95_s": 1.6529115027980874,
+    "share_over_chunk_length": 0.03333333333333333,
+    "first_text_after_audio_start_s": {
+     "median": 2.2441026708111167,
+     "max": 2.2441026708111167
+    },
+    "drain_after_last_chunk_s": {
+     "median": 0.5024225451052189,
+     "max": 0.5024225451052189
+    },
+    "retrieve_s": {
+     "p50": 0.0653685,
+     "p95": 0.6005205499999996
+    },
+    "generation_s": {
+     "p50": 0.309636,
+     "p95": 0.7580814499999999
+    },
+    "events_with_selected_slices": 1.0,
+    "mean_selected_slices": 4.0,
+    "router_switches": 0,
+    "events_with_references": 0.7840909090909091,
+    "gpu_memory_mib_max": [
+     36897,
+     34606
+    ]
+   },
+   {
+    "sessions": 8,
+    "chunks_per_session": 93,
+    "coverage_min": 1.0,
+    "e2e_latency_s": {
+     "p50": 5.885549241676927,
+     "p95": 12.96583314768504,
+     "p99": 15.076193165434523
+    },
+    "worst_session_p95_s": 13.779744407953695,
+    "share_over_chunk_length": 0.8833333333333333,
+    "first_text_after_audio_start_s": {
+     "median": 2.3000414832495153,
+     "max": 2.46733917016536
+    },
+    "drain_after_last_chunk_s": {
+     "median": 0.8919678486417979,
+     "max": 2.2674112152308226
+    },
+    "retrieve_s": {
+     "p50": 1.307044,
+     "p95": 6.188998
+    },
+    "generation_s": {
+     "p50": 0.913713,
+     "p95": 3.0974159999999995
+    },
+    "events_with_selected_slices": 1.0,
+    "mean_selected_slices": 3.995633187772926,
+    "router_switches": 6,
+    "events_with_references": 0.8355167394468704,
+    "gpu_memory_mib_max": [
+     38433,
+     35514
+    ]
+   },
+   {
+    "sessions": 16,
+    "chunks_per_session": 93,
+    "coverage_min": 1.0,
+    "e2e_latency_s": {
+     "p50": 6.1662402434740216,
+     "p95": 11.649675353011116,
+     "p99": 13.543284950130612
+    },
+    "worst_session_p95_s": 12.009755805204621,
+    "share_over_chunk_length": 0.9666666666666667,
+    "first_text_after_audio_start_s": {
+     "median": 2.3787755141966045,
+     "max": 3.6695585306733847
+    },
+    "drain_after_last_chunk_s": {
+     "median": 7.1621891390532255,
+     "max": 8.126675195991993
+    },
+    "retrieve_s": {
+     "p50": 1.597966,
+     "p95": 4.753552
+    },
+    "generation_s": {
+     "p50": 1.481867,
+     "p95": 3.361894950000001
+    },
+    "events_with_selected_slices": 1.0,
+    "mean_selected_slices": 3.99358059914408,
+    "router_switches": 21,
+    "events_with_references": 0.8266761768901569,
+    "gpu_memory_mib_max": [
+     41095,
+     36786
+    ]
+   },
+   {
+    "sessions": 32,
+    "chunks_per_session": 93,
+    "coverage_min": 1.0,
+    "e2e_latency_s": {
+     "p50": 12.457008045632392,
+     "p95": 20.10425607324578,
+     "p99": 22.52950418984052
+    },
+    "worst_session_p95_s": 25.66115895456168,
+    "share_over_chunk_length": 1.0,
+    "first_text_after_audio_start_s": {
+     "median": 2.803162075113505,
+     "max": 4.165997112635523
+    },
+    "drain_after_last_chunk_s": {
+     "median": 8.922521679196507,
+     "max": 11.116949820891023
+    },
+    "retrieve_s": {
+     "p50": 4.851855,
+     "p95": 7.52279524999992
+    },
+    "generation_s": {
+     "p50": 2.843271,
+     "p95": 5.8013831
+    },
+    "events_with_selected_slices": 1.0,
+    "mean_selected_slices": 3.9895433949111188,
+    "router_switches": 53,
+    "events_with_references": 0.9104217497385849,
+    "gpu_memory_mib_max": [
+     46493,
+     37764
+    ]
+   }
+  ]
+ },
+ "vllm_serve_bge_gpu": {
+  "audio_files": [
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/acl6060/2022.acl-long.110.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/acl6060/2022.acl-long.117.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/acl6060/2022.acl-long.268.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/acl6060/2022.acl-long.367.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/acl6060/2022.acl-long.590.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/medicine/sample_404_v2/404_v2.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/medicine/sample_545006_v2/545006_v2.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/medicine/sample_596001_v2/596001_v2.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/medicine/sample_605000_v2/605000_v2.wav",
+   "/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/medicine/sample_606_v2/606_v2.wav"
+  ],
+  "seconds_per_session": 180.0,
+  "warmup": {
+   "sessions": 1,
+   "chunks_per_session": 93,
+   "coverage_min": 1.0,
+   "e2e_latency_s": {
+    "p50": 0.5355564292985946,
+    "p95": 1.9094128562137485,
+    "p99": 5.636423615799284
+   },
+   "worst_session_p95_s": 1.9094128562137485,
+   "share_over_chunk_length": 0.05555555555555555,
+   "first_text_after_audio_start_s": {
+    "median": 13.014182304032147,
+    "max": 13.014182304032147
+   },
+   "drain_after_last_chunk_s": {
+    "median": 0.4152565421536565,
+    "max": 0.4152565421536565
+   },
+   "retrieve_s": {
+    "p50": 0.0720765,
+    "p95": 0.18233424999999992
+   },
+   "generation_s": {
+    "p50": 0.363562,
+    "p95": 1.0092930999999992
+   },
+   "events_with_selected_slices": 1.0,
+   "mean_selected_slices": 3.897727272727273,
+   "router_switches": 0,
+   "events_with_references": 0.7840909090909091,
+   "gpu_memory_mib_max": [
+    41881,
+    34602
+   ]
+  },
+  "levels": [
+   {
+    "sessions": 1,
+    "chunks_per_session": 93,
+    "coverage_min": 1.0,
+    "e2e_latency_s": {
+     "p50": 0.5662407726049423,
+     "p95": 1.1728301074588667,
+     "p99": 1.5504514836752787
+    },
+    "worst_session_p95_s": 1.1728301074588667,
+    "share_over_chunk_length": 0.0,
+    "first_text_after_audio_start_s": {
+     "median": 2.2855845941230655,
+     "max": 2.2855845941230655
+    },
+    "drain_after_last_chunk_s": {
+     "median": 0.6766341240145266,
+     "max": 0.6766341240145266
+    },
+    "retrieve_s": {
+     "p50": 0.12252450000000001,
+     "p95": 0.3811584499999999
+    },
+    "generation_s": {
+     "p50": 0.3142395,
+     "p95": 0.7848917999999999
+    },
+    "events_with_selected_slices": 1.0,
+    "mean_selected_slices": 4.0,
+    "router_switches": 0,
+    "events_with_references": 0.7931034482758621,
+    "gpu_memory_mib_max": [
+     39609,
+     34606
+    ]
+   },
+   {
+    "sessions": 8,
+    "chunks_per_session": 93,
+    "coverage_min": 1.0,
+    "e2e_latency_s": {
+     "p50": 0.8177709800656885,
+     "p95": 1.7447222678922116,
+     "p99": 2.203961229026315
+    },
+    "worst_session_p95_s": 1.9312341895187273,
+    "share_over_chunk_length": 0.030555555555555555,
+    "first_text_after_audio_start_s": {
+     "median": 2.4116919566877186,
+     "max": 2.686109323054552
+    },
+    "drain_after_last_chunk_s": {
+     "median": 0.6827126634307206,
+     "max": 0.97502501308918
+    },
+    "retrieve_s": {
+     "p50": 0.0917165,
+     "p95": 0.3369264499999999
+    },
+    "generation_s": {
+     "p50": 0.430039,
+     "p95": 1.0433302499999995
+    },
+    "events_with_selected_slices": 1.0,
+    "mean_selected_slices": 3.9955686853766617,
+    "router_switches": 3,
+    "events_with_references": 0.6307237813884786,
+    "gpu_memory_mib_max": [
+     39687,
+     34652
+    ]
+   },
+   {
+    "sessions": 16,
+    "chunks_per_session": 93,
+    "coverage_min": 1.0,
+    "e2e_latency_s": {
+     "p50": 1.2545310214627534,
+     "p95": 5.172308933944435,
+     "p99": 9.724554097373037
+    },
+    "worst_session_p95_s": 5.856990850437431,
+    "share_over_chunk_length": 0.24583333333333332,
+    "first_text_after_audio_start_s": {
+     "median": 2.419950808864087,
+     "max": 2.8945416430942714
+    },
+    "drain_after_last_chunk_s": {
+     "median": 1.4798153566662222,
+     "max": 1.9156755837611854
+    },
+    "retrieve_s": {
+     "p50": 0.159512,
+     "p95": 0.590504
+    },
+    "generation_s": {
+     "p50": 0.5306074999999999,
+     "p95": 1.466353
+    },
+    "events_with_selected_slices": 1.0,
+    "mean_selected_slices": 3.993333333333333,
+    "router_switches": 8,
+    "events_with_references": 0.6637037037037037,
+    "gpu_memory_mib_max": [
+     41107,
+     35948
+    ]
+   },
+   {
+    "sessions": 32,
+    "chunks_per_session": 93,
+    "coverage_min": 1.0,
+    "e2e_latency_s": {
+     "p50": 4.2688055818434805,
+     "p95": 16.858422969514496,
+     "p99": 22.726007302012295
+    },
+    "worst_session_p95_s": 18.318010024819518,
+    "share_over_chunk_length": 0.9451388888888889,
+    "first_text_after_audio_start_s": {
+     "median": 2.791503793792799,
+     "max": 5.911186769139022
+    },
+    "drain_after_last_chunk_s": {
+     "median": 3.9844515591394156,
+     "max": 4.334253518842161
+    },
+    "retrieve_s": {
+     "p50": 0.606987,
+     "p95": 2.917799
+    },
+    "generation_s": {
+     "p50": 1.246377,
+     "p95": 3.3857636999999996
+    },
+    "events_with_selected_slices": 1.0,
+    "mean_selected_slices": 3.9913731128684398,
+    "router_switches": 29,
+    "events_with_references": 0.7706685837526959,
+    "gpu_memory_mib_max": [
+     44945,
+     37952
+    ]
+   }
+  ]
+ }
+}

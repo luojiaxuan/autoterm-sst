@@ -11,6 +11,7 @@ GPU_UTIL="$4"
 
 ROOT=/mnt/data2/jiaxuanluo/autoterm_taurus_20261024
 CODE="${ROOT}/code"
+IO_ROOT=/home/jiaxuanluo/autoterm_taurus_20261024_io
 PYTHON_BIN=/home/jiaxuanluo/miniconda3/envs/spaCyEnv/bin/python
 MODEL=/mnt/data2/jiaxuanluo/RASST_release_runs/models/speech_llm_zh_cap16_denoise_budget_ttag_r32a32_ep1_taurus4_hf
 RETRIEVER=/mnt/data1/jiaxuanluo/rasst_eval/autoterm_capacity_100topics_20260710/models/rasst-hn1024.pt
@@ -51,7 +52,7 @@ case "${MODE}" in
     ;;
 esac
 
-mkdir -p "${ROOT}/tmp/server_${PORT}"
+mkdir -p "${IO_ROOT}/tmp/server_${PORT}"
 cd "${CODE}"
 echo "slurm_step=${SLURM_STEP_ID:-} CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-}"
 export HF_HUB_OFFLINE=1
@@ -88,5 +89,5 @@ exec "${PYTHON_BIN}" -u eval/streaming_sst/serve_glossary_capacity_sweep.py \
   --retrieval-candidate-budget 100 \
   --term-map-format tagged \
   --empty-term-map-policy none_block \
-  --tmp-dir "${ROOT}/tmp/server_${PORT}" \
+  --tmp-dir "${IO_ROOT}/tmp/server_${PORT}" \
   --log-level info

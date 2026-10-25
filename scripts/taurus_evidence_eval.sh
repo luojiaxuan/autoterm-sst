@@ -11,6 +11,7 @@ ORACLE="${4:-}"
 
 ROOT=/mnt/data2/jiaxuanluo/autoterm_taurus_20261024
 PYTHON_BIN=/home/jiaxuanluo/miniconda3/envs/spaCyEnv/bin/python
+IO_ROOT=/home/jiaxuanluo/autoterm_taurus_20261024_io
 EXTRA=()
 if [[ "${PRESET}" != "auto_working" ]]; then
   EXTRA+=(--allow-missing-router-meta)
@@ -41,5 +42,5 @@ exec "${PYTHON_BIN}" -u eval/streaming_sst/eval_mixed_audio_switch.py \
   --max-switch-events 20 \
   --no-assert \
   "${EXTRA[@]}" \
-  --out-json "${ROOT}/runs/${NAME}.json" \
-  --out-md "${ROOT}/runs/${NAME}.md"
+  --out-json "${IO_ROOT}/runs/${NAME}.json" \
+  --out-md "${IO_ROOT}/runs/${NAME}.md"

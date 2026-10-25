@@ -18,8 +18,6 @@ from pathlib import Path
 import numpy as np
 from scipy.stats import binomtest
 
-RUNS = ["known", "autoterm", "merged100k", "merged1m"]
-PAIRS = [("autoterm", "known"), ("autoterm", "merged100k"), ("autoterm", "merged1m"), ("known", "merged1m")]
 METRICS = ("term_acc", "bleu", "mt_bleu")
 
 
@@ -50,13 +48,18 @@ class Corpus:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo", type=Path, required=True)
-    ap.add_argument("--staging", type=Path, required=True)
+    ap.add_argument("--gloss-dir", type=Path, required=True)
+    ap.add_argument("--run-data", action="append", required=True, metavar="NAME=SEGMENTS_JSONL,BUNDLE_MANIFEST")
+    ap.add_argument("--pair", action="append", required=True, metavar="A,B")
     ap.add_argument("--occurrences", type=Path, required=True)
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--n-boot", type=int, default=10000)
     ap.add_argument("--seed", type=int, default=20261024)
     args = ap.parse_args()
     rng = np.random.default_rng(args.seed)
+    run_data = {name: paths.split(",") for name, paths in (spec.split("=", 1) for spec in args.run_data)}
+    RUNS = list(run_data)
+    PAIRS = [tuple(spec.split(",")) for spec in args.pair]
 
     occ = [json.loads(line) for line in open(args.occurrences, encoding="utf-8")]
     hit = {r: np.array([o[f"hit_{r}"] for o in occ], dtype=np.float64) for r in RUNS}
@@ -65,18 +68,18 @@ def main() -> None:
     sys.path.insert(0, str(args.repo))
     from eval.streaming_sst.score_terms import compile_term_mask_patterns, load_target_terms_for_masking, mask_target_terms
 
-    gloss = args.staging / "gold/RASST/data/glossaries"
+    gloss = args.gloss_dir
     patterns = {
         "acl": compile_term_mask_patterns(load_target_terms_for_masking(str(gloss / "acl6060_tagged_gt_raw_min_norm2.json"), "zh")),
         "medicine": compile_term_mask_patterns(load_target_terms_for_masking(str(gloss / "hard_medicine_glossary_raw_llm_judge_manual_zh215_unique212.json"), "zh")),
     }
     corpora, keys, block_of_wav, domain_of_block = {}, None, {}, {}
     for r in RUNS:
-        manifest = json.load(open(args.staging / "bundles" / r / "manifest.json", encoding="utf-8"))
+        manifest = json.load(open(run_data[r][1], encoding="utf-8"))
         for b in manifest["blocks"]:
             block_of_wav[b["wav"]] = int(b["block_index"])
             domain_of_block[int(b["block_index"])] = b["corpus"]
-        rows = [json.loads(line) for line in open(args.staging / "scores" / r / "segments.jsonl", encoding="utf-8") if line.strip()]
+        rows = [json.loads(line) for line in open(run_data[r][0], encoding="utf-8") if line.strip()]
         row_keys = [(row["wav"], row["sentence_index_in_talk"], row["reference"]) for row in rows]
         if keys is None:
             keys = row_keys

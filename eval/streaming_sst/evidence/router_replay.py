@@ -158,6 +158,7 @@ def main():
     ap.add_argument("--run", type=Path, required=True)
     ap.add_argument("--model", required=True)
     ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--generated", type=Path, help="generate_router_prototypes.py output; adds one variant per sample")
     args = ap.parse_args()
     device = "mps" if torch.backends.mps.is_available() else "cpu"
     tok = AutoTokenizer.from_pretrained(args.model)
@@ -183,8 +184,16 @@ def main():
 
     valid = np.ones(n, dtype=bool)
     valid[0] = False
+    variants = dict(VARIANTS)
+    if args.generated:
+        gen = json.loads(args.generated.read_text(encoding="utf-8"))["slices"]
+        for i in range(len(next(iter(gen.values()))["samples"])):
+            variants[f"generated_s{i}"] = {
+                name.removesuffix("_core_1k"): [entry["samples"][i][k] for k in ("description", "en", "zh")]
+                for name, entry in gen.items()
+            }
     table = {}
-    for vname, protos in VARIANTS.items():
+    for vname, protos in variants.items():
         names, c = centroids(model, tok, protos, device)
         for w, (emb, _) in ctx_emb.items():
             table[f"{vname}|w={w}"] = ranking_metrics(emb @ c.T, names, gold, valid, ks=(1, 2, 3, 4, 6))

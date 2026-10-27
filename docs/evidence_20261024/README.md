@@ -51,7 +51,11 @@
 | 4 | 72.6% | 85.0% | 1,809 |
 | 8 | 84.5% | 94.8% | 792 |
 
-线上 router(w=4,平滑 + 一致性门槛 + pin)在同一 run 中:top-1 88.5%,工作集覆盖 96.9%,19 次切换(9 次真实切换)。
+线上 router(w=4,领先幅度与一致性门槛 + pin)在同一 run 中:top-1 88.5%,工作集覆盖 96.9%,19 次切换(9 次真实切换)。
+
+关于 "平滑":`hybrid_window_topic` 里领域分数的 EMA(`ema_domain_scores`)只写进日志,排序与切换判断读的是未平滑的分数(`DomainScore.confidence = raw_final`);`--autoterm-ema-alpha 0.80` 只作用于语音 query embedding,而论文配置里语音 centroid 权重为 0。所以这套配置下 EMA 不影响路由,压住抖动的是领先幅度门槛(归一化后领先第二名 0.15、领先当前 slice 0.10)、连续 3 次一致、冷却和 pin。taurus_runs.md 里列的 "EMA 0.80" 按此理解。
+
+pin 的反事实(`eval/streaming_sst/evidence/pin_counterfactual.py` → `pin_counterfactual.json`):同一组 w=4 raw 分数上,每个窗口取线上 run 记录的已确认 slice(`active_preset`),比较不 pin(raw 前 4)与 pin(已确认 slice + 其余 raw 前 3)。工作集含正确 slice 的比例:不 pin 85.0%,pin 97.0%,线上实测 96.9%(反事实与线上一致)。router 已确认正确 slice、但它不在 raw 前 4 的窗口有 1,068 个,占已确认正确窗口的 13.8%;这些窗口分成 350 段,中位 2 窗(约 4 秒),60% 的段不超过 2 窗,最长 31 窗。只有 0.2% 落在讲座边界后 60 秒内(全部窗口中这一时段占 3.2%;边界后约 30 秒内已确认的仍是旧 slice,按构造不会计入),所以 pin 挡住的主要是讲座中途的短暂下滑,而不是话题切换时的混乱。局限:open-loop,raw 分数由保存的译文重算,线上 run 的分数缓存刷新节奏未复现。
 
 prototype 文本变体(w=4 前 4 覆盖):原版 85.0、只英文 85.4、只中文 81.0、只 description 83.3、独立改写 89.4、只写领域名 84.0。注意各变体同时改变了语言、条数与语义范围,这是联合敏感性,不是受控的措辞鲁棒性检验。
 

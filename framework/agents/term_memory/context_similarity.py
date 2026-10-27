@@ -87,6 +87,7 @@ class DomainDescriptionSimilarity:
             "device": self.device_name,
             "domains": list(self._domains),
             "truncation_side": self._tokenizer.truncation_side,
+            "prototypes": {domain: list(texts) for domain, texts in self.prototypes.items()},
         }
 
     def _encode_sync(self, texts: Sequence[str]):

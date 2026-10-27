@@ -101,3 +101,14 @@ AutoTerm 单独占一台服务:router 的 warmup / update / cooldown 计时用�
 - 所有 job step 与进程已结束,占位作业 48285 未改动。
 - 结果目录已从家目录挪回 `/mnt/data2/jiaxuanluo/autoterm_taurus_20261024/io/`(runs、scores、bundles、logs,176 MB;挪动前后整体哈希一致,家目录副本已删除)。
 - 汇总结果与分析输出已进 Git(本目录与 `taurus/` 子目录);原始 run JSON 含 ESO 讲座派生的中文译文,公开上传前需确认源数据许可,状态 HF pending,正本在上述 Taurus 目录。
+
+## 生成文本的闭环重跑(2026-10-26 PT 排队)
+
+目的:router 改用从各 slice glossary 自动生成的三行文本后,端到端结果是否与现用文本一致。open-loop replay 已显示两者打平(见 README),这里补闭环。
+
+- 文本:`configs/router_prototypes_generated_s0.json`,即 10 次生成里的第一组,事先定的规则,不按结果挑。
+- 设置:与上面 sst-a 的 AutoTerm-1k×4 重跑完全相同,只多一个 `--autoterm-context-prototypes`;单独占一台服务(router 计时用墙钟)。对照是同一硬件上的 AutoTerm 重跑 TERM_ACC 87.30 / BLEU 45.15 / MT-BLEU 42.36;两次 AutoTerm 跑之间的差异约 ±1 TERM_ACC 点,比较时以 talk 级配对检验为准。
+- 发射方式:`scripts/taurus_genproto_chain.sh` 在 tmux `sst-gchain` 里运行。2026-10-26 下午 PT 时占位作业 48285 的 GPU 0–5 全被 shiweiliu 在 Slurm 外启动的 SGLang 服务占着(每卡约 43 GB、利用率接近 100%),所以脚本先每 10 分钟查一次,有两张卡连续两次读数都空闲才起服务(端口 8041,tmux `sst-gp`),然后跑十 talk 闭环客户端、关服务、评分,成功时写 `runs/autoterm_genproto_s0_taurus.done`。
+- 健康检查:除 rag 与 context_similarity 都为 ready 外,还断言 health 里载入的 prototype 与文件逐字一致。
+- 进度与告警:等卡阶段 chain 日志每 10 分钟一行 `waiting`;运行阶段服务日志每 batch 一行 `RASST_BATCH_METRIC`。本机后台监视器每 10 分钟查一次,tmux 消失、日志出现 Traceback / out of memory / Killed、或运行阶段服务日志 15 分钟无新输出即视为失败;单会话闭环 run 不能续跑,失败则整段重跑。
+- IO 仍沿用家目录 `/home/jiaxuanluo/autoterm_taurus_20261024_io/` 的临时例外(`/mnt/data2` 只剩约 2.7G 且在被别的租户写),结果拉回并核对后挪回 `/mnt/data2/.../io/`。

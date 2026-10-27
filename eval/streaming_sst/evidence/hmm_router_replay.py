@@ -9,6 +9,7 @@ text did not change carries no new evidence and only applies the transition.
 
 Working-set policies compared on the same raw scores:
   map_pin    the MAP slice plus the three best other slices by raw score (pin analogue)
+  post_top4  the four slices with the highest posterior
   mass       the fewest slices whose posterior mass reaches c, at most four
   mass_fill  ``mass`` topped up to four slices by raw score
 Streams: the audited ten-talk run, and the synthetic fast-switching streams of
@@ -27,8 +28,8 @@ from router_replay import VARIANTS, centroids, encode
 
 CHUNK_S = 1.92
 MAX_SLICES = 4
-RHOS = (1e-4, 3e-4, 1e-3, 3e-3, 1e-2, 3e-2, 1e-1)
-TEMPS = (0.005, 0.01, 0.02, 0.04)
+RHOS = (1e-5, 3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2, 3e-2, 1e-1)
+TEMPS = (0.005, 0.01, 0.02, 0.04, 0.08, 0.16, 0.32)
 MASSES = (0.9, 0.95, 0.99)
 PIECES = (15, 30, 60, 120, 300)
 
@@ -87,10 +88,11 @@ def working_sets(post, scores, mass):
     post_order = np.argsort(-post, axis=1)
     cum = np.cumsum(np.take_along_axis(post, post_order, axis=1), axis=1)
     size = np.minimum(np.argmax(cum >= mass, axis=1) + 1, MAX_SLICES)
-    sets = {"map_pin": [], "mass": [], "mass_fill": []}
+    sets = {"map_pin": [], "post_top4": [], "mass": [], "mass_fill": []}
     for t in range(len(post)):
         top = post_order[t, 0]
         sets["map_pin"].append({top, *[d for d in raw_order[t] if d != top][:MAX_SLICES - 1]})
+        sets["post_top4"].append(set(post_order[t, :MAX_SLICES]))
         chosen = set(post_order[t, :size[t]])
         sets["mass"].append(chosen)
         sets["mass_fill"].append(chosen | set([d for d in raw_order[t] if d not in chosen][:MAX_SLICES - len(chosen)]))

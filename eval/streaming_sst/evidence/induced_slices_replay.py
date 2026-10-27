@@ -12,6 +12,9 @@ then assigned to the nearest centroid. For every decoder window of the audited r
 are admitted in order of cos(context, slice centroid) while the total stays within a term
 budget B (larger slices that do not fit are skipped). The metric is the share of the 2,047
 gold term occurrences whose term is inside the active slices at the window that completes it.
+An oracle that ranks slices by how many gold occurrences of the talk's domain they hold
+bounds what any router could reach with a given partition; ``slices_for_90pct`` counts how
+many slices (and terms) that oracle needs to cover 90% of a domain's gold occurrences.
 """
 
 import argparse
@@ -127,13 +130,34 @@ def main():
             for i, row in zip(items, labels):
                 by_term.setdefault(norm(i["term"]), set()).update(int(s) for s in np.flatnonzero(row))
         row = {"slices": len(slice_centroids), "size_min": int(sizes.min()), "size_median": float(np.median(sizes)), "size_max": int(sizes.max()), **(extra or {})}
+        counts = {d: np.zeros(len(slice_centroids)) for d in ("nlp", "medicine")}
+        for term, d in zip(occ_terms, occ_domain):
+            for s in by_term.get(term, ()):
+                counts[d][s] += 1
+        oracle_order = {d: np.argsort(-c) for d, c in counts.items()}
+        row["slices_for_90pct"] = {}
+        for d, order in oracle_order.items():
+            total = int((occ_domain == d).sum())
+            cum = np.cumsum(counts[d][order])
+            n90 = int(np.searchsorted(cum, 0.9 * total) + 1)
+            row["slices_for_90pct"][d] = {"slices": n90, "terms": int(sizes[order[:n90]].sum())}
         for budget in BUDGETS:
             active = route(ctx_emb, windows, slice_centroids, sizes, budget)
             hits, present = coverage(active, by_term, occ_windows, occ_terms)
+            oracle = {}
+            for w, d in zip(occ_windows, occ_domain):
+                used, chosen = 0, set()
+                for s in oracle_order[d]:
+                    if used + sizes[s] <= budget:
+                        chosen.add(int(s))
+                        used += sizes[s]
+                oracle[w] = chosen
+            oracle_hits, _ = coverage(oracle, by_term, occ_windows, occ_terms)
             row[f"B={budget}"] = {
                 "cover": round(float(hits.mean()), 4),
                 "cover_nlp": round(float(hits[occ_domain == "nlp"].mean()), 4),
                 "cover_medicine": round(float(hits[occ_domain == "medicine"].mean()), 4),
+                "oracle_cover": round(float(oracle_hits.mean()), 4),
                 "mean_active_slices": round(float(np.mean([len(a) for a in active.values()])), 2),
             }
         row["catalog_ceiling"] = round(float(present.mean()), 4)

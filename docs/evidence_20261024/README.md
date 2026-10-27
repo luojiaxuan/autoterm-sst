@@ -55,7 +55,7 @@
 
 prototype 文本变体(w=4 前 4 覆盖):原版 85.0、只英文 85.4、只中文 81.0、只 description 83.3、独立改写 89.4、只写领域名 84.0。注意各变体同时改变了语言、条数与语义范围,这是联合敏感性,不是受控的措辞鲁棒性检验。
 
-从 glossary 自动生成 prototype(`scripts/term_memory/generate_router_prototypes.py` → `generated_prototypes.json`;replay 加 `--generated` → `router_replay_generated.json`,同一次运行里原有 24 项结果逐位复现)。现用的 `DOMAIN_ROUTER_PROTOTYPES` 是当初让 LLM 按领域名一次写成的,没有读 glossary。这里把每个 1k slice 的术语(`英文 => 中文`,全部给,不抽样)交给 `gpt-5.5-2026-04-23`(带日期的固定快照),生成同结构的三行:description、列 7–10 个核心主题的英文句、它的中文翻译。生成前去掉评测集来源的条目(`acl_tagged_gt` 238 条、`medicine_hard_llm_judge_manual` 212 条),prototype 不接触测试术语;NLP 用剩下的 762 条、medicine 788 条,其余 8 个 slice 都是 Wikipedia/Wikidata 来源,用满 1,000 条。每个 slice 独立生成 10 次,衡量单次措辞的偶然性。
+从 glossary 自动生成 prototype(`scripts/term_memory/generate_router_prototypes.py` → `generated_prototypes.json`;replay 加 `--generated` → `router_replay_generated.json`,同一次运行里原有 24 项结果逐位复现)。现用文本是让 AI 写好后写死在代码里的,当时给 AI 的输入没有留记录:description 一行来自 a1e6033(2026-06-20 PT)的 slice 表;中英两句来自 fe313bd(2026-07-10 PT),同一 commit 还加了 RealSI 领域映射和 load balancing、database 等关键词,NLP 那句也写了 servers、databases、load balancing,所以不只是按领域名写的。这里把每个 1k slice 的术语(`英文 => 中文`,全部给,不抽样)交给 `gpt-5.5-2026-04-23`(带日期的固定快照),生成同结构的三行:description、列 7–10 个核心主题的英文句、它的中文翻译。生成前去掉评测集来源的条目(`acl_tagged_gt` 238 条、`medicine_hard_llm_judge_manual` 212 条),prototype 不接触测试术语;NLP 用剩下的 762 条、medicine 788 条,其余 8 个 slice 都是 Wikipedia/Wikidata 来源,用满 1,000 条。每个 slice 独立生成 10 次,衡量单次措辞的偶然性。
 
 | 指标 | 现用文本 | 自动生成 10 次:中位数 | 范围 | 不低于现用 |
 |---|---|---|---|---|
@@ -63,7 +63,7 @@ prototype 文本变体(w=4 前 4 覆盖):原版 85.0、只英文 85.4、只中�
 | w=4 top-1 | 72.6 | 70.8 | 67.3–77.8 | 3/10 |
 | w=8 前 4 覆盖 | 94.8 | 95.0 | 94.2–97.1 | 7/10 |
 
-读法:自动生成与现用文本打平(前 4 覆盖中位 +0.8 点、top-1 中位 −1.8 点),仍落在上面措辞变体的区间里;不同次生成之间相差 7 点,比生成与现用之差大。最先试跑过一次 3 次采样(前 4 覆盖 86.8 / 95.2 / 86.0),样本间差异太大,改为 10 次;试跑的文本已被 10 次结果覆盖,没有保留。生成文本也暴露了 slice 的实际内容:`legal` 被概括为政治、法律与国际事务,`science` 被概括为泛学科分类。局限同上:open-loop、裸相似度、gold 只有 NLP 与 medicine;线上 router 换用生成文本需要闭环重跑才能报告端到端结果。
+读法:自动生成与现用文本打平(前 4 覆盖中位 +0.8 点、top-1 中位 −1.8 点),仍落在上面措辞变体的区间里;不同次生成之间相差 7 点,比生成与现用之差大。最先试跑过一次 3 次采样(前 4 覆盖 86.8 / 95.2 / 86.0),样本间差异太大,改为 10 次;试跑的文本已被 10 次结果覆盖,没有保留。生成文本也暴露了 slice 的实际内容:`legal` 被概括为政治、法律与国际事务,`science` 被概括为泛学科分类。局限同上:open-loop、裸相似度、gold 只有 NLP 与 medicine;线上 router 换用生成文本需要闭环重跑才能报告端到端结果。服务已能用 `--autoterm-context-prototypes` 读入生成文本(health 的 `context_similarity.prototypes` 会列出实际载入的文本);闭环用事先定下的第一组生成结果 `configs/router_prototypes_generated_s0.json`(前 4 覆盖 87.0、top-1 68.6),不挑最好的一组,对照是同一硬件上的 AutoTerm 重跑(TERM_ACC 87.30)。运行状态见 `taurus_runs.md`。
 
 子领域测试(NLP、medicine 各拆 8 个子领域,共 24 个 prototype,w=4):同领域 slice 占前 4 槽位 78.3%(随机 33.3%);正确领域进入前 4 的 90.1% 只略高于随机的 82.9%,不能作为证据。肿瘤学讲座中 top-1 为肿瘤学或放疗的无条件比例 48.2%。只有 prototype,没有真实子领域索引,也没有对照专科的 gold,不能回答 "相近领域" 的质疑。
 

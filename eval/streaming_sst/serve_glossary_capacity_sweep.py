@@ -86,6 +86,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--autoterm-context-window-chunks", type=int, default=12)
     parser.add_argument("--autoterm-context-model", default="BAAI/bge-m3")
     parser.add_argument("--autoterm-context-device", default="cpu")
+    parser.add_argument(
+        "--autoterm-context-prototypes",
+        type=Path,
+        help="JSON mapping each domain to the texts the router embeds; default is the slice description plus the built-in sentences",
+    )
     parser.add_argument("--autoterm-context-weight", type=float, default=0.80)
     parser.add_argument("--autoterm-text-weight", type=float, default=0.10)
     parser.add_argument("--autoterm-domain-probe-weight", type=float, default=0.07)
@@ -218,6 +223,7 @@ def build_agent(
         router_context_similarity_weight=float(
             getattr(args, "autoterm_context_weight", 0.80)
         ),
+        router_context_similarity_prototypes_path=str(args.autoterm_context_prototypes or ""),
         router_text_topic_weight=float(getattr(args, "autoterm_text_weight", 0.10)),
         router_domain_probe_weight=float(
             getattr(args, "autoterm_domain_probe_weight", 0.07)

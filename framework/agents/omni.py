@@ -313,6 +313,7 @@ class OmniConfig:
     router_context_similarity_device: str = "cpu"
     router_context_similarity_batch_size: int = 32
     router_context_similarity_weight: float = 0.60
+    router_context_similarity_prototypes_path: str = ""
     router_text_topic_weight: float = 0.25
     router_domain_probe_weight: float = 0.10
     router_speech_centroid_weight: float = 0.03
@@ -781,6 +782,11 @@ class OmniAgent(Agent):
         self,
         catalog: GlossaryCatalog,
     ) -> Dict[str, Tuple[str, ...]]:
+        if self.config.router_context_similarity_prototypes_path:
+            texts = json.loads(
+                Path(self.config.router_context_similarity_prototypes_path).read_text(encoding="utf-8")
+            )
+            return {item.domain_id: tuple(texts[item.domain_id]) for item in self._domain_slices_for(catalog)}
         prototypes: Dict[str, List[str]] = {}
         for item in self._domain_slices_for(catalog):
             description = str(item.description or "").strip()

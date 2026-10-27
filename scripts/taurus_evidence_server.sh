@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # note (luojiaxuan): Serve the RASST agent for the ten-talk evidence runs on Taurus.
-# note (luojiaxuan): Usage: taurus_evidence_server.sh <port> <routed|fixed> <max_num_seqs> <gpu_memory_utilization>
+# note (luojiaxuan): Usage: taurus_evidence_server.sh <port> <routed|fixed> <max_num_seqs> <gpu_memory_utilization> [router_prototypes_json]
 # note (luojiaxuan): Run it inside a Slurm step that was granted two GPUs; the retriever shares the first one.
 set -euo pipefail
 
@@ -8,6 +8,7 @@ PORT="$1"
 MODE="$2"
 MAX_SEQS="$3"
 GPU_UTIL="$4"
+PROTOTYPES="${5:-}"
 
 ROOT=/mnt/data2/jiaxuanluo/autoterm_taurus_20261024
 CODE="${ROOT}/code"
@@ -39,6 +40,9 @@ case "${MODE}" in
       --autoterm-warmup-sec 6.0
       --autoterm-cooldown-sec 30.0
     )
+    if [[ -n "${PROTOTYPES}" ]]; then
+      POLICY_ARGS+=(--autoterm-context-prototypes "${PROTOTYPES}")
+    fi
     ;;
   fixed)
     POLICY_ARGS=(

@@ -39,6 +39,9 @@ from framework.agents.term_memory.topic_router import DomainSlice, RouterSession
 CHUNK_S = 1.92
 W = 4
 RHO = 1e-3
+# Chunks between a routing update and the first chunk that sees it (--delay-chunks). The deployed
+# router scores in a background worker; one chunk is the bound for a stream fed faster than real time.
+DELAY = 0
 # The server's clock is far from zero; its guards read a zero timestamp as "never".
 T0 = 1000.0
 # Router flags of the live similarity-router runs (scripts/radix_stream_eval/realsi.sh, ROUTED).
@@ -99,11 +102,13 @@ def similarity_rules(names, cos, contexts, times, default):
     router = build_router(names)
     state = RouterSessionState(active_preset_id=default, active_domain_id=default,
                                created_s=T0, last_decision_s=T0, last_switch_s=T0)
-    top, working, scores = [], [], {}
+    top, working, scores, pending = [], [], {}, []
     for t, text, fresh in refreshes(contexts, times, float(router.config.update_interval_sec)):
         now = T0 + float(times[t])
         if fresh:
-            scores = {n: float(v) for n, v in zip(names, cos[t])}
+            pending.append((t + DELAY, {n: float(v) for n, v in zip(names, cos[t])}))
+        while pending and pending[0][0] <= t:
+            scores = pending.pop(0)[1]
         decision = router.observe(state, None, [], now, router_text=text,
                                   router_text_source="generated_target" if text else "none",
                                   domain_probe_scores={}, context_similarity_scores=scores)
@@ -129,6 +134,9 @@ def language_model_hmm(names, probs, contexts, times, interval=5.0):
         ranked = sorted(posterior, key=lambda n: -posterior[n])
         top.append(ranked[0] if ranked else "")
         working.append(ranked[:4])
+    if DELAY:
+        top = [""] * DELAY + top[:-DELAY]
+        working = [[] for _ in range(DELAY)] + working[:-DELAY]
     return top, working
 
 
@@ -192,8 +200,11 @@ def main():
     ap.add_argument("--fine-llm", type=Path, required=True)
     ap.add_argument("--occurrences", type=Path, required=True, help="term_occurrences.jsonl.gz of fine_slice_replay.py")
     ap.add_argument("--wall-clock-check", action="store_true")
+    ap.add_argument("--delay-chunks", type=int, default=0)
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()
+    global DELAY
+    DELAY = args.delay_chunks
     import llm_router_replay as lrr
 
     names, cosine = encoder(args.encoder)

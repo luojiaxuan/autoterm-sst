@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
-# Watch the ten-talk stream job on a Radix node from the Mac every 5 minutes. Exits 0 when out/done appears,
+# Watch the ten-talk stream job on a Radix node from the Mac every 5 minutes. Exits 0 when the done marker
+# (default out/done) appears,
 # 1 when the container is gone, a log shows Traceback, out of memory or Killed, or nothing under the run
 # directory changed for 20 minutes. Usage: monitor.sh <receipt> <container> <run dir under /data/luojiaxuan/home>
+# [done marker relative to the run dir]
 set -uo pipefail
-RECEIPT=$1 NAME=$2 RUN=$3
+RECEIPT=$1 NAME=$2 RUN=$3 DONE=${4:-out/done}
 HELPER=~/.claude/skills/radix-gpu-nodes/scripts/radix_node.py
 while true; do
   out=$(timeout 120 python3 "$HELPER" ssh --receipt "$RECEIPT" -- "
     cd $RUN 2>/dev/null || { echo STATE missing-dir; exit; }
     echo STATE \$(podman ps -a --filter name=^$NAME\$ --format '{{.Status}}' | cut -d' ' -f1)
-    echo DONE \$([ -f out/done ] && echo yes || echo no)
+    echo DONE \$([ -f $DONE ] && echo yes || echo no)
     echo AGE \$(( \$(date +%s) - \$(find . -type f -printf '%T@\n' 2>/dev/null | sort -n | tail -1 | cut -d. -f1) ))
     echo ERR \$(grep -l -E 'Traceback|out of memory|OutOfMemoryError|Killed' logs/*.log download.log 2>/dev/null | tr '\n' ' ')
     echo OUTS \$(ls out 2>/dev/null | tr '\n' ' ')

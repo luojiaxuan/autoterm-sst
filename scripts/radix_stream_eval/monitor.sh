@@ -10,7 +10,7 @@ while true; do
     cd $RUN 2>/dev/null || { echo STATE missing-dir; exit; }
     echo STATE \$(podman ps -a --filter name=^$NAME\$ --format '{{.Status}}' | cut -d' ' -f1)
     echo DONE \$([ -f out/done ] && echo yes || echo no)
-    echo AGE \$(( \$(date +%s) - \$(find . -type f -printf '%T@\n' | sort -n | tail -1 | cut -d. -f1) ))
+    echo AGE \$(( \$(date +%s) - \$(find . -type f -printf '%T@\n' 2>/dev/null | sort -n | tail -1 | cut -d. -f1) ))
     echo ERR \$(grep -l -E 'Traceback|out of memory|OutOfMemoryError|Killed' logs/*.log download.log 2>/dev/null | tr '\n' ' ')
     echo OUTS \$(ls out 2>/dev/null | tr '\n' ' ')
     echo MEMFREE \$(free -g | awk '/Mem:/ {print \$7\"/\"\$2}')

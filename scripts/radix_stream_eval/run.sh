@@ -10,7 +10,10 @@ mkdir -p code out logs tmp
 tar xzf code.tar.gz -C code
 tar xzf retriever.tar.gz -C code
 cp /data/inputs/slices/manifest.json code/manifest.json
-pip install -q "transformers==4.57.3" "peft==0.18.0" "soundfile==0.13.1" "librosa==0.11.0" "qwen-omni-utils==0.0.8" "accelerate==1.12.0" "websockets==15.0.1" faiss-cpu pyyaml > logs/pip.log 2>&1
+# The image's vLLM needs its own Transformers v5, so it is held fixed while the rest is installed.
+TF=$(python3 -c "import transformers; print(transformers.__version__)")
+pip install -q peft soundfile librosa qwen-omni-utils faiss-cpu "transformers==$TF" > logs/pip.log 2>&1
+pip freeze > logs/pip_freeze.txt
 IFS=, read -r -a GPUS <<< "${CUDA_VISIBLE_DEVICES}"
 UTIL=${UTIL:-0.33}
 SLICES=nlp_core_1k,medicine_core_1k,education_core_1k,finance_core_1k,legal_core_1k,environment_core_1k,entertainment_core_1k,science_core_1k,sports_core_1k,art_core_1k

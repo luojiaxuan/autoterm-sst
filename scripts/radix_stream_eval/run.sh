@@ -8,8 +8,13 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 cd "$HERE"
 mkdir -p code out logs tmp
 tar xzf code.tar.gz -C code
-tar xzf retriever.tar.gz -C code
+tar xzf rasst.tar.gz
+# The framework imports the RASST retriever and agents from this checkout.
+export RASST_ACTIVE_CODE_ROOT="$HERE/rasst"
 cp /data/inputs/slices/manifest.json code/manifest.json
+# The ACL segment lists name the Taurus location of the audio.
+sed -i -E 's#[^" ]*/acl6060_zh_segments/#/data/inputs/acl6060_zh_segments/#g' \
+  /data/inputs/acl6060_zh_segments/segments.meta.jsonl /data/inputs/acl6060_zh_segments/audio.yaml
 # The image's vLLM needs its own Transformers v5, so it is held fixed while the rest is installed.
 TF=$(python3 -c "import transformers; print(transformers.__version__)")
 pip install -q peft soundfile librosa audioread av qwen-omni-utils faiss-cpu "transformers==$TF" > logs/pip.log 2>&1
@@ -23,7 +28,7 @@ BASE=(--host 127.0.0.1 --model-path /data/models/zh --manifest "$HERE/code/manif
   --vllm-limit-audio 16 --vllm-enforce-eager 1 --enable-prefix-caching 1 --disable-custom-all-reduce 1
   --vllm-use-v1 1 --vllm-enable-v1-multiprocessing 1 --vllm-worker-multiproc-method spawn
   --vllm-moe-use-deep-gemm 0 --vllm-use-fused-moe-grouped-topk 0 --nccl-p2p-disable 1 --nccl-ib-disable 1
-  --torch-nccl-enable-monitoring 0 --extra-python-path "$HERE/code/retriever"
+  --torch-nccl-enable-monitoring 0 --extra-python-path "$HERE/rasst/retriever"
   --scheduler-batch-size 32 --max-inflight-batches 2 --max-new-tokens 40 --rag-top-k 10
   --rag-score-threshold 0.78 --retrieval-candidate-budget 100 --term-map-format tagged
   --empty-term-map-policy none_block --log-level info --vllm-tp-size "${#GPUS[@]}" --gpu-memory-utilization "$UTIL")
@@ -44,9 +49,16 @@ serve() {  # serve <port> <name> [policy args]
     --tmp-dir "$HERE/tmp/$name" "$@" > "../logs/server_$name.log" 2>&1 &
   echo $!
 }
-ready() {
-  for _ in $(seq 1 720); do curl -sf "http://127.0.0.1:$1/health" >/dev/null && return 0; sleep 5; done
-  return 1
+ready() {  # ready <port> <routed|fixed>: wait for /health, then require retrieval (and routing) to be up
+  for _ in $(seq 1 720); do curl -sf "http://127.0.0.1:$1/health" >/dev/null && break; sleep 5; done
+  curl -sf "http://127.0.0.1:$1/health" > "../logs/health_$1.json"
+  python3 - "../logs/health_$1.json" "$2" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+assert d["rag"]["status"] == "ready", d["rag"]
+if sys.argv[2] == "routed":
+    assert d["context_similarity"]["status"] == "ready", d["context_similarity"]
+PY
 }
 client() {  # client <port> <preset> <name> [extra args]
   local port=$1 preset=$2 name=$3; shift 3
@@ -70,7 +82,7 @@ phase() {  # phase <port> <name> <server args...> -- <client spec "preset name [
   [[ $todo -eq 1 ]] || return 0
   local pid pids=()
   pid=$(serve "$port" "$name" "${args[@]}")
-  ready "$port"
+  ready "$port" "$([[ $name == fixed ]] && echo fixed || echo routed)"
   for spec in "${specs[@]}"; do read -r -a f <<< "$spec"; client "$port" "${f[@]}" & pids+=($!); done
   wait "${pids[@]}" || true
   kill "$pid" 2>/dev/null || true

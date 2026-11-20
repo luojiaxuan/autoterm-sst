@@ -11,4 +11,8 @@ snapshot_download("gavinlaw/rasst-demo-acl6060-zh-segments", repo_type="dataset"
                   revision="a10a6a9bab8758bdc50607b50c62f060ed623109")
 snapshot_download("gavinlaw/rasst-main-result-data", repo_type="dataset", local_dir="/data/inputs/main",
                   allow_patterns=["main_result/audio/medicine/*"], revision="96b44797d8926d14ef7535e831b861b6af05a28e")
+# The RASST retriever loads these by repository id from the Hugging Face cache.
+for repo, patterns in (("Atotti/Qwen3-Omni-AudioTransformer", None), ("BAAI/bge-m3", None),
+                       ("openai/whisper-large-v3", ["*.json", "*.txt"])):
+    print(repo, snapshot_download(repo, allow_patterns=patterns), flush=True)
 print("downloaded", flush=True)

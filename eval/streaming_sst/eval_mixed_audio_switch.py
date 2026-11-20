@@ -1415,6 +1415,14 @@ def main() -> None:
         default="alternating",
     )
     ap.add_argument("--seed", type=int, default=20260707)
+    ap.add_argument(
+        "--playlist",
+        default="",
+        help=(
+            "JSON list of {item_id, domain, corpus, wav} entries streamed in the listed order, "
+            "in place of the ACL and medicine blocks; each wav is 16 kHz mono"
+        ),
+    )
     ap.add_argument("--preset", default="auto_working")
     ap.add_argument(
         "--oracle-preset-map",
@@ -1475,7 +1483,14 @@ def main() -> None:
     except ValueError as exc:
         ap.error(str(exc))
 
-    if args.selected_window_protocol:
+    if args.playlist:
+        medicine_ids = []
+        entries = json.loads(Path(args.playlist).read_text(encoding="utf-8"))
+        blocks = [
+            AudioBlock(str(e["item_id"]), str(e["domain"]), str(e["corpus"]), [str(e["wav"])])
+            for e in entries
+        ]
+    elif args.selected_window_protocol:
         if args.max_seconds_per_item > 0 or args.max_acl_segs_per_talk > 0:
             ap.error(
                 "--selected-window-protocol cannot be combined with "

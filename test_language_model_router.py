@@ -59,3 +59,4 @@ def test_topic_follows_the_posterior_top_slice():
     assert topic["active_domain"] == "medicine"
     assert topic["confidence"] == 0.7
     assert topic["switch_count"] == 1
+    assert topic["router"] == "language_model"

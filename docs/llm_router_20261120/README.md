@@ -138,3 +138,4 @@ RASST 论文的 De、Ja 运行（`release_profiles_taurusdata2_20260528T000922Z/
 - 检索器按 `RASST_ACTIVE_CODE_ROOT` 找 RASST 代码，默认是 Taurus 路径；它还按仓库名从 HF 缓存加载 `Atotti/Qwen3-Omni-AudioTransformer`、`BAAI/bge-m3` 和 `openai/whisper-large-v3` 的特征提取配置，离线模式下要先缓存。
 - `vllm/vllm-openai:v0.24.0` 只接受 Transformers v5，不能再按旧环境钉 4.57.3；`qwen-omni-utils` 依赖 `audioread`，要显式装。
 - ACL 分段的 `segments.meta.jsonl` 与 `audio.yaml` 写的是 Taurus 绝对路径，换机器要改写。
+- 访客授予有每卡显存额度（R550 是 59,392 MiB），cuda:0 上除 vLLM 外还有检索器、BGE-M3 和 4B 路由模型，合计约 10.9 GB。H200 上 `UTIL=0.33` 时 LLM 路由阶段 GPU 0 用到 60,079 MiB，超额；`realsi.sh` 默认改为 0.32。

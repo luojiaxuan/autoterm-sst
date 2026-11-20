@@ -2251,13 +2251,14 @@ class OmniAgent(Agent):
         if self.config.router_context_switch_rate > 0.0 and session.active_retrieval_slices:
             # The language-model router's topic is its posterior argmax, the first slice of the working set.
             top = session.active_retrieval_slices[0]
-            return glossary_topic_meta(
+            meta = glossary_topic_meta(
                 active_domain=top.domain,
                 confidence=float(session.router_posterior.get(top.domain, 0.0)),
                 active_glossary_preset=top.preset_id,
                 switch_count=session.top_slice_changes,
                 last_reason="posterior argmax",
             )
+            return {**meta, "router": "language_model"}
         return glossary_topic_meta(
             active_domain=session.active_domain,
             confidence=session.topic_confidence,

@@ -1390,7 +1390,7 @@
                 activeGlossaryPreset: topic.active_glossary_preset || topic.activeGlossaryPreset || adaptiveInfo.activeGlossaryPreset,
                 activeTerms: Number((extra && extra.active_terms) || adaptiveInfo.activeTerms || 0),
                 switchCount: Number(topic.switch_count != null ? topic.switch_count : adaptiveInfo.switchCount) || 0,
-                router: adaptiveInfo.router,
+                router: topic.router || adaptiveInfo.router,
                 updatedAt: Date.now()
             };
             if (!adaptiveInfo.activeTerms) {

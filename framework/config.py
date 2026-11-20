@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 from framework.agent import Agent
 from framework.router import AgentRouter
@@ -47,6 +47,28 @@ AGENT_FACTORIES: Dict[str, Callable[[], Agent]] = {
 }
 
 
+def _language_servers() -> Dict[str, Tuple[str, Optional[str]]]:
+    """``RASST_FRAMEWORK_LANGUAGE_SERVERS``: ``pair=url`` or ``pair=url|model`` entries separated by ``;``.
+
+    Each entry builds one RASST agent loaded for that language pair and backed by
+    the vllm serve process at that URL. ``model`` names the served model, which is
+    how one multi-LoRA server exposes several language adapters, for example
+    ``English -> Chinese=http://127.0.0.1:18700|zh;English -> German=http://127.0.0.1:18700|de``.
+    """
+    raw = os.environ.get("RASST_FRAMEWORK_LANGUAGE_SERVERS", "")
+    servers: Dict[str, Tuple[str, Optional[str]]] = {}
+    for item in raw.split(";"):
+        if item.strip():
+            pair, target = item.split("=", 1)
+            url, _, model = target.partition("|")
+            servers[pair.strip()] = (url.strip(), model.strip() or None)
+    return servers
+
+
+def language_agent_key(agent_type: str, language_pair: str) -> str:
+    return f"{agent_type}@{language_pair}"
+
+
 def _requested_agents(explicit: Optional[str]) -> List[str]:
     raw = explicit if explicit is not None else os.environ.get("RASST_FRAMEWORK_AGENTS", DEFAULT_AGENTS)
     names = [item.strip() for item in raw.split(",") if item.strip()]
@@ -59,7 +81,24 @@ def build_router(
 ) -> AgentRouter:
     requested = _requested_agents(agents)
     built: Dict[str, Agent] = {}
+    servers = _language_servers()
+    if servers:
+        from framework.agents.omni import OmniAgent
+
+        for pair, (url, model) in servers.items():
+            key = language_agent_key("RASST", pair)
+            built[key] = OmniAgent(
+                name="RASST",
+                model_id="qwen3_omni",
+                language_pair=pair,
+                vllm_serve_base_url=url,
+                served_model_name=model,
+            )
+            logger.info("constructed agent %r backed by %s model %s", key, url, model)
+        requested = list(built)
     for name in requested:
+        if name in built:
+            continue
         factory = AGENT_FACTORIES.get(name)
         if factory is None:
             logger.warning("unknown agent %r requested; skipping (known: %s)", name, list(AGENT_FACTORIES))

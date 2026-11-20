@@ -533,7 +533,14 @@ class OmniSession:
 class OmniAgent(Agent):
     """Omni-model streaming SST agent (RASST / Qwen3-Omni / MiniCPM-o)."""
 
-    def __init__(self, name: str = "RASST", model_id: str = "qwen3_omni") -> None:
+    def __init__(
+        self,
+        name: str = "RASST",
+        model_id: str = "qwen3_omni",
+        language_pair: Optional[str] = None,
+        vllm_serve_base_url: Optional[str] = None,
+        served_model_name: Optional[str] = None,
+    ) -> None:
         self.name = name
         self.model_id = model_id
         self.template = get_template(model_id)
@@ -548,7 +555,15 @@ class OmniAgent(Agent):
                 backend_kind=backend_override,
                 **({"served_model_name": served} if served else {}),
             )
+        if served_model_name is not None:
+            import dataclasses  # noqa: WPS433
+
+            self.template = dataclasses.replace(self.template, served_model_name=served_model_name)
         self.config = OmniConfig.from_env(self.template)
+        if language_pair is not None:
+            self.config.language_pair = language_pair
+        if vllm_serve_base_url is not None:
+            self.config.vllm_serve_base_url = vllm_serve_base_url
         self.prompt = PromptBuilder(
             system_prompt_style=self.config.system_prompt_style,
             term_map_format=self.config.term_map_format,

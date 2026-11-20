@@ -120,7 +120,11 @@ class AgentRouter:
             pass
 
     # ------------------------------------------------------------------ routing
-    def _pick_agent(self, agent_type: Optional[str]) -> Tuple[str, Agent]:
+    def _pick_agent(self, agent_type: Optional[str], language_pair: Optional[str] = None) -> Tuple[str, Agent]:
+        if agent_type and language_pair:
+            key = f"{agent_type}@{language_pair}"
+            if key in self.agents:
+                return key, self.agents[key]
         if agent_type and agent_type in self.agents:
             return agent_type, self.agents[agent_type]
         # Fall back to the default agent (single-agent deployments, or an
@@ -141,7 +145,7 @@ class AgentRouter:
 
     async def open_session(self, config: Dict[str, Any]) -> Tuple[str, SessionInfo]:
         agent_type = config.get("agent_type")
-        agent_name, agent = self._pick_agent(agent_type)
+        agent_name, agent = self._pick_agent(agent_type, config.get("language_pair"))
         session_id = self._new_session_id(agent_name, config)
 
         record = SessionRecord(

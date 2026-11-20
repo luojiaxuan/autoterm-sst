@@ -154,6 +154,19 @@ gold term occurrences, the slice holding the term is in the working set for
 82.7\% under the language-model router and 52.2\% under the similarity router,
 against 97.3\% for the best four slices chosen per talk in hindsight.
 
+\paragraph{Generated prototypes and late updates.}
+Prototypes need not be written by hand. GPT-5.5 wrote one per slice from the
+slice's glossary with every evaluation term removed; with per-chunk updates,
+the language-model router then keeps the correct slice among its top four in
+97.9\% of ten-talk chunks, against 98.7\% with the hand-written prototypes. The
+RealSI streams use the generated prototypes, because the hand-written NLP
+prototype names topics of the RealSI technology talk. The closed-loop runs of
+Section~\ref{sec:evaluation} scored each update before the chunk continued,
+whereas the deployed worker can apply it one chunk later when audio arrives
+faster than real time; replaying every update one chunk late lowers the
+coverage of the language-model router by at most 0.33 points on the replays
+of Table~\ref{tab:router-diag}.
+
 \begin{table}[!ht]
 \centering
 \small

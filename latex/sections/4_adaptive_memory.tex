@@ -67,8 +67,9 @@ pairs, reranks the rest globally, and admits at most ten into the prompt, fewer
 when fewer candidates clear the 0.78 threshold. Gains of AutoTerm-SST therefore
 come from placing more relevant mappings inside the same budget.
 
-\paragraph{Causal updates.}
-Each chunk retrieves from a snapshot of the working set taken before its
-decoding begins, so a routing update that finishes during generation takes
-effect at the next chunk. Indexes of likely slices are preloaded in the
-background, so loading happens outside decoding.
+\paragraph{Non-blocking updates.}
+Routing never delays a chunk. A background worker scores, in one batch, every
+session whose context has changed, each chunk retrieves from the working set
+current when its decoding begins, and an update takes effect at the first
+chunk that starts after it finishes. Indexes of likely slices are likewise
+preloaded in the background.

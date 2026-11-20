@@ -21,7 +21,7 @@ if [[ ! -s "$SLICES_OUT/manifest.json" ]]; then
     --model-path /data/models/retriever/hn1024.pt > logs/build_slices.log 2>&1
 fi
 IFS=, read -r -a GPUS <<< "${CUDA_VISIBLE_DEVICES}"
-UTIL=${UTIL:-0.32}
+UTIL=${UTIL:-0.31}
 SLICES=nlp_core_1k,medicine_core_1k,education_core_1k,finance_core_1k,legal_core_1k,environment_core_1k,entertainment_core_1k,science_core_1k,sports_core_1k,art_core_1k
 PROTOTYPES="$HERE/code/configs/router_prototypes_generated_s0.json"
 BASE=(--host 127.0.0.1 --model-path /data/models/zh --manifest "$SLICES_OUT/manifest.json"

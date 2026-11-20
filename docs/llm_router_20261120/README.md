@@ -30,3 +30,15 @@
 参照：线上手调规则（领先阈值、连续三次、冷却与 pin）在同一 run 闭环实测前 4 覆盖 96.9%、确认 slice 正确 88.5%。
 
 原始输出：`llm_router_replay.json`、`llm_hmm_filter.json`；逐窗口概率 `result.w4.npy` 在 aries `/mnt/data6/jiaxuanluo/omni-eval/runs/20261120T040902Z/`（含 ESO 派生译文的输入只留在私有存储）。
+
+## 德语与日语
+
+RASST 论文的 De、Ja 运行（`release_profiles_taurusdata2_20260528T000922Z/paper_adjacent_cache30`，lm2，已知领域术语表）按发出时间切成 1.92 秒一块，五个 ACL talk 与五个 ESO 讲座交替拼成一条流。路由、原型与提示和中文相同，只把提示里的目标语言换成 German 或 Japanese。
+
+| 目标语言 | 余弦 top-1 / 前 4 / 变化 | 语言模型 top-1 / 前 4 / 变化 | 语言模型 + HMM 前 4 覆盖（ρ = 1e-5 / 1e-3 / 1e-1） |
+| --- | --- | --- | --- |
+| zh（run 1） | 72.6 / 85.0 / 1,809 | 79.4 / 90.5 / 986 | 98.9 / 98.7 / 98.4 |
+| de | 68.2 / 84.8 / 2,192 | 78.0 / 87.7 / 1,076 | 97.8 / 97.5 / 96.8 |
+| ja | 69.2 / 84.9 / 1,985 | 79.0 / 88.2 / 1,008 | 98.5 / 98.3 / 97.5 |
+
+原始输出：`multilingual_de.json`、`multilingual_ja.json`、`multilingual_hmm_filter.json`。

@@ -15,42 +15,52 @@ with its label, term count, prototype text, and index path. At session start
 the router reads only the manifest and prototypes, and during decoding the
 retriever skips every index outside the working set.
 
-\paragraph{Semantic routing.}
-The router selects relevant slices by matching recent partial translations
-against each slice prototype. Because the speech LLM translates audio directly
-and produces no source transcript, routing reads target-language output, which
+\paragraph{Language-model routing.}
+The router asks a small instruction-tuned LLM which slice matches the talk at
+the current point. Because the speech LLM translates audio directly and
+produces no source transcript, routing reads target-language output, which
 becomes more topic-specific as context builds. At chunk $t$, the router
-concatenates the last $w$ translated chunks into a context $c_t$. The prototype
-$P_d$ of slice $d$ holds three texts: a one-line description, an English
-sentence naming the slice's core topics and representative terms, and its
-Chinese translation. With sentence encoder $E$ and L2 normalization
-$\operatorname{norm}$, the router scores each slice by cosine similarity to the
-context:
+concatenates the last $w=4$ translated chunks into a context $c_t$ and builds a
+multiple-choice prompt that lists the prototype of every slice under a letter.
+The prototype $P_d$ of slice $d$ is a one-line description followed by an
+English sentence naming the slice's core topics and representative terms. The
+score of slice $d$ is the probability that the router LLM $\pi$, the 4-billion
+parameter Qwen3-4B-Instruct~\citep{yang2025qwen3}, assigns to the letter of
+$d$ as the first answer token. Averaging over the listed order $\sigma$ and its
+reverse $\bar\sigma$ removes the preference for early or late positions:
+\begin{equation}
+  o_t(d)=\tfrac12\bigl[\pi(\ell_\sigma(d)\mid c_t)
+  +\pi(\ell_{\bar\sigma}(d)\mid c_t)\bigr],
+\end{equation}
+where $\ell_\sigma(d)$ is the letter of $d$ under order $\sigma$. Each update
+takes two forward passes and needs neither generation nor training.
+
+\paragraph{Topic filtering.}
+A sticky hidden Markov model accumulates these noisy scores into a stable
+posterior $b_t$ over the current topic. Between updates, the topic stays with
+probability $1-\rho$ and otherwise moves to one of the other $N-1$ slices
+uniformly, and each update treats $o_t$ as the observation likelihood:
 \begin{equation}
 \begin{aligned}
-  \bar p_d &=
-  \operatorname{norm}\!\left(\frac{1}{|P_d|}
-  \sum_{p\in P_d} E(p)\right), \\
-  s(d\mid c_t) &= \cos\!\left(E(c_t),\bar p_d\right).
+  b_t(d)\propto{}&\Bigl[(1-\rho)\,b_{t-1}(d)\\
+  &+\tfrac{\rho}{N-1}\bigl(1-b_{t-1}(d)\bigr)\Bigr]\,o_t(d)^{\beta_t}.
 \end{aligned}
 \end{equation}
-We use the multilingual encoder BGE-M3~\citep{chen-etal-2024-m3} for $E$,
-placing Chinese partial translations and bilingual English and Chinese
-prototype texts in one shared embedding space. Routing is causal, so a decision
-made at chunk $t$ affects only later chunks.
+Consecutive contexts can share chunks, so the exponent
+$\beta_t=\min(1,n_t/w)$, with $n_t$ the number of chunks translated since the
+previous update, counts each chunk's evidence once. The switch rate $\rho$ is
+the filter's only free parameter. We set $\rho=10^{-3}$, and
+Appendix~\ref{app:router} shows that top-four coverage moves by at most 0.5
+points as $\rho$ ranges from $10^{-5}$ to $10^{-1}$. Routing is causal, so a
+decision made at chunk $t$ affects only later chunks.
 
 \paragraph{Working-set update.}
-Pinning a confirmed slice alongside top-scoring alternatives stabilizes routing
-while accommodating topic transitions. The confirmed slice is the router's
-current topic choice: it changes only when another slice leads both the
-runner-up and the confirmed slice by fixed score margins in three consecutive
-updates, and not within 30 seconds of the previous change. Every five seconds,
-the router rescores every catalog slice and builds a working set of at most
-$K=4$ slices and $B=4{,}000$ searchable terms. One slot always holds the
-confirmed slice, the remaining slots hold the highest-scoring other slices
-within budget $B$, and lower-ranked slices are excluded from retrieval. Holding up to four slices
-lets outgoing and incoming topics coexist during transitions until stale slices
-drop in rank; Appendix~\ref{app:config} lists all router thresholds.
+Every five seconds, the router scores every catalog slice, updates the
+posterior, and fills a working set of at most $K=4$ slices and $B=4{,}000$
+searchable terms in order of posterior probability; lower-ranked slices are
+excluded from retrieval. Holding up to four slices lets outgoing and incoming
+topics coexist during transitions until stale slices drop in rank.
+Appendix~\ref{app:config} lists all router settings.
 
 \paragraph{Fixed evidence budget.}
 All active slices share one retrieval and prompt budget. The retriever splits

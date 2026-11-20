@@ -38,11 +38,14 @@ from framework.router import AgentRouter  # noqa: E402
 
 
 def topic_of(record):
+    # The first working-set slice is the router's current topic: the posterior argmax of the
+    # language-model router, or the pinned confirmed slice of the similarity router.
+    preset = (record["selected_slice_presets"] or [record["active_preset"]])[0]
     return {
-        "active_domain": record["active_domain"],
+        "active_domain": preset.split("_core")[0] if "_core" in preset else record["active_domain"],
         "confidence": record["router_confidence"],
-        "active_glossary_preset": record["active_preset"],
-        "switch_count": record["switch_count"],
+        "active_glossary_preset": preset,
+        "switch_count": record["top_changes"],
         "last_reason": record["router_reason"],
     }
 
@@ -50,9 +53,10 @@ def topic_of(record):
 class ReplayAgent(OmniAgent):
     """Mock RASST agent whose partial outputs come from a recorded run."""
 
-    def __init__(self, records, **kwargs):
+    def __init__(self, records, router_name, **kwargs):
         super().__init__(**kwargs)
         self.records = records
+        self.router_name = router_name
         self.cursor = {}
         self.delivered = 0
 
@@ -81,6 +85,8 @@ class ReplayAgent(OmniAgent):
                     start_sample=record["start_sample"],
                 )
                 meta.pop("topic_router", None)
+                if self.router_name:
+                    meta["topic_router"] = {"reason": self.router_name}
                 event = TranslationEvent(
                     session_id=event.session_id, type=EVENT_PARTIAL, text=record["text"], meta=meta
                 )
@@ -197,11 +203,19 @@ def main():
     ap.add_argument("--height", type=int, default=820)
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--extra-css", default="")
+    ap.add_argument("--router-name", default="", help="router shown in the status row, e.g. language_model")
     args = ap.parse_args()
 
     records = json.loads(args.records.read_text(encoding="utf-8"))["records"]
+    # The switch count shown is the number of changes of the topic slice since the stream began.
+    previous, changes = None, 0
+    for record in records:
+        first = (record["selected_slice_presets"] or [None])[0]
+        changes += previous is not None and first != previous
+        previous = first
+        record["top_changes"] = changes
     records = [r for r in records if r["event_idx"] >= args.start_event][: args.count]
-    agent = ReplayAgent(records, name="RASST", model_id="qwen3_omni")
+    agent = ReplayAgent(records, args.router_name, name="RASST", model_id="qwen3_omni")
     server = serve(agent, args.port)
     try:
         asyncio.run(capture(args, agent))

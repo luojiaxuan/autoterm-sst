@@ -10,56 +10,65 @@
 \cmidrule(lr){2-5}\cmidrule(lr){6-9}\cmidrule(lr){10-13}
 Baseline & Diff. & Low & High & $p$ & Diff. & Low & High & $p$ & Diff. & Low & High & $p$ \\
 \midrule
-\multicolumn{13}{l}{\emph{Run 1}} \\
+\multicolumn{13}{l}{\emph{Run 3, AutoTerm-SST minus each baseline}} \\
+Known-domain-1k & $+0.20$ & $-0.83$ & $+0.99$ & 0.82 & $-0.05$ & $-0.60$ & $+0.39$ & 0.85 & $-0.13$ & $-0.75$ & $+0.35$ & 0.61 \\
+Similarity routing & $+0.10$ & $-0.92$ & $+0.93$ & 0.94 & $-0.29$ & $-0.75$ & $+0.01$ & 0.14 & $-0.35$ & $-0.98$ & $-0.02$ & 0.13 \\
+Merged-2k & $-0.20$ & $-1.19$ & $+0.56$ & 0.83 & $-0.21$ & $-0.57$ & $+0.24$ & 0.36 & $-0.21$ & $-0.61$ & $+0.24$ & 0.46 \\
+Merged-10k & $-0.39$ & $-1.05$ & $+0.18$ & 0.34 & $-0.01$ & $-0.25$ & $+0.21$ & 0.96 & $-0.06$ & $-0.30$ & $+0.18$ & 0.63 \\
+\midrule
+\multicolumn{13}{l}{\emph{Run 1, similarity routing minus each baseline}} \\
 Known-domain-1k & $+0.24$ & $-0.95$ & $+1.49$ & 0.86 & $-0.10$ & $-0.50$ & $+0.38$ & 0.70 & $-0.11$ & $-0.57$ & $+0.39$ & 0.73 \\
 Merged-100k & $+0.54$ & $-0.60$ & $+1.84$ & 0.48 & $+1.37$ & $+0.86$ & $+1.80$ & 0.004 & $+1.36$ & $+0.65$ & $+1.81$ & 0.018 \\
 Merged-1M & $+3.91$ & $+2.03$ & $+5.76$ & 0.012 & $+2.30$ & $+1.71$ & $+2.95$ & 0.002 & $+2.33$ & $+1.10$ & $+3.06$ & 0.002 \\
 \midrule
-\multicolumn{13}{l}{\emph{Run 2}} \\
+\multicolumn{13}{l}{\emph{Run 2, two A6000 GPUs, similarity routing minus each baseline}} \\
 Known-domain-1k & $-0.68$ & $-1.48$ & 0.00 & 0.18 & $+0.36$ & $-0.24$ & $+1.26$ & 0.69 & $+0.42$ & $-0.24$ & $+1.42$ & 0.66 \\
 Merged-2k & $-0.39$ & $-1.29$ & $+0.30$ & 0.49 & $-0.03$ & $-0.56$ & $+0.61$ & 0.94 & $-0.06$ & $-0.44$ & $+0.60$ & 0.79 \\
 Merged-10k & $-0.83$ & $-1.58$ & $-0.25$ & 0.084 & $+0.18$ & $-0.18$ & $+0.64$ & 0.43 & $+0.17$ & $-0.16$ & $+0.69$ & 0.51 \\
 \midrule
-\multicolumn{13}{l}{\emph{Run 1, the 935 sentences whose reference contains no glossary term}} \\
+\multicolumn{13}{l}{\emph{Run 1, the 935 sentences whose references contain no glossary term}} \\
 Known-domain-1k &  & & &  & $-0.11$ & $-0.76$ & $+0.35$ & 0.80 &  & & &  \\
 Merged-100k &  & & &  & $+1.69$ & $+1.08$ & $+2.16$ & 0.012 &  & & &  \\
 Merged-1M &  & & &  & $+2.19$ & $+0.66$ & $+3.46$ & 0.023 &  & & &  \\
 \bottomrule
 \end{tabular}
-\caption{Paired metric differences of AutoTerm-SST minus each baseline across
-runs 1 and 2. Low and High give the 95\% stratified talk-bootstrap confidence
+\caption{Paired metric differences between the routed system and each
+baseline. Low and High give the 95\% stratified talk-bootstrap confidence
 bounds, and $p$ is the exact two-sided talk-level permutation $p$-value.
-TERM\_ACC differences are in percentage points, and the bottom block reports
-BLEU on the 935 sentences whose references contain no glossary term.}
+TERM\_ACC differences are in percentage points.}
 \label{tab:stats}
 \end{table*}
 
 \section{Statistical comparisons}
 \label{app:stats}
 
-Paired talk-level tests show that the gains of AutoTerm-SST over Merged-1M
-hold across individual talks. Table~\ref{tab:stats} reports every paired
-comparison. The exact permutation test swaps the outputs of two systems within
-each talk across all 1,024 combinations and recomputes the pooled metric,
-giving a minimum attainable two-sided $p$-value of 0.002. Significance claims
-rest on this test. With ten talks, the percentile bootstrap can disagree with
-it near the boundary: for Merged-10k the interval excludes zero while
-$p=0.084$. Confidence intervals
-come from 4,000 stratified bootstrap resamples of five ACL and five ESO talks.
-Removing any single talk preserves all three advantages of AutoTerm-SST over
-Merged-1M, with gains of at least 3.28 TERM\_ACC points, 2.00 BLEU, and 1.99
-MT-BLEU.
+Paired talk-level tests show that the gains of the routed system over
+Merged-1M hold across individual talks. Table~\ref{tab:stats} reports every
+paired comparison. The exact permutation test swaps the outputs of two systems
+within each talk across all 1,024 combinations and recomputes the pooled
+metric, giving a minimum attainable two-sided $p$-value of 0.002. Significance
+claims rest on this test. With ten talks, the percentile bootstrap can disagree
+with it near the boundary: for Merged-10k in run 2 and for the MT-BLEU of
+similarity routing in run 3, the interval excludes zero while $p\ge0.08$.
+Confidence intervals come from 4,000 stratified bootstrap resamples of five
+ACL and five ESO talks. Removing any single talk preserves all three
+advantages of similarity routing over Merged-1M in run 1, with gains of at
+least 3.28 TERM\_ACC points, 2.00 BLEU, and 1.99 MT-BLEU.
 
 \section{Router configuration}
 \label{app:config}
 
-Both evaluation runs use one fixed set of routing and retrieval parameters,
-listed in Table~\ref{tab:config}. Because the router's timers run on wall-clock
-time, AutoTerm-SST ran alone on its server in run 2, while the three
-fixed-glossary configurations shared a second server. We selected the routing thresholds on four short segments drawn from the
-evaluation talks before running the complete streams. The context encoder
-reads at most the last 128 tokens of the four-chunk context $c_t$, and the
-router scores slices only by this context similarity.
+Table~\ref{tab:config} lists the routing and retrieval settings. The
+language-model router adds a single parameter to the shared settings, the
+switch rate $\rho$. The similarity router, used as a baseline, embeds the
+context and each prototype with BGE-M3~\citep{chen-etal-2024-m3}, reading at
+most the last 128 tokens of $c_t$, and extends each prototype with its Chinese
+translation. It keeps a confirmed slice that changes only when another slice
+leads both the runner-up and the confirmed slice by fixed margins in three
+consecutive updates and not within 30 seconds of the previous change, and it
+pins that slice in the working set. We selected these thresholds on four short
+segments drawn from the evaluation talks before running the complete streams.
+Because both routers update on wall-clock time, each ran alone on its server.
 
 \begin{table}[!ht]
 \centering
@@ -68,84 +77,110 @@ router scores slices only by this context similarity.
 \toprule
 Setting & Value \\
 \midrule
+\multicolumn{2}{l}{\emph{Shared}} \\
 Audio chunk & 1.92 s \\
 Translation context $w$ & 4 chunks \\
 Maximum active slices $K$ & 4 \\
 Active term budget $B$ & 4,000 \\
 Routing update interval & 5 s \\
+Retrieval score threshold & 0.78 \\
+Candidate slots & 100 \\
+Prompt cap & 10 pairs \\
+\midrule
+\multicolumn{2}{l}{\emph{Language-model router}} \\
+Router LLM & Qwen3-4B-Instruct-2507 \\
+Switch rate $\rho$ & $10^{-3}$ \\
+\midrule
+\multicolumn{2}{l}{\emph{Similarity router}} \\
 Warm-up before first switch & 6 s \\
 Cooldown after a switch & 30 s \\
 Lead over runner-up & 0.15 \\
 Lead over confirmed slice & 0.10 \\
 Consecutive agreeing updates & 3 \\
-Retrieval score threshold & 0.78 \\
-Candidate slots & 100 \\
-Prompt cap & 10 pairs \\
 \bottomrule
 \end{tabular}
-\caption{Router and retrieval settings used by AutoTerm-SST in both runs. Lead
-thresholds are differences of normalized similarity scores, and a switch
-requires both leads in each of the consecutive updates.}
+\caption{Router and retrieval settings. Lead thresholds are differences of
+normalized similarity scores, and a switch of the similarity router requires
+both leads in each of the consecutive updates.}
 \label{tab:config}
 \end{table}
 
 \section{Router diagnostics}
 \label{app:router}
 
-Open-loop replays of the routing signal isolate the benefit of pinning,
-measure responsiveness to rapid topic shifts, and test LLM-generated
-prototypes. Each diagnostic replays the router on the saved translations of
-run 1 without decoding again, encoding the last four translated chunks as in
-Section~\ref{sec:adaptive-memory} and ranking slices by raw similarity without
-the confirmation rule or pinning. Under raw similarity alone, the correct slice
-ranks among the top four in 85.0\% of the 8,776 chunks. Keeping the live run's
-confirmed slice in the working set and filling the remaining three slots by raw
-rank raises coverage to 97.0\%, matching the 96.9\% measured live.
+Open-loop replays compare the two deployed routers on identical inputs. Each
+replay feeds the saved translations of run 1 to both routers without decoding
+again and builds the context from the last four translated chunks as in
+Section~\ref{sec:adaptive-memory}. As in the live system, context scores
+refresh at most once every 5 seconds of audio, the similarity router applies
+its confirmation rule and pins its confirmed slice, and the language-model
+router takes one filter step per refresh with $\rho=10^{-3}$.
+Table~\ref{tab:router-diag} reports how often the correct slice is in the
+four-slice working set. Replayed on the emission times of run 1, the
+similarity router makes 19 switches, as it did live, and covers 96.2\% of
+chunks against 96.9\% live.
+
+\paragraph{Topic filter.}
+The filter turns noisy per-update scores into a stable ranking without
+thresholds. Updated at every chunk, letter probabilities alone keep the
+correct slice among the top four in 90.5\% of chunks, and the filtered
+posterior in 98.7\%. Coverage stays between 98.4\% and 98.9\% as $\rho$ ranges
+from $10^{-5}$ to $10^{-1}$, so the single free parameter needs no tuning. Raw
+similarity covers 85.0\% under the same updates, and the confirmation rule
+and pin raise the similarity router to 97.0\%.
 
 \paragraph{Short topic shifts.}
-The raw-similarity ranking follows topic switches quickly even when domains
-alternate every 15 to 300 seconds. For each length in Table~\ref{tab:router-diag},
-we cut the saved translations of the NLP and medicine talks into segments of
-that length and interleave them into one 40-segment stream. At every length, the
-incoming topic slice enters the top four after a median of one chunk, or 1.92
-seconds, and ranks first after a median of 5.76 seconds. It reaches the top
-four in all 40 segments at every length, and Table~\ref{tab:router-diag} shows
-that top-four coverage stays above 81\% even when topics switch every 15
-seconds.
+The posterior follows topics that alternate every 15 to 300 seconds. For each
+length in Table~\ref{tab:router-diag}, we cut the saved translations of the NLP
+and medicine talks into segments of that length and interleave them into one
+40-segment stream. At every length, the median segment starts with the
+incoming slice already in the working set of the language-model router, and
+the slice reaches the top of the posterior after a median of 7.7 seconds. The
+similarity router waits for three consecutive leads and a 30-second cooldown,
+so in segments of one minute or longer it confirms the incoming slice only
+after a median of 27 to 46 seconds.
 
-\paragraph{Generated prototypes.}
-LLM-generated prototypes route about as well as hand-written ones. For each
-slice, we remove entries originating from the evaluation glossaries and give
-the remaining term pairs to \texttt{gpt-5.5-2026-04-23}, which writes a topic
-description, seven to ten core topics, and their Chinese translation in the
-format of the hand-written prototypes. Across the ten independently generated sets in Table~\ref{tab:router-diag},
-the lowest and highest sets bracket the hand-written prototypes on both Top-4
-and Top-1.
+\paragraph{Other target languages.}
+The router reads German and Japanese output as well as Chinese. We replay the
+German and Japanese RASST translations of the same ten talks and change only
+the target language named in the router prompt.
+
+\paragraph{Close domains.}
+Finer slices separate the two routers further. The same 4B model splits the
+NLP and medicine catalogs into eight subtopics each: it proposes subtopics from
+400 terms outside the evaluation glossaries and assigns every term by letter
+probability. With the eight other topics, this yields 24 slices. On the 2,047
+gold term occurrences, the slice holding the term is in the working set for
+82.7\% under the language-model router and 52.2\% under the similarity router,
+against 97.3\% for the best four slices chosen per talk in hindsight.
 
 \begin{table}[!ht]
 \centering
 \small
 \begin{tabular}{lrr}
 \toprule
-Replay & Top-4 & Top-1 \\
+Replay & Similarity & Language model \\
+\midrule
+Ten-talk stream & 97.0 & 99.0 \\
 \midrule
 \multicolumn{3}{l}{\emph{Topic switch every}} \\
-15 s & 81.7 & 56.7 \\
-30 s & 84.9 & 68.8 \\
-60 s & 86.8 & 74.7 \\
-120 s & 85.8 & 71.6 \\
-300 s & 87.1 & 72.1 \\
+15 s & 82.1 & 100.0 \\
+30 s & 90.5 & 98.2 \\
+60 s & 89.3 & 97.9 \\
+120 s & 89.6 & 97.4 \\
+300 s & 93.5 & 99.3 \\
 \midrule
-\multicolumn{3}{l}{\emph{Ten-talk stream, prototype text}} \\
-Hand-written & 85.0 & 72.6 \\
-Generated, median of ten & 85.8 & 70.7 \\
-Generated, lowest of ten & 84.3 & 67.3 \\
-Generated, highest of ten & 91.4 & 77.8 \\
+\multicolumn{3}{l}{\emph{Target language}} \\
+German & 97.2 & 97.9 \\
+Japanese & 97.8 & 99.0 \\
+\midrule
+24 close-domain slices & 52.2 & 82.7 \\
 \bottomrule
 \end{tabular}
-\caption{Open-loop router replays on run-1 translations. Top-4 and Top-1 are
-the percentages of chunks whose correct slice ranks in the top four or first.
-Generated sets are ranked separately per column.}
+\caption{Open-loop replays of the two deployed routers at the live update
+rate. Each cell is the percentage of chunks whose correct slice is in the
+four-slice working set; the close-domain row counts gold term occurrences
+whose slice is in it.}
 \label{tab:router-diag}
 \end{table}
 

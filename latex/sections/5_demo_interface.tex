@@ -11,18 +11,18 @@ selector.
 \paragraph{Walkthrough.}
 A session follows topic changes with no manual control. Partial translations
 appear immediately; once context accumulates, the status row at the top of the
-interface switches to the best-matching slice, and the pairs retrieved for each
-output appear in the evidence panel. After a topic change, outgoing and
+interface names the slice on top of the router's posterior, and the pairs
+retrieved for each output appear in the evidence panel. After a topic change, outgoing and
 incoming slices briefly coexist in the working set.
 
 \begin{figure*}[t]
   \centering
   \includegraphics[width=0.72\textwidth]{ui_evidence_panel.png}
-  \caption{The English-to-Chinese interface replaying run 1 during an oncology
-  lecture, about 20 minutes into the stream. The status row shows the confirmed
-  medicine slice and 4,000 searchable terms; retrieved terms are highlighted in
-  the translation, and the bottom panel lists the latest retrieved pairs with
-  scores and source slices.}
+  \caption{The English-to-Chinese interface replaying run 3 during an oncology
+  lecture, about 19 minutes into the stream. The status row shows the medicine
+  slice on top of the router's posterior and 4,000 searchable terms; retrieved
+  terms are highlighted in the translation, and the bottom panel lists the
+  latest retrieved pairs with scores and source slices.}
   \label{fig:ui}
 \end{figure*}
 
@@ -30,8 +30,8 @@ incoming slices briefly coexist in the working set.
 Highlighting and an evidence panel make terminology behavior transparent. As
 Figure~\ref{fig:ui} shows, the
 interface highlights retrieved terms inside the translation and lists their
-source--target mappings; the status row shows the confirmed slice and the
-active term count, and the evidence-panel header names the active slices and
+source--target mappings; the status row shows the top slice, its posterior
+probability, and the active term count, and the evidence-panel header names the active slices and
 the retrieval latency. A viewer can thus see whether a mistranslated term was never retrieved, came
 from an irrelevant slice, or was retrieved but not used.
 

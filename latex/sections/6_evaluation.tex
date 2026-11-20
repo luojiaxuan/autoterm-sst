@@ -39,25 +39,28 @@ budget.
 \cmidrule(lr){4-6}
 Setting & Input & Active & NLP & Medicine & All & BLEU & MT-BLEU & Prompt prec. & Pairs \\
 \midrule
+\multicolumn{10}{l}{\emph{Run 3, two H200 GPUs}} \\
+Known-domain-1k & Domain & 1k & 88.3 & 85.9 & 87.5 & 45.15 & 42.41 & 48.7 & 0.69 \\
+AutoTerm-SST & None & 4k & 88.4 & 86.3 & 87.7 & 45.10 & 42.27 & 35.7 & 0.94 \\
+Similarity routing & None & 4k & 88.4 & 86.0 & 87.6 & 45.39 & 42.62 & 35.7 & 0.94 \\
+Merged-2k & Domains & 2k & 88.8 & 86.0 & 87.9 & 45.31 & 42.48 & 39.1 & 0.86 \\
+Merged-10k & None & 9.9k & 88.6 & 87.0 & 88.1 & 45.11 & 42.33 & 27.1 & 1.26 \\
+\midrule
 \multicolumn{10}{l}{\emph{Run 1, one H200 GPU}} \\
 InfiniSST & None & 0 & 76.6 & 46.3 & 61.4 & 41.84 & 38.32 & 0.0 & 0.00 \\
 Known-domain-1k & Domain & 1k & 88.8 & 86.6 & 88.1 & 45.19 & 42.39 & 48.7 & 0.69 \\
-AutoTerm-SST & None & 4k & 89.3 & 86.3 & 88.3 & 45.09 & 42.28 & 34.8 & 0.94 \\
+Similarity routing & None & 4k & 89.3 & 86.3 & 88.3 & 45.09 & 42.28 & 34.8 & 0.94 \\
 Merged-100k & None & 100k & 89.4 & 84.5 & 87.8 & 43.72$^\dagger$ & 40.93$^\dagger$ & 6.8 & 4.96 \\
 Merged-1M & None & 1M & 87.1 & 78.9 & 84.4$^\dagger$ & 42.79$^\dagger$ & 39.95$^\dagger$ & 3.4 & 8.70 \\
-\midrule
-\multicolumn{10}{l}{\emph{Run 2, two A6000 GPUs}} \\
-Known-domain-1k & Domain & 1k & 88.9 & 86.2 & 88.0 & 44.79 & 41.94 & 48.8 & 0.69 \\
-AutoTerm-SST & None & 4k & 87.9 & 86.0 & 87.3 & 45.15 & 42.36 & 35.2 & 0.94 \\
-Merged-2k & Domains & 2k & 88.9 & 85.3 & 87.7 & 45.18 & 42.42 & 39.2 & 0.86 \\
-Merged-10k & None & 9.9k & 89.1 & 86.2 & 88.1 & 44.97 & 42.19 & 27.1 & 1.26 \\
 \bottomrule
 \end{tabular}
 \caption{Results on the ten-talk stream. Input is what the user supplies
-before the session; Active is the most entries searched per chunk.
+before the session; Active is the most entries searched per chunk; Similarity
+routing is AutoTerm-SST with the similarity router of Appendix~\ref{app:config}.
 TERM\_ACC and prompt precision are in percent, MT-BLEU masks glossary terms, and
-Pairs is the mean injected per chunk. $\dagger$: $p<0.05$ against AutoTerm-SST in the same run, talk-level permutation. InfiniSST uses no glossary, and its All, BLEU, and MT-BLEU are unweighted NLP
-and medicine means.}
+Pairs is the mean injected per chunk. $\dagger$: $p<0.05$ against the routed
+system of the same run, talk-level permutation. InfiniSST uses no glossary, and
+its All, BLEU, and MT-BLEU are unweighted NLP and medicine means.}
 \label{tab:quality}
 \end{table*}
 
@@ -71,18 +74,21 @@ retrieval. Known-domain-1k searches only the 1,000-entry slice matching the
 current talk's domain and therefore requires the domain label of every talk.
 AutoTerm-SST routes over ten 1,000-entry slices spanning NLP, medicine, and
 eight topics drawn from Wikipedia and Wikidata, with at most four active at
-once. Merged-2k pools the NLP and medicine slices, which requires knowing both
+once. Similarity routing keeps these slices and budgets but swaps in the
+similarity router of Appendix~\ref{app:config}, which ranks slices by embedding
+similarity and switches only after fixed confirmation rules. Merged-2k pools the NLP and medicine slices, which requires knowing both
 domains, and Merged-10k pools all ten slices, 9,880 entries after removing
 exact duplicates. Merged-1M adds entries from other topics to the same NLP and
 medicine glossaries, and Merged-100k is its first 100,000 entries. Merged
 glossaries keep conflicting translations of a source term.
 
 \paragraph{Runs.}
-Run 1, on one H200 GPU, evaluates InfiniSST, Known-domain-1k, AutoTerm-SST,
-Merged-100k, and Merged-1M. Run 2, on two A6000 GPUs, repeats Known-domain-1k
-and AutoTerm-SST as an independent check of their parity and adds Merged-2k and
-Merged-10k. Within a run, all configurations see the same audio order and chunk
-boundaries, and every comparison is made within a run.
+Run 3, on two H200 GPUs, compares AutoTerm-SST with Known-domain-1k,
+similarity routing, Merged-2k, and Merged-10k. Run 1, on one H200 GPU, used
+similarity routing and adds InfiniSST, Merged-100k, and Merged-1M; run 2
+repeats its known-domain comparison on two A6000 GPUs. Within a run, all
+configurations see the same audio order and chunk boundaries, and every
+comparison is made within a run.
 
 \paragraph{Metrics.}
 Following RASST, terminology accuracy, or TERM\_ACC, is the share of 2,047 time-aligned
@@ -112,29 +118,30 @@ comparison.
 
 \paragraph{Comparison with the known-domain reference.}
 AutoTerm-SST performs on par with a known-domain reference without receiving
-any user input. In run 1, AutoTerm-SST minus Known-domain-1k is $+0.2\pm1.2$
-TERM\_ACC points at $p=0.86$ and $-0.10^{+0.48}_{-0.40}$ BLEU at $p=0.70$. Run 2
-on separate GPUs again shows no significant difference, as
-Table~\ref{tab:stats} reports. Both lie well above retrieval-free InfiniSST, scored with its own per-corpus
-scorers in Table~\ref{tab:quality}.
+any user input. In run 3, AutoTerm-SST minus Known-domain-1k is
+$+0.2^{+0.8}_{-1.0}$ TERM\_ACC points at $p=0.82$ and $-0.05^{+0.44}_{-0.55}$
+BLEU at $p=0.85$. Similarity routing also ties the reference in runs 1 and 2,
+as Table~\ref{tab:stats} reports. All of them lie well above retrieval-free
+InfiniSST, scored with its own per-corpus scorers in Table~\ref{tab:quality}.
 
 \paragraph{Effect of catalog scale.}
-Merged glossaries keep pace with AutoTerm-SST up to 10k entries, yet lose
-translation quality and terminology accuracy as the catalog grows further. In
-run 2, Merged-2k and Merged-10k lead AutoTerm-SST by at most 0.83 TERM\_ACC
-points with matching BLEU, and the larger lead, by Merged-10k, has $p=0.08$. In
-run 1, Merged-100k matches AutoTerm-SST in TERM\_ACC but trails it by
+Merged glossaries keep pace with a routed working set up to 10k entries, yet
+lose translation quality and terminology accuracy as the catalog grows
+further. In run 3, Merged-2k and Merged-10k lead AutoTerm-SST by at most 0.4
+TERM\_ACC points at $p\ge0.34$, with matching BLEU. In run 1, Merged-100k
+matches similarity routing in TERM\_ACC but trails it by
 $1.37^{+0.43}_{-0.51}$ BLEU at $p=0.004$. Merged-1M trails by $3.9\pm1.9$
-TERM\_ACC points at $p=0.012$ and by $2.30^{+0.65}_{-0.59}$ BLEU at $p=0.002$.
-Its TERM\_ACC loss concentrates on medicine: 7.4 points, against 2.2 on NLP.
+TERM\_ACC points at $p=0.012$ and by $2.30^{+0.65}_{-0.59}$ BLEU at $p=0.002$,
+and its TERM\_ACC loss concentrates on medicine: 7.4 points, against 2.2 on
+NLP. The two routers differ by 0.1 points in run 3, far below this margin.
 
 \paragraph{Effect of prompt noise.}
 Large merged glossaries fill the fixed prompt with irrelevant pairs, which also
 lowers the quality of the surrounding translation. As Table~\ref{tab:quality}
-shows, Merged-1M injects nine times as many pairs per chunk as AutoTerm-SST at
-one tenth of its prompt precision. On the 935 of 1,905 sentences whose
-references contain no glossary term, so term accuracy plays no role,
-AutoTerm-SST still leads Merged-1M by 2.19 BLEU at $p=0.023$.
+shows, Merged-1M injects nine times as many pairs per chunk as the routed
+system at one tenth of its prompt precision. On the 935 of 1,905 sentences
+whose references contain no glossary term, so term accuracy plays no role,
+similarity routing still leads Merged-1M by 2.19 BLEU at $p=0.023$.
 
 \paragraph{Routing behavior.}
 Pinning the confirmed slice in a four-slice working set shields coverage from

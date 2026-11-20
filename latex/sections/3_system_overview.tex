@@ -1,44 +1,38 @@
 \section{System overview}
 \label{sec:system}
 
-AutoTerm-SST adds an adaptive terminology loop to RASST without changing its
-models, as Figure~\ref{fig:architecture} shows. RASST consists of a speech
-encoder, a term retriever, and the Qwen3-Omni LLM, and it translates the audio
-in 1.92-second chunks. For chunk $t$, the retriever scores every glossary term
-by MaxSim: each source term is pre-encoded as a vector $z_i$, the current
-speech is encoded into vectors $q_w$ for overlapping windows
-$w\in\mathcal W_t$, and the term score is
+AutoTerm-SST adds an online terminology-selection loop around RASST while
+leaving its neural models unchanged, as Figure~\ref{fig:architecture} shows.
+RASST is a retrieval-augmented SST pipeline combining a speech encoder, a
+cross-modal term retriever, and the Qwen3-Omni LLM, and it translates audio in
+1.92-second chunks. To find spoken terms without a transcript, the retriever
+scores every glossary entry by maximum similarity, or MaxSim: with each source
+term pre-encoded as a vector $z_i$ and the speech of chunk $t$ encoded into
+vectors $q_w$ over overlapping windows $w\in\mathcal W_t$, the term score is
 $r_i=\max_{w\in\mathcal W_t}q_w^\top z_i$. Terms scoring above 0.78 become
 candidates, and at most ten source--target pairs enter the LLM prompt.
-AutoTerm-SST restricts this search to the working set, a few topic slices
-chosen by its router. After decoding, the new translation joins the router's
-context and can change the working set for later chunks.
+AutoTerm-SST restricts this lookup to a working set of up to four topic slices
+selected by its router, then appends each newly decoded translation to the
+router's context to guide slice selection for subsequent chunks.
 
 \begin{figure*}[t]
 \centering
 \includegraphics[width=0.98\textwidth]{autoterm_architecture.pdf}
-\caption{AutoTerm-SST as a stream moves from NLP to medicine. Recent
-translation context selects several glossary slices under a fixed term budget,
-and RASST retrieves prompt evidence only from this working set. The ellipsis
-denotes additional registered topic slices.}
+\caption{Architecture of AutoTerm-SST during a live topic transition from NLP
+to medicine. Recent translation context guides the router to activate up to
+four topic slices under a fixed term budget, and RASST retrieves prompt terms
+only from this working set. The ellipsis indicates additional offline topic
+slices registered in the catalog.}
 \label{fig:architecture}
 \end{figure*}
 
-The adaptive step sits outside the translation model. It changes neither the
-speech representation nor the retriever's candidate budget; it only decides
-which prebuilt indexes share that budget. This separation keeps the system
-pluggable: the same streaming protocol serves a retrieval-free agent, a
-fixed-glossary RASST agent, or AutoTerm-SST, and the web interface receives
-structured evidence with every partial translation.
-
-AutoTerm-SST enforces three invariants. The live request carries no domain or
-glossary; catalog growth cannot raise the per-chunk retrieval or prompt
-budget; and adding a topic is an offline data update with no model training.
-All compared policies therefore share the speech model, retriever, decoder,
-and streaming schedule, and differ only in which terminology indexes are
-searchable.
-
-With each partial translation, the agent emits the retrieved term pairs, their
-source slices, the retrieval latency, and the current working set. These fields
-drive the evidence panel in Section~\ref{sec:demo-interface}, so terminology
-behavior is visible in the interface.
+Placing adaptation outside the translation model keeps the system pluggable:
+one streaming protocol serves a retrieval-free agent, a fixed-glossary RASST
+agent, or AutoTerm-SST, and every partial translation carries the retrieved
+pairs, their source slices, and the working set to the interface. Three
+invariants hold. Live requests carry no domain label or glossary, catalog
+growth leaves per-chunk retrieval and prompt budgets constant, and adding a
+topic is an offline data update with no model training. All compared policies
+in Section~\ref{sec:evaluation} therefore share the speech encoder, retriever,
+decoder, and streaming schedule, and differ only in which terminology indexes
+are searchable.

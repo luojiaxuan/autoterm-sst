@@ -26,31 +26,35 @@ Merged-100k &  & & &  & $+1.69$ & $+1.08$ & $+2.16$ & 0.012 &  & & &  \\
 Merged-1M &  & & &  & $+2.19$ & $+0.66$ & $+3.46$ & 0.023 &  & & &  \\
 \bottomrule
 \end{tabular}
-\caption{Paired differences of AutoTerm-SST minus each baseline. Low and High
-bound the 95\% stratified talk-bootstrap interval, and $p$ is the exact
-two-sided talk-level permutation $p$-value. TERM\_ACC differences are in
-points; the last block reports BLEU on the sentences without glossary terms.}
+\caption{Paired metric differences of AutoTerm-SST minus each baseline across
+runs 1 and 2. Low and High give the 95\% stratified talk-bootstrap confidence
+bounds, and $p$ is the exact two-sided talk-level permutation $p$-value.
+TERM\_ACC differences are in percentage points, and the bottom block reports
+BLEU on the 935 sentences whose references contain no glossary term.}
 \label{tab:stats}
 \end{table*}
 
 \section{Statistical comparisons}
 \label{app:stats}
 
-Table~\ref{tab:stats} lists every paired comparison. The permutation test
-swaps the outputs of the two systems within each talk over all 1,024
-combinations and recomputes the pooled metric, so the smallest attainable
-two-sided $p$ is 0.002. The intervals come from 4,000 bootstrap resamples of
-five ACL and five ESO talks. Removing any single talk keeps all three
-advantages of AutoTerm-SST over Merged-1M positive, at least 3.28 TERM\_ACC
-points, 2.00 BLEU, and 1.99 MT-BLEU.
+Paired talk-level tests show that the gains of AutoTerm-SST over Merged-1M
+hold across individual talks. Table~\ref{tab:stats} reports every paired
+comparison. The exact permutation test swaps the outputs of two systems within
+each talk across all 1,024 combinations and recomputes the pooled metric,
+giving a minimum attainable two-sided $p$-value of 0.002. Confidence intervals
+come from 4,000 stratified bootstrap resamples of five ACL and five ESO talks.
+Removing any single talk preserves all three advantages of AutoTerm-SST over
+Merged-1M, with gains of at least 3.28 TERM\_ACC points, 2.00 BLEU, and 1.99
+MT-BLEU.
 
 \section{Router configuration}
 \label{app:config}
 
-Table~\ref{tab:config} lists the settings used in both runs. We chose the
-routing values on four windows drawn from the evaluation talks before the
-complete runs. The context encoder reads the last 128 tokens of the translation
-context, and the router uses only this context similarity to score slices.
+Both evaluation runs use one fixed set of routing and retrieval parameters,
+listed in Table~\ref{tab:config}. We selected the routing thresholds on four
+windows drawn from the evaluation talks before running the complete streams.
+The context encoder reads the last 128 tokens of translated context, and the
+router scores slices only by this context similarity.
 
 \begin{table}[!ht]
 \centering
@@ -74,41 +78,44 @@ Candidate slots & 100 \\
 Prompt cap & 10 pairs \\
 \bottomrule
 \end{tabular}
-\caption{Router and retrieval settings of AutoTerm-SST. Leads are differences
-of normalized similarity scores, and a switch requires both leads in every one
-of the consecutive updates.}
+\caption{Router and retrieval settings used by AutoTerm-SST in both runs. Lead
+thresholds are differences of normalized similarity scores, and a switch
+requires both leads in each of the consecutive updates.}
 \label{tab:config}
 \end{table}
 
 \section{Router diagnostics}
 \label{app:router}
 
-These diagnostics replay the routing signal on the saved translations of run 1
-without decoding again. Each window encodes the last four translated chunks as
-in Section~\ref{sec:adaptive-memory} and ranks the slices by raw similarity,
-without the confirmation rule and pinning of the live router. In this raw
-ranking the correct slice is among the four most similar slices in 85.0\% of
-the 8,776 windows. Keeping the confirmed slice of the live run in the working
-set and filling the other three slots by raw rank raises this to 97.0\%, which
-matches the 96.9\% measured in the live run.
+Open-loop replays of the routing signal isolate the benefit of pinning,
+measure responsiveness to rapid topic shifts, and test LLM-generated
+prototypes. Each diagnostic replays the router on the saved translations of
+run 1 without decoding again, encoding the last four translated chunks as in
+Section~\ref{sec:adaptive-memory} and ranking slices by raw similarity without
+the confirmation rule or pinning. Under raw similarity alone, the correct slice
+ranks among the top four in 85.0\% of the 8,776 windows. Keeping the live run's
+confirmed slice in the working set and filling the remaining three slots by raw
+rank raises coverage to 97.0\%, matching the 96.9\% measured live.
 
 \paragraph{Short topic shifts.}
-We cut the translations of the five ACL and five medicine talks into segments
-of 15 to 300 seconds and interleave NLP and medicine segments into one stream
-of 40 segments per length. At every length, the slice of the new topic enters
-the four most similar slices a median of one chunk, 1.92 seconds, after the
-switch and ranks first after a median of 5.76 seconds. It reaches the top four
-in all 40 segments at every length. Table~\ref{tab:router-diag} shows that
-coverage stays above 81\% even when the topic changes every 15 seconds.
+The router follows topic switches quickly even when domains alternate every 15
+to 300 seconds. We cut the saved translations of the five ACL and five
+medicine talks into segments of 15 to 300 seconds and interleave NLP and
+medicine segments into one 40-segment stream per length. At every length, the
+incoming topic slice enters the top four after a median of one chunk, or 1.92
+seconds, and ranks first after a median of 5.76 seconds. It reaches the top
+four in all 40 segments at every length, and Table~\ref{tab:router-diag} shows
+that top-four coverage stays above 81\% even when topics switch every 15
+seconds.
 
 \paragraph{Generated prototypes.}
-Prototypes can be produced without hand-writing. For each slice we give all
-of its term pairs, after removing entries that come from the evaluation
-glossaries, to \texttt{gpt-5.5-2026-04-23} and ask for a description, a list of
-seven to ten core topics, and its Chinese translation, in the same format as
-the hand-written prototypes. We generate ten independent prototype sets.
-Table~\ref{tab:router-diag} shows that their routing accuracy brackets that of
-the hand-written prototypes.
+LLM-generated prototypes route as accurately as hand-written ones. For each
+slice, we remove entries originating from the evaluation glossaries and give
+the remaining term pairs to \texttt{gpt-5.5-2026-04-23}, which writes a topic
+description, seven to ten core topics, and their Chinese translation in the
+format of the hand-written prototypes. Across ten independently generated
+prototype sets in Table~\ref{tab:router-diag}, routing accuracy brackets that
+of the hand-written prototypes.
 
 \begin{table}[!ht]
 \centering
@@ -131,11 +138,11 @@ Generated, lowest of ten & 84.3 & 67.3 \\
 Generated, highest of ten & 91.4 & 77.8 \\
 \bottomrule
 \end{tabular}
-\caption{Open-loop replays of the routing signal on the saved translations of
-run 1. Top-4 is the percentage of windows whose correct slice is among the
-four most similar slices, and Top-1 is the percentage whose most similar slice
-is correct. The lowest and highest generated sets are
-chosen separately for each column.}
+\caption{Open-loop routing replays on the saved translations of run 1 across
+short topic shifts and prototype sources. Top-4 and Top-1 are the percentages
+of windows whose correct slice ranks among the top four or ranks first by raw
+similarity. The lowest and highest generated sets are chosen separately for
+each column.}
 \label{tab:router-diag}
 \end{table}
 

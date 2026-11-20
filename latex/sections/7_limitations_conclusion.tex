@@ -1,13 +1,13 @@
 \section{Conclusion}
 
-AutoTerm-SST removes glossary upload and domain selection from
-terminology-aware streaming translation. It reads the topic from its own
-partial translation, searches a few topic slices under a fixed budget, and
-shows the evidence behind every partial output. On a mixed ACL and oncology
-stream it matches a known-domain reference in two independent runs and avoids
-the losses of a one-million-entry merged glossary. Extending the router to more
-target languages and to finer-grained subtopics is a natural next step.
-
+AutoTerm-SST eliminates glossary upload and domain selection from
+terminology-aware streaming speech translation without sacrificing accuracy or
+real-time speed. By routing over modular offline topic slices from its own
+partial translations under a fixed budget, the system is on par with a
+known-domain reference across two independent runs and avoids the degradation
+of million-entry merged glossaries while exposing live terminology evidence in
+the interface. Extending the router to more target languages and finer-grained
+subtopics is a natural next step.
 \section*{Acknowledgments}
 We used Claude, GPT, and Gemini models for code development, data processing,
 and editing, among other uses. The authors reviewed all outputs and take full

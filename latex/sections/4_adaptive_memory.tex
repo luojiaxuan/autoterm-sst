@@ -1,24 +1,27 @@
 \section{Adaptive terminology memory}
 \label{sec:adaptive-memory}
 
-AutoTerm-SST separates the offline catalog from the small glossary that one
-session searches. A topic slice holds about 1,000 term--translation pairs for
-one topic, a prebuilt MaxSim index over these terms, and a prototype: a short
-bilingual description of the topic with representative terms. Because each
-slice keeps its own translations, the same source term can map to different
-targets in different slices.
+Separating an offline catalog from a small working set lets AutoTerm-SST
+cover broad domains while keeping per-chunk search bounded. Each topic slice
+packages about 1,000 term--translation pairs, a prebuilt MaxSim index over the
+source terms, and a bilingual prototype: a short topic description with example
+terms. Because each slice stores its own translations, the same source term can
+map to different targets in different slices.
 
 \paragraph{Offline catalog.}
-An operator registers a slice by adding one entry to a manifest file that lists
-its label, term count, prototype, and index location. Slices are independent
-and replaceable. At session time the router reads only the manifest and the
-prototypes, and indexes outside the working set are never searched, so the
-catalog can grow without enlarging the glossary that any decoding step sees.
+Slices are modular catalog entries that expand coverage without enlarging
+online retrieval. An operator registers a slice by adding one manifest entry
+with its label, term count, prototype text, and index path. At session start
+the router reads only the manifest and prototypes, and during decoding the
+retriever skips every index outside the working set.
 
 \paragraph{Semantic routing.}
-The router matches the recent translation against the slice prototypes. At
-chunk $t$ it concatenates the last $w$ translated chunks into a context $c_t$.
-For slice $d$ with prototype texts $P_d$ and sentence encoder $E$, it computes
+The router selects relevant slices by matching recent partial translations
+against each slice prototype. Because the speech LLM translates audio directly
+and produces no source transcript, routing reads target-language output, which
+becomes more topic-specific as context builds. At chunk $t$, the router
+concatenates the last $w$ translated chunks into a context $c_t$; for slice $d$
+with prototype texts $P_d$ and sentence encoder $E$, it computes
 \begin{equation}
 \begin{aligned}
   \bar p_d &=
@@ -27,12 +30,10 @@ For slice $d$ with prototype texts $P_d$ and sentence encoder $E$, it computes
   s(d\mid c_t) &= \cos\!\left(E(c_t),\bar p_d\right).
 \end{aligned}
 \end{equation}
-We use the multilingual encoder BGE-M3~\citep{chen-etal-2024-m3} for $E$, so
-the Chinese translation and the English and Chinese prototype text share one
-embedding space. The router reads the translation because the speech LLM
-translates audio directly and produces no source transcript, and its partial
-output becomes more topic-specific as context accumulates. Routing is causal:
-a decision made at chunk $t$ only affects later chunks.
+We use the multilingual encoder BGE-M3~\citep{chen-etal-2024-m3} for $E$,
+placing Chinese partial translations and bilingual English and Chinese
+prototype texts in one shared embedding space. Routing is causal, so a decision
+made at chunk $t$ affects only later chunks.
 
 \begin{table*}[t]
 \centering
@@ -59,39 +60,40 @@ Merged-10k & None & 9.9k & 89.1 & 86.2 & 88.1 & 44.97 & 42.19 & 27.1 & 1.26 \\
 \bottomrule
 \end{tabular}
 \caption{Terminology accuracy, translation quality, and prompt evidence on the
-4.7-hour ten-talk stream. Input is what the user supplies before the session,
-and Active is the largest number of glossary entries searched per chunk.
-TERM\_ACC is the percentage of gold term occurrences translated with their
-glossary target, prompt precision is the percentage of injected term pairs that
-match a gold term, and Refs is the mean number of pairs injected per chunk. $\dagger$ marks a difference from AutoTerm-SST
-in the same run with $p<0.05$ in a talk-level permutation test. InfiniSST uses
-no glossary, and its All, BLEU, and MT-BLEU are means of RASST's separate ACL
-and medicine scores.}
+4.7-hour ten-talk stream. Input is what the user supplies before the session;
+Active is the most entries searched per chunk, with 1k denoting 1,000. TERM\_ACC
+and prompt precision are percentages, and Refs is the mean number of term pairs
+injected per chunk. $\dagger$ marks $p<0.05$ against AutoTerm-SST in the same run
+under a talk-level permutation test. InfiniSST uses no glossary, and its All,
+BLEU, and MT-BLEU are unweighted means of its separate ACL and medicine scores.}
 \label{tab:quality}
 \end{table*}
 
 \paragraph{Working-set update.}
-The working set holds the confirmed slice plus the highest-scoring remaining
-slices, up to $K=4$ slices and $B=4{,}000$ active terms. The router re-scores
-all slices every five seconds. The confirmed slice changes only when another
-slice leads both the runner-up and the confirmed slice by fixed margins in
-three consecutive updates, and it always stays in the working set. Keeping
-four slices lets the old and the new topic coexist during a transition, while
-stale slices drop out as their scores fall. Appendix~\ref{app:config} lists
-all router settings.
+Pinning a confirmed slice alongside top-scoring alternatives stabilizes routing
+while accommodating topic transitions. Every five seconds, the router rescores
+every catalog slice and builds a working set of at most $K=4$ slices and
+$B=4{,}000$ searchable terms in total. One slot stays pinned to the confirmed
+slice, which switches only when another slice leads both the runner-up and the
+confirmed slice by fixed score margins across three consecutive updates. The
+remaining slots hold the highest-scoring other slices within budget $B$, while
+lower-ranked slices remain excluded from retrieval. Holding up to four slices
+lets outgoing and incoming topics coexist during transitions until stale slices
+drop in rank; Appendix~\ref{app:config} lists all router thresholds.
 
 \paragraph{Fixed evidence budget.}
-All active slices share one candidate budget, so selecting four slices does not
-give AutoTerm-SST four times the evidence. The retriever splits 100 candidate
-slots among the active slices, removes exact duplicate source--target pairs,
-reranks the remaining candidates globally, and admits at most ten into the
-prompt. The 100 slots leave room for deduplication and reranking across
-slices; a chunk receives fewer than ten pairs when fewer candidates pass the
-score threshold. Any advantage of AutoTerm-SST must therefore come from placing
-more relevant mappings inside the same budget.
+All active slices share one retrieval and prompt budget, keeping prompt size
+independent of the number of active slices. The retriever distributes 100
+candidate slots across the active slices, removes exact duplicate
+source--target pairs, reranks the remaining candidates globally, and inserts at
+most ten pairs into the LLM prompt. Retrieving 100 candidates first leaves
+headroom for deduplication and cross-slice reranking before final admission,
+and a chunk receives fewer than ten pairs whenever fewer candidates clear the
+0.78 score threshold. Gains of AutoTerm-SST therefore come from placing more
+relevant mappings inside the same prompt budget.
 
 \paragraph{Causal updates.}
-Each chunk retrieves from a snapshot of the working set installed before that
-chunk began, and a routing update that finishes during generation takes effect
-at the next chunk. Indexes of likely slices are preloaded in the background,
-so loading an index never changes a prompt that is already being decoded.
+Each chunk retrieves from a snapshot of the working set taken before its
+decoding begins, so a routing update that finishes during generation takes
+effect at the next chunk. Indexes of likely slices are preloaded in the
+background, so loading never changes a prompt mid-decoding.

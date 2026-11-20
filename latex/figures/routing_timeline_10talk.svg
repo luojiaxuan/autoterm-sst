@@ -25,7 +25,7 @@
 
   <!-- Row labels -->
   <text class="row-label" x="70" y="105">Talk domain</text>
-  <text class="row-label" x="70" y="225">Selected slice</text>
+  <text class="row-label" x="70" y="225">Confirmed slice</text>
   <text class="row-label" x="70" y="334">Correct slice in</text>
   <text class="row-label" x="70" y="361">working set</text>
 

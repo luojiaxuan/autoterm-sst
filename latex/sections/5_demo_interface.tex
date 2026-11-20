@@ -10,10 +10,10 @@ selector.
 
 \paragraph{Walkthrough.}
 A session follows topic changes with no manual control. Partial translations
-appear immediately; once context accumulates, the slice status row switches to
-the highest-scoring slices, and retrieved pairs appear beside the output that
-used them. After a topic change, outgoing and incoming slices briefly
-coexist.
+appear immediately; once context accumulates, the status row at the top of the
+interface switches to the best-matching slice, and the pairs retrieved for each
+output appear in the evidence panel. After a topic change, outgoing and
+incoming slices briefly coexist in the working set.
 
 \begin{figure*}[t]
   \centering
@@ -27,26 +27,27 @@ coexist.
 \end{figure*}
 
 \paragraph{Visible terminology evidence.}
-Inline term highlighting and a dedicated evidence panel make terminology
-behavior transparent during streaming. As Figure~\ref{fig:ui} shows, the
-interface highlights retrieved terms inside the translation, lists their
-source--target mappings, and displays the active slices, active term count, and
-retrieval latency in a status row. Viewers can directly determine whether a
+Highlighting and an evidence panel make terminology behavior transparent. As
+Figure~\ref{fig:ui} shows, the
+interface highlights retrieved terms inside the translation and lists their
+source--target mappings; the status row shows the confirmed slice and the
+active term count, and the evidence-panel header names the active slices and
+the retrieval latency. Viewers can directly determine whether a
 mistranslation stems from missing retrieval evidence, an irrelevant slice, or
 LLM decoding.
 
 \paragraph{Extensibility.}
-Organizations grow the catalog from single glossary files without restarting
-the service. Registration validates the term pairs, builds an independent
-MaxSim index, and writes one manifest entry. Prototypes can be written by hand
-or generated from the glossary by an LLM, and Appendix~\ref{app:router} shows
-that generated prototypes route as accurately. Running sessions keep their
-snapshot while new sessions see new slices at once, and fixed-glossary presets
+Adding a topic takes one glossary file and no restart: registration validates
+the pairs, builds the index, and writes the manifest entry. Prototypes can be
+written by hand or generated from the glossary by an LLM, which routes as
+accurately in Appendix~\ref{app:router}. Running sessions keep the catalog snapshot taken at session start while new
+sessions see new slices at once, and fixed-glossary presets
 remain available for expert users.
 
 \paragraph{Availability.}
 The MIT-licensed implementation, a one-command launcher, and a screencast are
 in the \href{https://github.com/luojiaxuan/autoterm-sst}{GitHub repository},
 and the hosted entry page is \url{https://luojiaxuan.github.io/autoterm-sst/}.
-Live mode serves Qwen3-Omni with vLLM continuous batching alongside the RASST
-retriever.
+In live mode, as opposed to the replay of recorded outputs in
+Figure~\ref{fig:ui}, the demo serves Qwen3-Omni with vLLM continuous batching
+alongside the RASST retriever.

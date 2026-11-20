@@ -11,18 +11,14 @@ AutoTerm-SST keeps an existing streaming model and adds terminology management
 and an inspection layer around it.
 
 \paragraph{Terminology-aware translation.}
-Terminology-aware translation methods assume the relevant glossary is known
-before decoding. They apply user-provided dictionaries through constrained
-decoding or training-time exposure \citep{hokamp2017lexically,dinu2019training},
-and rare terms and named entities remain a weakness of speech translation
-\citep{gaido2021moby}. Retrieval-augmented generation offers a non-parametric
+Rare terms and named entities remain a weakness of speech translation
+\citep{gaido2021moby}. Terminology-aware methods apply user-provided
+dictionaries through constrained decoding or training-time exposure
+\citep{hokamp2017lexically,dinu2019training}, and so assume the relevant
+glossary is known before decoding. Retrieval-augmented generation offers a non-parametric
 alternative \citep{lewis2020retrieval,khandelwal2021nearest}, which RASST
-applies to streaming LLM decoding \citep{luo2026rasst}. AutoTerm-SST removes
-the pre-session glossary by selecting topic slices online.
-
-\paragraph{Interactive translation systems.}
-Serving engines such as vLLM and SGLang provide low-latency continuous
-batching \citep{kwon2023efficient,zheng2024sglang}, and interactive
-translation tools make model decisions visible \citep{dandekar2024translation}.
-AutoTerm-SST combines streaming audio transport with automatic glossary routing
-and a live terminology evidence view.
+applies to streaming LLM decoding \citep{luo2026rasst}. AutoTerm-SST removes the
+pre-session glossary by selecting topic slices online, and like interactive
+translation tools \citep{dandekar2024translation} it makes these decisions
+visible, on top of a continuous-batching serving engine
+\citep{kwon2023efficient,zheng2024sglang}.

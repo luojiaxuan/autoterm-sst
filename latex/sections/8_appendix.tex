@@ -51,9 +51,9 @@ MT-BLEU.
 \label{app:config}
 
 Both evaluation runs use one fixed set of routing and retrieval parameters,
-listed in Table~\ref{tab:config}. We selected the routing thresholds on four
-windows drawn from the evaluation talks before running the complete streams.
-The context encoder reads the last 128 tokens of translated context, and the
+listed in Table~\ref{tab:config}. We selected the routing thresholds on four short segments drawn from the
+evaluation talks before running the complete streams. The context encoder
+reads at most the last 128 tokens of the four-chunk context $c_t$, and the
 router scores slices only by this context similarity.
 
 \begin{table}[!ht]
@@ -93,15 +93,15 @@ prototypes. Each diagnostic replays the router on the saved translations of
 run 1 without decoding again, encoding the last four translated chunks as in
 Section~\ref{sec:adaptive-memory} and ranking slices by raw similarity without
 the confirmation rule or pinning. Under raw similarity alone, the correct slice
-ranks among the top four in 85.0\% of the 8,776 windows. Keeping the live run's
+ranks among the top four in 85.0\% of the 8,776 chunks. Keeping the live run's
 confirmed slice in the working set and filling the remaining three slots by raw
 rank raises coverage to 97.0\%, matching the 96.9\% measured live.
 
 \paragraph{Short topic shifts.}
-The router follows topic switches quickly even when domains alternate every 15
-to 300 seconds. We cut the saved translations of the five ACL and five
-medicine talks into segments of 15 to 300 seconds and interleave NLP and
-medicine segments into one 40-segment stream per length. At every length, the
+The raw-similarity ranking follows topic switches quickly even when domains
+alternate every 15 to 300 seconds. For each length in Table~\ref{tab:router-diag},
+we cut the saved translations of the NLP and medicine talks into segments of
+that length and interleave them into one 40-segment stream. At every length, the
 incoming topic slice enters the top four after a median of one chunk, or 1.92
 seconds, and ranks first after a median of 5.76 seconds. It reaches the top
 four in all 40 segments at every length, and Table~\ref{tab:router-diag} shows
@@ -113,9 +113,9 @@ LLM-generated prototypes route as accurately as hand-written ones. For each
 slice, we remove entries originating from the evaluation glossaries and give
 the remaining term pairs to \texttt{gpt-5.5-2026-04-23}, which writes a topic
 description, seven to ten core topics, and their Chinese translation in the
-format of the hand-written prototypes. Across ten independently generated
-prototype sets in Table~\ref{tab:router-diag}, routing accuracy brackets that
-of the hand-written prototypes.
+format of the hand-written prototypes. Across the ten independently generated sets in Table~\ref{tab:router-diag},
+the lowest and highest sets bracket the hand-written prototypes on both Top-4
+and Top-1.
 
 \begin{table}[!ht]
 \centering
@@ -138,11 +138,9 @@ Generated, lowest of ten & 84.3 & 67.3 \\
 Generated, highest of ten & 91.4 & 77.8 \\
 \bottomrule
 \end{tabular}
-\caption{Open-loop routing replays on the saved translations of run 1 across
-short topic shifts and prototype sources. Top-4 and Top-1 are the percentages
-of windows whose correct slice ranks among the top four or ranks first by raw
-similarity. The lowest and highest generated sets are chosen separately for
-each column.}
+\caption{Open-loop router replays on run-1 translations. Top-4 and Top-1 are
+the percentages of chunks whose correct slice ranks in the top four or first
+by raw similarity. Lowest and highest generated sets are chosen per column.}
 \label{tab:router-diag}
 \end{table}
 

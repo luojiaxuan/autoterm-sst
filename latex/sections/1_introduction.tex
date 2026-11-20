@@ -3,8 +3,8 @@
 Simultaneous speech translation, or SST, generates target-language text while
 a speaker is still talking, serving technical talks, lectures, and live media.
 Speech large language models, or LLMs, now translate long-form audio directly
-\citep{xu2025qwen3omni,ouyang2025infinisst}, yet rare methods, datasets,
-clinical concepts, and named entities remain difficult to recover from
+\citep{xu2025qwen3omni,ouyang2025infinisst}, yet rare method and dataset
+names, clinical concepts, and named entities remain difficult to recover from
 acoustics alone. Glossary retrieval closes this gap by matching incoming speech
 against source--target term pairs and placing the best matches in the LLM
 prompt before decoding.
@@ -16,41 +16,41 @@ out-of-domain talks, but it fixes the glossary before translation begins.
 Listeners rarely know the exact domain of a live talk in advance, and finding,
 uploading, or selecting a glossary before every session adds friction. Merging
 all domains into one universal glossary avoids manual selection and works at
-small scale, yet fixed retrieval and prompt capacities let irrelevant and
-conflicting mappings crowd out relevant terms as the catalog grows. In our
-evaluation, expanding a merged glossary from 100,000 to one million entries
-lowers terminology accuracy from 87.8\% to 84.4\%.
+small scale, yet retrieval keeps a fixed number of candidates and the prompt
+a fixed number of term pairs, so irrelevant and conflicting mappings crowd out
+relevant terms as the catalog grows. In our evaluation, expanding a merged
+glossary from 100,000 to one million entries lowers terminology accuracy from
+87.8\% to 84.4\%, as Table~\ref{tab:quality} shows.
 
 The translation stream itself supplies the domain evidence needed to choose a
-glossary. Partial output names the active topic within seconds: in an open-loop
-replay of system translations, the slice for a new topic ranks among the top
-four slices after a median of one 1.92-second audio chunk. A streaming
+glossary. Partial output names the active topic within seconds: when we replay
+saved system translations without decoding again, the glossary for a new topic
+ranks among the four best-matching topic glossaries after a median of one
+1.92-second audio chunk, as Appendix~\ref{app:router} shows. A streaming
 translator can therefore infer the domain from its own recent output without
 asking the listener to declare a topic beforehand.
 
 We present AutoTerm-SST, a system demo that moves glossary selection from user
 setup into the streaming loop. Operators register offline topic slices, each
-holding roughly 1,000 term pairs and a short bilingual topic description.
-During a session, a training-free router compares recent partial translations
-against each slice description and activates up to four matching slices inside
-a fixed term budget. Retrieval and decoding stay unchanged: AutoTerm-SST
-controls only which slices compete for each prompt, keeping the per-chunk
-budget constant as the catalog grows. The live interface exposes active slices,
-retrieved term pairs, and highlighted target terms as audio streams. In
-summary, our contributions are threefold:
+holding roughly 1,000 term pairs and a prototype, a short bilingual
+description of the topic. During a session, a training-free router compares
+recent partial translations against each prototype and activates up to four matching slices inside
+a fixed term budget. Retrieval and decoding stay unchanged: AutoTerm-SST controls only which slices
+compete for each prompt, so the per-chunk budget stays constant as the catalog
+grows. In summary, our contributions are threefold:
 \begin{itemize}
-\item Zero-setup terminology-aware SST built on RASST, paired with a live
-interface that displays active slices and retrieved term pairs beside every
-partial translation while running 2.46 times faster than real time.
+\item Zero-setup terminology-aware SST built on RASST that runs 2.46 times
+faster than real time, paired with a live interface that displays active
+slices and retrieved term pairs beside every partial translation.
 \item Budgeted multi-slice terminology memory that selects offline slices
-from the system's own translations without training, holding per-chunk
-retrieval and prompt budgets constant as the catalog grows and keeping the
-correct glossary searchable in 96.9\% of decoding windows by pinning the
-confirmed slice.
-\item Evidence on a 4.7-hour stream alternating natural language processing,
-or NLP, and oncology talks that zero setup incurs no significant quality loss:
-AutoTerm-SST is on par with a known-domain reference across two independent
-runs and beats a one-million-entry merged glossary by 3.9 points of
-terminology accuracy and 2.30 BLEU, whereas merged glossaries match it on both
-metrics only up to 10,000 entries.
+from the system's own translations without training. It holds per-chunk
+retrieval and prompt budgets constant as the catalog grows, and by pinning the
+slice the router has confirmed as the current topic, it keeps the correct
+glossary searchable in 96.9\% of chunks.
+\item Evidence that zero setup incurs no significant quality loss, from a
+4.7-hour stream alternating natural language processing, or NLP, and oncology
+talks. AutoTerm-SST is on par with a known-domain reference across two
+independent runs and beats a one-million-entry merged glossary by 3.9 points
+of terminology accuracy and 2.30 BLEU, whereas merged glossaries match it on
+both metrics only up to 10,000 entries.
 \end{itemize}

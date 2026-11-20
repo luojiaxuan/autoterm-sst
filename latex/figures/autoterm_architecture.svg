@@ -154,7 +154,7 @@
 
   <!-- AutoTerm forms a budgeted multi-slice working set from the registered catalog. -->
   <rect x="1145" y="320" width="555" height="365" class="autoterm-box"/>
-  <text x="1175" y="365" class="component-title" fill="#B85120">AutoTerm</text>
+  <text x="1175" y="365" class="component-title" fill="#B85120">Adaptive terminology memory</text>
 
   <rect x="1175" y="386" width="495" height="70" fill="#FFFFFF" stroke="#C86A32" stroke-width="2.2"/>
   <text x="1425" y="428" class="domain" text-anchor="middle">Sliding-window context similarity</text>

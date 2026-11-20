@@ -106,6 +106,20 @@ RASST 论文的 De、Ja 运行（`release_profiles_taurusdata2_20260528T000922Z/
 
 读法：两个领域、讲座很长时，规则与 pin 已把覆盖抬到 97 左右，与语言模型路由只差 1 到 2 点（与 run 3 闭环打平一致）。话题每 15 到 300 秒一换时，规则要连续 3 次确认并冷却 30 秒，新话题升为确认 slice 的中位延迟 27 到 46 秒（60 s 流里 40 段有 12 段始终没确认），覆盖 82 到 94；语言模型路由 97 以上，新话题进前 4 的中位延迟为 0。近领域时规则无济于事（52.2），语言模型路由 82.7。代价：语言模型路由的后验第一名更常换（十讲流 379 次，规则 18 次），十讲流上第一名正确 77.8，规则 91.2；检索用的是前 4，第一名只影响界面显示。
 
+## run 3 闭环结果（十讲流，两张 H200，2026-11-20）
+
+五种配置同一音频顺序、同一切块，打分沿用审计过的流程（`scripts/taurus_run3_score.sh`）。TERM_ACC 是 2,047 个按时间对齐的术语出现，越大越好；配对检验以讲座为单位，精确置换 2^10，讲座 bootstrap 4,000 次。
+
+| 配置 | TERM_ACC NLP / 医学 / 全部 | BLEU | MT-BLEU | 提示精度 | 每块词对 |
+| --- | --- | --- | --- | --- | --- |
+| AutoTerm-SST（LLM 路由） | 88.4 / 86.3 / 87.7 | 45.10 | 42.27 | 35.7 | 0.94 |
+| 相似度路由 | 88.4 / 86.0 / 87.6 | 45.39 | 42.62 | 35.7 | 0.94 |
+| Known-domain-1k | 88.3 / 85.9 / 87.5 | 45.15 | 42.41 | 48.7 | 0.69 |
+| Merged-2k | 88.8 / 86.0 / 87.9 | 45.31 | 42.48 | 39.1 | 0.86 |
+| Merged-10k | 88.6 / 87.0 / 88.1 | 45.11 | 42.33 | 27.1 | 1.26 |
+
+读法：LLM 路由与其余四种都没有显著差别（TERM_ACC 差 −0.4 到 +0.2，p ≥ 0.34；BLEU 差 −0.29 到 −0.01，p ≥ 0.14）。两种路由的线上工作集覆盖 98.0 与 98.7，第一名正确 76.4 与 95.8，第一名变化 89 次与 15 次（`run3/routing_coverage.json`）。两领域长讲座太容易，分不出路由高下，所以更难的闭环改用 RealSI（`docs/realsi_20261120/`）。
+
 ## Source of Truth
 
 | 产物 | 位置 | revision | 内容与来源 |
@@ -115,7 +129,7 @@ RASST 论文的 De、Ja 运行（`release_profiles_taurusdata2_20260528T000922Z/
 | ESO 医学讲座音频 | HF dataset `gavinlaw/rasst-main-result-data`（公开，早先已发布）`main_result/audio/medicine/` | `96b44797d8926d14ef7535e831b861b6af05a28e` | 五个 wav 的 sha256 与 Taurus `/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/medicine` 一致 |
 | 德语、日语 slice 视图（公开） | 同一仓库 `gavinlaw/run-inputs-20261120` | `91ce34aeb3799880c54ff4e7fd455c9c33fffe26` | `build_language_slices.py`：复用英文端向量，目标取已有译法，没有就取 Wikidata 标签（`fetch_wikidata_labels.py`，2026-11-20 抓取）；每个 slice 的德语条数 368–1,000、日语 411–999，education 德语最少（368） |
 | 三语 LoRA adapter（公开） | HF model `gavinlaw/rasst-speech-llm-cap16-denoise-ttag-lora` | `a82e03699c697b52a69e5702094fb4a7a81aeb52` | `scripts/extract_lora_from_merged.py`；de 用精确 SVD，zh、ja 用随机化 SVD（与精确 SVD 在 256 个 de 模块上最大相对差 0.34%） |
-| run 3 闭环（进行中） | hyper01 `/data/luojiaxuan/home/runs/20261120T062838Z`，容器 `sglang-omni-jaxan-2`，GPU 2、5（访客） | 代码 `c33dfca` 起的 `scripts/radix_stream_eval/` | 三段：LLM 路由、相似度路由、固定术语表；监控 `monitor.sh` |
+| run 3 闭环 | 输出 Taurus `/home/jiaxuanluo/autoterm_taurus_20261024_io/runs/r3_*.json`（含 ESO 讲座译文，私有配额已满，状态 `PENDING_HF_UPLOAD`），日志 `runs/r3_logs.tar.gz`；汇总 `run3/*.json` | 代码 `c33dfca` 起的 `scripts/radix_stream_eval/run.sh`，hyper01 两张 H200 | 每个输出的 sha256 在 `run3/results.json` |
 | 私有输入副本（未完成） | HF dataset `gavinlaw/autoterm-sst-eval-inputs`（私有） | 只有 ACL 分段 | 私有配额已满（403，要求开自动充值），医学音频与 slice 没传上；闭环任务改用上面三个公开仓库 |
 
 ## 坑（在 Radix 节点上跑闭环）

@@ -14,8 +14,9 @@ mkdir -p "${OUT}"
 cd "${ROOT}/code"
 git rev-parse HEAD > "${OUT}/code_revision.txt"
 
+# The capacity server is built from an explicit config, so its vllm serve URL is the default port 8200.
 measure() {  # measure <mode> <preset>
-  local mode=$1 preset=$2 port=8040 vport=8240
+  local mode=$1 preset=$2 port=8040 vport=8200
   [[ -s "${OUT}/${mode}.json" ]] && return 0
   tmux new-session -d -s lat-server \
     "srun --jobid=${JOB} --overlap --gres=gpu:3 --ntasks=1 --cpus-per-task=12 --mem=80G env CONTEXT_DEVICE=cuda:0 VLLM_UTIL=0.85 ${ROOT}/code/scripts/taurus_evidence_server_vllm_serve.sh ${port} ${vport} ${mode} > ${OUT}/server_${mode}.log 2>&1"

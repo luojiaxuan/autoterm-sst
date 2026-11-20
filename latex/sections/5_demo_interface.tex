@@ -37,11 +37,10 @@ from an irrelevant slice, or was retrieved but not used.
 
 \paragraph{Extensibility.}
 Adding a topic takes one glossary file and no restart: registration validates
-the pairs, builds the index, and writes the manifest entry. Prototypes can be
-written by hand or generated from the glossary by an LLM, with comparable routing accuracy in
-Appendix~\ref{app:router}. Running sessions keep the catalog snapshot taken at session start while new
-sessions see new slices at once, and fixed-glossary presets
-remain available for expert users.
+the pairs, builds the index, and writes the manifest entry, and an LLM can
+write the prototype from the glossary, as Appendix~\ref{app:router} evaluates.
+Running sessions keep their catalog snapshot, and fixed-glossary presets remain
+available for expert users.
 
 \paragraph{Availability.}
 The MIT-licensed implementation, a one-command launcher, and a screencast are

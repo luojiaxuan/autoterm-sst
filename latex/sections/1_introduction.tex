@@ -22,35 +22,33 @@ relevant terms as the catalog grows. In our evaluation, expanding a merged
 glossary from 100,000 to one million entries lowers terminology accuracy from
 87.8\% to 84.4\%, as Table~\ref{tab:quality} shows.
 
-The translation stream itself supplies the domain evidence needed to choose a
-glossary. Partial output names the active topic within seconds: when we replay
-saved system translations without decoding again, the glossary for a new topic
-ranks among the four best-matching topic glossaries after a median of one
-1.92-second audio chunk, as Appendix~\ref{app:router} shows. A streaming
-translator can therefore infer the domain from its own recent output without
-asking the listener to declare a topic beforehand.
+The translation stream itself supplies the evidence needed to choose a
+glossary. A few seconds of partial output name the active topic: on RealSI
+streams that change domain every few minutes, a 4-billion-parameter LLM
+reading the last four translated chunks ranks a new talk's glossary first
+after a median of 15.6 seconds. A streaming translator can therefore infer the
+domain from its own output without asking the listener to declare it.
 
 We present AutoTerm-SST, a system demo that moves glossary selection from user
 setup into the streaming loop. Operators register offline topic slices, each
-holding roughly 1,000 term pairs and a prototype, a short bilingual
-description of the topic. During a session, a training-free router compares
-recent partial translations against each prototype and activates up to four matching slices inside
-a fixed term budget. Retrieval and decoding stay unchanged: AutoTerm-SST controls only which slices
-compete for each prompt, so the per-chunk budget stays constant as the catalog
-grows. In summary, our contributions are threefold:
+holding roughly 1,000 term pairs and a prototype, a short description of the
+topic. During a session, a small LLM scores every prototype against recent
+partial translations, a sticky hidden Markov filter accumulates these scores
+into a posterior over topics, and the most probable slices, at most four, form
+a working set inside a fixed term budget. Retrieval and decoding stay
+unchanged, so the per-chunk budget stays constant as the catalog grows. In
+summary, our contributions are threefold:
 \begin{itemize}
-\item Zero-setup terminology-aware SST built on RASST that runs 2.46 times
-faster than real time, paired with a live interface that displays active
-slices and retrieved term pairs beside every partial translation.
-\item Budgeted multi-slice terminology memory that selects offline slices
-from the system's own translations without training. It holds per-chunk
-retrieval and prompt budgets constant as the catalog grows, and by pinning the
-slice the router has confirmed as the current topic, it keeps the correct
-glossary searchable in 96.9\% of chunks.
-\item Evidence that zero setup incurs no significant quality loss, from a
-4.7-hour stream alternating natural language processing, or NLP, and oncology
-talks. AutoTerm-SST is on par with a known-domain reference across two
-independent runs and beats a one-million-entry merged glossary by 3.9 points
-of terminology accuracy and 2.30 BLEU, whereas merged glossaries match it on
-both metrics only up to 10,000 entries.
+\item Zero-setup terminology-aware SST built on RASST, paired with a live
+interface that displays the active slices and the retrieved term pairs beside
+every partial translation.
+\item Training-free language-model routing with a sticky topic filter whose
+only free parameter is the switch rate. On ten-domain RealSI streams it keeps
+the correct glossary searchable in 89.7\% of chunks, against 78.8\% for a
+similarity router with tuned confirmation rules.
+\item Evidence from a 4.7-hour stream alternating natural language processing,
+or NLP, and oncology talks that zero setup costs no significant quality:
+AutoTerm-SST is on par with a known-domain reference, and routing beats a
+one-million-entry merged glossary by 3.9 points of terminology accuracy and
+2.30 BLEU.
 \end{itemize}

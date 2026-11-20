@@ -9,11 +9,9 @@ terms. Because each slice stores its own translations, the same source term can
 map to different targets in different slices.
 
 \paragraph{Offline catalog.}
-Slices are modular catalog entries that expand coverage without enlarging
-online retrieval. An operator registers a slice by adding one manifest entry
-with its label, term count, prototype text, and index path. At session start
-the router reads only the manifest and prototypes, and during decoding the
-retriever skips every index outside the working set.
+An operator registers a slice by adding one manifest entry with its label,
+term count, prototype, and index path. The router reads only the manifest and
+prototypes, and the retriever skips every index outside the working set.
 
 \paragraph{Language-model routing.}
 The router asks a small instruction-tuned LLM which slice matches the talk at
@@ -65,11 +63,9 @@ Appendix~\ref{app:config} lists all router settings.
 \paragraph{Fixed evidence budget.}
 All active slices share one retrieval and prompt budget. The retriever splits
 100 candidate slots equally among the active slices, removes exact duplicate
-pairs, reranks the rest globally, and admits at most ten into the prompt; the
-100 slots leave headroom for deduplication and cross-slice reranking, and a
-chunk receives fewer than ten pairs when fewer candidates clear the 0.78
-threshold. Gains of AutoTerm-SST therefore come from placing more relevant
-mappings inside the same budget.
+pairs, reranks the rest globally, and admits at most ten into the prompt, fewer
+when fewer candidates clear the 0.78 threshold. Gains of AutoTerm-SST therefore
+come from placing more relevant mappings inside the same budget.
 
 \paragraph{Causal updates.}
 Each chunk retrieves from a snapshot of the working set taken before its

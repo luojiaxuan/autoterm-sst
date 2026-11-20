@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # note (luojiaxuan): Serve the RASST agent for the ten-talk evidence runs on Taurus.
-# note (luojiaxuan): Usage: taurus_evidence_server.sh <port> <routed|fixed> <max_num_seqs> <gpu_memory_utilization> [router_prototypes_json]
+# note (luojiaxuan): Usage: taurus_evidence_server.sh <port> <routed|lm|fixed> <max_num_seqs> <gpu_memory_utilization> [router_prototypes_json]
 # note (luojiaxuan): Run it inside a Slurm step that was granted two GPUs; the retriever shares the first one.
 set -euo pipefail
 
@@ -20,7 +20,7 @@ MANIFEST="${ROOT}/slices/manifest_taurus_1k.json"
 SLICES=nlp_core_1k,medicine_core_1k,education_core_1k,finance_core_1k,legal_core_1k,environment_core_1k,entertainment_core_1k,science_core_1k,sports_core_1k,art_core_1k
 
 case "${MODE}" in
-  routed)
+  routed|lm)
     POLICY_ARGS=(
       --required-presets "${SLICES}"
       --autoterm-policy budgeted_top_slices
@@ -42,6 +42,15 @@ case "${MODE}" in
     )
     if [[ -n "${PROTOTYPES}" ]]; then
       POLICY_ARGS+=(--autoterm-context-prototypes "${PROTOTYPES}")
+    fi
+    if [[ "${MODE}" == lm ]]; then
+      # Language-model router: letter probabilities of the 4B model, filtered by the sticky HMM, no pin.
+      POLICY_ARGS+=(
+        --autoterm-context-scorer language_model
+        --autoterm-context-language-model Qwen/Qwen3-4B-Instruct-2507
+        --autoterm-switch-rate 1e-3
+        --no-autoterm-pin-active-slice
+      )
     fi
     ;;
   fixed)

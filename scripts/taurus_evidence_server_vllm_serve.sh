@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # note (luojiaxuan): Routed AutoTerm server whose generation goes to an external vllm serve (continuous batching).
-# note (luojiaxuan): Usage: taurus_evidence_server_vllm_serve.sh <framework_port> <vllm_port>
+# note (luojiaxuan): Usage: taurus_evidence_server_vllm_serve.sh <framework_port> <vllm_port> [routed|lm|fixed]
 # note (luojiaxuan): With two granted GPUs, vllm serve uses both and the retriever shares the first.
 # note (luojiaxuan): With three, vllm serve uses the first two and the retriever and router model get the third.
 set -euo pipefail
 
 PORT="$1"
 VLLM_PORT="$2"
+MODE="${3:-routed}"
 ROOT=/mnt/data2/jiaxuanluo/autoterm_taurus_20261024
 IO_ROOT=/home/jiaxuanluo/autoterm_taurus_20261024_io
 PYTHON_BIN=/home/jiaxuanluo/miniconda3/envs/spaCyEnv/bin/python
@@ -55,4 +56,4 @@ curl -fsS --max-time 3 "http://127.0.0.1:${VLLM_PORT}/health" >/dev/null
 
 export RASST_BACKEND_KIND=vllm_serve
 export RASST_VLLM_SERVE_URL="http://127.0.0.1:${VLLM_PORT}"
-CUDA_VISIBLE_DEVICES="${FRAMEWORK_GPUS}" "${ROOT}/code/scripts/taurus_evidence_server.sh" "${PORT}" routed 32 0.72
+CUDA_VISIBLE_DEVICES="${FRAMEWORK_GPUS}" "${ROOT}/code/scripts/taurus_evidence_server.sh" "${PORT}" "${MODE}" 32 0.72

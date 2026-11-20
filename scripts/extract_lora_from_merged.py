@@ -8,6 +8,10 @@ adapter: lora_B = U_r * S_r and lora_A = V_r^T, with lora_alpha = r so the scale
 one. Expert weights stay per expert, the 2D layout that vLLM loads with
 is_3d_lora_weight false. The script reports, per module type, the share of the
 difference's energy that the adapter keeps.
+
+``--method lowrank`` computes the top singular directions with a randomized SVD
+(rank r plus 16 oversampling, 4 power iterations). The spectrum has a wide gap
+after rank r, so this matches the exact SVD at a fraction of its cost.
 """
 
 import argparse
@@ -32,6 +36,7 @@ def main():
     ap.add_argument("--rank", type=int, default=32)
     ap.add_argument("--base-model-id", default="Qwen/Qwen3-Omni-30B-A3B-Instruct")
     ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--method", choices=["exact", "lowrank"], default="lowrank")
     args = ap.parse_args()
     torch.set_grad_enabled(False)
 
@@ -58,10 +63,14 @@ def main():
             groups[tuple(merged[k].shape)].append(k)
         for shape, ks in groups.items():
             delta = torch.stack([merged[k].float() - base[k].float() for k in ks])
-            u, s, vh = torch.linalg.svd(delta, full_matrices=False)
+            if args.method == "exact":
+                u, s, vh = torch.linalg.svd(delta, full_matrices=False)
+            else:
+                u, s, v = torch.svd_lowrank(delta, q=r + 16, niter=4)
+                vh = v.mT
             b = (u[:, :, :r] * s[:, None, :r]).to(torch.bfloat16)
             a = vh[:, :r, :].to(torch.bfloat16)
-            energy = (s**2).sum(-1)
+            energy = delta.pow(2).sum((-2, -1))
             top = (s[:, :r] ** 2).sum(-1)
             for i, k in enumerate(ks):
                 module = k[: -len(".weight")]
@@ -88,6 +97,7 @@ def main():
     (args.out / "adapter_config.json").write_text(json.dumps(config, indent=2) + "\n")
     report = {
         "rank": r,
+        "method": args.method,
         "modules": len(tensors) // 2,
         "energy_kept": {k: round(v[0] / v[1], 4) for k, v in sorted(kept.items())},
     }

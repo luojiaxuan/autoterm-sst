@@ -85,3 +85,10 @@ RASST 论文的 De、Ja 运行（`release_profiles_taurusdata2_20260528T000922Z/
 | 三语 LoRA adapter（公开） | HF model `gavinlaw/rasst-speech-llm-cap16-denoise-ttag-lora` | `a82e03699c697b52a69e5702094fb4a7a81aeb52` | `scripts/extract_lora_from_merged.py`；de 用精确 SVD，zh、ja 用随机化 SVD（与精确 SVD 在 256 个 de 模块上最大相对差 0.34%） |
 | run 3 闭环（进行中） | hyper01 `/data/luojiaxuan/home/runs/20261120T062838Z`，容器 `sglang-omni-jaxan-2`，GPU 2、5（访客） | 代码 `c33dfca` 起的 `scripts/radix_stream_eval/` | 三段：LLM 路由、相似度路由、固定术语表；监控 `monitor.sh` |
 | 私有输入副本（未完成） | HF dataset `gavinlaw/autoterm-sst-eval-inputs`（私有） | 只有 ACL 分段 | 私有配额已满（403，要求开自动充值），医学音频与 slice 没传上；闭环任务改用上面三个公开仓库 |
+
+## 坑（在 Radix 节点上跑闭环）
+
+- 框架在 RASST 检索器导入或加载失败时只记一行 ERROR，然后不带检索继续服务（`rag=False`），客户端照常出数，数字看起来正常。`run.sh` 在每个阶段开始前读 `/health`，检索没有 ready 就退出；换环境跑闭环必须保留这一检查。
+- 检索器按 `RASST_ACTIVE_CODE_ROOT` 找 RASST 代码，默认是 Taurus 路径；它还按仓库名从 HF 缓存加载 `Atotti/Qwen3-Omni-AudioTransformer`、`BAAI/bge-m3` 和 `openai/whisper-large-v3` 的特征提取配置，离线模式下要先缓存。
+- `vllm/vllm-openai:v0.24.0` 只接受 Transformers v5，不能再按旧环境钉 4.57.3；`qwen-omni-utils` 依赖 `audioread`，要显式装。
+- ACL 分段的 `segments.meta.jsonl` 与 `audio.yaml` 写的是 Taurus 绝对路径，换机器要改写。

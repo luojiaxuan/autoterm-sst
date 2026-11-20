@@ -1,0 +1,197 @@
+{
+ "rho": 0.001,
+ "w": 4,
+ "flags": [
+  "--port",
+  "0",
+  "--model-path",
+  "unused",
+  "--manifest",
+  "unused",
+  "--rag-model-path",
+  "unused",
+  "--tmp-dir",
+  "unused",
+  "--autoterm-policy",
+  "budgeted_top_slices",
+  "--autoterm-default-preset",
+  "nlp_core_1k",
+  "--autoterm-term-budget",
+  "4000",
+  "--autoterm-max-active-slices",
+  "4",
+  "--autoterm-context-window-chunks",
+  "4",
+  "--autoterm-context-weight",
+  "1.0",
+  "--autoterm-text-weight",
+  "0.0",
+  "--autoterm-domain-probe-weight",
+  "0.0",
+  "--autoterm-speech-weight",
+  "0.0",
+  "--autoterm-metadata-weight",
+  "0.0",
+  "--autoterm-ema-alpha",
+  "0.80",
+  "--autoterm-update-sec",
+  "5.0",
+  "--autoterm-warmup-sec",
+  "6.0",
+  "--autoterm-cooldown-sec",
+  "30.0"
+ ],
+ "ten_talk": {
+  "similarity_rules": {
+   "top1_acc": 0.9052,
+   "cover@4": 0.9698,
+   "top1_changes": 20
+  },
+  "language_model_hmm": {
+   "top1_acc": 0.7778,
+   "cover@4": 0.9896,
+   "top1_changes": 379
+  }
+ },
+ "rapid": {
+  "piece=15s": {
+   "similarity_rules": {
+    "top1_acc": 0.4647,
+    "cover@4": 0.7724,
+    "top1_changes": 4,
+    "median_seconds_until_gold_in_top1": 0.0,
+    "pieces_where_gold_never_in_top1": 18,
+    "median_seconds_until_gold_in_working_set": 0.0,
+    "pieces_where_gold_never_in_working_set": 1
+   },
+   "language_model_hmm": {
+    "top1_acc": 0.4135,
+    "cover@4": 1.0,
+    "top1_changes": 34,
+    "median_seconds_until_gold_in_top1": 8.64,
+    "pieces_where_gold_never_in_top1": 5,
+    "median_seconds_until_gold_in_working_set": 0.0,
+    "pieces_where_gold_never_in_working_set": 0
+   }
+  },
+  "piece=30s": {
+   "similarity_rules": {
+    "top1_acc": 0.4375,
+    "cover@4": 0.8526,
+    "top1_changes": 13,
+    "median_seconds_until_gold_in_top1": 0.0,
+    "pieces_where_gold_never_in_top1": 15,
+    "median_seconds_until_gold_in_working_set": 0.0,
+    "pieces_where_gold_never_in_working_set": 0
+   },
+   "language_model_hmm": {
+    "top1_acc": 0.6026,
+    "cover@4": 0.9808,
+    "top1_changes": 47,
+    "median_seconds_until_gold_in_top1": 9.6,
+    "pieces_where_gold_never_in_top1": 2,
+    "median_seconds_until_gold_in_working_set": 0.0,
+    "pieces_where_gold_never_in_working_set": 0
+   }
+  },
+  "piece=60s": {
+   "similarity_rules": {
+    "top1_acc": 0.3772,
+    "cover@4": 0.8801,
+    "top1_changes": 19,
+    "median_seconds_until_gold_in_top1": 27.84,
+    "pieces_where_gold_never_in_top1": 13,
+    "median_seconds_until_gold_in_working_set": 0.0,
+    "pieces_where_gold_never_in_working_set": 0
+   },
+   "language_model_hmm": {
+    "top1_acc": 0.7361,
+    "cover@4": 0.976,
+    "top1_changes": 64,
+    "median_seconds_until_gold_in_top1": 9.6,
+    "pieces_where_gold_never_in_top1": 1,
+    "median_seconds_until_gold_in_working_set": 0.0,
+    "pieces_where_gold_never_in_working_set": 0
+   }
+  },
+  "piece=120s": {
+   "similarity_rules": {
+    "top1_acc": 0.5959,
+    "cover@4": 0.8883,
+    "top1_changes": 25,
+    "median_seconds_until_gold_in_top1": 26.88,
+    "pieces_where_gold_never_in_top1": 8,
+    "median_seconds_until_gold_in_working_set": 0.0,
+    "pieces_where_gold_never_in_working_set": 0
+   },
+   "language_model_hmm": {
+    "top1_acc": 0.7676,
+    "cover@4": 0.9715,
+    "top1_changes": 100,
+    "median_seconds_until_gold_in_top1": 9.6,
+    "pieces_where_gold_never_in_top1": 0,
+    "median_seconds_until_gold_in_working_set": 0.0,
+    "pieces_where_gold_never_in_working_set": 0
+   }
+  },
+  "piece=300s": {
+   "similarity_rules": {
+    "top1_acc": 0.7204,
+    "cover@4": 0.9306,
+    "top1_changes": 43,
+    "median_seconds_until_gold_in_top1": 48.0,
+    "pieces_where_gold_never_in_top1": 1,
+    "median_seconds_until_gold_in_working_set": 3.84,
+    "pieces_where_gold_never_in_working_set": 0
+   },
+   "language_model_hmm": {
+    "top1_acc": 0.8139,
+    "cover@4": 0.9926,
+    "top1_changes": 210,
+    "median_seconds_until_gold_in_top1": 9.6,
+    "pieces_where_gold_never_in_top1": 0,
+    "median_seconds_until_gold_in_working_set": 0.0,
+    "pieces_where_gold_never_in_working_set": 0
+   }
+  }
+ },
+ "multilingual": {
+  "de": {
+   "similarity_rules": {
+    "top1_acc": 0.8725,
+    "cover@4": 0.9686,
+    "top1_changes": 14
+   },
+   "language_model_hmm": {
+    "top1_acc": 0.7593,
+    "cover@4": 0.9783,
+    "top1_changes": 406
+   }
+  },
+  "ja": {
+   "similarity_rules": {
+    "top1_acc": 0.8904,
+    "cover@4": 0.9736,
+    "top1_changes": 19
+   },
+   "language_model_hmm": {
+    "top1_acc": 0.7894,
+    "cover@4": 0.99,
+    "top1_changes": 411
+   }
+  }
+ },
+ "close_domains": {
+  "occurrences": 2047,
+  "similarity_rules": {
+   "term_cover@4": 0.5242,
+   "term_cover@4_nlp": 0.4481,
+   "term_cover@4_medicine": 0.6775
+  },
+  "language_model_hmm": {
+   "term_cover@4": 0.8266,
+   "term_cover@4_nlp": 0.8947,
+   "term_cover@4_medicine": 0.6892
+  }
+ }
+}

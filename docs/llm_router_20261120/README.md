@@ -59,3 +59,12 @@ RASST 论文的 De、Ja 运行（`release_profiles_taurusdata2_20260528T000922Z/
 ## 负结果：未知领域回退
 
 `unknown_domain_replay.py`：去掉一个领域，给语言模型加“都不合适”选项。去掉 NLP 时 NLP 讲座只有 3.8% 的窗口选“都不合适”，去掉医学时为 0%，模型改选最接近的剩余 slice（`unknown_domain.json`）。多选一的问法不能用来做回退，不进论文。
+
+## Source of Truth
+
+| 产物 | 位置 | revision | 内容与来源 |
+| --- | --- | --- | --- |
+| 1k topic slices（公开，中性名） | HF dataset `gavinlaw/run-inputs-20261120` | `1d5e87adac9c70606df8b0c611ebc4c4240a11d2` | Taurus `/mnt/data2/jiaxuanluo/autoterm_taurus_20261024/slices/prefix_1k` 的十个 1k slice 与 MaxSim 索引；`stage_slices.py` 把路径改成节点上的 `/data/inputs/slices`，元数据里的项目名换成中性词，向量与术语不变 |
+| ACL 60/60 分段 | HF dataset `gavinlaw/rasst-demo-acl6060-zh-segments`（公开） | `a10a6a9bab8758bdc50607b50c62f060ed623109` | 与 Taurus `/mnt/data2/jiaxuanluo/rasst_eval/acl6060_zh_segments` 同一套文件 |
+| ESO 医学讲座音频 | HF dataset `gavinlaw/rasst-main-result-data`（公开，早先已发布）`main_result/audio/medicine/` | `96b44797d8926d14ef7535e831b861b6af05a28e` | 五个 wav 的 sha256 与 Taurus `/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/medicine` 一致 |
+| 私有输入副本（未完成） | HF dataset `gavinlaw/autoterm-sst-eval-inputs`（私有） | 只有 ACL 分段 | 私有配额已满（403，要求开自动充值），医学音频与 slice 没传上；闭环任务改用上面三个公开仓库 |

@@ -47,7 +47,7 @@ case "${MODE}" in
       # Language-model router: letter probabilities of the 4B model, filtered by the sticky HMM, no pin.
       POLICY_ARGS+=(
         --autoterm-context-scorer language_model
-        --autoterm-context-language-model Qwen/Qwen3-4B-Instruct-2507
+        --autoterm-context-language-model /home/jiaxuanluo/.cache/huggingface/hub/models--Qwen--Qwen3-4B-Instruct-2507/snapshots/cdbee75f17c01a7cc42f958dc650907174af0554
         --autoterm-switch-rate 1e-3
         --no-autoterm-pin-active-slice
       )

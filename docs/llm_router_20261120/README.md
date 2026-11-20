@@ -42,3 +42,20 @@ RASST 论文的 De、Ja 运行（`release_profiles_taurusdata2_20260528T000922Z/
 | ja | 69.2 / 84.9 / 1,985 | 79.0 / 88.2 / 1,008 | 98.5 / 98.3 / 97.5 |
 
 原始输出：`multilingual_de.json`、`multilingual_ja.json`、`multilingual_hmm_filter.json`。
+
+## 近领域：语言模型切出的细粒度 slice
+
+`llm_fine_slices.py` 用同一个 4B 模型把 NLP 与医学的 10k 目录各切成 8 个子方向（先从 400 条非评测来源的术语提出子方向，再给每条术语按字母概率归类），加上其余 8 个领域，共 24 个 slice。子方向名称与大小见 `fine_slices_taxonomy.json`。指标是 2,047 次 gold 术语出现中，它所在的 slice 在该块工作集前 4 里的比例（`fine_slice_replay.py`、`fine_slices_coverage.json`）。
+
+| 路由 | 全部 | NLP | 医学 |
+| --- | --- | --- | --- |
+| 余弦（子方向描述作原型） | 51.6 | 43.1 | 68.6 |
+| 语言模型 | 73.9 | 80.6 | 60.2 |
+| 语言模型 + HMM（ρ = 1e-5） | 83.9 | 90.3 | 71.0 |
+| 每个 talk 取最好的 4 个 slice（上界） | 97.3 | 97.7 | 96.5 |
+
+医学讲座的 gold 术语分散在操作与治疗（211）、药理（211）、疾病（141）、诊断工具（58）、遗传（47）五个子方向，路由要在相邻子方向里挑对组合。
+
+## 负结果：未知领域回退
+
+`unknown_domain_replay.py`：去掉一个领域，给语言模型加“都不合适”选项。去掉 NLP 时 NLP 讲座只有 3.8% 的窗口选“都不合适”，去掉医学时为 0%，模型改选最接近的剩余 slice（`unknown_domain.json`）。多选一的问法不能用来做回退，不进论文。

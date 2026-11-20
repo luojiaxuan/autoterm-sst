@@ -12,7 +12,7 @@ tar xzf retriever.tar.gz -C code
 cp /data/inputs/slices/manifest.json code/manifest.json
 # The image's vLLM needs its own Transformers v5, so it is held fixed while the rest is installed.
 TF=$(python3 -c "import transformers; print(transformers.__version__)")
-pip install -q peft soundfile librosa qwen-omni-utils faiss-cpu "transformers==$TF" > logs/pip.log 2>&1
+pip install -q peft soundfile librosa audioread av qwen-omni-utils faiss-cpu "transformers==$TF" > logs/pip.log 2>&1
 pip freeze > logs/pip_freeze.txt
 IFS=, read -r -a GPUS <<< "${CUDA_VISIBLE_DEVICES}"
 UTIL=${UTIL:-0.33}

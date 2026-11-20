@@ -567,6 +567,7 @@ class OmniSession:
     created_s: float = field(default_factory=time.perf_counter)
     topic_history: List[Dict[str, Any]] = field(default_factory=list)
     glossary_switch_count: int = 0
+    top_slice_changes: int = 0
     topic_update_task: Optional[asyncio.Task] = None
     recent_references: Deque[Dict[str, Any]] = field(default_factory=lambda: deque(maxlen=64))
     last_topic_reason: str = ""
@@ -1224,6 +1225,9 @@ class OmniAgent(Agent):
         return self._slice_for_preset(session, self.config.autoterm_rescue_preset, role="rescue")
 
     def _record_active_slices(self, session: "OmniSession", slices: Sequence[RetrievalSlice]) -> None:
+        first = slices[0].preset_id if slices else ""
+        if session.active_slice_presets and first != session.active_slice_presets[0]:
+            session.top_slice_changes += 1
         session.active_retrieval_slices = list(slices)
         session.active_slice_presets = [item.preset_id for item in slices]
         session.active_slice_terms = {item.preset_id: int(item.term_count or 0) for item in slices}
@@ -1698,6 +1702,7 @@ class OmniAgent(Agent):
         session.topic_history.clear()
         session.topic_confidence = 0.0
         session.glossary_switch_count = 0
+        session.top_slice_changes = 0
         session.last_topic_update_s = time.perf_counter()
         session.last_topic_reason = "reset"
         session.last_router_decision = None
@@ -2243,6 +2248,16 @@ class OmniAgent(Agent):
         return self._annotate_references(session, references)[: max(0, int(self.config.ui_top_k))]
 
     def _topic_meta(self, session: OmniSession) -> Dict[str, Any]:
+        if self.config.router_context_switch_rate > 0.0 and session.active_retrieval_slices:
+            # The language-model router's topic is its posterior argmax, the first slice of the working set.
+            top = session.active_retrieval_slices[0]
+            return glossary_topic_meta(
+                active_domain=top.domain,
+                confidence=float(session.router_posterior.get(top.domain, 0.0)),
+                active_glossary_preset=top.preset_id,
+                switch_count=session.top_slice_changes,
+                last_reason="posterior argmax",
+            )
         return glossary_topic_meta(
             active_domain=session.active_domain,
             confidence=session.topic_confidence,
@@ -2959,13 +2974,7 @@ class OmniAgent(Agent):
             "active_index_path": active_index,
             "active_terms": rag_health.get("active_terms"),
             "sessions": {
-                sid: {
-                    "active_domain": sess.active_domain,
-                    "confidence": round(sess.topic_confidence, 4),
-                    "active_glossary_preset": sess.active_glossary_preset,
-                    "switch_count": sess.glossary_switch_count,
-                    "router": sess.last_router_decision,
-                }
+                sid: {**self._topic_meta(sess), "router": sess.last_router_decision}
                 for sid, sess in list(self.sessions.items())[:16]
             },
         }

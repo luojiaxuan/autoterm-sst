@@ -8,9 +8,17 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from eval.streaming_sst.serve_glossary_capacity_sweep import build_agent, configure_vllm_runtime
+from eval.streaming_sst.serve_glossary_capacity_sweep import build_agent, configure_vllm_runtime, parse_args
 from framework.agents.omni import OmniAgent, OmniConfig
 from framework.agents.term_memory.manifest import TermMemoryManifest
+
+
+def capacity_args(root: Path, **overrides):
+    """Server arguments with parser defaults for every option the test does not set."""
+    args = parse_args(["--port", "0", "--model-path", str(root / "model"), "--manifest", str(root / "manifest.json"),
+                       "--rag-model-path", str(root / "retriever.pt"), "--tmp-dir", str(root / "tmp")])
+    vars(args).update(overrides)
+    return args
 
 
 class OmniExplicitConfigTest(unittest.TestCase):
@@ -97,9 +105,8 @@ class OmniExplicitConfigTest(unittest.TestCase):
                 base_dir=root,
                 path=str(root / "manifest.json"),
             )
-            args = SimpleNamespace(
-                model_path=root / "model",
-                rag_model_path=root / "retriever.pt",
+            args = capacity_args(
+                root,
                 rag_device="cuda:0",
                 vllm_tp_size=1,
                 gpu_memory_utilization=0.6,
@@ -116,7 +123,6 @@ class OmniExplicitConfigTest(unittest.TestCase):
                 empty_term_map_policy="none_block",
                 rag_top_k=10,
                 rag_score_threshold=0.78,
-                tmp_dir=root / "tmp",
             )
 
             agent = build_agent(args, manifest, ["capacity_1m"])
@@ -144,9 +150,8 @@ class OmniExplicitConfigTest(unittest.TestCase):
                 base_dir=root,
                 path=str(root / "manifest.json"),
             )
-            args = SimpleNamespace(
-                model_path=root / "model",
-                rag_model_path=root / "retriever.pt",
+            args = capacity_args(
+                root,
                 rag_device="cuda:0",
                 vllm_tp_size=1,
                 gpu_memory_utilization=0.6,
@@ -169,7 +174,6 @@ class OmniExplicitConfigTest(unittest.TestCase):
                 autoterm_term_budget=20_000,
                 autoterm_max_active_slices=2,
                 autoterm_context_window_chunks=12,
-                tmp_dir=root / "tmp",
             )
 
             agent = build_agent(

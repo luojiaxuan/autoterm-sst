@@ -7,7 +7,7 @@ IO=/home/jiaxuanluo/autoterm_taurus_20261024_io
 CODE=/mnt/data2/jiaxuanluo/autoterm_taurus_20261024/code
 PY=/home/jiaxuanluo/miniconda3/envs/spaCyEnv/bin/python
 JULY=/mnt/data1/jiaxuanluo/autoterm_streamlaal_20260711
-REALSI=/mnt/data1/jiaxuanluo/rasst_autoterm_10domain/realsi_65f3eff/en2zh
+REALSI=/mnt/data1/jiaxuanluo/rasst_autoterm_10domain/realsi_65f3eff/en2zh/json
 NAMES=(lm_hmm cosine known merged10k)
 ORDERS=(1 2 3)
 SLICES=nlp=nlp_core_1k,medicine=medicine_core_1k,education=education_core_1k,finance=finance_core_1k,legal=legal_core_1k,environment=environment_core_1k,entertainment=entertainment_core_1k,science=science_core_1k,sports=sports_core_1k,art=art_core_1k

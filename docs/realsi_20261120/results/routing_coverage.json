@@ -1,0 +1,38 @@
+{
+ "lm_hmm_s1": {
+  "chunks": 1390,
+  "cover": 91.22,
+  "top1": 69.35,
+  "top_changes": 55
+ },
+ "lm_hmm_s2": {
+  "chunks": 1390,
+  "cover": 88.56,
+  "top1": 63.17,
+  "top_changes": 64
+ },
+ "lm_hmm_s3": {
+  "chunks": 1390,
+  "cover": 89.28,
+  "top1": 68.42,
+  "top_changes": 55
+ },
+ "cosine_s1": {
+  "chunks": 1390,
+  "cover": 78.63,
+  "top1": 21.29,
+  "top_changes": 5
+ },
+ "cosine_s2": {
+  "chunks": 1390,
+  "cover": 79.21,
+  "top1": 26.91,
+  "top_changes": 5
+ },
+ "cosine_s3": {
+  "chunks": 1390,
+  "cover": 78.49,
+  "top1": 23.6,
+  "top_changes": 5
+ }
+}

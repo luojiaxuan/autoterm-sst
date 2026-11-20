@@ -34,3 +34,28 @@ def test_repeated_evidence_moves_the_topic():
     for _ in range(12):
         posterior = filter_step(posterior, window, switch_rate=1e-3, evidence_weight=0.25)
     assert max(posterior, key=posterior.get) == "medicine"
+
+
+def test_topic_follows_the_posterior_top_slice():
+    from types import SimpleNamespace
+
+    from framework.agents.omni import OmniAgent
+    from framework.agents.term_memory.slice_registry import RetrievalSlice
+
+    def slice_(domain):
+        return RetrievalSlice(preset_id=f"{domain}_core_1k", slice_id=domain, role="topic", domain=domain,
+                              index_path=f"/{domain}.pt", term_count=1000)
+
+    agent = SimpleNamespace(config=SimpleNamespace(router_context_switch_rate=1e-3))
+    session = SimpleNamespace(active_retrieval_slices=[], active_slice_presets=[], active_slice_terms={},
+                              last_retrieval_plan=[], top_slice_changes=0,
+                              router_posterior={"medicine": 0.7, "nlp": 0.2},
+                              active_domain="nlp", topic_confidence=1.0, active_glossary_preset="nlp_core_1k",
+                              glossary_switch_count=3, last_topic_reason="rules")
+    for first in ("nlp", "nlp", "medicine"):
+        OmniAgent._record_active_slices(agent, session, [slice_(first), slice_("finance")])
+    topic = OmniAgent._topic_meta(agent, session)
+    assert topic["active_glossary_preset"] == "medicine_core_1k"
+    assert topic["active_domain"] == "medicine"
+    assert topic["confidence"] == 0.7
+    assert topic["switch_count"] == 1

@@ -135,10 +135,12 @@ class LanguageModelSliceScorer:
         k = len(domains)
         ids = self._letter_ids(k)
         totals = [[0.0] * k for _ in texts]
+        # Both option orders of every text go through the model in the same batches.
+        jobs = []
         for order in (list(range(k)), list(range(k))[::-1]):
             block = "\n".join(f"{LETTERS[j]}. {self.descriptions[domains[i]]}" for j, i in enumerate(order))
-            prompts = [
-                self._tokenizer.apply_chat_template(
+            for t_idx, t in enumerate(texts):
+                prompt = self._tokenizer.apply_chat_template(
                     [
                         {
                             "role": "user",
@@ -148,18 +150,18 @@ class LanguageModelSliceScorer:
                     tokenize=False,
                     add_generation_prompt=True,
                 )
-                for t in texts
-            ]
-            for start in range(0, len(prompts), self.batch_size):
-                enc = self._tokenizer(prompts[start : start + self.batch_size], return_tensors="pt", padding=True).to(
-                    self.device_name
-                )
-                with torch.inference_mode():
-                    logits = self._model(**enc).logits[:, -1, :].float()
-                probs = torch.softmax(logits[:, ids], dim=-1).cpu().tolist()
-                for row, p in enumerate(probs):
-                    for j, src in enumerate(order):
-                        totals[start + row][src] += p[j] / 2.0
+                jobs.append((t_idx, order, prompt))
+        for start in range(0, len(jobs), self.batch_size):
+            part = jobs[start : start + self.batch_size]
+            enc = self._tokenizer([prompt for _, _, prompt in part], return_tensors="pt", padding=True).to(
+                self.device_name
+            )
+            with torch.inference_mode():
+                logits = self._model(**enc).logits[:, -1, :].float()
+            probs = torch.softmax(logits[:, ids], dim=-1).cpu().tolist()
+            for (t_idx, order, _), p in zip(part, probs):
+                for j, src in enumerate(order):
+                    totals[t_idx][src] += p[j] / 2.0
         return [{domains[i]: row[i] for i in range(k)} for row in totals]
 
     async def score_batch(self, texts: Sequence[str], *, allowed_domains: Sequence[str]) -> List[Dict[str, float]]:

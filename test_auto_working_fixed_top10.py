@@ -551,7 +551,7 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(agent._domain_probe_refresh_sec(no_text), 1.92)
         self.assertEqual(agent._domain_probe_refresh_sec(with_text), 30.0)
 
-    def test_context_similarity_batches_and_reuses_cached_scores(self) -> None:
+    def test_context_scores_refresh_in_the_background_and_are_reused(self) -> None:
         class FakeContextSimilarity:
             enabled = True
 
@@ -567,25 +567,36 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         scorer = FakeContextSimilarity()
         agent.context_similarity = scorer
         session = SimpleNamespace(
+            session_id="s1",
             auto_glossary_enabled=True,
             router_text_window="患者接受临床治疗。",
             router_text_source="generated_target",
             latency_multiplier=2,
+            language_pair=agent.config.language_pair,
+            segment_idx=3,
+            router_posterior={},
+            router_posterior_segment=-1,
             last_context_similarity_scores={},
             last_context_similarity_s=None,
             last_context_similarity_at_s=0.0,
             last_context_similarity_text="",
             last_context_similarity_cached=False,
         )
+        agent.sessions["s1"] = session
 
-        first = asyncio.run(agent._context_similarity_scores_batch([session]))
-        second = asyncio.run(agent._context_similarity_scores_batch([session]))
+        # A chunk never waits for scoring: it reads the cached scores and wakes the router worker.
+        before = asyncio.run(agent._context_similarity_scores_batch([session]))
+        self.assertEqual(before, [{}])
+        self.assertEqual(scorer.calls, [])
+        self.assertTrue(agent._router_wakeup.is_set())
 
-        self.assertEqual(first, [{"nlp": 0.2, "medicine": 0.9}])
-        self.assertEqual(second, first)
+        asyncio.run(agent._refresh_context_scores())
+        asyncio.run(agent._refresh_context_scores())
+        after = asyncio.run(agent._context_similarity_scores_batch([session]))
+
+        self.assertEqual(after, [{"nlp": 0.2, "medicine": 0.9}])
         self.assertEqual(len(scorer.calls), 1)
         self.assertTrue(session.last_context_similarity_cached)
-        self.assertEqual(session.last_context_similarity_s, 0.0)
 
     def test_cached_probe_scores_can_confirm_audio_only_switch(self) -> None:
         router = HybridWindowTopicRouter(

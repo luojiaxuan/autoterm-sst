@@ -649,6 +649,8 @@ class OmniAgent(Agent):
         self.pending_set: Set[str] = set()
 
         self._scheduler_task: Optional[asyncio.Task] = None
+        self._router_task: Optional[asyncio.Task] = None
+        self._router_wakeup = asyncio.Event()
         self._batch_gate: Optional[asyncio.Semaphore] = None
         self._retriever_lock: Optional[asyncio.Lock] = None
         self.batch_seq = 0
@@ -1068,28 +1070,14 @@ class OmniAgent(Agent):
         latency_multiplier = max(1, min(4, latency_multiplier))
         return max(0.1, float(self.config.base_segment_sec) * latency_multiplier)
 
-    async def _context_similarity_scores_batch(
+    def _due_context_sessions(
         self,
-        batch: Sequence["OmniSession"],
-    ) -> List[Dict[str, float]]:
-        output = [dict(session.last_context_similarity_scores) for session in batch]
-        scorer = self.context_similarity
-        if scorer is None or not scorer.enabled:
-            return output
-        allowed_domains = list(getattr(scorer, "prototypes", {}) or {})
-        if not allowed_domains and batch:
-            language_pair = str(
-                getattr(batch[0], "language_pair", self.config.language_pair)
-                or self.config.language_pair
-            )
-            allowed_domains = [
-                item.domain_id
-                for item in self._domain_slices_for(self._catalog(language_pair))
-            ]
-        now = time.perf_counter()
-        pending_indexes: List[int] = []
-        pending_texts: List[str] = []
-        for index, session in enumerate(batch):
+        sessions: Sequence["OmniSession"],
+        now: float,
+    ) -> List[Tuple["OmniSession", str]]:
+        """Sessions whose router text changed and whose last refresh is older than the update interval."""
+        due: List[Tuple[OmniSession, str]] = []
+        for session in sessions:
             text = str(session.router_text_window or "").strip()
             source = str(session.router_text_source or "none")
             if not session.auto_glossary_enabled or not text or source == "none":
@@ -1102,29 +1090,65 @@ class OmniAgent(Agent):
                     or now - float(session.last_context_similarity_at_s) < refresh_sec
                 )
             )
-            if cache_fresh:
-                session.last_context_similarity_cached = True
-                session.last_context_similarity_s = 0.0
-                continue
-            pending_indexes.append(index)
-            pending_texts.append(text)
-        if not pending_texts:
-            return output
+            if not cache_fresh:
+                due.append((session, text))
+        return due
+
+    async def _context_similarity_scores_batch(
+        self,
+        batch: Sequence["OmniSession"],
+    ) -> List[Dict[str, float]]:
+        # Routing never blocks a chunk: it reads the latest scores, and the router worker refreshes
+        # due sessions in the background.
+        scorer = self.context_similarity
+        if scorer is not None and scorer.enabled and self._due_context_sessions(batch, time.perf_counter()):
+            self._router_wakeup.set()
+        for session in batch:
+            session.last_context_similarity_cached = True
+        return [dict(session.last_context_similarity_scores) for session in batch]
+
+    async def _router_loop(self) -> None:
+        while True:
+            await self._router_wakeup.wait()
+            self._router_wakeup.clear()
+            await self._refresh_context_scores()
+
+    async def _refresh_context_scores(self) -> None:
+        """Scores every due session in one batch and folds the result into its posterior."""
+        scorer = self.context_similarity
+        if scorer is None or not scorer.enabled:
+            return
+        now = time.perf_counter()
+        due = self._due_context_sessions(list(self.sessions.values()), now)
+        if not due:
+            return
+        allowed_domains = list(getattr(scorer, "prototypes", {}) or {})
+        if not allowed_domains:
+            language_pair = str(
+                getattr(due[0][0], "language_pair", self.config.language_pair)
+                or self.config.language_pair
+            )
+            allowed_domains = [
+                item.domain_id
+                for item in self._domain_slices_for(self._catalog(language_pair))
+            ]
+        segments = [session.segment_idx for session, _ in due]
         started = time.perf_counter()
         try:
             scores = await scorer.score_batch(
-                pending_texts,
+                [text for _, text in due],
                 allowed_domains=allowed_domains,
             )
         except Exception:  # noqa: BLE001 - context evidence is optional
             logger.exception("context-similarity scoring failed; using cached router evidence")
-            return output
+            return
         elapsed = time.perf_counter() - started
-        for index, text, row in zip(pending_indexes, pending_texts, scores):
-            session = batch[index]
+        for (session, text), segment, row in zip(due, segments, scores):
+            if self.sessions.get(session.session_id) is not session:
+                continue
             if self.config.router_context_switch_rate > 0.0 and row:
                 window = max(1, int(self.config.router_generated_target_window_chunks))
-                fresh = session.segment_idx - session.router_posterior_segment
+                fresh = segment - session.router_posterior_segment
                 if session.router_posterior_segment < 0:
                     fresh = window
                 # Consecutive contexts share chunks; each chunk's evidence is counted once.
@@ -1135,14 +1159,12 @@ class OmniAgent(Agent):
                     evidence_weight=min(1.0, max(0, fresh) / window),
                 )
                 session.router_posterior = dict(row)
-                session.router_posterior_segment = session.segment_idx
+                session.router_posterior_segment = segment
             session.last_context_similarity_scores = dict(row)
             session.last_context_similarity_s = elapsed
             session.last_context_similarity_at_s = now
             session.last_context_similarity_text = text
             session.last_context_similarity_cached = False
-            output[index] = dict(row)
-        return output
 
     async def _probe_domain_scores(
         self,
@@ -1464,6 +1486,8 @@ class OmniAgent(Agent):
         if self.config.auto_glossary_enabled and self.retrieval.enabled:
             self._schedule_auto_preloads()
 
+        if self.context_similarity is not None:
+            self._router_task = asyncio.create_task(self._router_loop())
         self._scheduler_task = asyncio.create_task(self._scheduler_loop())
         logger.info(
             "OmniAgent %r started (model=%s mock=%s rag=%s)",
@@ -1474,9 +1498,10 @@ class OmniAgent(Agent):
         )
 
     async def shutdown(self) -> None:
-        if self._scheduler_task:
-            self._scheduler_task.cancel()
-            await asyncio.gather(self._scheduler_task, return_exceptions=True)
+        for task in (self._scheduler_task, self._router_task):
+            if task:
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
         if self.backend is not None:
             try:
                 await self.backend.stop()
@@ -2359,6 +2384,9 @@ class OmniAgent(Agent):
             return
         session.router_text_window = router_text
         session.router_text_source = "generated_target"
+        # Score the new context while the next chunk is still being spoken.
+        if self.context_similarity is not None and self._due_context_sessions([session], time.perf_counter()):
+            self._router_wakeup.set()
 
     async def _observe_active_glossary(
         self,

@@ -1,0 +1,141 @@
+\appendix
+
+\begin{table*}[t]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lrrrrrrrrrrrr}
+\toprule
+& \multicolumn{4}{c}{TERM\_ACC} & \multicolumn{4}{c}{BLEU} & \multicolumn{4}{c}{MT-BLEU} \\
+\cmidrule(lr){2-5}\cmidrule(lr){6-9}\cmidrule(lr){10-13}
+Baseline & Diff. & Low & High & $p$ & Diff. & Low & High & $p$ & Diff. & Low & High & $p$ \\
+\midrule
+\multicolumn{13}{l}{\emph{Run 1}} \\
+Known-domain-1k & $+0.24$ & $-0.95$ & $+1.49$ & 0.86 & $-0.10$ & $-0.50$ & $+0.38$ & 0.70 & $-0.11$ & $-0.57$ & $+0.39$ & 0.73 \\
+Merged-100k & $+0.54$ & $-0.60$ & $+1.84$ & 0.48 & $+1.37$ & $+0.86$ & $+1.80$ & 0.004 & $+1.36$ & $+0.65$ & $+1.81$ & 0.018 \\
+Merged-1M & $+3.91$ & $+2.03$ & $+5.76$ & 0.012 & $+2.30$ & $+1.71$ & $+2.95$ & 0.002 & $+2.33$ & $+1.10$ & $+3.06$ & 0.002 \\
+\midrule
+\multicolumn{13}{l}{\emph{Run 2}} \\
+Known-domain-1k & $-0.68$ & $-1.48$ & 0.00 & 0.18 & $+0.36$ & $-0.24$ & $+1.26$ & 0.69 & $+0.42$ & $-0.24$ & $+1.42$ & 0.66 \\
+Merged-2k & $-0.39$ & $-1.29$ & $+0.30$ & 0.49 & $-0.03$ & $-0.56$ & $+0.61$ & 0.94 & $-0.06$ & $-0.44$ & $+0.60$ & 0.79 \\
+Merged-10k & $-0.83$ & $-1.58$ & $-0.25$ & 0.084 & $+0.18$ & $-0.18$ & $+0.64$ & 0.43 & $+0.17$ & $-0.16$ & $+0.69$ & 0.51 \\
+\midrule
+\multicolumn{13}{l}{\emph{Run 1, the 935 sentences whose reference contains no glossary term}} \\
+Known-domain-1k &  & & &  & $-0.11$ & $-0.76$ & $+0.35$ & 0.80 &  & & &  \\
+Merged-100k &  & & &  & $+1.69$ & $+1.08$ & $+2.16$ & 0.012 &  & & &  \\
+Merged-1M &  & & &  & $+2.19$ & $+0.66$ & $+3.46$ & 0.023 &  & & &  \\
+\bottomrule
+\end{tabular}
+\caption{Paired differences of AutoTerm-SST minus each baseline. Low and High
+bound the 95\% stratified talk-bootstrap interval, and $p$ is the exact
+two-sided talk-level permutation $p$-value. TERM\_ACC differences are in
+points; the last block reports BLEU on the sentences without glossary terms.}
+\label{tab:stats}
+\end{table*}
+
+\section{Statistical comparisons}
+\label{app:stats}
+
+Table~\ref{tab:stats} lists every paired comparison. The permutation test
+swaps the outputs of the two systems within each talk over all 1,024
+combinations and recomputes the pooled metric, so the smallest attainable
+two-sided $p$ is 0.002. The intervals come from 4,000 bootstrap resamples of
+five ACL and five ESO talks. Removing any single talk keeps all three
+advantages of AutoTerm-SST over Merged-1M positive, at least 3.28 TERM\_ACC
+points, 2.00 BLEU, and 1.99 MT-BLEU.
+
+\section{Router configuration}
+\label{app:config}
+
+Table~\ref{tab:config} lists the settings used in both runs. We chose the
+routing values on four windows drawn from the evaluation talks before the
+complete runs. The context encoder reads the last 128 tokens of the translation
+context, and the router uses only this context similarity to score slices.
+
+\begin{table}[!ht]
+\centering
+\small
+\begin{tabular}{lr}
+\toprule
+Setting & Value \\
+\midrule
+Audio chunk & 1.92 s \\
+Translation context $w$ & 4 chunks \\
+Maximum active slices $K$ & 4 \\
+Active term budget $B$ & 4,000 \\
+Routing update interval & 5 s \\
+Warm-up before first switch & 6 s \\
+Cooldown after a switch & 30 s \\
+Lead over runner-up & 0.15 \\
+Lead over confirmed slice & 0.10 \\
+Consecutive agreeing updates & 3 \\
+Retrieval score threshold & 0.78 \\
+Candidate slots & 100 \\
+Prompt cap & 10 pairs \\
+\bottomrule
+\end{tabular}
+\caption{Router and retrieval settings of AutoTerm-SST. Leads are differences
+of normalized similarity scores, and a switch requires both leads in every one
+of the consecutive updates.}
+\label{tab:config}
+\end{table}
+
+\section{Router diagnostics}
+\label{app:router}
+
+These diagnostics replay the routing signal on the saved translations of run 1
+without decoding again. Each window encodes the last four translated chunks as
+in Section~\ref{sec:adaptive-memory} and ranks the slices by raw similarity,
+without the confirmation rule and pinning of the live router. In this raw
+ranking the correct slice is among the four most similar slices in 85.0\% of
+the 8,776 windows. Keeping the confirmed slice of the live run in the working
+set and filling the other three slots by raw rank raises this to 97.0\%, which
+matches the 96.9\% measured in the live run.
+
+\paragraph{Short topic shifts.}
+We cut the translations of the five ACL and five medicine talks into segments
+of 15 to 300 seconds and interleave NLP and medicine segments into one stream
+of 40 segments per length. At every length, the slice of the new topic enters
+the four most similar slices a median of one chunk, 1.92 seconds, after the
+switch and ranks first after a median of 5.76 seconds. It reaches the top four
+in all 40 segments at every length. Table~\ref{tab:router-diag} shows that
+coverage stays above 81\% even when the topic changes every 15 seconds.
+
+\paragraph{Generated prototypes.}
+Prototypes can be produced without hand-writing. For each slice we give all
+of its term pairs, after removing entries that come from the evaluation
+glossaries, to \texttt{gpt-5.5-2026-04-23} and ask for a description, a list of
+seven to ten core topics, and its Chinese translation, in the same format as
+the hand-written prototypes. We generate ten independent prototype sets.
+Table~\ref{tab:router-diag} shows that their routing accuracy brackets that of
+the hand-written prototypes.
+
+\begin{table}[!ht]
+\centering
+\small
+\begin{tabular}{lrr}
+\toprule
+Replay & Top-4 & Top-1 \\
+\midrule
+\multicolumn{3}{l}{\emph{Topic switch every}} \\
+15 s & 81.7 & 56.7 \\
+30 s & 84.9 & 68.8 \\
+60 s & 86.8 & 74.7 \\
+120 s & 85.8 & 71.6 \\
+300 s & 87.1 & 72.1 \\
+\midrule
+\multicolumn{3}{l}{\emph{Ten-talk stream, prototype text}} \\
+Hand-written & 85.0 & 72.6 \\
+Generated, median of ten & 85.8 & 70.8 \\
+Generated, lowest of ten & 84.3 & 67.3 \\
+Generated, highest of ten & 91.4 & 77.8 \\
+\bottomrule
+\end{tabular}
+\caption{Open-loop replays of the routing signal on the saved translations of
+run 1. Top-4 is the percentage of windows whose correct slice is among the
+four most similar slices, and Top-1 is the percentage whose most similar slice
+is correct. The lowest and highest generated sets are
+chosen separately for each column.}
+\label{tab:router-diag}
+\end{table}
+

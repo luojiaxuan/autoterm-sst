@@ -1,0 +1,20 @@
+\begin{abstract}
+Retrieval-augmented speech translation improves rare terminology, but systems
+such as RASST expect the user to supply a glossary before each session. Merging
+every domain into one universal glossary removes this step, yet as the glossary
+grows, irrelevant and conflicting entries take over the fixed retrieval and
+prompt budget. We present AutoTerm-SST, an interactive streaming speech
+translation system that needs neither a glossary upload nor a domain selection.
+It splits an offline terminology catalog into topic slices, matches its own
+recent translation against a short bilingual description of each slice, and
+retrieves terms only from the best-matching slices under an unchanged budget.
+On a 4.7-hour English-to-Chinese stream that alternates five ACL talks with five
+oncology lectures, AutoTerm-SST reaches 88.3\% terminology accuracy, and a
+reference that is told the domain of every talk reaches 88.1\%. The difference
+is not significant, and a second independent run reproduces this parity.
+Against a one-million-entry merged glossary, AutoTerm-SST gains 3.9 points of
+terminology accuracy and 2.30 BLEU, both significant in a talk-level
+permutation test. The full pipeline runs 2.46 times faster than real time, and
+the demo shows the active slices and the retrieved term pairs next to every
+partial translation.
+\end{abstract}

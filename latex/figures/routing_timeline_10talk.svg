@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="470" viewBox="0 0 1800 470">
+  <rect width="1800" height="470" fill="#ffffff"/>
+  <style>
+    text { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #344054; }
+    .legend { font-size: 18px; font-weight: 500; }
+    .row-label { font-size: 23px; font-weight: 700; }
+    .inside text { font-size: 18px; font-weight: 700; fill: #ffffff; text-anchor: middle; }
+    .tick text { font-size: 17px; font-weight: 500; fill: #607089; text-anchor: middle; }
+    .grid { stroke: #d4dce7; stroke-width: 2; shape-rendering: crispEdges; }
+    .outline { fill: none; stroke: #d4dce7; stroke-width: 2; shape-rendering: crispEdges; }
+    .block { shape-rendering: crispEdges; }
+  </style>
+
+  <!-- Legend -->
+  <rect x="600" y="20" width="23" height="23" rx="4" fill="#4f7cac"/>
+  <text class="legend" x="632" y="38">NLP</text>
+  <rect x="820" y="20" width="23" height="23" rx="4" fill="#d9822b"/>
+  <text class="legend" x="852" y="38">Medicine</text>
+  <rect x="1040" y="20" width="23" height="23" rx="4" fill="#94a3b8"/>
+  <text class="legend" x="1072" y="38">Other</text>
+  <rect x="1260" y="20" width="23" height="23" rx="4" fill="#2f855a"/>
+  <text class="legend" x="1292" y="38">Correct slice active</text>
+  <rect x="1480" y="20" width="23" height="23" rx="4" fill="#e8a1a1"/>
+  <text class="legend" x="1512" y="38">Absent</text>
+
+  <!-- Row labels -->
+  <text class="row-label" x="70" y="105">Talk domain</text>
+  <text class="row-label" x="70" y="225">Selected slice</text>
+  <text class="row-label" x="70" y="334">Correct slice in</text>
+  <text class="row-label" x="70" y="361">working set</text>
+
+  <!-- Shared talk boundaries -->
+  <g class="grid">
+    <line x1="470" y1="61" x2="470" y2="378"/>
+    <line x1="610" y1="61" x2="610" y2="378"/>
+    <line x1="750" y1="61" x2="750" y2="378"/>
+    <line x1="890" y1="61" x2="890" y2="378"/>
+    <line x1="1030" y1="61" x2="1030" y2="378"/>
+    <line x1="1170" y1="61" x2="1170" y2="378"/>
+    <line x1="1310" y1="61" x2="1310" y2="378"/>
+    <line x1="1450" y1="61" x2="1450" y2="378"/>
+    <line x1="1590" y1="61" x2="1590" y2="378"/>
+  </g>
+
+  <!-- Ground-truth talk domains -->
+  <g class="block">
+    <rect x="330" y="70" width="140" height="58" fill="#4f7cac"/>
+    <rect x="470" y="70" width="140" height="58" fill="#d9822b"/>
+    <rect x="610" y="70" width="140" height="58" fill="#4f7cac"/>
+    <rect x="750" y="70" width="140" height="58" fill="#d9822b"/>
+    <rect x="890" y="70" width="140" height="58" fill="#4f7cac"/>
+    <rect x="1030" y="70" width="140" height="58" fill="#d9822b"/>
+    <rect x="1170" y="70" width="140" height="58" fill="#4f7cac"/>
+    <rect x="1310" y="70" width="140" height="58" fill="#d9822b"/>
+    <rect x="1450" y="70" width="140" height="58" fill="#4f7cac"/>
+    <rect x="1590" y="70" width="140" height="58" fill="#d9822b"/>
+  </g>
+  <rect class="outline" x="330" y="70" width="1400" height="58"/>
+  <g class="inside">
+    <text x="400" y="106">NLP</text>
+    <text x="540" y="106">Medicine</text>
+    <text x="680" y="106">NLP</text>
+    <text x="820" y="106">Medicine</text>
+    <text x="960" y="106">NLP</text>
+    <text x="1100" y="106">Medicine</text>
+    <text x="1240" y="106">NLP</text>
+    <text x="1380" y="106">Medicine</text>
+    <text x="1520" y="106">NLP</text>
+    <text x="1660" y="106">Medicine</text>
+  </g>
+
+  <!-- Top selected slice over time -->
+  <g class="block">
+    <rect x="332" y="190" width="138" height="58" fill="#4f7cac"/>
+    <rect x="472" y="190" width="5" height="58" fill="#4f7cac"/>
+    <rect x="477" y="190" width="129" height="58" fill="#d9822b"/>
+    <rect x="606" y="190" width="4" height="58" fill="#94a3b8"/>
+    <rect x="612" y="190" width="55" height="58" fill="#94a3b8"/>
+    <rect x="667" y="190" width="83" height="58" fill="#4f7cac"/>
+    <rect x="752" y="190" width="3" height="58" fill="#4f7cac"/>
+    <rect x="755" y="190" width="104" height="58" fill="#d9822b"/>
+    <rect x="859" y="190" width="9" height="58" fill="#4f7cac"/>
+    <rect x="868" y="190" width="22" height="58" fill="#d9822b"/>
+    <rect x="892" y="190" width="16" height="58" fill="#d9822b"/>
+    <rect x="908" y="190" width="122" height="58" fill="#4f7cac"/>
+    <rect x="1032" y="190" width="2" height="58" fill="#4f7cac"/>
+    <rect x="1034" y="190" width="136" height="58" fill="#d9822b"/>
+    <rect x="1172" y="190" width="4" height="58" fill="#d9822b"/>
+    <rect x="1176" y="190" width="134" height="58" fill="#4f7cac"/>
+    <rect x="1312" y="190" width="106" height="58" fill="#d9822b"/>
+    <rect x="1418" y="190" width="14" height="58" fill="#4f7cac"/>
+    <rect x="1432" y="190" width="16" height="58" fill="#d9822b"/>
+    <rect x="1448" y="190" width="2" height="58" fill="#94a3b8"/>
+    <rect x="1452" y="190" width="10" height="58" fill="#94a3b8"/>
+    <rect x="1462" y="190" width="48" height="58" fill="#4f7cac"/>
+    <rect x="1510" y="190" width="51" height="58" fill="#94a3b8"/>
+    <rect x="1561" y="190" width="29" height="58" fill="#4f7cac"/>
+    <rect x="1592" y="190" width="3" height="58" fill="#4f7cac"/>
+    <rect x="1595" y="190" width="59" height="58" fill="#d9822b"/>
+    <rect x="1654" y="190" width="8" height="58" fill="#94a3b8"/>
+    <rect x="1662" y="190" width="68" height="58" fill="#d9822b"/>
+  </g>
+  <rect class="outline" x="330" y="190" width="1400" height="58"/>
+
+  <!-- Correct glossary present in four-slice working set -->
+  <rect class="block" x="330" y="310" width="1400" height="58" fill="#2f855a"/>
+  <g class="block" fill="#e8a1a1">
+    <rect x="651" y="310" width="4" height="58"/>
+    <rect x="892" y="310" width="3" height="58"/>
+    <rect x="1510" y="310" width="4" height="58"/>
+    <rect x="1518" y="310" width="3" height="58"/>
+    <rect x="1525" y="310" width="4" height="58"/>
+    <rect x="1535" y="310" width="2" height="58"/>
+  </g>
+  <rect class="outline" x="330" y="310" width="1400" height="58"/>
+
+  <!-- Talk labels -->
+  <g class="tick">
+    <text x="400" y="406">Talk 1</text>
+    <text x="540" y="406">Talk 2</text>
+    <text x="680" y="406">Talk 3</text>
+    <text x="820" y="406">Talk 4</text>
+    <text x="960" y="406">Talk 5</text>
+    <text x="1100" y="406">Talk 6</text>
+    <text x="1240" y="406">Talk 7</text>
+    <text x="1380" y="406">Talk 8</text>
+    <text x="1520" y="406">Talk 9</text>
+    <text x="1660" y="406">Talk 10</text>
+  </g>
+</svg>

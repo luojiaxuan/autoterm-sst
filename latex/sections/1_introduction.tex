@@ -1,0 +1,53 @@
+\section{Introduction}
+
+Simultaneous speech translation (SST) produces target-language text while the
+speaker is still talking, and it is increasingly used for technical talks,
+lectures, and live media. Speech large language models (LLMs) now translate
+long-form audio directly \citep{xu2025qwen3omni,ouyang2025infinisst}, but rare
+methods, datasets, clinical concepts, and named entities remain hard to infer
+from the acoustic signal alone. Glossary retrieval closes this gap: the system
+looks up source--target term pairs that match the incoming speech and places
+them in the LLM prompt before decoding.
+
+RASST \citep{luo2026rasst}, a retrieval-augmented SST system, shows that this
+lookup improves terminology on out-of-domain talks. Its glossary, however, is
+fixed before the session. A listener often does not know the domain of a talk
+in advance, and asking every user to find, upload, or select a glossary adds
+friction. Merging all domains into one universal glossary avoids the choice and
+works at moderate scale. The retriever and the prompt have fixed capacity,
+though, so irrelevant and conflicting mappings crowd out useful ones as the
+catalog grows: in our evaluation, growing a merged glossary from 100k to one
+million entries lowers terminology accuracy from 87.8\% to 84.4\%.
+
+The translation system already produces the evidence needed to pick the right
+glossary. Its partial output names the topic within seconds: in a replay of
+the system's translations, the slice of a new topic ranks among the four most
+similar slices after a median of one 1.92-second audio chunk. The listener
+therefore does not need to declare a domain, because the system can read it
+from its own translation.
+
+We introduce AutoTerm-SST, a system demo that moves glossary selection from
+user setup into the streaming loop. Operators register topic slices, small
+glossaries of 1,000 term pairs each, offline. During a session, a
+training-free router compares the recent translation with a short bilingual
+description of each slice and keeps the best-matching slices inside a fixed
+term budget. Retrieval and decoding are unchanged; AutoTerm-SST only decides
+which part of the catalog competes for each prompt, so the per-chunk budget
+stays the same as the catalog grows. The demo makes this behavior visible:
+users see the active slices, the retrieved term pairs, and highlighted terms
+while audio streams. In summary, our contributions are threefold:
+\begin{itemize}
+    \item Zero-setup terminology-aware SST built on RASST, with a live
+    interface that shows the active slices and the retrieved term pairs for
+    every partial translation. The full pipeline runs 2.46 times faster than
+    real time.
+    \item Budgeted multi-slice memory that selects slices from the system's
+    own translation without training. Per-chunk retrieval and prompt budgets
+    stay fixed as the catalog grows, and pinning the confirmed slice keeps the
+    correct glossary searchable in 96.9\% of decoding windows.
+    \item Evidence that zero setup costs no quality. On a 4.7-hour ACL and
+    oncology stream, AutoTerm-SST is on par with a known-domain reference in
+    two independent runs and beats a one-million-entry merged glossary by 3.9
+    points of terminology accuracy and 2.30 BLEU, while merged glossaries
+    match it on both terminology and BLEU only up to 10k entries.
+\end{itemize}

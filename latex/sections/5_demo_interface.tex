@@ -1,0 +1,50 @@
+\section{Demo interface}
+\label{sec:demo-interface}
+
+AutoTerm-SST serves listeners of technical speech who cannot prepare a
+glossary for every session, such as conference attendees, students in
+specialized courses, and clinicians following medical lectures. The demo
+starts like an ordinary streaming translator: the user picks a
+language pair and starts a microphone or file stream. In AutoTerm-SST mode
+there is no glossary upload and no domain selector. The system starts with a
+small working set and updates it as translation context accumulates.
+
+\paragraph{Walkthrough.}
+The page first shows live partial translations while context accumulates. The
+slice status row then switches to the most similar slices, and retrieved pairs
+appear beside the partial translation that used them. After a topic change, old
+and new slices briefly coexist until the sliding context reflects the new
+subject. The user touches no control throughout this progression.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.8\textwidth]{ui_evidence_panel.png}
+  \caption{The live En$\rightarrow$Zh interface after an automatic transition
+  to medicine. Retrieved term pairs, their source slices, and highlighted terms
+  in the translation expose the evidence behind each partial output.}
+  \label{fig:ui}
+\end{figure*}
+
+\paragraph{Visible terminology evidence.}
+The interface highlights retrieved terms in the translation and lists the
+corresponding source--target mappings. A status row shows the active slices,
+their term count, and the retrieval latency, as Figure~\ref{fig:ui} shows. A
+viewer can thus tell whether a mistranslation came from missing retrieval
+evidence, an irrelevant slice, or LLM decoding.
+
+\paragraph{Extensibility.}
+Adding a topic takes one glossary file. Registration validates the term pairs,
+encodes them into an independent index, and writes one manifest entry; the
+prototype can be written by hand or generated from the glossary by an LLM, and
+Appendix~\ref{app:router} shows that generated prototypes route as accurately
+as hand-written ones. Running sessions keep their current snapshot, and new
+sessions see the updated catalog at once, so an organization can grow its
+catalog without restarting the translation service. Fixed-glossary presets and
+ad-hoc term overrides remain available for expert users.
+
+\paragraph{Availability.}
+The MIT-licensed implementation, a one-command launcher, and a screencast are
+available in the
+\href{https://github.com/luojiaxuan/autoterm-sst}{GitHub repository}. The
+hosted entry page is \url{https://luojiaxuan.github.io/autoterm-sst/}. Live mode
+serves Qwen3-Omni with vLLM continuous batching and the RASST retriever.

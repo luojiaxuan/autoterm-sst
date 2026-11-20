@@ -62,6 +62,7 @@ from framework.agents.term_memory.active_glossary import (
     glossary_topic_meta,
 )
 from framework.agents.term_memory.context_similarity import DomainDescriptionSimilarity
+from framework.agents.term_memory.language_model_router import LanguageModelSliceScorer, filter_step
 from framework.agents.term_memory.domain_taxonomy import (
     AUTO_WORKING_PRESET,
     DOMAIN_ROUTER_PROTOTYPES,
@@ -314,6 +315,11 @@ class OmniConfig:
     router_context_similarity_batch_size: int = 32
     router_context_similarity_weight: float = 0.60
     router_context_similarity_prototypes_path: str = ""
+    # "embedding" scores slices by BGE-M3 cosine similarity, "language_model" by letter probability.
+    router_context_scorer: str = "embedding"
+    router_context_language_model: str = "Qwen/Qwen3-4B-Instruct-2507"
+    # Per-chunk topic switch probability of the sticky HMM filter; 0 uses the window scores directly.
+    router_context_switch_rate: float = 0.0
     router_text_topic_weight: float = 0.25
     router_domain_probe_weight: float = 0.10
     router_speech_centroid_weight: float = 0.03
@@ -592,6 +598,8 @@ class OmniSession:
     last_context_similarity_at_s: float = 0.0
     last_context_similarity_text: str = ""
     last_context_similarity_cached: bool = False
+    router_posterior: Dict[str, float] = field(default_factory=dict)
+    router_posterior_segment: int = -1
     active_retrieval_slices: List[RetrievalSlice] = field(default_factory=list)
     pending_since_s: Optional[float] = None
     latency_multiplier: int = 2
@@ -1113,6 +1121,20 @@ class OmniAgent(Agent):
         elapsed = time.perf_counter() - started
         for index, text, row in zip(pending_indexes, pending_texts, scores):
             session = batch[index]
+            if self.config.router_context_switch_rate > 0.0 and row:
+                window = max(1, int(self.config.router_generated_target_window_chunks))
+                fresh = session.segment_idx - session.router_posterior_segment
+                if session.router_posterior_segment < 0:
+                    fresh = window
+                # Consecutive contexts share chunks; each chunk's evidence is counted once.
+                row = filter_step(
+                    session.router_posterior,
+                    row,
+                    switch_rate=float(self.config.router_context_switch_rate),
+                    evidence_weight=min(1.0, max(0, fresh) / window),
+                )
+                session.router_posterior = dict(row)
+                session.router_posterior_segment = session.segment_idx
             session.last_context_similarity_scores = dict(row)
             session.last_context_similarity_s = elapsed
             session.last_context_similarity_at_s = now
@@ -1415,12 +1437,21 @@ class OmniAgent(Agent):
                 prototypes = self._context_similarity_prototypes_for(
                     self._catalog(self.config.language_pair)
                 )
-                self.context_similarity = DomainDescriptionSimilarity(
-                    model_id=self.config.router_context_similarity_model,
-                    device=self.config.router_context_similarity_device,
-                    batch_size=self.config.router_context_similarity_batch_size,
-                    prototypes=prototypes,
-                )
+                if self.config.router_context_scorer == "language_model":
+                    self.context_similarity = LanguageModelSliceScorer(
+                        model_id=self.config.router_context_language_model,
+                        device=self.config.router_context_similarity_device,
+                        batch_size=self.config.router_context_similarity_batch_size,
+                        prototypes=prototypes,
+                        target_language=str(LANGUAGE_PAIRS[self.config.language_pair]["target_lang"]),
+                    )
+                else:
+                    self.context_similarity = DomainDescriptionSimilarity(
+                        model_id=self.config.router_context_similarity_model,
+                        device=self.config.router_context_similarity_device,
+                        batch_size=self.config.router_context_similarity_batch_size,
+                        prototypes=prototypes,
+                    )
                 await self.context_similarity.start()
             except Exception:  # noqa: BLE001 - router falls back to other evidence
                 logger.exception("context-similarity router failed to load; continuing without it")

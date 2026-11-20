@@ -18,6 +18,8 @@ import torch
 import torch.nn.functional as F
 from transformers import AutoModel, AutoTokenizer
 
+from routing_metrics import DOMAINS, ranking_metrics
+
 DESCRIPTIONS = {
     "nlp": "NLP, speech, translation, ML, dataset, and benchmark terms.",
     "medicine": "Clinical, disease, drug, procedure, and biomedical terms.",
@@ -136,21 +138,6 @@ def centroids(model, tok, protos, device):
     emb = encode(model, tok, flat, device)
     c = np.stack([emb[a:b].mean(0) for a, b in spans])
     return names, c / np.linalg.norm(c, axis=1, keepdims=True)
-
-
-def ranking_metrics(scores, names, gold, valid, ks):
-    order = np.argsort(-scores, axis=1)
-    gold_idx = np.array([names.index(g) for g in gold])
-    rank = np.argmax(order == gold_idx[:, None], axis=1)
-    top1 = order[:, 0]
-    flips = int((top1[1:] != top1[:-1]).sum())
-    out = {"top1_acc": round(float((rank[valid] == 0).mean()), 4), "top1_changes": flips}
-    for k in ks:
-        sets = [frozenset(row[:k]) for row in order]
-        changes = sum(a != b for a, b in zip(sets[1:], sets[:-1]))
-        out[f"cover@{k}"] = round(float((rank[valid] < k).mean()), 4)
-        out[f"set_changes@{k}"] = int(changes)
-    return out
 
 
 def main():

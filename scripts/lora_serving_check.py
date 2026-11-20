@@ -8,7 +8,8 @@ of prompts whose greedy outputs are identical.
 
 Modes:
   generate  --url merged server, writes greedy targets and their token log-probs
-  compare   --url multi-LoRA server and --model adapter name, reads the targets
+  compare   --url multi-LoRA server and --model adapter name (or the base model as a control),
+            reads the targets and saves each served output next to the merged one
 """
 
 import argparse
@@ -79,10 +80,11 @@ def main():
         return
 
     rows = json.loads(args.targets.read_text(encoding="utf-8"))
-    diffs, same = [], 0
+    diffs, same, outputs = [], 0, []
     for row in rows:
         t = chat(args.url, args.model, args.lang, row["source"], args.max_tokens)
         same += int(t == row["target"])
+        outputs.append({"source": row["source"], "merged": row["target"], "served": t})
         lp = target_logprobs(args.url, args.model, args.lang, row["source"], row["target"])
         assert len(lp) == len(row["logprobs"])
         diffs += [abs(a - b) for a, b in zip(lp, row["logprobs"]) if a is not None and b is not None]
@@ -93,8 +95,9 @@ def main():
         "mean_abs_logprob_diff": sum(diffs) / len(diffs),
         "max_abs_logprob_diff": max(diffs),
         "tokens": len(diffs),
+        "outputs": outputs,
     }
-    print(json.dumps(result), flush=True)
+    print(json.dumps({k: v for k, v in result.items() if k != "outputs"}), flush=True)
     if args.out:
         args.out.write_text(json.dumps(result, indent=1) + "\n")
 

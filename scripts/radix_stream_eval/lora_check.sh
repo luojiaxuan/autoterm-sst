@@ -45,5 +45,7 @@ done
 wait_ready 18701 "$LORA"
 for l in zh de ja; do
   python3 check.py compare --url http://127.0.0.1:18701 --model "$l" --lang "$l" --sentences sents.txt --targets "targets_$l.json" --out "result_$l.json"
+  # Control: the base model without any adapter, scored against the same merged targets.
+  python3 check.py compare --url http://127.0.0.1:18701 --model base --lang "$l" --sentences sents.txt --targets "targets_$l.json" --out "result_base_$l.json"
 done
 kill "$LORA"; wait "$LORA" || true

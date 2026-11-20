@@ -9,7 +9,7 @@ JOB=48285
 ROOT=/mnt/data2/jiaxuanluo/autoterm_taurus_20261024
 IO_ROOT=/home/jiaxuanluo/autoterm_taurus_20261024_io
 PYTHON_BIN=/home/jiaxuanluo/miniconda3/envs/spaCyEnv/bin/python
-OUT="${IO_ROOT}/runs/latency_20261120"
+OUT="${OUT:-${IO_ROOT}/runs/latency_20261120}"
 mkdir -p "${OUT}"
 cd "${ROOT}/code"
 git rev-parse HEAD > "${OUT}/code_revision.txt"

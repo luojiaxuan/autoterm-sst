@@ -60,3 +60,65 @@ def test_topic_follows_the_posterior_top_slice():
     assert topic["confidence"] == 0.7
     assert topic["switch_count"] == 1
     assert topic["router"] == "language_model"
+
+
+def _router_agent(scorer, sessions):
+    import asyncio
+    from types import SimpleNamespace
+
+    from framework.agents.omni import OmniAgent
+
+    agent = SimpleNamespace(
+        config=SimpleNamespace(router_context_switch_rate=1e-3, router_generated_target_window_chunks=4),
+        context_similarity=scorer,
+        sessions={s.session_id: s for s in sessions},
+        _router_wakeup=asyncio.Event(),
+        _domain_probe_refresh_sec=lambda session: 5.0,
+    )
+    agent._due_context_sessions = lambda batch, now: OmniAgent._due_context_sessions(agent, batch, now)
+    return agent
+
+
+def _router_session(session_id, text, segment):
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        session_id=session_id, router_text_window=text, router_text_source="generated_target",
+        auto_glossary_enabled=True, last_context_similarity_scores={}, last_context_similarity_text="",
+        last_context_similarity_at_s=0.0, last_context_similarity_s=None, last_context_similarity_cached=False,
+        router_posterior={}, router_posterior_segment=-1, segment_idx=segment, language_pair="English -> Chinese",
+    )
+
+
+class _FakeScorer:
+    enabled = True
+    prototypes = {"nlp": "", "medicine": ""}
+
+    def __init__(self):
+        self.calls = []
+
+    async def score_batch(self, texts, *, allowed_domains):
+        self.calls.append(list(texts))
+        return [{"nlp": 0.2, "medicine": 0.8} for _ in texts]
+
+
+def test_chunks_read_cached_scores_and_the_worker_refreshes_them():
+    import asyncio
+
+    from framework.agents.omni import OmniAgent
+
+    scorer = _FakeScorer()
+    session = _router_session("s1", "癌症治疗", segment=6)
+    agent = _router_agent(scorer, [session])
+    out = asyncio.run(OmniAgent._context_similarity_scores_batch(agent, [session]))
+    assert out == [{}] and scorer.calls == [] and agent._router_wakeup.is_set()
+
+    asyncio.run(OmniAgent._refresh_context_scores(agent))
+    assert scorer.calls == [["癌症治疗"]]
+    assert session.router_posterior_segment == 6
+    expected = filter_step({}, {"nlp": 0.2, "medicine": 0.8}, switch_rate=1e-3, evidence_weight=1.0)
+    assert session.last_context_similarity_scores == expected
+
+    # Same text: nothing is due, so the worker does not score again.
+    asyncio.run(OmniAgent._refresh_context_scores(agent))
+    assert len(scorer.calls) == 1

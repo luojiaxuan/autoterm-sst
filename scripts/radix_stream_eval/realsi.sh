@@ -87,10 +87,17 @@ fi
 if todo known merged10k; then
   server 18902 fixed fixed "${FIXED[@]}"
   for o in "${ORDERS[@]}"; do
-    [[ -s "../out/known_s$o.json" ]] || client 18902 nlp_core_1k known "$o" --allow-missing-router-meta \
-      --oracle-preset-map "$ORACLE" &
-    [[ -s "../out/merged10k_s$o.json" ]] || client 18902 merged_10x1k merged10k "$o" --allow-missing-router-meta &
-    wait
+    # Wait on the two clients only: a bare wait would also wait on the server and never return.
+    pids=()
+    if [[ ! -s "../out/known_s$o.json" ]]; then
+      client 18902 nlp_core_1k known "$o" --allow-missing-router-meta --oracle-preset-map "$ORACLE" &
+      pids+=($!)
+    fi
+    if [[ ! -s "../out/merged10k_s$o.json" ]]; then
+      client 18902 merged_10x1k merged10k "$o" --allow-missing-router-meta &
+      pids+=($!)
+    fi
+    [[ ${#pids[@]} -eq 0 ]] || wait "${pids[@]}"
   done
   stop
 fi

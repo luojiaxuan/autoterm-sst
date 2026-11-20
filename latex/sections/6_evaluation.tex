@@ -8,12 +8,11 @@ working-set budget avoids the degradation of large merged glossaries.
 \begin{figure*}[t]
   \centering
   \includegraphics[width=0.88\textwidth]{routing_timeline_10talk.pdf}
-  \caption{Routing trajectory of AutoTerm-SST across the ten alternating talks
-  of run 1, each talk drawn at equal width. Rows show the talk domain, the
-  confirmed slice, with gray for a slice of another topic, and whether the
-  correct slice is in the working set. The confirmed slice can lag briefly
-  after topic boundaries, yet the correct glossary stays searchable in 96.9\% of
-  chunks.}
+  \caption{Routing across the ten alternating talks of run 1, each drawn at equal
+  width. Rows show the talk domain, the confirmed slice, gray for another topic,
+  and whether the correct slice is in the working set. The confirmed slice can
+  lag after topic boundaries, yet the correct glossary stays searchable in
+  96.9\% of chunks.}
   \label{fig:routing}
 \end{figure*}
 
@@ -26,10 +25,9 @@ terminology~\citep{salesky-etal-2023-evaluating}, the NLP part, and five
 long-form oncology lectures from the European School of Oncology, or ESO, test
 set~\citep{iranzosanchez2025eso}, the medicine part. Following
 RASST~\citep{luo2026rasst}, we evaluate ESO with its model-generated Chinese
-references and manually verified ESO terminology. Because the NLP and medicine
-slices contain the benchmark glossaries, the gold terms are in the catalog, and
-the stream measures how reliably routing keeps them inside the fixed retrieval
-and prompt budget.
+references and manually verified ESO terminology. Because the NLP and medicine slices contain the benchmark glossaries, the
+stream measures how reliably routing keeps the gold terms inside the fixed
+budget.
 
 \begin{table*}[t]
 \centering
@@ -55,13 +53,11 @@ Merged-2k & Domains & 2k & 88.9 & 85.3 & 87.7 & 45.18 & 42.42 & 39.2 & 0.86 \\
 Merged-10k & None & 9.9k & 89.1 & 86.2 & 88.1 & 44.97 & 42.19 & 27.1 & 1.26 \\
 \bottomrule
 \end{tabular}
-\caption{Results on the 4.7-hour ten-talk stream. Input is what the user
-supplies before the session; Active is the most entries searched per chunk,
-with 1k denoting 1,000. TERM\_ACC and prompt precision are percentages, MT-BLEU
-is BLEU with glossary terms masked, and Pairs is the mean number of term pairs
-injected per chunk. $\dagger$ marks $p<0.05$ against AutoTerm-SST in the same run
-under a talk-level permutation test. InfiniSST uses no glossary; its All, BLEU,
-and MT-BLEU are unweighted means of its NLP and medicine scores.}
+\caption{Results on the ten-talk stream. Input is what the user supplies
+before the session; Active is the most entries searched per chunk.
+TERM\_ACC and prompt precision are in percent, MT-BLEU masks glossary terms, and
+Pairs is the mean injected per chunk. $\dagger$: $p<0.05$ against AutoTerm-SST in the same run, talk-level permutation. InfiniSST uses no glossary, and its All, BLEU, and MT-BLEU are unweighted NLP
+and medicine means.}
 \label{tab:quality}
 \end{table*}
 
@@ -97,7 +93,8 @@ to the reference boundaries of the StreamLAAL
 protocol~\citep{papi2024streamatt}, and we then compute corpus
 SacreBLEU~\citep{papineni-etal-2002-bleu,post-2018-call}. Masked-term BLEU, or
 MT-BLEU, repeats this scoring after masking every evaluated target term in both
-hypothesis and reference to measure the translation around the terms. Prompt
+hypothesis and reference, so it scores the translation with the evaluated
+terms masked out. Prompt
 precision is the share of injected term pairs that match a gold term in the
 audio they were retrieved from.
 
@@ -118,9 +115,8 @@ AutoTerm-SST performs on par with a known-domain reference without receiving
 any user input. In run 1, AutoTerm-SST minus Known-domain-1k is $+0.2\pm1.2$
 TERM\_ACC points at $p=0.86$ and $-0.10^{+0.48}_{-0.40}$ BLEU at $p=0.70$. Run 2
 on separate GPUs again shows no significant difference, as
-Table~\ref{tab:stats} reports. AutoTerm-SST and Known-domain-1k both exceed
-retrieval-free InfiniSST by about 27 TERM\_ACC points, as
-Table~\ref{tab:quality} shows.
+Table~\ref{tab:stats} reports. Both lie well above retrieval-free InfiniSST, scored with its own per-corpus
+scorers in Table~\ref{tab:quality}.
 
 \paragraph{Effect of catalog scale.}
 Merged glossaries keep pace with AutoTerm-SST up to 10k entries, yet lose
@@ -141,8 +137,8 @@ references contain no glossary term, so term accuracy plays no role,
 AutoTerm-SST still leads Merged-1M by 2.19 BLEU at $p=0.023$.
 
 \paragraph{Routing behavior.}
-Pinning the confirmed slice inside a four-slice working set shields terminology
-coverage from transient ranking errors. In run 1, the confirmed slice alone is
+Pinning the confirmed slice in a four-slice working set shields coverage from
+transient ranking errors. In run 1, the confirmed slice alone is
 correct in 88.5\% of chunks, whereas the four-slice working set keeps the
 correct glossary searchable in nearly all of them, as Figure~\ref{fig:routing}
 shows. Pinning accounts for most of this margin: replaying the saved translations
@@ -153,8 +149,8 @@ to 300 seconds.
 
 \paragraph{Latency and speed.}
 The full pipeline keeps pace with live speech. In a single session on two
-A6000 GPUs, the first translation appears 2.3 seconds after audio starts. Each
-chunk then returns its text 0.57 seconds after it is sent at the median and
-1.17 seconds at the 95th percentile. On one H200 GPU, the processing time of the 4.7-hour stream is 0.406 times its
+A6000 GPUs, the first translation appears 2.3 seconds after audio starts. Each chunk's text then arrives 0.57 seconds after the chunk is sent at the
+median and 1.17 seconds at the 95th percentile. On one H200 GPU, the processing time of the 4.7-hour stream is 0.406 times its
 duration, 2.46 times faster than real time and within 0.02 of Known-domain-1k;
-routing and retrieval average 203 milliseconds per chunk.
+the retrieval stage, which includes speech encoding, routing, and index
+queries, averages 203 milliseconds per chunk.

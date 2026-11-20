@@ -18,11 +18,11 @@ incoming slices briefly coexist in the working set.
 \begin{figure*}[t]
   \centering
   \includegraphics[width=0.72\textwidth]{ui_evidence_panel.png}
-  \caption{The English-to-Chinese interface during an oncology lecture, replaying
-  the recorded outputs of run 1 about 20 minutes into the stream. The status row
-  shows the confirmed medicine slice and the 4,000 searchable terms, retrieved
-  terms are highlighted in the translation, and the bottom panel lists the latest
-  retrieved term pairs with their scores and source slices.}
+  \caption{The English-to-Chinese interface replaying run 1 during an oncology
+  lecture, about 20 minutes into the stream. The status row shows the confirmed
+  medicine slice and 4,000 searchable terms; retrieved terms are highlighted in
+  the translation, and the bottom panel lists the latest retrieved pairs with
+  scores and source slices.}
   \label{fig:ui}
 \end{figure*}
 
@@ -32,15 +32,14 @@ Figure~\ref{fig:ui} shows, the
 interface highlights retrieved terms inside the translation and lists their
 source--target mappings; the status row shows the confirmed slice and the
 active term count, and the evidence-panel header names the active slices and
-the retrieval latency. Viewers can directly determine whether a
-mistranslation stems from missing retrieval evidence, an irrelevant slice, or
-LLM decoding.
+the retrieval latency. A viewer can thus see whether a mistranslated term was never retrieved, came
+from an irrelevant slice, or was retrieved but not used.
 
 \paragraph{Extensibility.}
 Adding a topic takes one glossary file and no restart: registration validates
 the pairs, builds the index, and writes the manifest entry. Prototypes can be
-written by hand or generated from the glossary by an LLM, which routes as
-accurately in Appendix~\ref{app:router}. Running sessions keep the catalog snapshot taken at session start while new
+written by hand or generated from the glossary by an LLM, with comparable routing accuracy in
+Appendix~\ref{app:router}. Running sessions keep the catalog snapshot taken at session start while new
 sessions see new slices at once, and fixed-glossary presets
 remain available for expert users.
 

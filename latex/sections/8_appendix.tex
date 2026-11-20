@@ -41,7 +41,10 @@ Paired talk-level tests show that the gains of AutoTerm-SST over Merged-1M
 hold across individual talks. Table~\ref{tab:stats} reports every paired
 comparison. The exact permutation test swaps the outputs of two systems within
 each talk across all 1,024 combinations and recomputes the pooled metric,
-giving a minimum attainable two-sided $p$-value of 0.002. Confidence intervals
+giving a minimum attainable two-sided $p$-value of 0.002. Significance claims
+rest on this test. With ten talks, the percentile bootstrap can disagree with
+it near the boundary: for Merged-10k the interval excludes zero while
+$p=0.084$. Confidence intervals
 come from 4,000 stratified bootstrap resamples of five ACL and five ESO talks.
 Removing any single talk preserves all three advantages of AutoTerm-SST over
 Merged-1M, with gains of at least 3.28 TERM\_ACC points, 2.00 BLEU, and 1.99
@@ -51,7 +54,9 @@ MT-BLEU.
 \label{app:config}
 
 Both evaluation runs use one fixed set of routing and retrieval parameters,
-listed in Table~\ref{tab:config}. We selected the routing thresholds on four short segments drawn from the
+listed in Table~\ref{tab:config}. Because the router's timers run on wall-clock
+time, AutoTerm-SST ran alone on its server in run 2, while the three
+fixed-glossary configurations shared a second server. We selected the routing thresholds on four short segments drawn from the
 evaluation talks before running the complete streams. The context encoder
 reads at most the last 128 tokens of the four-chunk context $c_t$, and the
 router scores slices only by this context similarity.
@@ -109,7 +114,7 @@ that top-four coverage stays above 81\% even when topics switch every 15
 seconds.
 
 \paragraph{Generated prototypes.}
-LLM-generated prototypes route as accurately as hand-written ones. For each
+LLM-generated prototypes route about as well as hand-written ones. For each
 slice, we remove entries originating from the evaluation glossaries and give
 the remaining term pairs to \texttt{gpt-5.5-2026-04-23}, which writes a topic
 description, seven to ten core topics, and their Chinese translation in the
@@ -133,14 +138,14 @@ Replay & Top-4 & Top-1 \\
 \midrule
 \multicolumn{3}{l}{\emph{Ten-talk stream, prototype text}} \\
 Hand-written & 85.0 & 72.6 \\
-Generated, median of ten & 85.8 & 70.8 \\
+Generated, median of ten & 85.8 & 70.7 \\
 Generated, lowest of ten & 84.3 & 67.3 \\
 Generated, highest of ten & 91.4 & 77.8 \\
 \bottomrule
 \end{tabular}
 \caption{Open-loop router replays on run-1 translations. Top-4 and Top-1 are
-the percentages of chunks whose correct slice ranks in the top four or first
-by raw similarity. Lowest and highest generated sets are chosen per column.}
+the percentages of chunks whose correct slice ranks in the top four or first.
+Generated sets are ranked separately per column.}
 \label{tab:router-diag}
 \end{table}
 

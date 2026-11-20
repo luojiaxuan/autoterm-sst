@@ -1,0 +1,75 @@
+{
+  "model": "Qwen/Qwen3-4B-Instruct-2507",
+  "windows": 8776,
+  "slices": [
+    "nlp",
+    "medicine",
+    "education",
+    "finance",
+    "legal",
+    "environment",
+    "entertainment",
+    "science",
+    "sports",
+    "art"
+  ],
+  "coarse": {
+    "w=4": {
+      "top1_acc": 0.7944,
+      "top1_changes": 986,
+      "cover@1": 0.7944,
+      "set_changes@1": 986,
+      "cover@2": 0.8441,
+      "set_changes@2": 3134,
+      "cover@3": 0.8705,
+      "set_changes@3": 4035,
+      "cover@4": 0.9046,
+      "set_changes@4": 4484,
+      "cover@6": 0.9396,
+      "set_changes@6": 5133,
+      "seconds": 881.0
+    }
+  },
+  "rapid_switch": {
+    "piece=15s": {
+      "cover@1": 0.641,
+      "cover@4": 0.9038,
+      "median_seconds_until_gold_in_top1": 3.84,
+      "pieces_where_gold_never_reaches_top1": 1,
+      "median_seconds_until_gold_in_top4": 0.0,
+      "pieces_where_gold_never_reaches_top4": 0
+    },
+    "piece=30s": {
+      "cover@1": 0.7516,
+      "cover@4": 0.8782,
+      "median_seconds_until_gold_in_top1": 5.76,
+      "pieces_where_gold_never_reaches_top1": 0,
+      "median_seconds_until_gold_in_top4": 1.92,
+      "pieces_where_gold_never_reaches_top4": 0
+    },
+    "piece=60s": {
+      "cover@1": 0.8246,
+      "cover@4": 0.9363,
+      "median_seconds_until_gold_in_top1": 3.84,
+      "pieces_where_gold_never_reaches_top1": 0,
+      "median_seconds_until_gold_in_top4": 0.0,
+      "pieces_where_gold_never_reaches_top4": 0
+    },
+    "piece=120s": {
+      "cover@1": 0.8056,
+      "cover@4": 0.9268,
+      "median_seconds_until_gold_in_top1": 5.76,
+      "pieces_where_gold_never_reaches_top1": 0,
+      "median_seconds_until_gold_in_top4": 0.0,
+      "pieces_where_gold_never_reaches_top4": 0
+    },
+    "piece=300s": {
+      "cover@1": 0.8299,
+      "cover@4": 0.9343,
+      "median_seconds_until_gold_in_top1": 5.76,
+      "pieces_where_gold_never_reaches_top1": 0,
+      "median_seconds_until_gold_in_top4": 0.0,
+      "pieces_where_gold_never_reaches_top4": 0
+    }
+  }
+}

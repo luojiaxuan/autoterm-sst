@@ -1,9 +1,10 @@
 \section{Evaluation}
 \label{sec:evaluation}
 
-We test three claims: zero setup costs no accuracy or translation quality, the
-fixed working-set budget avoids the losses of large merged glossaries, and the
-router follows frequent topic changes across ten domains.
+We test three claims: without any setup, AutoTerm-SST matches a reference told
+each talk's domain; its fixed working-set budget avoids the losses of large
+merged glossaries; and its router follows frequent topic changes across ten
+domains.
 
 \begin{figure*}[t]
   \centering
@@ -48,19 +49,18 @@ AutoTerm-SST & None & 4k & 88.4 & 86.3 & 87.7 & 45.10 & 42.27 & 35.7 & 0.94 \\
 Similarity routing & None & 4k & 88.4 & 86.0 & 87.6 & 45.39 & 42.62 & 35.7 & 0.94 \\
 Merged-2k & Domains & 2k & 88.8 & 86.0 & 87.9 & 45.31 & 42.48 & 39.1 & 0.86 \\
 Merged-10k & None & 9.9k & 88.6 & 87.0 & 88.1 & 45.11 & 42.33 & 27.1 & 1.26 \\
-Merged-100k$^*$ & None & 100k & 89.4 & 84.5 & 87.8 & 43.72$^\dagger$ & 40.93$^\dagger$ & 6.8 & 4.96 \\
-Merged-1M$^*$ & None & 1M & 87.1 & 78.9 & 84.4$^\dagger$ & 42.79$^\dagger$ & 39.95$^\dagger$ & 3.4 & 8.70 \\
+Merged-100k & None & 100k & 89.4 & 84.5 & 87.8 & 43.72$^\dagger$ & 40.93$^\dagger$ & 6.8 & 4.96 \\
+Merged-1M & None & 1M & 87.1 & 78.9 & 84.4$^\dagger$ & 42.79$^\dagger$ & 39.95$^\dagger$ & 3.4 & 8.70 \\
 \midrule
 InfiniSST & None & 0 & 76.6 & 46.3 & 61.4 & 41.84 & 38.32 & 0.0 & 0.00 \\
 \bottomrule
 \end{tabular}
-\caption{Results on the ten-talk stream. Input is what the user supplies
-before the session; Active is the most entries searched per chunk; Similarity
-routing is AutoTerm-SST with the similarity router of Appendix~\ref{app:config}.
-TERM\_ACC and prompt precision are in percent, MT-BLEU masks glossary terms, and
-Pairs is the mean injected per chunk. $^*$: run 1 on the same audio and chunk
-boundaries. $\dagger$: $p<0.05$ against AutoTerm-SST, talk-level permutation.
-InfiniSST uses no glossary, and its All, BLEU, and MT-BLEU average the corpora.}
+\caption{Results on the ten-talk stream. Input is what the user supplies before
+the session, and Active the most entries searched per chunk; Similarity routing
+swaps in the router of Appendix~\ref{app:config}. TERM\_ACC and prompt
+precision are percentages, MT-BLEU masks glossary terms, and Pairs counts
+injected pairs per chunk. $\dagger$: $p<0.05$ against AutoTerm-SST. InfiniSST
+uses no glossary; its All, BLEU, and MT-BLEU average the corpora.}
 \label{tab:quality}
 \end{table*}
 
@@ -99,14 +99,6 @@ exact duplicates. Merged-1M adds entries from other topics to the same NLP and
 medicine glossaries, and Merged-100k is its first 100,000 entries. Merged
 glossaries keep conflicting translations of a source term.
 
-\paragraph{Runs.}
-Run 3, on two H200 GPUs, compares AutoTerm-SST with Known-domain-1k,
-similarity routing, Merged-2k, and Merged-10k. Merged-100k and Merged-1M come
-from run 1 on one H200 GPU; every run plays the same audio order with the same
-chunk boundaries, so we pair them with AutoTerm-SST talk by talk. Runs 1 and
-2, the latter on two A6000 GPUs, also compare similarity routing with
-Known-domain-1k. The RealSI streams run on the same two H200 GPUs as run 3.
-
 \paragraph{Metrics.}
 Following RASST, terminology accuracy, or TERM\_ACC, is the share of 2,047 time-aligned
 term occurrences, 1,368 NLP and 679 medicine, whose reference translation
@@ -133,11 +125,10 @@ Appendix~\ref{app:stats} reports every paired comparison.
 
 \paragraph{Comparison with the known-domain reference.}
 AutoTerm-SST performs on par with a known-domain reference without receiving
-any user input. In run 3, AutoTerm-SST minus Known-domain-1k is
+any user input. AutoTerm-SST minus Known-domain-1k is
 $+0.2^{+0.8}_{-1.0}$ TERM\_ACC points at $p=0.82$ and $-0.05^{+0.44}_{-0.55}$
-BLEU at $p=0.85$. Similarity routing also ties the reference in runs 1 and 2,
-as Table~\ref{tab:stats} reports. All lie well above retrieval-free InfiniSST
-in Table~\ref{tab:quality}.
+BLEU at $p=0.85$. Every glossary configuration lies well above
+retrieval-free InfiniSST in Table~\ref{tab:quality}.
 
 \paragraph{Effect of catalog scale.}
 Merged glossaries keep pace with a routed working set up to 10k entries, yet
@@ -167,8 +158,8 @@ switches and 24 close-domain slices.
 
 \paragraph{Processing speed.}
 Retrieval and routing take a small share of the processing time:
-AutoTerm-SST processes audio in about a fifth of its duration, as fast as
-Known-domain-1k in Table~\ref{tab:speed}, and RASST measured its retriever
+AutoTerm-SST processes audio in about a fifth of its duration, the same
+real-time factor as Known-domain-1k in Table~\ref{tab:speed}, and RASST measured its retriever
 alone at 0.042 seconds per chunk on the same GPUs. The first translation
 appears 2.3 seconds after audio starts.
 

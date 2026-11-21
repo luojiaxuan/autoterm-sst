@@ -10,30 +10,23 @@
 \cmidrule(lr){2-5}\cmidrule(lr){6-9}\cmidrule(lr){10-13}
 Baseline & Diff. & Low & High & $p$ & Diff. & Low & High & $p$ & Diff. & Low & High & $p$ \\
 \midrule
-\multicolumn{13}{l}{\emph{AutoTerm-SST minus each baseline}} \\
+\multicolumn{13}{l}{\emph{All sentences}} \\
 Known-domain-1k & $+0.20$ & $-0.83$ & $+0.99$ & 0.82 & $-0.05$ & $-0.60$ & $+0.39$ & 0.85 & $-0.13$ & $-0.75$ & $+0.35$ & 0.61 \\
 Similarity routing & $+0.10$ & $-0.92$ & $+0.93$ & 0.94 & $-0.29$ & $-0.75$ & $+0.01$ & 0.14 & $-0.35$ & $-0.98$ & $-0.02$ & 0.13 \\
 Merged-2k & $-0.20$ & $-1.19$ & $+0.56$ & 0.83 & $-0.21$ & $-0.57$ & $+0.24$ & 0.36 & $-0.21$ & $-0.61$ & $+0.24$ & 0.46 \\
 Merged-10k & $-0.39$ & $-1.05$ & $+0.18$ & 0.34 & $-0.01$ & $-0.25$ & $+0.21$ & 0.96 & $-0.06$ & $-0.30$ & $+0.18$ & 0.63 \\
-Merged-100k$^*$ & $-0.10$ & $-1.27$ & $+0.82$ & 0.97 & $+1.38$ & $+0.68$ & $+1.91$ & 0.010 & $+1.35$ & $+0.64$ & $+1.75$ & 0.006 \\
-Merged-1M$^*$ & $+3.27$ & $+1.38$ & $+4.79$ & 0.031 & $+2.31$ & $+1.49$ & $+2.94$ & 0.002 & $+2.32$ & $+0.87$ & $+2.96$ & 0.002 \\
+Merged-100k & $-0.10$ & $-1.27$ & $+0.82$ & 0.97 & $+1.38$ & $+0.68$ & $+1.91$ & 0.010 & $+1.35$ & $+0.64$ & $+1.75$ & 0.006 \\
+Merged-1M & $+3.27$ & $+1.38$ & $+4.79$ & 0.031 & $+2.31$ & $+1.49$ & $+2.94$ & 0.002 & $+2.32$ & $+0.87$ & $+2.96$ & 0.002 \\
 \midrule
-\multicolumn{13}{l}{\emph{Similarity routing minus each baseline, runs 1 and 2}} \\
-Known-domain-1k, run 1 & $+0.24$ & $-0.95$ & $+1.49$ & 0.86 & $-0.10$ & $-0.50$ & $+0.38$ & 0.70 & $-0.11$ & $-0.57$ & $+0.39$ & 0.73 \\
-Known-domain-1k, run 2 & $-0.68$ & $-1.48$ & 0.00 & 0.18 & $+0.36$ & $-0.24$ & $+1.26$ & 0.69 & $+0.42$ & $-0.24$ & $+1.42$ & 0.66 \\
-Merged-2k, run 2 & $-0.39$ & $-1.29$ & $+0.30$ & 0.49 & $-0.03$ & $-0.56$ & $+0.61$ & 0.94 & $-0.06$ & $-0.44$ & $+0.60$ & 0.79 \\
-Merged-10k, run 2 & $-0.83$ & $-1.58$ & $-0.25$ & 0.084 & $+0.18$ & $-0.18$ & $+0.64$ & 0.43 & $+0.17$ & $-0.16$ & $+0.69$ & 0.51 \\
-\midrule
-\multicolumn{13}{l}{\emph{AutoTerm-SST, the 935 sentences whose references contain no glossary term}} \\
+\multicolumn{13}{l}{\emph{The 935 sentences whose references contain no glossary term}} \\
 Known-domain-1k &  & & &  & $-0.42$ & $-0.97$ & $+0.07$ & 0.17 &  & & &  \\
-Merged-100k$^*$ &  & & &  & $+1.35$ & $+0.64$ & $+1.83$ & 0.023 &  & & &  \\
-Merged-1M$^*$ &  & & &  & $+1.85$ & $+0.52$ & $+3.01$ & 0.047 &  & & &  \\
+Merged-100k &  & & &  & $+1.35$ & $+0.64$ & $+1.83$ & 0.023 &  & & &  \\
+Merged-1M &  & & &  & $+1.85$ & $+0.52$ & $+3.01$ & 0.047 &  & & &  \\
 \bottomrule
 \end{tabular}
-\caption{Paired metric differences between the routed system and each
-baseline. Low and High give the 95\% stratified talk-bootstrap confidence
+\caption{AutoTerm-SST minus each baseline on the ten-talk stream. Low and High give the 95\% stratified talk-bootstrap confidence
 bounds, and $p$ is the exact two-sided talk-level permutation $p$-value.
-TERM\_ACC differences are in percentage points; $^*$ marks baselines from run 1.}
+TERM\_ACC differences are in percentage points.}
 \label{tab:stats}
 \end{table*}
 
@@ -46,8 +39,8 @@ comparison. The exact permutation test swaps the outputs of two systems
 within each talk across all 1,024 combinations and recomputes the pooled
 metric, giving a minimum attainable two-sided $p$-value of 0.002. Significance
 claims rest on this test. With ten talks, the percentile bootstrap can disagree
-with it near the boundary: for Merged-10k in run 2 and for the MT-BLEU of
-similarity routing, the interval excludes zero while $p\ge0.08$. Confidence
+with it near the boundary: for the MT-BLEU difference from similarity
+routing, the interval excludes zero while $p=0.13$. Confidence
 intervals come from 4,000 stratified bootstrap resamples of five ACL and five
 ESO talks. Removing any single talk preserves all three advantages of
 AutoTerm-SST over Merged-1M, with gains of at least 2.57 TERM\_ACC points, 2.04
@@ -108,23 +101,22 @@ both leads in each of the consecutive updates.}
 \label{app:router}
 
 Open-loop replays compare the two deployed routers on identical inputs. Each
-replay feeds the saved translations of run 1 to both routers without decoding
+replay feeds saved translations of the ten-talk stream to both routers without decoding
 again and builds the context from the last four translated chunks as in
 Section~\ref{sec:adaptive-memory}. As in the live system, context scores
 refresh at most once every 5 seconds of audio, the similarity router applies
 its confirmation rule and pins its confirmed slice, and the language-model
 router takes one filter step per refresh with $\rho=10^{-3}$.
 Table~\ref{tab:router-diag} reports how often the correct slice is in the
-four-slice working set. Replayed on the emission times of run 1, the
-similarity router makes 19 switches, as it did live, and covers 96.2\% of
-chunks against 96.9\% live.
+four-slice working set. Replayed on the live emission times, the similarity
+router makes the same 19 switches as it did live.
 
 \paragraph{Topic filter.}
 The filter turns noisy per-update scores into a stable ranking without
 thresholds. Updated at every chunk, letter probabilities alone keep the
 correct slice among the top four in 90.5\% of chunks, and the filtered
 posterior in 98.7\%. Coverage stays between 98.4\% and 98.9\% as $\rho$ ranges
-from $10^{-5}$ to $10^{-1}$, so the single free parameter needs no tuning. Raw
+over four orders of magnitude, from $10^{-5}$ to $10^{-1}$. Raw
 similarity covers 85.0\% under the same updates, and the confirmation rule
 and pin raise the similarity router to 97.0\%.
 

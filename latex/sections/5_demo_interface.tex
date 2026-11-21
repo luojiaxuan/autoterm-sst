@@ -18,8 +18,8 @@ incoming slices briefly coexist in the working set.
 \begin{figure*}[t]
   \centering
   \includegraphics[width=0.64\textwidth]{ui_evidence_panel.png}
-  \caption{The English-to-Chinese interface replaying run 3 during an oncology
-  lecture, about 19 minutes into the stream. The status row shows the medicine
+  \caption{The English-to-Chinese interface replaying the ten-talk stream
+  during an oncology lecture, about 19 minutes in. The status row shows the medicine
   slice on top of the router's posterior and 4,000 searchable terms; retrieved
   terms are highlighted in the translation, and the bottom panel lists the
   latest retrieved pairs with scores and source slices.}
@@ -46,6 +46,5 @@ available for expert users.
 The MIT-licensed implementation, a one-command launcher, and a screencast are
 in the \href{https://github.com/luojiaxuan/autoterm-sst}{GitHub repository},
 and the hosted entry page is \url{https://luojiaxuan.github.io/autoterm-sst/}.
-In live mode, as opposed to the replay of recorded outputs in
-Figure~\ref{fig:ui}, the demo serves Qwen3-Omni with vLLM continuous batching
-alongside the RASST retriever.
+The live demo serves Qwen3-Omni with vLLM continuous batching alongside the
+RASST retriever.

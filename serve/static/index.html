@@ -3,7 +3,13 @@
 <head>
     <title>AutoTerm-SST</title>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="AutoTerm">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/autoterm-180.png">
     <style>
         * {
             margin: 0;
@@ -1113,6 +1119,86 @@
         .electron-status-icon.error {
             background: #f44336;
         }
+
+        @media (max-width: 599px) {
+            body {
+                min-height: 100dvh;
+                padding: calc(10px + env(safe-area-inset-top))
+                         calc(10px + env(safe-area-inset-right))
+                         calc(10px + env(safe-area-inset-bottom))
+                         calc(10px + env(safe-area-inset-left)) !important;
+            }
+
+            .header, .drag-area, .resize-handle, #closeBtn,
+            .buttons-group label, #videoSection:not(:has(audio, video)) {
+                display: none;
+            }
+
+            #backendBanner {
+                position: relative !important;
+                margin-bottom: 8px;
+                border-radius: 8px;
+            }
+
+            .container { padding-bottom: 0; }
+
+            .main-panel {
+                margin: 0;
+                padding: 0;
+                border: 0;
+                background: none;
+                backdrop-filter: none;
+                box-shadow: none;
+            }
+
+            .controls-section, .input-section {
+                gap: 8px;
+                padding: 8px;
+                margin-bottom: 8px;
+            }
+
+            .controls-section { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .buttons-group { grid-column: 1 / -1; }
+            .sample-item .sample-row { flex-wrap: wrap; }
+            .input-item.youtube-section { gap: 8px; }
+
+            .control-group select { height: 44px; font-size: 1rem; }
+            .btn { height: 44px; }
+            .upload-btn, .record-btn {
+                min-height: 44px;
+                padding: 8px;
+                gap: 6px;
+                border-radius: 8px;
+                white-space: normal;
+            }
+            .input-section .icon { flex-shrink: 0; }
+            .url-input { min-width: 0; min-height: 44px; padding: 8px; border-radius: 8px; }
+            .play-btn { width: 44px; height: 44px; }
+            .video-section { margin: 8px 0; padding: 8px; }
+
+            .translation-panel {
+                position: static;
+                margin-top: 8px;
+                cursor: auto;
+                user-select: text;
+            }
+
+            .translation-panel.minimized { height: auto; }
+            .translation-panel.minimized .translation-content { display: none; }
+            .translation-header { gap: 8px; padding: 8px; cursor: auto; }
+            .header-left { flex-wrap: wrap; gap: 4px; min-width: 0; }
+            .header-left, .translation-output, .evidence-panel { overflow-wrap: anywhere; }
+            .panel-btn, .panel-btn.reset-btn { min-width: 44px; min-height: 44px; }
+            .translation-content { padding: 8px; }
+            .translation-output { padding: 10px; }
+            .evidence-panel { margin-top: 8px; padding: 8px; }
+            .evidence-header { flex-direction: column; align-items: flex-start; gap: 2px; }
+            .evidence-header > :first-child { white-space: nowrap; }
+            .evidence-row { gap: 4px; }
+            .evidence-row .ev-term, .evidence-row .ev-tr, .evidence-row .ev-source {
+                white-space: normal;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1290,6 +1376,12 @@
     </div>
 
     <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').catch(error => {
+                console.error('Service worker registration failed:', error);
+            });
+        }
+
         let ws = null;
         let sessionId = null;
         let sessionLanguagePair = null;
@@ -1331,7 +1423,8 @@
         let isDragging = false;
         let isResizing = false;
         let dragOffset = { x: 0, y: 0 };
-        let isMinimized = true;  // start docked; auto-expand on first translation
+        const phoneLayout = matchMedia('(max-width: 599px)');
+        let isMinimized = !phoneLayout.matches;
         let panelAutoExpanded = false;
 
         // UI Elements
@@ -2000,7 +2093,7 @@
                 msg.id = 'backendBannerMsg';
                 backendBannerEl.appendChild(msg);
                 backendBannerEl.appendChild(close);
-                document.body.appendChild(backendBannerEl);
+                document.body.prepend(backendBannerEl);
             }
             backendBannerEl.style.background =
                 kind === 'offline' ? 'rgba(153,27,27,0.96)' : 'rgba(30,58,95,0.96)';
@@ -2822,6 +2915,7 @@
         }
 
         function startDragging(e) {
+            if (phoneLayout.matches) return;
             if (e.target === minimizeBtn || e.target === closeBtn || e.target.closest('.panel-btn')) {
                 return;
             }
@@ -4086,9 +4180,12 @@
                     updateStatus('Requesting microphone access...', 'processing');
                 }
             
+            let browserMicContext;
             try {
                 console.log('Requesting microphone access...');
                 updateStatus('Requesting microphone access...', 'processing');
+                // Create the browser audio context while the Record Audio tap is still active.
+                if (!isElectron) browserMicContext = new AudioContext();
                 
                 micStream = await navigator.mediaDevices.getUserMedia({ 
                     audio: {
@@ -4097,6 +4194,7 @@
                         autoGainControl: true
                     }
                 });
+                if (!isElectron) audioContext = browserMicContext;
                 
                 console.log('Microphone access granted, stream obtained:', micStream);
                 updateStatus('Microphone access granted, connecting...', 'processing');
@@ -4209,7 +4307,7 @@
                         
                         // 传统浏览器处理方式
                         console.log('Creating AudioContext...');
-                        audioContext = new AudioContext();
+                        if (isElectron) audioContext = new AudioContext();
                         console.log('AudioContext created with sample rate:', audioContext.sampleRate);
                         
                         console.log('Creating MediaStreamSource...');
@@ -4312,6 +4410,10 @@
                 };
                 
             } catch (error) {
+                if (browserMicContext) {
+                    await browserMicContext.close();
+                    if (audioContext === browserMicContext) audioContext = null;
+                }
                 console.error('Microphone access error:', error);
                 let errorMessage = 'Error accessing microphone: ';
                 
@@ -5093,10 +5195,12 @@
                 loadServerConfig();
                 refreshTermMemoryStatus();
                 checkBackendAvailability();
-                if (translationPanel) translationPanel.classList.add('minimized');
-                if (minimizeBtn) {
-                    minimizeBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z"/></svg>';
-                    minimizeBtn.title = 'Restore';
+                if (isMinimized) {
+                    if (translationPanel) translationPanel.classList.add('minimized');
+                    if (minimizeBtn) {
+                        minimizeBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z"/></svg>';
+                        minimizeBtn.title = 'Restore';
+                    }
                 }
                 const modeAutoBtn = document.getElementById('modeAutoBtn');
                 const modeFixedBtn = document.getElementById('modeFixedBtn');

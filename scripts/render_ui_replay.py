@@ -162,13 +162,16 @@ async def capture(args, agent):
         while agent.delivered < args.count and time.time() < deadline:
             await asyncio.sleep(1.0)
         await asyncio.sleep(2.0)
+        if args.extra_css:
+            await page.add_style_tag(content=args.extra_css)
+            await asyncio.sleep(0.5)
         chips_bottom = await page.evaluate(
             "() => { const lang = document.getElementById('languagePair');"
             " const card = lang.closest('.control-group') || lang;"
             " window.scrollTo(0, Math.max(0, card.getBoundingClientRect().top + window.scrollY - 16));"
             " return Math.round(document.getElementById('adaptiveStatus').getBoundingClientRect().bottom); }"
         )
-        await page.add_style_tag(content=STAGE_CSS % (chips_bottom + 10) + args.extra_css)
+        await page.add_style_tag(content=STAGE_CSS % (chips_bottom + 10))
         await page.evaluate(
             "() => document.querySelectorAll('.toast, .notification, .status-toast').forEach(e => e.remove())"
         )

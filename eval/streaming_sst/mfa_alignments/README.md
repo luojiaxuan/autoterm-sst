@@ -1,4 +1,4 @@
-# ACL 与 Medicine 的 MFA 对齐数据
+# ACL 60/60 的 MFA 对齐数据
 
 这里保存论文评测所需的轻量级 Montreal Forced Aligner（MFA）标注。文件只包含
 Praat TextGrid 时间区间和 ACL 的 alignment diagnostics，不包含音频。评测代码应读取
@@ -9,11 +9,13 @@ Praat TextGrid 时间区间和 ACL 的 alignment diagnostics，不包含音频�
 | 领域 | 内容 | 文件数 | 原始位置（Taurus） |
 | --- | --- | ---: | --- |
 | ACL 60/60 | 5 个完整 talk 的 TextGrid，以及 `alignment_analysis.csv` | 6 | `/mnt/gemini/data2/jiaxuanluo/acl6060_dev_offline_eval/mfa_textgrids` |
-| ESO medicine | 5 个完整 speech 的 TextGrid：404、545006、596001、605000、606 | 5 | `/home/jiaxingxu/rag-sst/eso-dataset/mfa_v1/textgrids` |
 
-ACL talk IDs 为 `2022.acl-long.{110,117,268,367,590}`。Medicine 文件沿用上游
-`test_<sample>_full.TextGrid` 命名。数据于 2026-07-09 从 Taurus 原样复制；本目录的
+ACL talk IDs 为 `2022.acl-long.{110,117,268,367,590}`。数据于 2026-07-09 从 Taurus 原样复制；本目录的
 `SHA256SUMS` 与远端源文件逐项一致。
+
+ESO medicine 五个 speech（404、545006、596001、605000、606）的 TextGrid 来自 ESO 测试集的转写，
+不随本仓库分发；有 ESO 测试集访问权的用户按上游 `test_<sample>_full.TextGrid` 命名放进
+`medicine_eso/` 即可复用评测脚本。
 
 ## 完整性检查
 

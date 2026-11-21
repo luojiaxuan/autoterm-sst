@@ -1,6 +1,6 @@
 import json, sys, time, urllib.parse, urllib.request
 API="https://www.wikidata.org/w/api.php"
-UA="AutoTerm-SST/1.0 (academic; mailto:jluo50@jhu.edu)"
+UA="AutoTerm-SST/1.0 (academic; https://github.com/luojiaxuan/autoterm-sst)"
 LANG="ja"
 def fetch(ids):
     url=API+"?"+urllib.parse.urlencode({"action":"wbgetentities","ids":"|".join(ids),

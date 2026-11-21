@@ -41,9 +41,9 @@ Mirrors the InfiniSST layout so imports resolve with `PYTHONPATH=$PWD/eval/infin
 
 **External runtime deps (NOT vendored):** `simuleval` pkg, `vllm`, `qwen_omni_utils`,
 `transformers`; fairseq `examples/.../stream_laal_term.py`; the InfiniSST conda env.
-The five medicine MFA TextGrids used by this evaluation are vendored at
-`eval/streaming_sst/mfa_alignments/medicine_eso/`; their original Taurus path
-was `/home/jiaxingxu/rag-sst/eso-dataset/mfa_v1/textgrids`.
+The five medicine MFA TextGrids used by this evaluation come from the ESO test
+set and are not redistributed; place them under
+`eval/streaming_sst/mfa_alignments/medicine_eso/` to rerun it.
 
 ## Data (on /mnt/gemini — NOT copied, paths recorded)
 

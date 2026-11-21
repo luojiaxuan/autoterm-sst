@@ -11,7 +11,7 @@
 #   MANIFEST       topic-slice manifest with the ten 1,000-term slices
 # Optional environment:
 #   PORT (8000), HOST (127.0.0.1), TP_SIZE (2), GPU_UTIL (0.80), MAX_SEQS (8),
-#   ROUTER_LM (Qwen/Qwen3-4B-Instruct-2507), CONTEXT_MODEL (BAAI/bge-m3),
+#   ROUTER_LM (Qwen/Qwen3-4B-Instruct-2507), ROUTER_DEVICE (cuda:0), CONTEXT_MODEL (BAAI/bge-m3),
 #   PROTOTYPES (configs/router_prototypes_generated_s0.json), PYTHON_BIN (python3),
 #   DEFAULT_SLICE (nlp_core_1k), SLICES (the ten slice ids of the manifest)
 set -euo pipefail
@@ -28,6 +28,7 @@ TP_SIZE="${TP_SIZE:-2}"
 GPU_UTIL="${GPU_UTIL:-0.80}"
 MAX_SEQS="${MAX_SEQS:-8}"
 ROUTER_LM="${ROUTER_LM:-Qwen/Qwen3-4B-Instruct-2507}"
+ROUTER_DEVICE="${ROUTER_DEVICE:-cuda:0}"
 CONTEXT_MODEL="${CONTEXT_MODEL:-BAAI/bge-m3}"
 PROTOTYPES="${PROTOTYPES:-${REPO_ROOT}/configs/router_prototypes_generated_s0.json}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
@@ -51,7 +52,7 @@ exec "${PYTHON_BIN}" -u eval/streaming_sst/serve_glossary_capacity_sweep.py \
   --autoterm-max-active-slices 4 \
   --autoterm-context-window-chunks 4 \
   --autoterm-context-model "${CONTEXT_MODEL}" \
-  --autoterm-context-device cpu \
+  --autoterm-context-device "${ROUTER_DEVICE}" \
   --autoterm-context-weight 1.0 \
   --autoterm-text-weight 0.0 \
   --autoterm-domain-probe-weight 0.0 \

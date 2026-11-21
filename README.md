@@ -1,139 +1,94 @@
 # AutoTerm-SST
 
-**Zero session-time setup for terminology-aware streaming speech translation,
-as a thin, pluggable framework.**
+**Terminology-aware streaming speech translation with no glossary upload and
+no domain selection.**
 
-AutoTerm-SST is an interactive simultaneous speech-translation (SST) system for
-term-dense vertical domains (academic, medical, legal, financial). It streams
-speech in, runs a swappable translation **agent**, and streams translated text
-back. Its **adaptive terminology memory** picks the glossary on the fly: a small
+AutoTerm-SST translates live speech in term-dense domains such as academic
+talks, medicine, law, and finance. It builds on RASST (Retrieval-Augmented
+Simultaneous Speech Translation), which needs a user glossary before each
+session. AutoTerm-SST removes that step. An offline terminology catalog is
+split into topic slices of 1,000 terms each. While a session runs, a small
 language model (Qwen3-4B-Instruct-2507) reads the last four translated chunks
-and scores every topic slice of an offline catalog by the probability of its
-option letter, a sticky hidden Markov filter turns these scores into a
-posterior over topics, and term retrieval searches only the most probable
-slices, at most four and 4,000 terms. Up to 10 retrieved term pairs enter the
-prompt of each chunk, so the model gets specialized vocabulary right without a
-per-session glossary upload or domain choice. Topic slices are prebuilt and
-registered by the deployment operator.
+and scores every slice by the probability of its option letter. A sticky
+topic filter turns these scores into a posterior over topics, and term
+retrieval searches only the most probable slices: at most four slices and
+4,000 terms. Up to 10 retrieved term pairs enter the prompt of each chunk.
+The web UI shows the active slices with their posterior probabilities and the
+retrieved term pairs next to each partial translation.
 
-The codebase is a **thin middle layer** (transport / session / routing) plus
-**swappable agents**. The framework knows nothing about models, prompting,
-batching, KV-cache, or retrieval; an agent is an opaque black box that owns all
-of that internally.
+## Try it
 
-## Demo
+- **Hosted entry page:** <https://luojiaxuan.github.io/autoterm-sst/>. It
+  installs as a phone app on iOS and Android (see [Phone app](#phone-app)).
+- **Screencast:** [`docs/demo_screencast.mp4`](https://github.com/luojiaxuan/autoterm-sst/blob/main/docs/demo_screencast.mp4)
+  (2.5 min, recorded with an earlier version of the interface).
+- **Mock mode:** one command runs the full web UI and wire protocol on a
+  laptop with no GPU and no model download ([Quick start](#quick-start)).
+- **Paper configuration:** `scripts/start_autoterm_demo.sh` serves the
+  evaluated system and its web UI on one port ([below](#paper-configuration-gpu)).
 
-- 📄 Paper: *AutoTerm-SST: Adaptive Terminology Memory with Zero Session-Time
-  Setup for Streaming Speech Translation*, arXiv preprint
-  [arXiv:2610.26865](https://arxiv.org/abs/2610.26865) ([PDF](https://arxiv.org/pdf/2610.26865)).
-- 📊 Evaluation source of truth: [`docs/llm_router_20261120/README.md`](docs/llm_router_20261120/README.md)
-  for the language-model router (closed-loop results, replays, processing
-  speed), [`docs/realsi_20261120/README.md`](docs/realsi_20261120/README.md) for
-  the ten-domain RealSI routing test, and
-  [`docs/autoterm_1m_budget_search_20260711.md`](docs/autoterm_1m_budget_search_20260711.md)
-  for the large merged-glossary baselines.
-- 🎬 Screencast video: [docs/demo_screencast.mp4](https://github.com/luojiaxuan/autoterm-sst/blob/main/docs/demo_screencast.mp4) (2.5 min, recorded with the July 2026 interface).
-- 🌐 Hosted live demo: <https://luojiaxuan.github.io/autoterm-sst/> (stable
-  entry page; the GPU-backed demo is currently offline, so use the screencast or
-  mock mode below).
-- 🖥️ No GPU? Mock mode below runs the full UI, wire protocol, and JSON evidence
-  stream on a laptop with zero model downloads.
+## Results
+
+| Setting | AutoTerm-SST | Reference |
+| --- | --- | --- |
+| 4.7-hour English-to-Chinese stream, five ACL 60/60 talks alternating with five oncology lectures: terminology accuracy | 87.7% | 87.5% for a system told each talk's domain |
+| Same stream against a one-million-entry merged glossary | +3.3 accuracy points, +2.31 BLEU | paired by talk, p = 0.031 and p = 0.002 |
+| Ten-domain RealSI streams: share of audio chunks whose correct slice is searchable | 89.7% | 78.8% for an embedding-similarity router with tuned confirmation rules |
+
+The result files and the scripts that produce them are listed under
+[Evaluation](#evaluation).
 
 ---
 
-## Highlights
-
-- **Zero session-time setup.** A training-free language-model router reads the
-  translation's own recent output, and a sticky topic filter with one free
-  parameter, the switch rate, keeps the most probable slices searchable. No ASR
-  or source transcript is needed. Routing runs in a background worker that
-  scores all sessions in one batch, so no chunk waits for it. The earlier
-  embedding-similarity router with confirmation rules remains available as a
-  baseline.
-- **Thin framework, pluggable agents.** The core only does WebSocket/REST
-  transport, session lifecycle, and `agent_type` routing. Agents implement a
-  small `Agent` contract.
-- **Retrieval is optional and agent-internal.** Terminology retrieval (MaxSim
-  RAG over glossary indexes) lives *inside* the agent as a plugin: enable it,
-  swap it, or turn it off without touching the framework.
-- **Live evidence panel.** The JSON WebSocket protocol exposes retrieved terms,
-  active glossary state, router decisions/confidence, and retrieval/generation
-  latency, rendered live in the web UI.
-- **Multiple backends.** Ships with an in-process **vLLM** Qwen3-Omni agent
-  (continuous batching for many concurrent sessions) and a legacy **InfiniSST**
-  scheduler agent; the same protocol can front external SGLang-compatible
-  servers.
-- **Runs without a GPU for development.** `RASST_DEMO_MOCK=1` exercises the full
-  protocol/UI with no model, GPU, or network dependencies.
-
----
-
-## Architecture
+## How it works
 
 ```mermaid
 flowchart LR
-    Client[Web / Electron client] -- WS audio + REST control --> FW
-    subgraph FW[framework  ·  thin middle layer]
+    Client[Web / phone / Electron client] -- WS audio + REST control --> FW
+    subgraph FW[framework: thin transport layer]
       APP[app.py REST + WS] --> RT[router.py session routing]
     end
     RT -- open/submit/control/close --> AG
-    subgraph AG[Agent  ·  black box]
+    subgraph AG[OmniAgent]
       direction TB
-      PB[PromptBuilder] --- BK[ModelBackend\nvLLM / SGLang / mock]
-      RET[RetrievalPlugin\nMaxSim RAG · optional]
-      TR[HybridWindowTopicRouter\nadaptive working glossary] --> RET
+      LLM[Speech LLM\nvLLM / mock]
+      W[Router worker\nQwen3-4B letter probabilities\n+ sticky topic filter] --> S[Active slices\nK = 4, B = 4,000 terms]
+      S --> RET[MaxSim term retrieval\n10 pairs per chunk]
+      RET --> LLM
+      LLM -- recent translations --> W
     end
-    AG -- TranslationEvent via emit() --> RT --> APP --> Client
+    AG -- partial translations, active slices, retrieved terms --> RT --> APP --> Client
 ```
 
-The contract between the two halves is intentionally tiny
-(`framework/agent.py`): `open_session`, `submit_audio`, `on_control`,
-`close_session`, plus `describe()` / `health()` and a thread-safe `emit()`
-callback for streaming results back. Everything model-specific is hidden behind
-that boundary.
+- **Language-model router**
+  (`framework/agents/term_memory/language_model_router.py`). Each slice has a
+  short prototype description (`configs/router_prototypes_generated_s0.json`).
+  The router asks Qwen3-4B which topic the recent translation belongs to and
+  reads the probability of each option letter as the first answer token,
+  averaged over the original and the reversed option order.
+- **Sticky topic filter** (`filter_step` in the same file). A hidden Markov
+  filter treats these probabilities as observations. Its one parameter is the
+  per-chunk topic switch rate (1e-3 by default), so the posterior stays on the
+  current topic until the evidence for a new one accumulates.
+- **Budgeted retrieval.** Retrieval searches the slices with the highest
+  posterior probability, at most four slices and 4,000 terms, so the retrieval
+  and prompt budgets stay fixed as the catalog grows.
+- **Background router worker** (`_router_loop` and `_refresh_context_scores`
+  in `framework/agents/omni.py`). Routing updates run every 5 seconds and score
+  all due sessions in one batch, so no chunk waits for the router.
+- **Thin framework, swappable agents.** The framework (`framework/`) handles
+  WebSocket and REST transport, session lifecycle, and `agent_type` routing.
+  Models, prompting, batching, and retrieval live inside the agent behind the
+  small contract in `framework/agent.py`.
 
----
-
-## Repository layout
-
-```
-framework/                 # the thin transport/session/routing layer (entry point)
-├── server.py              #   python -m framework.server  (uvicorn launcher)
-├── app.py                 #   FastAPI: REST + /wss WebSocket (wire protocol)
-├── router.py              #   AgentRouter: sessions, routing, health/config aggregation
-├── agent.py               #   the Agent <-> framework contract
-├── config.py              #   config-driven, lazy agent loading
-└── agents/
-    ├── omni.py            #   OmniAgent: streaming Qwen3-Omni (in-process vLLM)
-    ├── infinisst.py       #   InfiniSSTAgent: wraps the legacy scheduler/engine
-    ├── glossary.py        #   language pairs + glossary/index presets (agent data)
-    ├── term_memory/       #   open-memory manifests, domain taxonomy, topic router
-    └── plugins/           #   agent-internal plugins (NOT framework concerns)
-        ├── backends.py    #     ModelBackend: VLLMBackend / SGLangHTTPBackend / MockBackend
-        ├── retrieval.py   #     RetrievalPlugin: MaxSimRetrievalPlugin / NullRetrieval
-        └── prompt.py      #     PromptBuilder: system prompt + term_map assembly
-
-serve/                     # original servers + shared assets
-├── static/                #   the demo web UI (served at / by the framework)
-├── vllm_compat/           #   sitecustomize.py (vLLM aimv2 registry fix; keep on PYTHONPATH)
-├── api.py, scheduler.py, inference_engine.py   # legacy InfiniSST stack
-└── rasst_server.py, rasst_sglang_server.py     # legacy standalone RASST servers
-
-electron/                  # desktop client
-eval/streaming_sst/        # terminology / routing / scale eval harnesses
-scripts/                   # run + smoke + SLURM scripts (see below)
-configs/autoterm_slices.yaml   # default adaptive-router thresholds
-docs/                      # design notes, evaluation reports, paper PDF, screencast
-tests/                     # unit + integration suites (run from the repo root)
-legacy/                    # pre-AutoTerm InfiniSST launchers and pages (unused)
-start_demo.sh              # primary framework launcher (mock-friendly)
-```
+The earlier embedding-similarity router with confirmation rules remains
+available as a baseline (`--autoterm-context-scorer embedding`).
 
 ---
 
 ## Quick start
 
-### 1. Mock mode (no GPU)
+### Mock mode (no GPU)
 
 ```bash
 python3 -m venv .venv
@@ -142,12 +97,33 @@ RASST_DEMO_MOCK=1 PORT=8000 bash start_demo.sh
 # open http://127.0.0.1:8000/
 ```
 
-`start_demo.sh` resolves the repository from its own location and automatically
-uses `.venv/bin/python` when present; it contains no machine-specific paths.
-Mock mode loads the RASST agent with deterministic CPU-only generation and
-retrieval (no torch/vLLM/GPU), so you can exercise the full
-`/init` → `/wss` → translate → `/delete_session` flow, the web UI, and the JSON
-evidence protocol.
+`start_demo.sh` resolves the repository from its own location and uses
+`.venv/bin/python` when present. Mock mode replaces the speech LLM and the
+retriever with deterministic CPU stand-ins and does not load the router model,
+so you can run the whole `/init` → `/wss` → translate → `/delete_session`
+flow, the web UI, and the JSON evidence stream on a laptop. The topic
+posterior appears only in the GPU configuration.
+
+### Paper configuration (GPU)
+
+`scripts/start_autoterm_demo.sh` serves the configuration evaluated in the
+paper, with the web UI on the same port: ten 1,000-term topic slices, the
+Qwen3-4B router with the sticky filter (switch rate 1e-3), at most four active
+slices within 4,000 terms, a four-chunk router context, routing updates every
+5 seconds, and at most 10 term pairs per prompt.
+
+```bash
+MODEL=<RASST speech LLM> RETRIEVER=<rasst-hn1024.pt> \
+RETRIEVER_CODE=<RASST retriever code> MANIFEST=<topic-slice manifest> \
+PORT=8000 bash scripts/start_autoterm_demo.sh
+```
+
+The script header lists the optional overrides (GPUs, memory fraction, router
+model and device, prototypes, slice ids). The topic slices with their MaxSim
+indexes, the ACL 60/60 segments, and the speech LLM adapter are public on
+Hugging Face; the Source of Truth table in
+[`docs/llm_router_20261120/README.md`](docs/llm_router_20261120/README.md)
+gives each repository and revision.
 
 ### Phone app
 
@@ -157,289 +133,188 @@ Open the HTTPS demo page on your phone. In iOS Safari, tap **Share** and choose
 localhost. The installed app uses the same server for live translation and can
 open its interface offline after the first online visit.
 
-### 2. Live GPU mode: RASST (Qwen3-Omni)
+---
 
-The real RASST agent loads a ~30B Qwen3-Omni checkpoint with **in-process vLLM
-tensor parallelism** (2 GPUs by default) plus the MaxSim retriever on a third
-GPU. Requirements: A6000-class NVIDIA GPUs, `vllm>=0.13`,
-`transformers>=4.57`, and the RASST retriever checkpoint
-(`checkpoints/retriever/rasst-hn1024.pt`, distributed separately).
+## Repository layout
 
-```bash
-bash scripts/run_taurus_framework_vllm.sh   # pins GPUs and sets every vLLM/RAG knob
-curl -s http://127.0.0.1:8011/health | python -m json.tool
 ```
+framework/                 # thin transport/session/routing layer
+├── server.py              #   python -m framework.server (uvicorn launcher)
+├── app.py                 #   FastAPI: REST + /wss WebSocket
+├── router.py              #   AgentRouter: sessions, routing, health/config aggregation
+├── agent.py               #   the Agent <-> framework contract
+└── agents/
+    ├── omni.py            #   OmniAgent: streaming speech LLM, router worker, retrieval
+    ├── infinisst.py       #   InfiniSSTAgent: wraps the InfiniSST scheduler
+    ├── term_memory/       #   language-model router, topic filter, slice manifests
+    └── plugins/           #   model backends, MaxSim retrieval, prompt assembly
 
-See the comments in that script and [Configuration](#configuration) for every
-knob (GPU selection, ports, memory fractions, retrieval devices).
-
-### 3. Paper configuration: language-model router
-
-`scripts/start_autoterm_demo.sh` serves the configuration evaluated in the
-NAACL 2027 demo paper, with the web UI on the same port: ten 1,000-term topic
-slices, the Qwen3-4B router with the sticky filter (switch rate 1e-3), at most
-four active slices within 4,000 terms, a four-chunk router context, routing
-updates every 5 seconds, and at most 10 term pairs per prompt.
-
-```bash
-MODEL=<RASST speech LLM> RETRIEVER=<rasst-hn1024.pt> \
-RETRIEVER_CODE=<RASST retriever code> MANIFEST=<topic-slice manifest> \
-PORT=8000 bash scripts/start_autoterm_demo.sh
+serve/static/              # web UI and phone app (served at / by the framework)
+electron/                  # desktop client
+configs/                   # router prototypes, topic taxonomy, slice settings
+eval/streaming_sst/        # evaluation harnesses; evidence/ holds the paper's scripts
+scripts/                   # launchers, slice builders, evaluation drivers
+docs/                      # evaluation records and the screencast
+tests/                     # unit and integration tests (run from the repo root)
+start_demo.sh              # framework launcher (mock-friendly)
 ```
-
-The script runs `eval/streaming_sst/serve_glossary_capacity_sweep.py` with the
-same router and retrieval flags as the paper's runs; its header lists the
-optional overrides (GPUs, router model, prototypes, slice ids). The slices,
-their manifest, and the evaluation audio are listed with their Hugging Face
-revisions in the Source of Truth table of
-[`docs/llm_router_20261120/README.md`](docs/llm_router_20261120/README.md).
 
 ---
 
-## Agents & models
+## Agents
 
-| `agent_type` | Agent             | Backend                         | Notes |
-|--------------|-------------------|---------------------------------|-------|
-| `RASST`      | `OmniAgent`       | in-process **vLLM** Qwen3-Omni  | streaming, batched, optional MaxSim RAG |
-| `InfiniSST`  | `InfiniSSTAgent`  | legacy scheduler + engine       | paged-attention LLM stack |
-| `Qwen3-Omni` | `OmniAgent`       | vLLM (`qwen3_omni` template)    | model-extension entry |
-| `MiniCPM-o`  | `OmniAgent`       | `minicpm_o` template            | extension stub |
+| `agent_type` | Agent | Backend | Notes |
+| --- | --- | --- | --- |
+| `RASST` | `OmniAgent` | in-process vLLM, Qwen3-Omni based | streaming, batched, terminology retrieval |
+| `InfiniSST` | `InfiniSSTAgent` | InfiniSST scheduler and engine | paged-attention LLM stack |
+| `Qwen3-Omni` | `OmniAgent` | vLLM (`qwen3_omni` template) | model-extension entry |
 
-Which agents load is controlled by `RASST_FRAMEWORK_AGENTS` (the UI's model
-picker uses these ids). An omni agent can also use an external SGLang/vLLM HTTP
-server instead of in-process vLLM by setting its template `backend_kind` to
-`sglang_http`.
+`RASST_FRAMEWORK_AGENTS` selects which agents load. An omni agent can call an
+external HTTP inference server instead of in-process vLLM by setting its
+template's `backend_kind` to `sglang_http`.
 
 ---
 
 ## Configuration
 
-Selected environment variables (all optional; sensible defaults in the scripts).
+The paper configuration is set by the flags in
+`scripts/start_autoterm_demo.sh`:
 
-**Framework / routing**
+| Setting | Flag | Value |
+| --- | --- | --- |
+| Slice scorer | `--autoterm-context-scorer` | `language_model` (`embedding` for the similarity baseline) |
+| Router model | `--autoterm-context-language-model` | `Qwen/Qwen3-4B-Instruct-2507` |
+| Topic switch rate | `--autoterm-switch-rate` | `1e-3` (0 disables the filter) |
+| Slice selection | `--autoterm-policy` | `budgeted_top_slices` |
+| Active slices / term budget | `--autoterm-max-active-slices` / `--autoterm-term-budget` | 4 / 4,000 |
+| Router context | `--autoterm-context-window-chunks` | 4 chunks |
+| Routing update interval | `--autoterm-update-sec` | 5 s |
+| Term pairs per prompt | `--rag-top-k` | 10 |
+
+`start_demo.sh` reads environment variables instead:
 
 | Var | Default | Meaning |
-|-----|---------|---------|
-| `RASST_FRAMEWORK_AGENTS` | `InfiniSST,RASST` | comma-separated agents to load |
-| `RASST_FRAMEWORK_DEFAULT_AGENT` | first loaded | agent for blank/unknown `agent_type` |
-| `RASST_DEMO_MOCK` | `0` | `1` = no GPU/model, deterministic mock |
+| --- | --- | --- |
+| `RASST_DEMO_MOCK` | `0` | `1` runs with no GPU or model |
+| `RASST_FRAMEWORK_AGENTS` | `InfiniSST,RASST` (mock: `RASST`) | agents to load |
+| `RASST_FRAMEWORK_DEFAULT_AGENT` | `RASST` | agent for a blank or unknown `agent_type` |
 | `HOST` / `PORT` | `127.0.0.1` / `8000` | bind address |
-
-**RASST / vLLM (OmniAgent)**
-
-| Var | Default | Meaning |
-|-----|---------|---------|
-| `RASST_VLLM_TP_SIZE` | `1` (script: `2`) | tensor-parallel GPUs for vLLM |
-| `RASST_GPU_MEMORY_UTILIZATION` | `0.86` (script: `0.80`) | vLLM memory fraction/GPU |
-| `RASST_MAX_NUM_SEQS` | `32` | max concurrent sequences (continuous batching) |
-| `RASST_MAX_MODEL_LEN` | `16384` | context length |
-| `RASST_VLLM_LIMIT_AUDIO` | `16` | max audio clips per prompt |
-| `RASST_VLLM_ENFORCE_EAGER` | `0` (script: `1`) | disable CUDA graphs |
-| `RASST_VLLM_MODEL_PATH` | per-language catalog | override the checkpoint path |
-| `CUDA_VISIBLE_DEVICES` | — | which physical GPUs are visible |
-
-**Retrieval (MaxSim RAG)**
-
-| Var | Default | Meaning |
-|-----|---------|---------|
-| `RASST_RAG_ENABLED` | `1` | enable terminology retrieval |
-| `RASST_RAG_DEVICE` | `cuda:1` (script: `cuda:2`) | retriever GPU |
+| `RASST_VLLM_TP_SIZE` | `1` | tensor-parallel GPUs for vLLM |
+| `RASST_GPU_MEMORY_UTILIZATION` | `0.86` | vLLM memory fraction per GPU |
 | `RASST_HN1024_RETRIEVER` | `checkpoints/retriever/rasst-hn1024.pt` | retriever checkpoint |
-| `RASST_ROOT` | — | glossary indexes + retriever code root |
-
-If retrieval fails to load, the agent logs it and continues **without** RAG
-(graceful degradation).
-
-**Adaptive working glossary (AutoTerm)**
-
-| Var | Default | Meaning |
-|-----|---------|---------|
-| `RASST_AUTO_GLOSSARY_ENABLED` | `1` | default to zero session-time setup via `auto_working` mode |
-| `RASST_AUTO_GLOSSARY_DEFAULT` | `nlp_core_10k` | initial domain-specific active slice |
-| `RASST_AUTO_GLOSSARY_PRESETS` | `nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k` | domain slices the topic router may activate |
-| `RASST_AUTO_GLOSSARY_UPDATE_SEC` | `45` | minimum interval between topic decisions |
-| `RASST_AUTO_GLOSSARY_WARMUP_SEC` | `30` | no switching before this many session seconds |
-| `RASST_AUTO_GLOSSARY_MIN_CONF` | `0.60` | minimum router confidence to switch |
-| `RASST_AUTO_GLOSSARY_MIN_MARGIN` | `0.15` | minimum top-vs-runner-up domain margin |
-| `RASST_AUTO_GLOSSARY_MIN_CONSISTENT_WINDOWS` | `2` | repeated windows required before switching |
-| `RASST_AUTO_GLOSSARY_FALLBACK` | `none` | uncertain routing keeps the current domain slice |
-| `RASST_ROUTER_MODE` | `hybrid_window_topic` | window-topic-first router; `embedding_refs` / `legacy_keywords` are compatibility modes |
-| `RASST_PROMPT_TOP_K` | `10` | retrieval cap: max refs injected into the prompt |
-| `RASST_UI_TOP_K` | `10` | max refs surfaced in JSON metadata/UI evidence |
-
-Additional router hysteresis defaults live in
-[`configs/autoterm_slices.yaml`](configs/autoterm_slices.yaml)
-(`current_margin_threshold`, per-signal consistency windows, probe floors,
-`switch_cooldown_sec`, `candidate_stale_sec`).
+| `RASST_TERM_MEMORY_MANIFEST` | none | topic-slice manifest |
 
 ---
 
 ## HTTP / WebSocket API
 
 | Method | Path | Purpose |
-|--------|------|---------|
-| `GET`  | `/` | demo web UI (`serve/static/index.html`) |
-| `GET`  | `/config` | aggregated agent capabilities (models, language pairs, presets) |
-| `GET`  | `/health` | aggregated agent health (incl. `term_memory` block) |
-| `POST` | `/init` | open a session (`agent_type`, `language_pair`, …) → `session_id` |
-| `WS`   | `/wss/{session_id}` | stream float32 PCM (16 kHz mono) up; receive text down. `EOF` ends input |
-| `POST` | `/reset_translation`, `/update_latency`, `/glossary/build`, `/ping`, `/delete_session` | session control (forwarded to the agent) |
-| `GET`  | `/queue_status/{session_id}` | admission/queue info |
+| --- | --- | --- |
+| `GET` | `/` | web UI (`serve/static/index.html`) |
+| `GET` | `/config` | agent capabilities (models, language pairs, presets) |
+| `GET` | `/health` | agent health, including the terminology memory |
+| `POST` | `/init` | open a session (`agent_type`, `language_pair`, ...) and return `session_id` |
+| `WS` | `/wss/{session_id}` | stream float32 PCM (16 kHz mono) up and receive text down; `EOF` ends input |
+| `POST` | `/reset_translation`, `/update_latency`, `/glossary/build`, `/ping`, `/delete_session` | session control |
+| `GET` | `/queue_status/{session_id}` | admission and queue info |
 
-By default output events are **plain text** over the WS (errors as `ERROR: ...`,
-end-of-file as `PROCESSING_COMPLETE: ...`), unchanged for existing clients.
-
-Add **`?event_format=json`** to the WS URL for the **structured protocol**:
-each message is `{"type", "text", "meta"}` where `type` is
-`partial` / `final` / `status` / `error`, and `meta` carries the agent's
-evidence: retrieved terms (`references`), per-tick retrieval latency
-(`retrieve_s`), generation latency (`elapsed_s`), segment index, routing-only
-domain-probe scores (`domain_probe_scores`), and adaptive router evidence
-(`topic`, `topic_router`). The web UI renders this as the live **Retrieved
-Terms** evidence panel and active-glossary status line.
+By default the WebSocket sends plain text (errors as `ERROR: ...`, end of file
+as `PROCESSING_COMPLETE: ...`). Add `?event_format=json` to the URL for
+structured events `{"type", "text", "meta"}`, where `type` is `partial`,
+`final`, `status`, or `error`. `meta` carries the retrieved term pairs
+(`references`), retrieval and generation latency (`retrieve_s`, `elapsed_s`),
+and the router state (`topic`). With the language-model router,
+`topic.top_slices` lists the active slices with their posterior probabilities.
 
 ---
 
-## Open terminology memory
+## Adding topic slices
 
-Beyond curated glossary presets, the agent serves a large, swappable **open
-terminology memory** (Wikidata/Wikipedia-derived). A small **manifest**
-(`framework/agents/term_memory/manifest.py`) points the agent at a snapshot's
-term files + precomputed MaxSim indexes; selecting an `open_wiki_*` preset
-retrieves from it exactly like a glossary.
-
-The default demo path provides **zero session-time terminology setup**:
-`auto_working` starts from a domain-specific slice (e.g. `nlp_core_10k`) and
-the `hybrid_window_topic` router may switch to another domain slice (e.g.
-`medicine_core_10k`) from streaming evidence. The prompt interface stays
-capped: each chunk retrieves at most `RASST_PROMPT_TOP_K=10` candidates, then
-score filtering keeps only confident matches (no filler terms). Large
-100k/500k/1M memories remain offline resources, rescue pools, and scale
-evidence. See [`docs/adaptive_working_glossary.md`](docs/adaptive_working_glossary.md).
-
-Build pipeline (normalize → filter/rank → index → snapshot/manifest):
+A topic slice is one glossary file plus its MaxSim index, registered in a
+manifest that the agent reads. Manifests, snapshots, and indexes live under a
+runtime root outside the repository.
 
 ```bash
-# 1. normalize a Wikidata-derived glossary -> rows, filter/rank/scale -> glossary
+# 1. normalize a Wikidata-derived glossary, then filter and rank it
 python scripts/term_memory/extract_wikidata_terms.py --glossary <wiki_glossary.json> \
     --target-lang zh --out rows.en-zh.jsonl
 python scripts/term_memory/filter_terms.py --in rows.en-zh.jsonl --target-lang zh \
-    --limit 100000 --out wiki_open_zh_100k.json
+    --limit 1000 --out aviation_core_1k.json
 
-# 2. build the maxsim index (GPU; RASST text encoder)
+# 2. build the MaxSim index (GPU, RASST text encoder)
 python <RASST>/retriever/build_maxsim_index.py --model-path checkpoints/retriever/rasst-hn1024.pt \
-    --glossary-path wiki_open_zh_100k.json --output-path <root>/indexes/wiki_100k/en-zh/maxsim.pt --device cuda:0
+    --glossary-path aviation_core_1k.json --output-path <root>/indexes/aviation_core_1k/en-zh/maxsim.pt --device cuda:0
 
-# 3. write terms.jsonl + publish a manifest exposing the preset (atomic swap)
-python scripts/term_memory/build_term_memory_snapshot.py --glossary wiki_open_zh_100k.json \
-    --snapshot-id wiki_100k --langs zh --preset-id open_wiki_100k \
-    --root <root> --maxsim-index zh=<root>/indexes/wiki_100k/en-zh/maxsim.pt
-
-# 4. point the agent at it
-export RASST_TERM_MEMORY_MANIFEST=<root>/manifests/current.json
-export RASST_DEFAULT_GLOSSARY_PRESET=open_wiki_100k   # or leave 'none'; users pick in the UI
+# 3. write terms.jsonl and publish a manifest entry for the slice
+python scripts/term_memory/build_term_memory_snapshot.py --glossary aviation_core_1k.json \
+    --snapshot-id aviation_core_1k --langs zh --preset-id aviation_core_1k \
+    --root <root> --maxsim-index zh=<root>/indexes/aviation_core_1k/en-zh/maxsim.pt
 ```
 
-Manifests/snapshots/indexes live under a runtime root (e.g.
-`$RASST_DEMO_DATA_ROOT/runtime/term_memory`), **never in the repo**. Open
-presets degrade to `none` if no manifest/index is available, so a missing
-snapshot never breaks a session.
+Add a prototype entry for the new topic to the prototypes file, which is keyed
+by topic (see `configs/router_prototypes_generated_s0.json`), and pass the
+slice id to the launcher through `SLICES`. Sessions keep the catalog snapshot
+from their start.
 
 ---
 
 ## Evaluation
 
-Harnesses live in `eval/streaming_sst/`; result summaries live in `docs/`.
+The paper's numbers come from the scripts in `eval/streaming_sst/evidence/`.
+Their outputs and run provenance are in `docs/`:
 
-| Harness | Purpose |
-|---------|---------|
-| `eval_auto_glossary.py` | adaptive glossary switch/latency/reference-volume eval |
-| `eval_auto_glossary_switch.py` | router-unit ACL/NLP ↔ medicine switch diagnostic |
-| `eval_mixed_domain_switch.py` | state-machine mixed-playlist switch benchmark |
-| `eval_mixed_audio_switch.py` | real E2E mixed-audio routing probe (JSON WS) |
-| `score_auto_glossary.py` | summarize adaptive glossary eval JSON as a table |
-| `sweep_term_memory.py` | term-memory scale sweep (retrieve p50/p95, refs/chunk) |
-| `score_terms.py` | terminology accuracy + regular/masked-term BLEU vs references |
-| `scripts/smoke_p0_protocol.py` | client-side protocol/concurrency smoke test |
+| Result | Scripts | Outputs |
+| --- | --- | --- |
+| Closed-loop ACL 60/60 and oncology stream: terminology accuracy, BLEU, paired tests | `paired_significance.py`, `term_free_quality.py`, `per_occurrence_terms.py`, `eval/streaming_sst/score_prompt_precision.py`, driven by `scripts/taurus_run3_score.sh` | [`docs/llm_router_20261120/run3/`](docs/llm_router_20261120/run3/) |
+| Comparison with large merged glossaries | same scripts, `scripts/taurus_run3_vs_run1_merged.sh` | `docs/llm_router_20261120/run3/vs_run1_merged_*.json`, [`docs/autoterm_1m_budget_search_20260711.md`](docs/autoterm_1m_budget_search_20260711.md) |
+| Ten-domain RealSI routing | `realsi_eval.py`, `routing_coverage.py`, `scripts/taurus_realsi_score.sh` | [`docs/realsi_20261120/`](docs/realsi_20261120/) |
+| Open-loop router replays: rapid switching, German and Japanese, close domains, live cadence | `llm_router_replay.py`, `llm_hmm_filter.py`, `llm_rapid_hmm.py`, `multilingual_router_replay.py`, `llm_fine_slices.py`, `fine_slice_replay.py`, `live_cadence_replay.py` | [`docs/llm_router_20261120/`](docs/llm_router_20261120/) |
+| Single-session processing speed | `latency_means.py`, `scripts/taurus_latency_routers.sh` | `docs/llm_router_20261120/latency/` |
 
-The demo paper's numbers come from the scripts in `eval/streaming_sst/evidence/`
-(paired significance, term-free BLEU, routing coverage and delay, open-loop
-router replays, single-session processing speed); their outputs and the run
-provenance are in [`docs/llm_router_20261120/`](docs/llm_router_20261120/),
-[`docs/realsi_20261120/`](docs/realsi_20261120/), and
-[`docs/evidence_20261024/`](docs/evidence_20261024/).
-
-Earlier reports: [`docs/adaptive_working_glossary_eval.md`](docs/adaptive_working_glossary_eval.md),
-[`docs/auto_glossary_mixed_switch_20260707.md`](docs/auto_glossary_mixed_switch_20260707.md),
-[`docs/open_term_memory_eval.md`](docs/open_term_memory_eval.md),
-[`docs/ai_glossary_sweep.md`](docs/ai_glossary_sweep.md).
+The test audio is not part of this repository. ACL 60/60 and RealSI are
+public; the oncology lectures come from the ESO test set.
 
 ---
 
-## Remote access (Cloudflare Tunnel)
+## Remote access
 
-Expose the local server for the public/live demo with **cloudflared** (no
-interstitial page, no concurrent-session limit, WebSockets proxied natively):
+`scripts/run_cloudflared_tunnel.sh` exposes a local server through a
+Cloudflare Tunnel, with WebSockets proxied natively:
 
 ```bash
-# quick tunnel (ephemeral https://<random>.trycloudflare.com URL in the log)
-setsid nohup bash scripts/run_cloudflared_tunnel.sh \
-  > logs/cloudflared_tunnel.out 2>&1 &
+# ephemeral https://<random>.trycloudflare.com URL in the log
+bash scripts/run_cloudflared_tunnel.sh
 
-# stable URL for the submission link (one-time setup, free account):
-#   cloudflared tunnel login
-#   cloudflared tunnel create rasst-demo
-#   cloudflared tunnel route dns rasst-demo <your-hostname>
-CF_TUNNEL_NAME=rasst-demo CF_HOSTNAME=<your-hostname> \
-  setsid nohup bash scripts/run_cloudflared_tunnel.sh \
-  > logs/cloudflared_tunnel.out 2>&1 &
+# stable hostname (after `cloudflared tunnel login` and `cloudflared tunnel create`)
+CF_TUNNEL_NAME=<tunnel> CF_HOSTNAME=<hostname> bash scripts/run_cloudflared_tunnel.sh
 ```
 
 If the model backend goes down while the tunnel is up, the web UI shows a
-fallback banner pointing visitors to the demo video and this repository
-instead of a raw connection error.
-
-`scripts/run_ngrok_tunnel.sh` remains as a legacy alternative; note the free
-ngrok tier shows a one-time "Visit Site" interstitial and allows only a single
-concurrent agent session per authtoken, so it is not suitable for the
-reviewer-facing live demo.
+banner that points visitors to the screencast and this repository.
 
 ---
 
 ## Requirements
 
-- **GPU (live mode only):** NVIDIA A6000-class. The 30B Qwen3-Omni checkpoint
-  needs ≥ 2 GPUs (tensor parallel); RAG uses an additional small allocation.
-  Mock mode needs no GPU.
-- **Python:** two environments are used in practice:
-  a vLLM env for the real RASST run (`vllm>=0.13`, `transformers>=4.57`,
-  `torch` cu12x, `qwen_omni_utils`, `fastapi`, `uvicorn`, `soundfile`, `numpy`)
-  and a lighter env for mock mode / the InfiniSST scheduler agent.
+- **GPU (paper configuration only):** two NVIDIA GPUs for the speech LLM with
+  tensor parallelism. The first GPU also holds the retriever and the 4B
+  router, about 11 GB in the paper's runs; set `GPU_UTIL` so both fit.
+- **Python:** a vLLM environment for the GPU configuration (`vllm>=0.13`,
+  `transformers`, `torch`, `qwen_omni_utils`, `fastapi`, `uvicorn`,
+  `soundfile`, `numpy`) and `requirements-mock.txt` for mock mode.
 - **Node:** Electron 28+ for the optional desktop client (`package.json`).
 
-> `serve/vllm_compat` must stay on `PYTHONPATH` for any vLLM run (it
-> neutralizes the duplicate `aimv2` Transformers-config registration in a
-> subprocess-safe way).
+`serve/vllm_compat` must stay on `PYTHONPATH` for any vLLM run; it avoids a
+duplicate Transformers config registration in vLLM worker processes.
 
-Internal cluster paths, staging locations, and lab-specific launchers are
-documented separately in
-[`docs/internal_operations.md`](docs/internal_operations.md).
+## Tests
 
----
+```bash
+.venv/bin/python -m pip install -r requirements-mock.txt pytest torch requests
+.venv/bin/python -m pytest tests
+```
 
 ## License
 
-The demo code is released under the [MIT License](LICENSE). Model weights
-(Qwen3-Omni) and Wikidata/Wikipedia-derived terminology resources retain their
-respective upstream licenses.
-
-## Citation
-
-```bibtex
-@article{luo2026autoterm,
-  title   = {{AutoTerm-SST}: Adaptive Terminology Memory with Zero Session-Time Setup for Streaming Speech Translation},
-  author  = {Luo, Jiaxuan and Ouyang, Siqi and Li, Lei},
-  journal = {arXiv preprint arXiv:2610.26865},
-  year    = {2026}
-}
-```
+The code is released under the [MIT License](LICENSE). Model weights and the
+Wikidata/Wikipedia-derived terminology resources keep their upstream licenses.

@@ -147,6 +147,11 @@ async def capture(args, agent):
             viewport={"width": args.width, "height": args.height},
             device_scale_factor=args.scale,
         )
+        if args.standalone:
+            # The installed phone app runs in standalone display mode.
+            cdp = await page.context.new_cdp_session(page)
+            await cdp.send("Emulation.setEmulatedMedia",
+                           {"features": [{"name": "display-mode", "value": "standalone"}]})
         await page.goto(f"http://127.0.0.1:{args.port}/", wait_until="networkidle")
         await page.click(".sample-btn-primary")
         await page.wait_for_function(
@@ -162,13 +167,16 @@ async def capture(args, agent):
         while agent.delivered < args.count and time.time() < deadline:
             await asyncio.sleep(1.0)
         await asyncio.sleep(2.0)
+        if args.extra_css:
+            await page.add_style_tag(content=args.extra_css)
+            await asyncio.sleep(0.5)
         chips_bottom = await page.evaluate(
             "() => { const lang = document.getElementById('languagePair');"
             " const card = lang.closest('.control-group') || lang;"
             " window.scrollTo(0, Math.max(0, card.getBoundingClientRect().top + window.scrollY - 16));"
             " return Math.round(document.getElementById('adaptiveStatus').getBoundingClientRect().bottom); }"
         )
-        await page.add_style_tag(content=STAGE_CSS % (chips_bottom + 10) + args.extra_css)
+        await page.add_style_tag(content=STAGE_CSS % (chips_bottom + 10))
         await page.evaluate(
             "() => document.querySelectorAll('.toast, .notification, .status-toast').forEach(e => e.remove())"
         )
@@ -203,6 +211,7 @@ def main():
     ap.add_argument("--height", type=int, default=820)
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--extra-css", default="")
+    ap.add_argument("--standalone", action="store_true", help="emulate the installed phone app")
     ap.add_argument("--posterior", type=Path, required=True, help="router_posterior_replay.py output")
     args = ap.parse_args()
 

@@ -149,6 +149,14 @@ retrieval (no torch/vLLM/GPU), so you can exercise the full
 `/init` → `/wss` → translate → `/delete_session` flow, the web UI, and the JSON
 evidence protocol.
 
+### Phone app
+
+Open the HTTPS demo page on your phone. In iOS Safari, tap **Share** and choose
+**Add to Home Screen**. In Android Chrome, open the browser menu and choose
+**Install app**. Installation and microphone access require HTTPS except on
+localhost. The installed app uses the same server for live translation and can
+open its interface offline after the first online visit.
+
 ### 2. Live GPU mode: RASST (Qwen3-Omni)
 
 The real RASST agent loads a ~30B Qwen3-Omni checkpoint with **in-process vLLM

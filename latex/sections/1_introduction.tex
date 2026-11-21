@@ -5,7 +5,7 @@ a speaker is still talking, serving technical talks, lectures, and live media.
 Speech large language models, or LLMs, now translate long-form audio directly
 \citep{xu2025qwen3omni,ouyang2025infinisst}, yet rare method and dataset
 names, clinical concepts, and named entities remain difficult to recover from
-acoustics alone. Glossary retrieval closes this gap by matching incoming speech
+acoustics alone. Glossary retrieval narrows this gap by matching incoming speech
 against source--target term pairs and placing the best matches in the LLM
 prompt before decoding.
 
@@ -46,8 +46,7 @@ only free parameter is the switch rate. On ten-domain RealSI streams it keeps
 the correct glossary searchable in 89.7\% of chunks, against 78.8\% for a
 similarity router with tuned confirmation rules.
 \item Evidence from a 4.7-hour stream alternating natural language processing,
-or NLP, and oncology talks that zero setup keeps translation quality:
-AutoTerm-SST is on par with a known-domain reference and beats a
+or NLP, and oncology talks: AutoTerm-SST is on par with a known-domain reference and beats a
 one-million-entry merged glossary by 3.3 points of terminology accuracy and
 2.31 BLEU.
 \end{itemize}

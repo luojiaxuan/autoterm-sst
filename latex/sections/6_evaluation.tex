@@ -13,15 +13,16 @@ domains.
   each, drawn at equal width. Each router's row marks per chunk whether the
   talk's slice ranks first in the working set, ranks lower, or is absent. The
   language-model router ranks a new talk's slice first within 21 seconds in nine
-  of the ten talks; the similarity router does so in three.}
+  of the ten talks; the similarity router ranks it first in three talks at all.}
   \label{fig:routing}
 \end{figure*}
 
 \subsection{Experimental setting}
 
 \paragraph{Data.}
-We build one continuous 4.7-hour English-to-Chinese stream by alternating five
-English ACL 60/60 dev talks with human-annotated
+Two English-to-Chinese benchmarks test translation quality and ten-domain
+routing. For quality, we build one continuous 4.7-hour stream by alternating
+five English ACL 60/60 dev talks with human-annotated
 terminology~\citep{salesky-etal-2023-evaluating}, the NLP part, and five
 long-form oncology lectures from the European School of Oncology, or ESO, test
 set~\citep{iranzosanchez2025eso}, the medicine part. Following
@@ -77,8 +78,8 @@ Similarity routing & 78.8 & 23.9 & 68.1 s & 19 \\
 \bottomrule
 \end{tabular}
 \caption{Routing on 30 RealSI talks: percentages of chunks whose correct slice
-is in the working set and ranks first, median delay until a talk's slice first
-ranks first, and talks where it never does.}
+is in the working set and ranks first, the median delay until it first ranks
+first among talks where it does, and talks where it never does.}
 \label{tab:realsi}
 \end{table}
 
@@ -138,11 +139,11 @@ points at $p\ge0.34$, with matching BLEU. Merged-100k matches AutoTerm-SST in
 TERM\_ACC but trails it by $1.38^{+0.53}_{-0.70}$ BLEU at $p=0.010$. Merged-1M
 trails by $3.3^{+1.5}_{-1.9}$ TERM\_ACC points at $p=0.031$ and by
 $2.31^{+0.63}_{-0.82}$ BLEU at $p=0.002$, and its TERM\_ACC loss concentrates
-on medicine: 7.4 points, against 1.2 on NLP. Merged-1M also fills the fixed
-prompt with irrelevant pairs, nine times as many per chunk as AutoTerm-SST at
-one tenth of its prompt precision, and on the 935 sentences whose references
-contain no glossary term, AutoTerm-SST still leads it by 1.85 BLEU at
-$p=0.047$.
+on medicine, a 7.4-point gap. Merged-1M also fills the fixed prompt with
+irrelevant pairs, nine times as many per chunk as AutoTerm-SST at one tenth of
+its prompt precision. The damage reaches sentences without terms: on the 935
+sentences whose references contain no glossary term, AutoTerm-SST leads it by
+1.85 BLEU at $p=0.047$.
 
 \paragraph{Routing across ten domains.}
 The language-model router follows topic changes that the confirmation rules
@@ -157,10 +158,10 @@ of chunks, so their accuracies match. Appendix~\ref{app:router} adds faster
 switches and 24 close-domain slices.
 
 \paragraph{Processing speed.}
-Retrieval and routing take a small share of the processing time:
-AutoTerm-SST processes audio in about a fifth of its duration, the same
-real-time factor as Known-domain-1k in Table~\ref{tab:speed}, and RASST measured its retriever
-alone at 0.042 seconds per chunk on the same GPUs. The first translation
+With routing, AutoTerm-SST still processes audio about 4.5 times faster than
+real time. Its real-time factor matches that of Known-domain-1k in
+Table~\ref{tab:speed}, and RASST measured its retriever alone at 0.042
+seconds per chunk on the same GPUs. The first translation
 appears 2.3 seconds after audio starts.
 
 \begin{table}[t]

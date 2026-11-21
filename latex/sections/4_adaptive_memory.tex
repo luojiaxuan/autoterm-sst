@@ -9,8 +9,8 @@ terms. Because each slice stores its own translations, the same source term can
 map to different targets in different slices.
 
 \paragraph{Offline catalog.}
-An operator registers a slice by adding one manifest entry with its label,
-term count, prototype, and index path. The router reads only the manifest and
+Adding a domain touches only the catalog manifest. An operator registers a
+slice with one entry holding its label, term count, prototype, and index path. The router reads only the manifest and
 prototypes, and the retriever skips every index outside the working set.
 
 \paragraph{Language-model routing.}
@@ -53,12 +53,12 @@ points as $\rho$ ranges from $10^{-5}$ to $10^{-1}$. Routing is causal, so a
 decision made at chunk $t$ affects only later chunks.
 
 \paragraph{Working-set update.}
-Every five seconds, the router scores every catalog slice, updates the
-posterior, and fills a working set of at most $K=4$ slices and $B=4{,}000$
-searchable terms in order of posterior probability; lower-ranked slices are
-excluded from retrieval. Holding up to four slices lets outgoing and incoming
-topics coexist during transitions until stale slices drop in rank.
-Appendix~\ref{app:config} lists all router settings.
+The working set holds the most probable slices and lets outgoing and incoming
+topics coexist during a transition. Every five seconds, the router scores every
+catalog slice, updates the posterior, and fills a working set of at most $K=4$
+slices and $B=4{,}000$ searchable terms in order of posterior probability.
+Lower-ranked slices are excluded from retrieval, and a stale slice leaves once
+it drops in rank. Appendix~\ref{app:config} lists all router settings.
 
 \paragraph{Fixed evidence budget.}
 All active slices share one retrieval and prompt budget. The retriever splits
@@ -68,8 +68,8 @@ when fewer candidates clear the 0.78 threshold. Gains of AutoTerm-SST therefore
 come from placing more relevant mappings inside the same budget.
 
 \paragraph{Non-blocking updates.}
-No chunk waits for routing. A background worker scores, in one batch, every
-session whose context has changed, each chunk retrieves from the working set
-current when its decoding begins, and an update takes effect at the first
-chunk that starts after it finishes. Indexes of likely slices are likewise
+A background worker keeps routing off the decoding path. It scores, in one
+batch, every session whose context has changed; each chunk retrieves from the
+working set current when its decoding begins, and an update takes effect at
+the first chunk that starts after it finishes. Indexes of likely slices are likewise
 preloaded in the background.

@@ -11,12 +11,12 @@ AutoTerm-SST keeps an existing streaming model and adds terminology management
 and an inspection layer around it.
 
 \paragraph{Terminology-aware translation.}
-Rare terms and named entities remain a weakness of speech translation
-\citep{gaido2021moby}. Terminology-aware methods apply user-provided
-dictionaries through constrained decoding or training-time exposure
-\citep{hokamp2017lexically,dinu2019training}, and so assume the relevant
-glossary is known before decoding. Retrieval-augmented generation offers a non-parametric
-alternative \citep{lewis2020retrieval,khandelwal2021nearest}, which RASST
+Terminology-aware methods take the relevant glossary as given before
+decoding. Rare terms and named entities remain a weakness of speech translation
+\citep{gaido2021moby}, and prior work applies user-provided dictionaries
+through constrained decoding or training-time exposure
+\citep{hokamp2017lexically,dinu2019training}. Retrieval-augmented generation
+offers a non-parametric alternative \citep{lewis2020retrieval,khandelwal2021nearest}, which RASST
 applies to streaming LLM decoding \citep{luo2026rasst}. AutoTerm-SST removes the
 pre-session glossary by selecting topic slices online, and like interactive
 translation tools \citep{dandekar2024translation} it makes these decisions

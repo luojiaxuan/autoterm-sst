@@ -21,3 +21,4 @@
 - TERM_ACC：`eval/streaming_sst/score_realsi_terms.py`，窗口与十讲流相同（子句开始前 2 秒到结束后 30 秒，一次输出只算一次）；参考给出的每种译法都算，括号注释可省。参考译文本身当输出时为 100%（439/439）。
 - BLEU：mWERSegmenter 按参考句字符级重切分后算 sacreBLEU（zh），同十讲流；参考译文本身当输出时为 100。
 - 配对检验：`eval/streaming_sst/evidence/realsi_eval.py`，以讲座为单位，三种顺序一起交换，精确置换 2^10，讲座 bootstrap 4,000 次。
+- 路由：`eval/streaming_sst/evidence/routing_coverage.py`，结果在 `results/routing_coverage.json`。工作集第一位是当前 slice；每段讲座从开头到第一个“当前 slice 正确”的块结束的音频时间是它的升顶延迟，没升上去的不计时，单独计数。三种顺序合并 30 段：语言模型路由 29 段升顶，延迟中位数 15.6 秒（没升顶的那段按无穷大算时中位数 16.1 秒），相似度路由 11 段升顶，中位数 68.1 秒；第一种顺序里语言模型路由 21 秒内升顶 9 段，相似度路由 1 段（升顶的共 3 段）。

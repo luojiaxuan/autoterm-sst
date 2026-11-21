@@ -25,6 +25,7 @@ done
 $PY eval/streaming_sst/score_realsi_terms.py --repo . --terms docs/realsi_20261120/realsi_terms.json "${RUNS[@]}" \
   --out "$IO/analysis/realsi_terms.json"
 $PY eval/streaming_sst/evidence/routing_coverage.py "${ROUTED[@]}" --slice-map "$SLICES" \
+  --group lm_hmm=lm_hmm_s1,lm_hmm_s2,lm_hmm_s3 --group cosine=cosine_s1,cosine_s2,cosine_s3 \
   --out "$IO/analysis/realsi_routing_coverage.json"
 $PY eval/streaming_sst/evidence/realsi_eval.py "${SYSTEMS[@]}" --term-hits "$IO/analysis/realsi_terms.json" \
   --realsi-json "$REALSI" --bleu-scorer "$JULY/code/score_merged_realistic_glossary.py" \

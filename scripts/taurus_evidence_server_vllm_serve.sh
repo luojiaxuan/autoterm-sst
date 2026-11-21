@@ -8,10 +8,10 @@ set -euo pipefail
 PORT="$1"
 VLLM_PORT="$2"
 MODE="${3:-routed}"
-ROOT=/mnt/data2/jiaxuanluo/autoterm_taurus_20261024
-IO_ROOT=/home/jiaxuanluo/autoterm_taurus_20261024_io
+ROOT=${ROOT:-/mnt/data2/jiaxuanluo/autoterm_taurus_20261024}
+IO_ROOT=${IO_ROOT:-/home/jiaxuanluo/autoterm_taurus_20261024_io}
 PYTHON_BIN=/home/jiaxuanluo/miniconda3/envs/spaCyEnv/bin/python
-MODEL=/mnt/data2/jiaxuanluo/RASST_release_runs/models/speech_llm_zh_cap16_denoise_budget_ttag_r32a32_ep1_taurus4_hf
+MODEL=${MODEL:-/mnt/data2/jiaxuanluo/RASST_release_runs/models/speech_llm_zh_cap16_denoise_budget_ttag_r32a32_ep1_taurus4_hf}
 
 export VLLM_USE_V1=1
 export VLLM_ENABLE_V1_MULTIPROCESSING=1

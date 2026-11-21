@@ -18,6 +18,9 @@ retrieved term pairs next to each partial translation.
 
 ## Try it
 
+- **Paper:** *AutoTerm-SST: Adaptive Terminology Memory with Zero Session-Time
+  Setup for Streaming Speech Translation*, arXiv preprint
+  [arXiv:2610.26865](https://arxiv.org/abs/2610.26865) ([PDF](https://arxiv.org/pdf/2610.26865)).
 - **Hosted entry page:** <https://luojiaxuan.github.io/autoterm-sst/>. It
   installs as a phone app on iOS and Android (see [Phone app](#phone-app)).
 - **Screencast:** [`docs/demo_screencast.mp4`](https://github.com/luojiaxuan/autoterm-sst/blob/main/docs/demo_screencast.mp4)
@@ -318,3 +321,14 @@ duplicate Transformers config registration in vLLM worker processes.
 
 The code is released under the [MIT License](LICENSE). Model weights and the
 Wikidata/Wikipedia-derived terminology resources keep their upstream licenses.
+
+## Citation
+
+```bibtex
+@article{luo2026autoterm,
+  title   = {{AutoTerm-SST}: Adaptive Terminology Memory with Zero Session-Time Setup for Streaming Speech Translation},
+  author  = {Luo, Jiaxuan and Ouyang, Siqi and Li, Lei},
+  journal = {arXiv preprint arXiv:2610.26865},
+  year    = {2026}
+}
+```

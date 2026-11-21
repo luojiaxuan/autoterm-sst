@@ -3,57 +3,55 @@
 \begin{table*}[t]
 \centering
 \footnotesize
-\setlength{\tabcolsep}{4pt}
+\setlength{\tabcolsep}{3pt}
 \begin{tabular}{lrrrrrrrrrrrr}
 \toprule
 & \multicolumn{4}{c}{TERM\_ACC} & \multicolumn{4}{c}{BLEU} & \multicolumn{4}{c}{MT-BLEU} \\
 \cmidrule(lr){2-5}\cmidrule(lr){6-9}\cmidrule(lr){10-13}
 Baseline & Diff. & Low & High & $p$ & Diff. & Low & High & $p$ & Diff. & Low & High & $p$ \\
 \midrule
-\multicolumn{13}{l}{\emph{Run 3, AutoTerm-SST minus each baseline}} \\
+\multicolumn{13}{l}{\emph{AutoTerm-SST minus each baseline}} \\
 Known-domain-1k & $+0.20$ & $-0.83$ & $+0.99$ & 0.82 & $-0.05$ & $-0.60$ & $+0.39$ & 0.85 & $-0.13$ & $-0.75$ & $+0.35$ & 0.61 \\
 Similarity routing & $+0.10$ & $-0.92$ & $+0.93$ & 0.94 & $-0.29$ & $-0.75$ & $+0.01$ & 0.14 & $-0.35$ & $-0.98$ & $-0.02$ & 0.13 \\
 Merged-2k & $-0.20$ & $-1.19$ & $+0.56$ & 0.83 & $-0.21$ & $-0.57$ & $+0.24$ & 0.36 & $-0.21$ & $-0.61$ & $+0.24$ & 0.46 \\
 Merged-10k & $-0.39$ & $-1.05$ & $+0.18$ & 0.34 & $-0.01$ & $-0.25$ & $+0.21$ & 0.96 & $-0.06$ & $-0.30$ & $+0.18$ & 0.63 \\
+Merged-100k$^*$ & $-0.10$ & $-1.27$ & $+0.82$ & 0.97 & $+1.38$ & $+0.68$ & $+1.91$ & 0.010 & $+1.35$ & $+0.64$ & $+1.75$ & 0.006 \\
+Merged-1M$^*$ & $+3.27$ & $+1.38$ & $+4.79$ & 0.031 & $+2.31$ & $+1.49$ & $+2.94$ & 0.002 & $+2.32$ & $+0.87$ & $+2.96$ & 0.002 \\
 \midrule
-\multicolumn{13}{l}{\emph{Run 1, similarity routing minus each baseline}} \\
-Known-domain-1k & $+0.24$ & $-0.95$ & $+1.49$ & 0.86 & $-0.10$ & $-0.50$ & $+0.38$ & 0.70 & $-0.11$ & $-0.57$ & $+0.39$ & 0.73 \\
-Merged-100k & $+0.54$ & $-0.60$ & $+1.84$ & 0.48 & $+1.37$ & $+0.86$ & $+1.80$ & 0.004 & $+1.36$ & $+0.65$ & $+1.81$ & 0.018 \\
-Merged-1M & $+3.91$ & $+2.03$ & $+5.76$ & 0.012 & $+2.30$ & $+1.71$ & $+2.95$ & 0.002 & $+2.33$ & $+1.10$ & $+3.06$ & 0.002 \\
+\multicolumn{13}{l}{\emph{Similarity routing minus each baseline, runs 1 and 2}} \\
+Known-domain-1k, run 1 & $+0.24$ & $-0.95$ & $+1.49$ & 0.86 & $-0.10$ & $-0.50$ & $+0.38$ & 0.70 & $-0.11$ & $-0.57$ & $+0.39$ & 0.73 \\
+Known-domain-1k, run 2 & $-0.68$ & $-1.48$ & 0.00 & 0.18 & $+0.36$ & $-0.24$ & $+1.26$ & 0.69 & $+0.42$ & $-0.24$ & $+1.42$ & 0.66 \\
+Merged-2k, run 2 & $-0.39$ & $-1.29$ & $+0.30$ & 0.49 & $-0.03$ & $-0.56$ & $+0.61$ & 0.94 & $-0.06$ & $-0.44$ & $+0.60$ & 0.79 \\
+Merged-10k, run 2 & $-0.83$ & $-1.58$ & $-0.25$ & 0.084 & $+0.18$ & $-0.18$ & $+0.64$ & 0.43 & $+0.17$ & $-0.16$ & $+0.69$ & 0.51 \\
 \midrule
-\multicolumn{13}{l}{\emph{Run 2, two A6000 GPUs, similarity routing minus each baseline}} \\
-Known-domain-1k & $-0.68$ & $-1.48$ & 0.00 & 0.18 & $+0.36$ & $-0.24$ & $+1.26$ & 0.69 & $+0.42$ & $-0.24$ & $+1.42$ & 0.66 \\
-Merged-2k & $-0.39$ & $-1.29$ & $+0.30$ & 0.49 & $-0.03$ & $-0.56$ & $+0.61$ & 0.94 & $-0.06$ & $-0.44$ & $+0.60$ & 0.79 \\
-Merged-10k & $-0.83$ & $-1.58$ & $-0.25$ & 0.084 & $+0.18$ & $-0.18$ & $+0.64$ & 0.43 & $+0.17$ & $-0.16$ & $+0.69$ & 0.51 \\
-\midrule
-\multicolumn{13}{l}{\emph{Run 1, the 935 sentences whose references contain no glossary term}} \\
-Known-domain-1k &  & & &  & $-0.11$ & $-0.76$ & $+0.35$ & 0.80 &  & & &  \\
-Merged-100k &  & & &  & $+1.69$ & $+1.08$ & $+2.16$ & 0.012 &  & & &  \\
-Merged-1M &  & & &  & $+2.19$ & $+0.66$ & $+3.46$ & 0.023 &  & & &  \\
+\multicolumn{13}{l}{\emph{AutoTerm-SST, the 935 sentences whose references contain no glossary term}} \\
+Known-domain-1k &  & & &  & $-0.42$ & $-0.97$ & $+0.07$ & 0.17 &  & & &  \\
+Merged-100k$^*$ &  & & &  & $+1.35$ & $+0.64$ & $+1.83$ & 0.023 &  & & &  \\
+Merged-1M$^*$ &  & & &  & $+1.85$ & $+0.52$ & $+3.01$ & 0.047 &  & & &  \\
 \bottomrule
 \end{tabular}
 \caption{Paired metric differences between the routed system and each
 baseline. Low and High give the 95\% stratified talk-bootstrap confidence
 bounds, and $p$ is the exact two-sided talk-level permutation $p$-value.
-TERM\_ACC differences are in percentage points.}
+TERM\_ACC differences are in percentage points; $^*$ marks baselines from run 1.}
 \label{tab:stats}
 \end{table*}
 
 \section{Statistical comparisons}
 \label{app:stats}
 
-Paired talk-level tests show that the gains of the routed system over
-Merged-1M hold across individual talks. Table~\ref{tab:stats} reports every
-paired comparison. The exact permutation test swaps the outputs of two systems
+Paired talk-level tests show that the gains of AutoTerm-SST over Merged-1M
+hold across individual talks. Table~\ref{tab:stats} reports every paired
+comparison. The exact permutation test swaps the outputs of two systems
 within each talk across all 1,024 combinations and recomputes the pooled
 metric, giving a minimum attainable two-sided $p$-value of 0.002. Significance
 claims rest on this test. With ten talks, the percentile bootstrap can disagree
 with it near the boundary: for Merged-10k in run 2 and for the MT-BLEU of
-similarity routing in run 3, the interval excludes zero while $p\ge0.08$.
-Confidence intervals come from 4,000 stratified bootstrap resamples of five
-ACL and five ESO talks. Removing any single talk preserves all three
-advantages of similarity routing over Merged-1M in run 1, with gains of at
-least 3.28 TERM\_ACC points, 2.00 BLEU, and 1.99 MT-BLEU.
+similarity routing, the interval excludes zero while $p\ge0.08$. Confidence
+intervals come from 4,000 stratified bootstrap resamples of five ACL and five
+ESO talks. Removing any single talk preserves all three advantages of
+AutoTerm-SST over Merged-1M, with gains of at least 2.57 TERM\_ACC points, 2.04
+BLEU, and 1.70 MT-BLEU.
 
 \section{Router configuration}
 \label{app:config}
@@ -73,6 +71,7 @@ Because both routers update on wall-clock time, each ran alone on its server.
 \begin{table}[!ht]
 \centering
 \small
+\setlength{\tabcolsep}{4pt}
 \begin{tabular}{lr}
 \toprule
 Setting & Value \\

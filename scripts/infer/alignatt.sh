@@ -11,8 +11,6 @@
 ##SBATCH --dependency=afterok:job_id
 #SBATCH --array=1-8
 ##SBATCH --account=siqiouya
-#SBATCH --mail-type=ALL
-#SBATCH --mail-user=siqiouya@andrew.cmu.edu
 #SBATCH -e slurm_logs/%A-%a.err
 #SBATCH -o slurm_logs/%A-%a.out
 

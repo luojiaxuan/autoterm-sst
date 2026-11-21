@@ -131,7 +131,7 @@ batch `generation_ok=0`，未产生有效结果 JSON。该失败 run 只作为�
 - Catalog report staging：
   `/mnt/data1/jiaxuanluo/rasst_autoterm_10domain/catalog_10domain_100k_deepcat_20260710/catalog_report.json`。
 - Canonical input data：Hugging Face `gavinlaw/rasst-main-result-data`, revision
-  `204ba141` for the compact medicine GT noted in `docs/internal_operations.md`。
+  `204ba141` for the compact medicine GT。
 
 关键 SHA-256 已写入 lightweight summary。raw streaming JSON、generated catalog、
 MaxSim indexes 与评分明细当前仍是 Taurus local staging，尚未上传 Hugging Face；

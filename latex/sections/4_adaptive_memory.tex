@@ -2,11 +2,11 @@
 \label{sec:adaptive-memory}
 
 Separating an offline catalog from a small working set lets AutoTerm-SST
-cover broad domains while keeping per-chunk search bounded. Each topic slice
-packages about 1,000 term--translation pairs, a prebuilt MaxSim index over the
-source terms, and a prototype: a short English topic description with example terms and
-its Chinese translation. Because each slice stores its own translations, the same source term can
-map to different targets in different slices.
+cover broad domains while keeping per-chunk search bounded. Each topic slice holds
+about 1,000 term--translation pairs, a prebuilt MaxSim index of source terms, and a
+prototype. The prototype gives a short English topic summary with example terms and
+its Chinese translation. Different topic slices can assign different target
+translations to the same source term.
 
 \paragraph{Offline catalog.}
 Adding a domain touches only the catalog manifest. An operator registers a
@@ -14,61 +14,58 @@ slice with one entry holding its label, term count, prototype, and index path. T
 prototypes, and the retriever skips every index outside the working set.
 
 \paragraph{Language-model routing.}
-The router asks a small instruction-tuned LLM which slice matches the talk at
-the current point. Because the speech LLM translates audio directly and
-produces no source transcript, routing reads target-language output, which
-becomes more topic-specific as context builds. At chunk $t$, the router
-concatenates the last $w=4$ translated chunks into a context $c_t$ and builds a
-multiple-choice prompt that lists the prototype of every slice under a letter.
-The prototype $P_d$ of slice $d$ is a one-line description followed by an
-English sentence naming the slice's core topics and representative terms. The
-score of slice $d$ is the probability that the router LLM $\pi$, the 4-billion-parameter Qwen3-4B-Instruct-2507~\citep{yang2025qwen3}, assigns to the letter of
-$d$ as the first answer token. Averaging over the catalog order $\sigma$ and its reverse $\bar\sigma$ places
-every slice at mirrored positions and offsets the preference for early or late
-positions:
+At each point, the router asks a small instruction-tuned LLM which slice
+matches the talk. The speech LLM translates audio directly without a source
+transcript, so routing reads target-language output, which becomes more
+topic-specific with context. At chunk $t$, the router concatenates the last
+$w=4$ translated chunks into context $c_t$ and lists each slice's prototype
+under a letter in a multiple-choice prompt. The prototype $P_d$ of slice $d$
+gives a one-line description, then an English sentence naming its core topics
+and representative terms. The 4-billion-parameter
+Qwen3-4B-Instruct-2507~\citep{yang2025qwen3} serves as router LLM $\pi$. It
+scores slice $d$ by the probability of its letter as the first answer token.
+Catalog order $\sigma$ and its reverse $\bar\sigma$ put each slice at
+mirrored positions. The mean offsets early or late position preferences and gives
 \begin{equation}
   o_t(d)=\tfrac12\bigl[\pi(\ell_\sigma(d)\mid c_t)
   +\pi(\ell_{\bar\sigma}(d)\mid c_t)\bigr],
 \end{equation}
 where $\ell_\sigma(d)$ is the letter of $d$ under order $\sigma$. Each update
-takes two forward passes and needs neither generation nor training.
+takes two forward passes and works without generating tokens or training the model.
 
 \paragraph{Topic filtering.}
-A sticky hidden Markov model accumulates these noisy scores into a stable
-posterior $b_t$ over the $N$ catalog slices. Between updates, the topic stays with
-probability $1-\rho$ and otherwise moves to one of the other $N-1$ slices
-uniformly, and each update treats $o_t$ as the observation likelihood:
+A sticky hidden Markov model combines noisy scores into a stable posterior $b_t$ over
+the $N$ catalog slices. Between updates, the topic stays in its slice with
+probability $1-\rho$ or moves uniformly to one of the other $N-1$ slices. With $o_t$
+as the observation likelihood, the posterior update is
 \begin{equation}
 \begin{aligned}
   b_t(d)\propto{}&\Bigl[(1-\rho)\,b_{t-1}(d)\\
   &+\tfrac{\rho}{N-1}\bigl(1-b_{t-1}(d)\bigr)\Bigr]\,o_t(d)^{\beta_t}.
 \end{aligned}
 \end{equation}
-Consecutive contexts can share chunks, so the exponent
-$\beta_t=\min(1,n_t/w)$, with $n_t$ the number of chunks translated since the
-previous update, weights each update by the share of its context that is new. The switch rate $\rho$ is
-the filter's only free parameter. We set $\rho=10^{-3}$, and
-Appendix~\ref{app:router} shows that top-four coverage moves by at most 0.5
-points as $\rho$ ranges from $10^{-5}$ to $10^{-1}$. Routing is causal, so a
-decision made at chunk $t$ affects only later chunks.
+To account for overlapping contexts, the exponent $\beta_t=\min(1,n_t/w)$ weights
+each update by its share of new context. Here $n_t$ counts the chunks translated
+since the previous update. The switch rate $\rho$ is
+the filter's only free parameter. We set $\rho=10^{-3}$. In the replays of Section~\ref{sec:evaluation}, top-four coverage varies by at
+most 0.5 points across the switch rates tested. Routing is causal: a decision at chunk $t$ affects only later chunks.
 
 \paragraph{Working-set update.}
-The working set holds the most probable slices and lets outgoing and incoming
-topics coexist during a transition. Every five seconds, the router scores every
-catalog slice, updates the posterior, and fills a working set of at most $K=4$
-slices and $B=4{,}000$ searchable terms in order of posterior probability.
-Lower-ranked slices are excluded from retrieval, and a stale slice leaves once
-it drops in rank. Appendix~\ref{app:config} lists all router settings.
+The working set holds the most probable slices so outgoing and incoming topics
+can coexist during transitions. Every five seconds, the router scores every
+catalog slice, updates the posterior, and fills the set by posterior rank up
+to $K=4$ slices and $B=4{,}000$ searchable terms. Retrieval skips lower-ranked
+slices, and stale slices leave as their rank falls. The complete router
+configuration appears in Appendix~\ref{app:config}.
 
 \paragraph{Fixed evidence budget.}
-All active slices share one retrieval and prompt budget. The retriever splits
-100 candidate slots equally among the active slices, removes exact duplicate
-pairs, reranks the rest globally, and admits at most ten into the prompt, fewer
-when fewer candidates clear the 0.78 threshold. Gains of AutoTerm-SST therefore
-come from placing more relevant mappings inside the same budget.
+Active slices share one retrieval and prompt budget. The retriever splits
+100 candidate slots equally among them, removes exact duplicates, reranks the
+rest globally, and prompts with up to ten pairs that clear 0.78. AutoTerm-SST
+thus gains by fitting more relevant mappings within the same fixed budget.
 
 \paragraph{Non-blocking updates.}
-A background worker keeps routing off the decoding path. In one batch, it scores every session whose context has changed. Each chunk
-retrieves from the working set that is current when its decoding begins, so an
-update takes effect at the first chunk that starts after the update finishes. Indexes of likely slices are likewise
-preloaded in the background.
+A background worker keeps routing off the decoding path. It scores changed session
+contexts in one batch. Each chunk retrieves from the working set at decode start.
+Finished updates apply from the next chunk. Likely slice indexes are preloaded in the
+background.

@@ -3,47 +3,47 @@
 
 AutoTerm-SST serves listeners of specialized live speech who cannot prepare a
 glossary for every session, such as conference attendees, students in
-technical courses, and clinicians following medical lectures. The demo starts
-like an ordinary streaming translator: the user selects a language pair and
-starts a microphone or file stream, with no glossary upload or domain
-selector.
+technical courses, and clinicians following medical lectures. Users start
+as they would with an ordinary streaming translator. They choose a language
+pair and start a microphone or file stream without uploading a glossary or
+selecting a domain.
 
 \paragraph{Walkthrough.}
-A session follows topic changes with no manual control. Partial translations
-appear immediately; once context accumulates, the status row at the top of the interface lists the active slices with their
-posterior probabilities, and the pairs
-retrieved for each output appear in the evidence panel. After a topic change, outgoing and
-incoming slices briefly coexist in the working set.
+Sessions follow topic changes without manual control. Partial translations
+appear immediately. As context builds, the top status row lists active topic
+slices and their posterior probabilities. The evidence panel shows the pairs
+retrieved for each output. After a topic change, outgoing and incoming topic slices
+briefly share the working set.
 
 \begin{figure*}[t]
   \centering
   \includegraphics[width=0.64\textwidth]{ui_evidence_panel.png}
-  \caption{The English-to-Chinese interface replaying the ACL-ESO stream during an oncology lecture, about 19 minutes into
-  the stream. The status row lists the four active slices with their posterior probabilities,
-  replayed on the recorded translations; retrieved terms are highlighted in the
-  translation, and the bottom panel lists the
-  latest retrieved pairs with scores and source slices.}
+  \caption{The English-to-Chinese interface replaying the ACL-ESO stream during
+  an oncology lecture, about 19 minutes in. The status row shows four active topic slices
+  and posterior probabilities from a replay of saved translations. Highlights mark
+  retrieved terms. The bottom panel lists the latest pairs, scores, and source
+  slices.}
   \label{fig:ui}
 \end{figure*}
 
 \paragraph{Visible terminology evidence.}
 Highlighting and an evidence panel make terminology behavior transparent. As
-Figure~\ref{fig:ui} shows, the
-interface highlights retrieved terms inside the translation and lists their
-source--target mappings; the status row lists the active slices with their posterior probabilities
-next to the active term count, and the evidence-panel header names the active slices and
-the retrieval latency. A viewer can thus see whether a mistranslated term was missed by retrieval,
-came from an irrelevant slice, or was retrieved but ignored by the decoder.
+Figure~\ref{fig:ui} shows, the interface highlights retrieved terms in the
+translation and lists their source--target mappings. The status row shows the active
+topic slices, their posterior probabilities, and the active term count. The
+evidence-panel header lists the active slices and retrieval latency. Viewers can tell
+whether retrieval missed a mistranslated term, drew it from an irrelevant slice, or
+supplied a term the decoder ignored.
 
 \paragraph{Extensibility.}
-Adding a topic takes one glossary file and no restart: registration validates
-the pairs, builds the index, and writes the manifest entry, and an LLM can
+Adding a topic requires one glossary file without a restart. Registration
+validates pairs, builds the index, and writes the manifest entry. An LLM can
 write the prototype from the glossary, as Appendix~\ref{app:router} evaluates.
-Running sessions keep their catalog snapshot.
+Sessions retain the catalog snapshot from the start of each session.
 
 \paragraph{Availability.}
-The MIT-licensed implementation, a one-command launcher, and a screencast are
-in the \href{https://github.com/luojiaxuan/autoterm-sst}{GitHub repository},
-and the hosted entry page is \url{https://luojiaxuan.github.io/autoterm-sst/}.
-The live demo serves Qwen3-Omni with vLLM continuous batching alongside the
-RASST retriever.
+The \href{https://github.com/luojiaxuan/autoterm-sst}{GitHub repository}
+hosts the MIT-licensed implementation, a one-command launcher, and a screencast.
+The hosted entry page is \url{https://luojiaxuan.github.io/autoterm-sst/}.
+The live demo runs the RASST retriever alongside Qwen3-Omni, which it
+serves with continuous batching in vLLM.

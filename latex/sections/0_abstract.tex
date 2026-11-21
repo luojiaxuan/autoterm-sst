@@ -1,21 +1,20 @@
 \begin{abstract}
 Retrieval-augmented speech translation improves rare terminology, yet systems
 such as Retrieval-Augmented Simultaneous Speech Translation, or RASST, expect
-the user to supply a glossary before every session. Merging every domain into
-one universal glossary removes this step, but retrieval and the prompt have
-fixed budgets, so irrelevant and conflicting entries crowd out useful terms as
-the catalog grows. We present AutoTerm-SST, an interactive streaming
-speech translation system that needs no glossary upload or domain selection.
-AutoTerm-SST partitions an offline terminology catalog into topic slices. A
-small language model scores each slice against recent partial translations, a
-sticky topic filter turns these scores into a posterior, and term retrieval
+a user glossary before each session. Merging all domains into one glossary
+removes this step, but fixed retrieval and prompt budgets let irrelevant and conflicting
+entries crowd out useful terms as the catalog grows. We present AutoTerm-SST,
+an interactive streaming speech translator without glossary upload or domain
+selection. It partitions an offline terminology catalog into topic slices.
+A small language model scores each slice against recent partial translations.
+A sticky topic filter forms a posterior from the scores, and retrieval
 searches only the most probable slices under an unchanged budget. On a
 4.7-hour English-to-Chinese stream alternating ACL talks with oncology
 lectures, AutoTerm-SST reaches 87.7\% terminology accuracy, on par with a
 reference told each talk's domain at 87.5\%, and it beats a
-one-million-entry merged glossary by 3.3 accuracy points and 2.31 BLEU. On
-ten-domain RealSI streams, the router keeps the correct topic slice searchable in
-89.7\% of audio chunks, against 78.8\% for an embedding-similarity router with tuned
-confirmation rules. The live interface shows the active slices and the
-retrieved term pairs beside every partial translation.
+one-million-entry merged glossary by 3.3 accuracy points and 2.31 BLEU. On ten-domain
+RealSI streams, the language-model router keeps the correct topic slice searchable in
+89.7\% of audio chunks, versus 78.8\% for an embedding-similarity router with tuned
+confirmation rules. The live interface shows active slices and retrieved term pairs with
+each partial translation.
 \end{abstract}

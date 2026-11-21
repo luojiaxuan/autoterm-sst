@@ -2,32 +2,28 @@
 
 Simultaneous speech translation, or SST, generates target-language text while
 a speaker is still talking, serving technical talks, lectures, and live media.
-Large language models, or LLMs, that take speech as input now translate
-long-form audio directly
-\citep{xu2025qwen3omni,ouyang2025infinisst}, yet rare method and dataset
-names, clinical concepts, and named entities remain difficult to recover from
-acoustics alone. Glossary retrieval narrows this gap by matching incoming speech
-against source--target term pairs and placing the best matches in the LLM
-prompt before decoding.
+Speech-capable large language models, or LLMs, now translate long-form audio directly
+\citep{xu2025qwen3omni,ouyang2025infinisst}. Rare method and dataset names, clinical
+concepts, and named entities remain hard to recover from acoustics alone. Glossary retrieval helps by matching speech to source--target term pairs
+and prompting the LLM with top matches before decoding.
 
-Existing retrieval-augmented SST systems require manual session setup or lose
-accuracy as terminology catalogs expand. Retrieval-Augmented Simultaneous
+Existing retrieval-augmented SST systems need manual session setup or lose
+accuracy as terminology catalogs grow. Retrieval-Augmented Simultaneous
 Speech Translation, or RASST \citep{luo2026rasst}, improves terminology on
-out-of-domain talks, but it fixes the glossary before translation begins.
-Listeners rarely know the exact domain of a live talk in advance, and finding,
-uploading, or selecting a glossary before every session adds friction. Merging
-all domains into one universal glossary avoids manual selection and works at
-small scale, yet retrieval keeps a fixed number of candidates and the prompt
-a fixed number of term pairs, so irrelevant and conflicting mappings crowd out
-relevant terms as the catalog grows. In our evaluation, expanding a merged
-glossary from 100,000 to one million entries lowers terminology accuracy from
-87.8\% to 84.4\%, as Table~\ref{tab:quality} shows.
+out-of-domain talks, but fixes the glossary before translation. Listeners
+rarely know a live talk's exact domain in advance. Finding, uploading, or
+selecting a glossary before every session adds friction. Merging all domains
+into one glossary avoids manual selection and works at small scale. With
+fixed counts of retrieval candidates and prompt term pairs, irrelevant and
+conflicting mappings crowd out relevant terms as the catalog grows. In our
+evaluation, increasing the size of a merged glossary from 100,000 to one million
+entries brings terminology accuracy down from 87.8\% to 84.4\%, as
+Table~\ref{tab:quality} shows.
 
-The translation stream itself supplies the evidence needed to choose a
-glossary. On RealSI streams~\citep{cheng2024clasi} that change domain every 3.4 to 5.2
-minutes, our router, a 4-billion-parameter LLM reading the last four
-translated chunks, ranks a new talk's glossary first after a median of 15.6
-seconds. A streaming translator can therefore infer the domain from its own
+The translation stream itself supplies the evidence to choose a glossary. The
+RealSI streams~\citep{cheng2024clasi} change domains every 3.4 to 5.2 minutes. Our
+4-billion-parameter language-model router reads the last four translated chunks and
+ranks a new talk's glossary first after a median of 15.6 seconds. A streaming translator can therefore infer the domain from its own
 output without asking the listener to declare it.
 
 We present AutoTerm-SST, a system demo that moves glossary selection from user
@@ -44,9 +40,9 @@ summary, our contributions are threefold:
 interface that displays the active slices and the retrieved term pairs beside
 every partial translation.
 \item Training-free language-model routing with a sticky topic filter whose
-only free parameter is the switch rate. On ten-domain RealSI streams it keeps
-the correct topic slice searchable in 89.7\% of chunks, against 78.8\% for an
-embedding-similarity router with tuned confirmation rules.
+only free parameter is the switch rate. The correct slice stays searchable
+in 89.7\% of chunks on ten-domain RealSI streams. Embedding-similarity
+routing with tuned confirmation rules reaches 78.8\%.
 \item Evidence from a 4.7-hour stream alternating natural language processing,
 or NLP, and oncology talks: AutoTerm-SST is on par with a known-domain reference and beats a
 one-million-entry merged glossary by 3.3 points of terminology accuracy and

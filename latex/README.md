@@ -13,9 +13,9 @@
 | 表 1：InfiniSST | RASST 的 no-RAG 五讲座结果，两个语料取平均 | 同上文档的 InfiniSST 行 |
 | 表 1 的 † 与附录统计表：run 3 内的配对 | run 3 | `run3/paired_significance.json`、`run3/term_free_quality.json` |
 | 表 1 的 † 与附录统计表：对 Merged-100k、Merged-1M 的配对 | run 3 的 AutoTerm-SST 对 run 1 的输出 | `run3/vs_run1_merged_paired_significance.json`、`run3/vs_run1_merged_term_free_quality.json`；脚本 `scripts/taurus_run3_vs_run1_merged.sh` |
-| 表 2 与图 3：RealSI 路由 | 2026-11-20，hyper01 两张 H200，三种顺序 | `docs/realsi_20261120/results/routing_coverage.json`；图由 `eval/streaming_sst/render_routing_states_svg.py` 生成 |
-| 表 3：处理速度 | 2026-11-20，Taurus 三张 A6000，单会话一场 ACL 讲座 | `docs/llm_router_20261120/latency/summary.json` 的 1 路一档 |
-| 附录路由诊断与回放表 | run 1 存下的译文，离线回放 | `docs/llm_router_20261120/README.md` 各节与同目录 JSON |
+| 表 3 与图 3：RealSI 路由 | 2026-11-20，hyper01 两张 H200，三种顺序 | `docs/realsi_20261120/results/routing_coverage.json`；图由 `eval/streaming_sst/render_routing_states_svg.py` 生成 |
+| 表 4：处理速度 | 2026-11-20，Taurus 三张 A6000，单会话一场 ACL 讲座 | `docs/llm_router_20261120/latency/summary.json` 的 1 路一档 |
+| 表 2（回放表）、第 6 节 topic filter 段与附录路由诊断 | run 1 存下的译文，离线回放 | `docs/llm_router_20261120/README.md` 各节与同目录 JSON |
 | 图 2：界面截图 | 回放 run 3 第 600 到 639 块的输出；状态行的后验由 `router_posterior_replay.py` 在 aries 一张 A6000 上按线上节奏在录下的译文上重放，前 660 块里首位 slice 与线上一致 87%，图中 40 块全部一致 | 实验仓库 `feat/status-row-top-slices`（[PR #2](https://github.com/luojiaxuan/autoterm-sst/pull/2)）的 `scripts/render_ui_replay.py`；后验在 `docs/llm_router_20261120/ui_posterior_replay.json` |
 
 ## 没进论文的

@@ -1,32 +1,32 @@
 \section{System overview}
 \label{sec:system}
 
-AutoTerm-SST adds an online terminology-selection loop around RASST without
-changing its models, as Figure~\ref{fig:architecture} shows. RASST translates
-audio in 1.92-second chunks with a speech encoder, a cross-modal term
-retriever, and the Qwen3-Omni LLM: the speech encoder turns chunk $t$ into features $h_t$,
-the retriever builds a term map $G_t$, and the LLM translates $h_t$ with $G_t$
-in its prompt. Because the model produces no source transcript, the retriever matches speech
-directly against glossary source terms by maximum similarity, or MaxSim,
-between pre-encoded term vectors and overlapping speech windows. Terms scoring
-above 0.78 become candidates, and at most ten source--target pairs enter $G_t$.
-AutoTerm-SST changes only which entries this lookup sees: its router restricts
-it to a working set of up to four topic slices, and each new translation joins
-the router's context for later chunks.
+Figure~\ref{fig:architecture} shows AutoTerm-SST's online terminology-selection
+loop around RASST, whose models stay unchanged. RASST translates 1.92-second
+audio chunks with a speech encoder, a cross-modal term retriever, and the
+Qwen3-Omni LLM. The encoder maps chunk $t$ to features $h_t$, the retriever
+builds a term map $G_t$, and the LLM translates $h_t$ with $G_t$ in its prompt.
+Without a source transcript from RASST, the retriever matches speech directly
+to glossary source terms by maximum similarity, or MaxSim, between overlapping
+speech windows and pre-encoded term vectors. Terms scoring above 0.78 become
+candidates. The retriever adds up to ten source--target pairs to $G_t$.
+AutoTerm-SST changes only the entries searched. Its router limits lookup to
+a working set of up to four topic slices and reads each new translation as
+context for later chunks.
 
 \begin{figure*}[t]
 \centering
 \includegraphics[width=0.86\textwidth]{autoterm_architecture.pdf}
 \caption{AutoTerm-SST during a live topic transition from NLP to medicine.
-The adaptive terminology memory, in orange, scores slices against the recent
-translations on the dashed arrow and activates up to four slices with at most 4,000 terms; the
-MaxSim retriever builds each chunk's term map $G_t$ only from this working set,
-and the LLM translates speech features $h_t$ with $G_t$. The ellipsis marks
-further offline slices.}
+The adaptive terminology memory, in orange, scores topic slices against recent translations on the
+dashed arrow. It activates up to four slices with at most 4,000 terms. The MaxSim
+retriever builds each chunk's term map $G_t$ from this working set alone. The LLM
+translates speech features $h_t$ with $G_t$. The ellipsis marks
+additional offline topic slices.}
 \label{fig:architecture}
 \end{figure*}
 
-Placing adaptation outside the translation model keeps the system pluggable:
-one streaming protocol serves a retrieval-free translator, a fixed-glossary
-RASST translator, or AutoTerm-SST, and every partial translation carries the
-retrieved pairs, their source slices, and the working set to the interface.
+Keeping adaptation outside the translation model makes the system pluggable.
+One streaming protocol supports a retrieval-free translator, fixed-glossary
+RASST, and AutoTerm-SST. Each partial translation sends the retrieved pairs,
+their source slices, and the working set to the interface.

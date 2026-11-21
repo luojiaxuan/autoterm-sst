@@ -1,24 +1,23 @@
 \section{Related work}
 
 \paragraph{Streaming speech translation.}
-Streaming SST balances quality against latency while decoding partial speech.
-Prefix-to-prefix policies make this trade-off explicit \citep{ma2019stacl},
+Streaming SST balances quality and latency when decoding partial speech.
+Prefix-to-prefix policies spell out this trade-off \citep{ma2019stacl},
 attention-based policies refine read and write decisions
 \citep{papi2023alignatt,papi2024streamatt}, and SimulEval standardizes
 evaluation \citep{ma2020simuleval}. Speech-language models broaden direct SST
 architectures \citep{seamless2023,zhang2024streamspeech,xu2025qwen3omni}.
-AutoTerm-SST keeps an existing streaming model and adds terminology management
-and an inspection layer around it.
+AutoTerm-SST adds terminology management and an inspection layer to an
+existing streaming model.
 
 \paragraph{Terminology-aware translation.}
-Terminology-aware methods take the relevant glossary as given before
-decoding. Rare terms and named entities remain a weakness of speech translation
-\citep{gaido2021moby}, and prior work applies user-provided dictionaries
-through constrained decoding or training-time exposure
-\citep{hokamp2017lexically,dinu2019training}. Retrieval-augmented generation
-offers a non-parametric alternative \citep{lewis2020retrieval,khandelwal2021nearest}, which RASST
-applies to streaming LLM decoding \citep{luo2026rasst}. AutoTerm-SST removes the
-pre-session glossary by selecting topic slices online, and like interactive
-translation tools \citep{dandekar2024translation} it makes these decisions
-visible, on top of a continuous-batching serving engine
-\citep{kwon2023efficient,zheng2024sglang}.
+Terminology-aware methods assume the relevant glossary is known before decoding. Speech
+translation struggles with rare terms and named entities \citep{gaido2021moby}.
+Prior work uses user dictionaries via constrained decoding or training-time
+exposure \citep{hokamp2017lexically,dinu2019training}. Retrieval-augmented
+generation offers a non-parametric alternative
+\citep{lewis2020retrieval,khandelwal2021nearest} that RASST applies to
+streaming LLM decoding \citep{luo2026rasst}. AutoTerm-SST selects topic slices
+online, removing pre-session glossary setup. Like interactive translation
+tools \citep{dandekar2024translation}, it shows its choices and uses a
+continuous-batching engine \citep{kwon2023efficient,zheng2024sglang}.

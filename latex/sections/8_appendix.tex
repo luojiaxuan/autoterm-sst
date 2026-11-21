@@ -24,60 +24,41 @@ Merged-100k &  & & &  & $+1.35$ & $+0.64$ & $+1.83$ & 0.023 &  & & &  \\
 Merged-1M &  & & &  & $+1.85$ & $+0.52$ & $+3.01$ & 0.047 &  & & &  \\
 \bottomrule
 \end{tabular}
-\caption{AutoTerm-SST minus each baseline on the ACL-ESO stream; positive
-values favor AutoTerm-SST. Low and High give the 95\% stratified talk-bootstrap confidence
-bounds, and $p$ is the exact two-sided talk-level permutation $p$-value.
+\caption{Paired differences on the ACL-ESO stream. We subtract each baseline score
+from AutoTerm-SST's score. Positive values favor AutoTerm-SST. Low and High are the
+95\% stratified talk-bootstrap confidence bounds. The $p$ column gives the exact
+two-sided talk-level permutation $p$-value.
 TERM\_ACC differences are in percentage points.}
 \label{tab:stats}
-\end{table*}
-
-\begin{table*}[t]
-\centering
-\small
-\begin{tabular}{lrrrrrrrrr}
-\toprule
-& & \multicolumn{5}{c}{Topic switch every} & \multicolumn{2}{c}{Target language} & \\
-\cmidrule(lr){3-7}\cmidrule(lr){8-9}
-Router & ACL-ESO stream & 15 s & 30 s & 60 s & 120 s & 300 s & German & Japanese & Close domains \\
-\midrule
-Similarity & 97.0 & 82.1 & 90.5 & 89.3 & 89.6 & 93.5 & 97.2 & 97.8 & 52.2 \\
-Language model & 99.0 & 100.0 & 98.2 & 97.9 & 97.4 & 99.3 & 97.9 & 99.0 & 82.7 \\
-\bottomrule
-\end{tabular}
-\caption{Open-loop replays of saved translations by the two deployed routers
-at the live update rate, with each update applied on time. Each cell is the
-percentage of chunks whose correct slice is in the four-slice
-working set; the close-domain column, with 24 slices, counts gold term
-occurrences whose slice is in it.}
-\label{tab:router-diag}
 \end{table*}
 
 \section{Statistical comparisons}
 \label{app:stats}
 
-Table~\ref{tab:stats} reports every paired comparison. The exact permutation test swaps the outputs of two systems
-within each talk across all 1,024 combinations and recomputes the pooled
-metric, giving a minimum attainable two-sided $p$-value of 0.002. Significance
+Table~\ref{tab:stats} reports all paired comparisons. The exact permutation test
+swaps outputs between the two systems within each talk and recomputes the pooled
+metric for all 1,024 combinations. The smallest attainable two-sided $p$-value is
+0.002. Significance
 claims rest on this test. With ten talks, the percentile bootstrap can disagree
 with it near the boundary: for the MT-BLEU difference from similarity
 routing, the interval excludes zero while $p=0.13$. Confidence
 intervals come from 4,000 stratified bootstrap resamples of five ACL and five
 ESO talks. Removing any single talk preserves all three advantages of
 AutoTerm-SST over Merged-1M, with gains of at least 2.57 TERM\_ACC points, 2.04
-BLEU, and 1.70 MT-BLEU.
+BLEU, and 1.70 MT-BLEU points.
 
 \section{Router configuration}
 \label{app:config}
 
 The language-model router adds a single parameter to the shared settings of
 Table~\ref{tab:config}, the switch rate $\rho$, against five for the
-similarity router. The similarity router embeds the last 128 tokens of $c_t$ and each prototype,
-extended with its Chinese translation, with BGE-M3~\citep{chen-etal-2024-m3}. It keeps a confirmed slice that changes only when another slice
-leads both the runner-up and the confirmed slice by fixed margins in three
-consecutive updates outside a 30-second cooldown, and it pins that slice in
-the working set. We selected these thresholds on four short
+similarity router. The similarity router uses BGE-M3~\citep{chen-etal-2024-m3} to
+embed the last 128 tokens of $c_t$ and each prototype with its Chinese translation. It
+pins the confirmed slice in the working set. A switch requires a candidate to lead
+both the runner-up and the confirmed slice by fixed margins for three consecutive
+updates outside a 30-second cooldown. We selected these thresholds on four short
 segments drawn from the evaluation talks before running the complete streams.
-Because both routers update on wall-clock time, each ran alone on its server.
+Because both routers update on wall-clock time, we ran each router alone on its own server.
 
 \begin{table}[!ht]
 \centering
@@ -109,61 +90,56 @@ Lead over confirmed slice & 0.10 \\
 Consecutive agreeing updates & 3 \\
 \bottomrule
 \end{tabular}
-\caption{Router and retrieval settings. Leads are differences of normalized
-similarity scores; a similarity-router switch needs both leads in every
-consecutive update.}
+\caption{Router and retrieval settings. Leads are differences between normalized
+similarity scores. The similarity router switches only when a candidate
+maintains both leads across the required consecutive updates.}
 \label{tab:config}
 \end{table}
 
 \section{Router diagnostics}
 \label{app:router}
 
-Open-loop replays feed saved translations of the ACL-ESO stream to both
-deployed routers, with the context of Section~\ref{sec:adaptive-memory}. As in the live system, scores refresh at
-most once every 5 seconds of audio, the similarity router applies its
-confirmation rule and pin, and the language-model router takes one filter step
-per refresh. On the live emission times, the replayed similarity router makes the same 19
-slice switches as it did live.
-
-\paragraph{Topic filter.}
-The filter turns noisy per-update scores into a stable ranking without
-thresholds. With an update at every chunk, letter probabilities alone keep the
-correct slice among the top four in 90.5\% of chunks, and the filtered
-posterior in 98.7\%. Coverage stays between 98.4\% and 98.9\% for $\rho$ from $10^{-5}$ to
-$10^{-1}$. Raw similarity covers 85.0\% under the same updates; at the live update rate,
-the confirmation rule and pin raise it to 97.0\%.
+Open-loop replays feed both deployed routers the same saved ACL-ESO stream
+translations, using the context defined in Section~\ref{sec:adaptive-memory}. As in
+the live system, scores refresh at most once every 5 seconds of audio. On each
+refresh, the similarity router applies its confirmation rule and pin, and the
+language-model router takes one filter step. The similarity router reproduces its 19
+live topic switches when replay uses the live emission times.
 
 \paragraph{Short topic shifts.}
 The posterior follows topics that alternate every 15 to 300 seconds. For each
 length in Table~\ref{tab:router-diag}, we cut the saved translations of the NLP
 and medicine talks into segments of that length and interleave them into one
-40-segment stream. At every length, at least half of the segments start with the incoming slice
-already in the language-model router's working set, and the slice tops the
-posterior after a median of 7.7 seconds. The similarity router's confirmation
-rule holds it back: in segments of one minute or longer it confirms the
-incoming slice after a median of 27 to 46 seconds.
+40-segment stream. At every segment length, at least half the segments start with the
+incoming topic slice in the language-model router's working set. The slice ranks
+first after a median of 7.7 seconds. With its confirmation rule, the similarity
+router takes a median of 27 to 46 seconds to confirm the incoming topic slice in
+segments of one minute or longer.
 
 \paragraph{Other target languages.}
-Routing coverage carries over to German and Japanese output: we replay RASST's translations of the same talks into each language, changing only the
-language named in the router prompt.
+Routing coverage carries over to German and Japanese. We replay RASST's translations
+of the same talks in each language. For each replay, we change only the language
+named in the router prompt.
 
 \paragraph{Close domains.}
-Finer slices separate the two routers further. The same 4B model splits the
-NLP and medicine catalogs into eight subtopics each: it proposes subtopics from
-400 terms outside the evaluation glossaries and assigns every term by letter probability, giving 24 slices with the eight
-other topics. Table~\ref{tab:router-diag} counts the 2,047 gold term occurrences whose slice
-is in the working set; the best four slices chosen per talk in hindsight
-reach 97.3\%.
+Finer slices separate the two routers further. The same 4B model splits the NLP and
+medicine catalogs into eight subtopics each. It proposes subtopics from 400 terms
+outside the evaluation glossaries and assigns each term by letter probability. The
+catalog also retains the eight other topics. Table~\ref{tab:router-diag}
+reports coverage over the 2,047 gold term occurrences by tracking their topic slices
+in the working set. In hindsight, choosing the best four slices separately for
+each talk yields coverage of 97.3\% of the gold term occurrences.
 
 \paragraph{Generated prototypes and late updates.}
-An LLM can write the prototypes. GPT-5.5 wrote one per slice from its
-glossary with every evaluation term removed, and with per-chunk updates the
-language-model router keeps the correct slice among its top four in 97.9\% of
-ACL-ESO chunks, against 98.7\% with hand-written prototypes. The RealSI
-streams use them, because the hand-written NLP prototype names topics of the
-RealSI talk mapped to NLP. The closed-loop runs of Section~\ref{sec:evaluation} scored each update before
-the next chunk; the deployed worker of Section~\ref{sec:adaptive-memory} can
-apply it one chunk late under faster-than-real-time input, which lowers the
-coverage of Table~\ref{tab:router-diag} by at most 0.33 points.
+An LLM can write the prototypes. GPT-5.5 wrote one prototype per topic slice from its
+glossary after removing every evaluation term. Replacing hand-written prototypes
+with generated ones lowers the language-model router's top-four coverage to 97.9\%
+with per-chunk updates on the ACL-ESO stream. The RealSI streams use
+generated prototypes because the hand-written NLP prototype names topics from the
+RealSI talk mapped to NLP. Closed-loop runs in Section~\ref{sec:evaluation} scored
+each update before the next chunk. When audio arrives faster than real time, the
+deployed worker in Section~\ref{sec:adaptive-memory} can apply an update one chunk
+late. That delay lowers coverage in Table~\ref{tab:router-diag} by at most 0.33
+points.
 
 

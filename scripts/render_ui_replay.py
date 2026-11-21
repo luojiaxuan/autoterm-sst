@@ -147,6 +147,11 @@ async def capture(args, agent):
             viewport={"width": args.width, "height": args.height},
             device_scale_factor=args.scale,
         )
+        if args.standalone:
+            # The installed phone app runs in standalone display mode.
+            cdp = await page.context.new_cdp_session(page)
+            await cdp.send("Emulation.setEmulatedMedia",
+                           {"features": [{"name": "display-mode", "value": "standalone"}]})
         await page.goto(f"http://127.0.0.1:{args.port}/", wait_until="networkidle")
         await page.click(".sample-btn-primary")
         await page.wait_for_function(
@@ -206,6 +211,7 @@ def main():
     ap.add_argument("--height", type=int, default=820)
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--extra-css", default="")
+    ap.add_argument("--standalone", action="store_true", help="emulate the installed phone app")
     ap.add_argument("--posterior", type=Path, required=True, help="router_posterior_replay.py output")
     args = ap.parse_args()
 

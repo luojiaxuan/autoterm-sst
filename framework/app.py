@@ -128,6 +128,18 @@ def create_app(router: AgentRouter) -> FastAPI:
             return FileResponse(index, headers={"Cache-Control": "no-cache"})
         raise HTTPException(status_code=404, detail="index.html not found")
 
+    @app.get("/manifest.webmanifest")
+    async def read_manifest():  # noqa: ANN202
+        return FileResponse(STATIC_DIR / "manifest.webmanifest", media_type="application/manifest+json")
+
+    @app.get("/sw.js")
+    async def read_service_worker():  # noqa: ANN202
+        return FileResponse(
+            STATIC_DIR / "sw.js",
+            media_type="text/javascript",
+            headers={"Service-Worker-Allowed": "/"},
+        )
+
     @app.get("/config")
     async def get_config():  # noqa: ANN202
         return router.config()

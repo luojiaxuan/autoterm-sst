@@ -147,7 +147,7 @@ RASST 论文的 De、Ja 运行（`release_profiles_taurusdata2_20260528T000922Z/
 | ESO 医学讲座音频 | HF dataset `gavinlaw/rasst-main-result-data`（公开，早先已发布）`main_result/audio/medicine/` | `96b44797d8926d14ef7535e831b861b6af05a28e` | 五个 wav 的 sha256 与 Taurus `/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/medicine` 一致 |
 | 德语、日语 slice 视图（公开） | 同一仓库 `gavinlaw/run-inputs-20261120` | `91ce34aeb3799880c54ff4e7fd455c9c33fffe26` | `build_language_slices.py`：复用英文端向量，目标取已有译法，没有就取 Wikidata 标签（`fetch_wikidata_labels.py`，2026-11-20 抓取）；每个 slice 的德语条数 368–1,000、日语 411–999，education 德语最少（368） |
 | 三语 LoRA adapter（公开） | HF model `gavinlaw/rasst-speech-llm-cap16-denoise-ttag-lora` | `a82e03699c697b52a69e5702094fb4a7a81aeb52` | `scripts/extract_lora_from_merged.py`；de 用精确 SVD，zh、ja 用随机化 SVD（与精确 SVD 在 256 个 de 模块上最大相对差 0.34%） |
-| run 3 闭环 | 输出 Taurus `/home/jiaxuanluo/autoterm_taurus_20261024_io/runs/r3_*.json`（含 ESO 讲座译文，私有配额已满，状态 `PENDING_HF_UPLOAD`），日志 `runs/r3_logs.tar.gz`；汇总 `run3/*.json` | 代码 `c33dfca` 起的 `scripts/radix_stream_eval/run.sh`，hyper01 两张 H200 | 每个输出的 sha256 在 `run3/results.json` |
+| run 3 闭环 | 输出 Taurus `/home/jiaxuanluo/autoterm_taurus_20261024_io/runs/r3_*.json`（含 ESO 讲座译文，私有配额已满，状态 `PENDING_HF_UPLOAD`），日志 `runs/r3_logs.tar.gz`；汇总 `run3/*.json` | 代码 `9b31ac1` 起的 `scripts/radix_stream_eval/run.sh`，hyper01 两张 H200 | 每个输出的 sha256 在 `run3/results.json` |
 | 私有输入副本（未完成） | HF dataset `gavinlaw/autoterm-sst-eval-inputs`（私有） | 只有 ACL 分段 | 私有配额已满（403，要求开自动充值），医学音频与 slice 没传上；闭环任务改用上面三个公开仓库 |
 
 ## 坑（在 Radix 节点上跑闭环）

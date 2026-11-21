@@ -129,7 +129,7 @@ per-request backend routes generation to an external `vllm serve` so the vLLM
 engine admits and continuously batches concurrent sessions itself:
 
 - `RASST_BACKEND_KIND=vllm_serve` → `VLLMServeBackend` (OpenAI chat,
-  `input_audio` base64; history carried as text). Commit `5a0f94d`.
+  `input_audio` base64; history carried as text). Commit `c72766b`.
 
 Verified end-to-end through the real framework + WebSocket protocol + demo
 model (`concurrency_term_memory.py`, ~real-time feed):

@@ -58,7 +58,7 @@ top-10 slices；随后 MaxSim 在每个激活 slice 内召回，并沿用现有�
 仍只向 LLM 注入全局 top-10 references。
 
 - 代码状态：GitHub 分支 `explore/multidomain-routing`，核心实现 commit
-  `40f71b6`。
+  `ebb25de`。
 - 默认兼容：`slice_selection_mode=hard_top1`；只有显式设置
   `budgeted_top_slices` 才改变线上行为。
 - Paper 评测固定使用严格的 `score_prompt_precision.py`：只有保存的 UI references
@@ -98,7 +98,7 @@ Hyper00 paused staging（2026-07-10）：
 /data02/jaxan/autoterm-capacity-zh-20260710/
 ```
 
-- Code：Git branch `explore/multidomain-routing` at `82d6394`。
+- Code：Git branch `explore/multidomain-routing` at `7179620`。
 - Integrity：RAG、四个 glossary 和四个 MaxSim index 的 SHA-256 均与上表一致；
   copied Conda runtime file count 与 Taurus source 同为 92,523。
 - Smoke：`outputs/smoke-10k` 已完成 60.0s / 28 emitted events，health 显示
@@ -159,7 +159,7 @@ Hyper00 paused staging（2026-07-10）：
   container `sglang-omni-jaxan-07101717`。四个 client 同时串流同一 playlist，分别固定
   `acl_tagged_gs10k/100k/500k/1m`。
 - Runtime code：`explore/multidomain-routing` at
-  `5a1df512cf7e4c3dcc42b0c017e1051380aff3da`。该 exploratory run 复用一个 server，
+  `04fda6be317c4b90a833679e666da171ddb173a4`。该 exploratory run 复用一个 server，
   四个 session 各自绑定独立 MaxSim index；它与上面的 frozen final protocol“每档重启
   server”不同，不能把两者混写成同一个 run。
 - Streaming：`chunk_samples=30,720`、`chunk_seconds=1.92`、

@@ -224,7 +224,7 @@ translation quality。
 
 ## Source of truth 与 artifact 状态
 
-- 代码分支：`explore/multidomain-routing`，核心 commits `fe313bd`、`5a8b5d8`。
+- 代码分支：`explore/multidomain-routing`，核心 commits `0271e68`、`5ee2ccc`。
 - Catalog/report：
   `/mnt/data1/jiaxuanluo/rasst_autoterm_10domain/catalog_4domain_10k_20260710/`
 - MaxSim indexes：

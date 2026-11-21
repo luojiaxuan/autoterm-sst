@@ -59,7 +59,7 @@ pin 的反事实(`eval/streaming_sst/evidence/pin_counterfactual.py` → `pin_co
 
 prototype 文本变体(w=4 前 4 覆盖):原版 85.0、只英文 85.4、只中文 81.0、只 description 83.3、独立改写 89.4、只写领域名 84.0。注意各变体同时改变了语言、条数与语义范围,这是联合敏感性,不是受控的措辞鲁棒性检验。
 
-从 glossary 自动生成 prototype(`scripts/term_memory/generate_router_prototypes.py` → `generated_prototypes.json`;replay 加 `--generated` → `router_replay_generated.json`,同一次运行里原有 24 项结果逐位复现)。现用文本是让 AI 写好后写死在代码里的,当时给 AI 的输入没有留记录:description 一行来自 a1e6033(2026-06-20 PT)的 slice 表;中英两句来自 fe313bd(2026-07-10 PT),同一 commit 还加了 RealSI 领域映射和 load balancing、database 等关键词,NLP 那句也写了 servers、databases、load balancing,所以不只是按领域名写的。这里把每个 1k slice 的术语(`英文 => 中文`,全部给,不抽样)交给 `gpt-5.5-2026-04-23`(带日期的固定快照),生成同结构的三行:description、列 7–10 个核心主题的英文句、它的中文翻译。生成前去掉评测集来源的条目(`acl_tagged_gt` 238 条、`medicine_hard_llm_judge_manual` 212 条),prototype 不接触测试术语;NLP 用剩下的 762 条、medicine 788 条,其余 8 个 slice 都是 Wikipedia/Wikidata 来源,用满 1,000 条。每个 slice 独立生成 10 次,衡量单次措辞的偶然性。
+从 glossary 自动生成 prototype(`scripts/term_memory/generate_router_prototypes.py` → `generated_prototypes.json`;replay 加 `--generated` → `router_replay_generated.json`,同一次运行里原有 24 项结果逐位复现)。现用文本是让 AI 写好后写死在代码里的,当时给 AI 的输入没有留记录:description 一行来自 a1e6033(2026-06-20 PT)的 slice 表;中英两句来自 0271e68(2026-07-10 PT),同一 commit 还加了 RealSI 领域映射和 load balancing、database 等关键词,NLP 那句也写了 servers、databases、load balancing,所以不只是按领域名写的。这里把每个 1k slice 的术语(`英文 => 中文`,全部给,不抽样)交给 `gpt-5.5-2026-04-23`(带日期的固定快照),生成同结构的三行:description、列 7–10 个核心主题的英文句、它的中文翻译。生成前去掉评测集来源的条目(`acl_tagged_gt` 238 条、`medicine_hard_llm_judge_manual` 212 条),prototype 不接触测试术语;NLP 用剩下的 762 条、medicine 788 条,其余 8 个 slice 都是 Wikipedia/Wikidata 来源,用满 1,000 条。每个 slice 独立生成 10 次,衡量单次措辞的偶然性。
 
 | 指标 | 现用文本 | 自动生成 10 次:中位数 | 范围 | 不低于现用 |
 |---|---|---|---|---|

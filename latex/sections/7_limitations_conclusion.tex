@@ -1,13 +1,14 @@
 \section{Conclusion}
 
-AutoTerm-SST routes its partial translations to offline topic slices, removing
-glossary upload and domain selection from terminology-aware streaming
-translation. It matches a known-domain reference, avoids losses from a
-million-entry merged glossary, and follows topic changes across ten domains.
-Routing to finer subtopics is a natural next step.
+AutoTerm-SST routes from partial translations to offline topic slices for
+terminology-aware streaming translation without glossary upload or domain
+selection. It matches a known-domain reference, avoids losses from a
+million-entry merged glossary, and tracks topic changes across ten domains.
+Scaling the router from tens of slices to thousands, with an embedding
+shortlist or a topic hierarchy ahead of the letter prompt, is a natural next step.
 
 \section*{Ethics statement}
-We evaluate on the published ACL 60/60, ESO test set, and RealSI corpora. We use
-RealSI under its CC BY 4.0 license without redistributing the audio. We used Claude,
-GPT, and Gemini for coding, data processing, editing, and other tasks. The authors
-reviewed all outputs and take full responsibility.
+We evaluate on the published ACL 60/60, ESO test set, and RealSI corpora,
+using RealSI under CC BY 4.0 without redistributing its audio. The authors used
+Claude, GPT, and Gemini for tasks including coding, data processing, and editing.
+They reviewed all outputs and take full responsibility.

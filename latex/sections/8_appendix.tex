@@ -35,30 +35,38 @@ TERM\_ACC differences are in percentage points.}
 \section{Statistical comparisons}
 \label{app:stats}
 
-Table~\ref{tab:stats} reports all paired comparisons. The exact permutation test
-swaps outputs between the two systems within each talk and recomputes the pooled
-metric for all 1,024 combinations. The smallest attainable two-sided $p$-value is
-0.002. Significance
-claims rest on this test. With ten talks, the percentile bootstrap can disagree
-with it near the boundary: for the MT-BLEU difference from similarity
-routing, the interval excludes zero while $p=0.13$. Confidence
-intervals come from 4,000 stratified bootstrap resamples of five ACL and five
-ESO talks. Removing any single talk preserves all three advantages of
-AutoTerm-SST over Merged-1M, with gains of at least 2.57 TERM\_ACC points, 2.04
-BLEU, and 1.70 MT-BLEU points.
+\paragraph{Translation metrics.}
+mWERSegmenter~\citep{matusov-etal-2005-evaluating} resegments the hypotheses
+to the StreamLAAL references~\citep{papi2024streamatt} before we compute
+corpus SacreBLEU~\citep{papineni-etal-2002-bleu,post-2018-call}.
+Masked-term BLEU, or MT-BLEU, repeats scoring with every evaluated target
+term masked in both hypothesis and reference.
+
+\paragraph{Paired tests.}
+Table~\ref{tab:stats} reports AutoTerm-SST minus each baseline. The exact
+permutation test swaps outputs between systems within each talk and recomputes
+the pooled metric for all 1,024 combinations. The smallest
+attainable two-sided $p$-value is 0.002. Significance claims rest on this test.
+With ten talks, the percentile bootstrap can disagree with it near the boundary.
+For MT-BLEU against similarity routing, the interval is below $0$ while $p=0.13$.
+Confidence intervals come from 4,000 talk-level bootstrap resamples
+stratified by corpus, with five ACL and five ESO talks. We write them as
+$a\pm h$ when symmetric and $a^{+u}_{-l}$ otherwise.
+When any single talk is removed, AutoTerm-SST still leads Merged-1M by at least
+2.57 TERM\_ACC, 2.04 BLEU, and 1.70 MT-BLEU points.
 
 \section{Router configuration}
 \label{app:config}
 
-The language-model router adds a single parameter to the shared settings of
-Table~\ref{tab:config}, the switch rate $\rho$, against five for the
-similarity router. The similarity router uses BGE-M3~\citep{chen-etal-2024-m3} to
-embed the last 128 tokens of $c_t$ and each prototype with its Chinese translation. It
-pins the confirmed slice in the working set. A switch requires a candidate to lead
-both the runner-up and the confirmed slice by fixed margins for three consecutive
-updates outside a 30-second cooldown. We selected these thresholds on four short
-segments drawn from the evaluation talks before running the complete streams.
-Because both routers update on wall-clock time, we ran each router alone on its own server.
+Beyond the shared settings in Table~\ref{tab:config}, the language-model router
+adds the switch rate $\rho$ and the similarity router adds five settings. The
+latter uses BGE-M3~\citep{chen-etal-2024-m3} to embed the last 128 tokens of $c_t$
+and each prototype with its Chinese translation. It pins the confirmed slice
+and switches after a candidate leads both the runner-up and the confirmed slice
+by fixed margins for three consecutive updates outside a 30-second cooldown.
+We tuned the thresholds on four short segments from the evaluation talks before
+running the complete streams. Each router ran on its own server because
+the updates use wall-clock time.
 
 \begin{table}[!ht]
 \centering
@@ -96,50 +104,107 @@ maintains both leads across the required consecutive updates.}
 \label{tab:config}
 \end{table}
 
+\section{Router prompt and prototypes}
+
+Table~\ref{tab:router-prototypes} lists the hand-written prototypes for the
+ACL-ESO runs, and the RealSI streams use the generated prototypes described in
+Appendix~\ref{app:router}.
+
+\begin{Verbatim}[fontsize=\small,fontfamily=\rmdefault,frame=single,breaklines=true,breaksymbolleft={}]
+A live speech translator is translating a talk from English into {language}. Below is its most recent {language} output, followed by terminology glossaries, one per topic. Which glossary best matches the topic of the talk at this point?
+
+Recent translation:
+{context}
+
+Glossaries:
+{options}
+
+Answer with the letter of the best glossary only.
+\end{Verbatim}
+
+\begin{table}[!t]
+\centering
+\small
+\begin{tabularx}{\columnwidth}{@{}l@{\quad}X@{}}
+\toprule
+Slice & English prototype \\
+\midrule
+art & Painting, sculpture, museums, architecture, and art-history terms. Art, painting, sculpture, museums, artists, portraits, tapestries, frescoes, galleries, and art history. \\
+education & School, teaching, curriculum, assessment, and learning terms. Education, schools, students, teachers, classrooms, curriculum, assessment, colleges, and universities. \\
+entertainment & Film, television, music, gaming, and media terms. Entertainment, films, television, music, video games, actors, directors, consoles, and popular media. \\
+environment & Climate, ecology, conservation, pollution, and disaster terms. Environment, climate, ecology, pollution, conservation, floods, storms, natural disasters, forests, and rivers. \\
+finance & Market, instrument, accounting, monetary, and trading terms. Finance, markets, banking, investment, accounting, business, brands, prices, customers, and the economy. \\
+legal & Law, court, contract, regulation, and liability terms. Law, courts, criminal cases, lawyers, contracts, legislation, legal rights, judgments, and appeals. \\
+medicine & Clinical, disease, drug, procedure, and biomedical terms. Healthcare, clinical medicine, patients, diagnosis, treatment, drugs, disease, and public health. \\
+nlp & NLP, speech, translation, ML, dataset, and benchmark terms. Natural language processing, speech translation, machine learning, software systems, servers, databases, and load balancing. \\
+science & Biology, chemistry, physics, experiments, and research terms. Science, biology, chemistry, physics, experiments, cells, organisms, species, molecules, and evolution. \\
+sports & Teams, tournaments, athletes, matches, and competition terms. Sports, football, basketball, teams, players, coaches, matches, leagues, tournaments, and championships. \\
+\bottomrule
+\end{tabularx}
+\caption{English prototypes for the ACL-ESO router.}
+\label{tab:router-prototypes}
+\end{table}
+
 \section{Router diagnostics}
 \label{app:router}
 
-Open-loop replays feed both deployed routers the same saved ACL-ESO stream
-translations, using the context defined in Section~\ref{sec:adaptive-memory}. As in
-the live system, scores refresh at most once every 5 seconds of audio. On each
-refresh, the similarity router applies its confirmation rule and pin, and the
-language-model router takes one filter step. The similarity router reproduces its 19
-live topic switches when replay uses the live emission times.
+Open-loop replays give both deployed routers the same saved ACL-ESO
+translations and use the context in Section~\ref{sec:adaptive-memory}.
+As in live runs, scores refresh at most once every 5 seconds of audio.
+Each refresh applies the similarity router's confirmation rule and pin,
+or one language-model filter step. The similarity router reproduces 19 topic
+switches from the live run when given the original emission times.
 
 \paragraph{Short topic shifts.}
-The posterior follows topics that alternate every 15 to 300 seconds. For each
-length in Table~\ref{tab:router-diag}, we cut the saved translations of the NLP
-and medicine talks into segments of that length and interleave them into one
-40-segment stream. At every segment length, at least half the segments start with the
-incoming topic slice in the language-model router's working set. The slice ranks
-first after a median of 7.7 seconds. With its confirmation rule, the similarity
-router takes a median of 27 to 46 seconds to confirm the incoming topic slice in
-segments of one minute or longer.
-
-\paragraph{Other target languages.}
-Routing coverage carries over to German and Japanese. We replay RASST's translations
-of the same talks in each language. For each replay, we change only the language
-named in the router prompt.
+The posterior follows topics alternating every 15 to 300 seconds. For each
+length in Table~\ref{tab:router-diag}, we interleave saved NLP and medicine
+translation segments into one 40-segment stream. At each length, at least
+half the segments start with the incoming slice in the language-model router's
+working set. The slice ranks first after a median of 7.7 seconds. On segments
+at least one minute long, similarity routing confirms the incoming slice
+after a median of 27 to 46 seconds.
 
 \paragraph{Close domains.}
-Finer slices separate the two routers further. The same 4B model splits the NLP and
-medicine catalogs into eight subtopics each. It proposes subtopics from 400 terms
-outside the evaluation glossaries and assigns each term by letter probability. The
-catalog also retains the eight other topics. Table~\ref{tab:router-diag}
-reports coverage over the 2,047 gold term occurrences by tracking their topic slices
-in the working set. In hindsight, choosing the best four slices separately for
-each talk yields coverage of 97.3\% of the gold term occurrences.
+Finer slices widen the routing gap. The same 4B model splits each of NLP
+and medicine into eight subtopics. It proposes subtopics from 400 terms
+outside the evaluation glossaries and assigns terms by letter probability.
+The other eight topics stay in the catalog. Table~\ref{tab:router-diag}
+tracks working-set coverage of the topic slices for 2,047 gold term
+occurrences. Selecting the best four slices per talk in hindsight gives
+97.3\% coverage of the gold term occurrences.
+
+\paragraph{Other target languages.}
+Routing coverage carries over to German and Japanese in replays of the same
+talks with RASST translations and only the prompt language changed.
 
 \paragraph{Generated prototypes and late updates.}
-An LLM can write the prototypes. GPT-5.5 wrote one prototype per topic slice from its
-glossary after removing every evaluation term. Replacing hand-written prototypes
-with generated ones lowers the language-model router's top-four coverage to 97.9\%
-with per-chunk updates on the ACL-ESO stream. The RealSI streams use
-generated prototypes because the hand-written NLP prototype names topics from the
-RealSI talk mapped to NLP. Closed-loop runs in Section~\ref{sec:evaluation} scored
-each update before the next chunk. When audio arrives faster than real time, the
-deployed worker in Section~\ref{sec:adaptive-memory} can apply an update one chunk
-late. That delay lowers coverage in Table~\ref{tab:router-diag} by at most 0.33
-points.
+GPT-5.5 wrote one prototype per slice from its glossary with evaluation
+terms removed. With per-chunk updates on ACL-ESO, the generated prototypes
+lower the language-model router's top-four coverage to 97.9\%. RealSI uses
+them because its NLP talk shares topics with the hand-written NLP prototype.
+Table~\ref{tab:realsi-orders} gives both routers' coverage and top-1 accuracy
+by stream order. Closed-loop runs in Section~\ref{sec:evaluation} scored
+updates before the next chunk. The deployed worker in
+Section~\ref{sec:adaptive-memory} can apply an update one chunk late when
+audio arrives faster than real time. For the replays in Table~\ref{tab:router-diag},
+the delay reduces coverage by up to 0.33 points.
 
-
+\begin{table}[!ht]
+\centering
+\small
+\begin{tabular}{lrrrr}
+\toprule
+& \multicolumn{2}{c}{Language model} & \multicolumn{2}{c}{Similarity} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Order & Coverage & Top-1 & Coverage & Top-1 \\
+\midrule
+1 & 91.2 & 69.4 & 78.6 & 21.3 \\
+2 & 88.6 & 63.2 & 79.2 & 26.9 \\
+3 & 89.3 & 68.4 & 78.5 & 23.6 \\
+\bottomrule
+\end{tabular}
+\caption{Routing by RealSI stream order. Coverage and top-1 accuracy report
+chunk percentages with the correct slice in the working set or ranked first,
+respectively.}
+\label{tab:realsi-orders}
+\end{table}

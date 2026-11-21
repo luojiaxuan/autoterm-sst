@@ -13,16 +13,22 @@ Sessions follow topic changes without manual control. Partial translations
 appear immediately. As context builds, the top status row lists active topic
 slices and their posterior probabilities. The evidence panel shows the pairs
 retrieved for each output. After a topic change, outgoing and incoming topic slices
-briefly share the working set.
+briefly share the working set. Figure~\ref{fig:ui} shows one session at two
+points. During the ACL talk, the NLP slice leads the posterior and the panel lists
+NLP pairs such as BERT model. During the oncology lecture, the medicine slice
+leads, and the translation renders high volume cancer centers with its retrieved
+target term.
 
 \begin{figure*}[t]
   \centering
-  \includegraphics[width=0.64\textwidth]{ui_evidence_panel.png}
-  \caption{The English-to-Chinese interface replaying the ACL-ESO stream during
-  an oncology lecture, about 19 minutes in. The status row shows four active topic slices
-  and posterior probabilities from a replay of saved translations. Highlights mark
-  retrieved terms. The bottom panel lists the latest pairs, scores, and source
-  slices.}
+  \includegraphics[height=0.33\textwidth]{ui_evidence_panel.png}\hfill
+  \includegraphics[height=0.33\textwidth]{ui_narrow_acl.png}
+  \caption{English-to-Chinese interface replay of one ACL-ESO session. The left
+  panel shows an oncology lecture 19 minutes into the session, with the medicine
+  slice leading the posterior. The right panel shows the same session on a narrow
+  screen during the first ACL talk, at 6 minutes, with the NLP slice leading the
+  posterior. Probabilities come from a replay of the recorded translations, and
+  highlights mark retrieved terms.}
   \label{fig:ui}
 \end{figure*}
 

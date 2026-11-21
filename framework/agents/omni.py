@@ -2284,7 +2284,15 @@ class OmniAgent(Agent):
                 switch_count=session.top_slice_changes,
                 last_reason="posterior argmax",
             )
-            return {**meta, "router": "language_model"}
+            top_slices = [
+                {
+                    "domain": item.domain,
+                    "preset": item.preset_id,
+                    "probability": round(float(session.router_posterior.get(item.domain, 0.0)), 4),
+                }
+                for item in session.active_retrieval_slices
+            ]
+            return {**meta, "router": "language_model", "top_slices": top_slices}
         return glossary_topic_meta(
             active_domain=session.active_domain,
             confidence=session.topic_confidence,

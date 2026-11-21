@@ -1,0 +1,242 @@
+{
+ "n_boot": 4000,
+ "seed": 20261024,
+ "talks": [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+  10
+ ],
+ "contrasts": {
+  "autoterm_taurus_vs_known_taurus:term_acc": {
+   "diff": -0.6839276990718162,
+   "stratified_talk_bootstrap_ci95": [
+    -1.4815043579713127,
+    0.0
+   ],
+   "talk_permutation_p": 0.181640625,
+   "per_domain_diff": {
+    "acl": -0.9502923976608173,
+    "medicine": -0.14727540500736325
+   },
+   "leave_one_talk_out_range": [
+    -0.9724473257698634,
+    -0.4880694143167119
+   ],
+   "sensitivity_occurrence_mcnemar": {
+    "a_only": 32,
+    "b_only": 46,
+    "p": 0.14053828626952242
+   },
+   "talk_permutation_p_holm": 1.0
+  },
+  "autoterm_taurus_vs_known_taurus:bleu": {
+   "diff": 0.3553934432966699,
+   "stratified_talk_bootstrap_ci95": [
+    -0.2385220480497418,
+    1.2564817175269696
+   ],
+   "talk_permutation_p": 0.69140625,
+   "per_domain_diff": {
+    "acl": -0.35027326136242465,
+    "medicine": 0.5429366324997531
+   },
+   "leave_one_talk_out_range": [
+    -0.08179810854933578,
+    0.5216668686402457
+   ],
+   "talk_permutation_p_holm": 1.0
+  },
+  "autoterm_taurus_vs_known_taurus:mt_bleu": {
+   "diff": 0.4190584247661775,
+   "stratified_talk_bootstrap_ci95": [
+    -0.2418777941727189,
+    1.420884220013891
+   ],
+   "talk_permutation_p": 0.662109375,
+   "per_domain_diff": {
+    "acl": -0.3264420035715432,
+    "medicine": 0.6072776615413744
+   },
+   "leave_one_talk_out_range": [
+    -0.0443173920708162,
+    0.6081313967486608
+   ],
+   "talk_permutation_p_holm": 1.0
+  },
+  "autoterm_taurus_vs_merged10k_taurus:term_acc": {
+   "diff": -0.8304836345871962,
+   "stratified_talk_bootstrap_ci95": [
+    -1.5762667965415602,
+    -0.25186389137800935
+   ],
+   "talk_permutation_p": 0.083984375,
+   "per_domain_diff": {
+    "acl": -1.1695906432748586,
+    "medicine": -0.14727540500736325
+   },
+   "leave_one_talk_out_range": [
+    -1.038251366120221,
+    -0.6321839080459597
+   ],
+   "sensitivity_occurrence_mcnemar": {
+    "a_only": 29,
+    "b_only": 46,
+    "p": 0.06394991646706692
+   },
+   "talk_permutation_p_holm": 1.0
+  },
+  "autoterm_taurus_vs_merged10k_taurus:bleu": {
+   "diff": 0.18395446821180883,
+   "stratified_talk_bootstrap_ci95": [
+    -0.18351361062070487,
+    0.6420273313028287
+   ],
+   "talk_permutation_p": 0.43359375,
+   "per_domain_diff": {
+    "acl": -0.4463264904962969,
+    "medicine": 0.2847549312143798
+   },
+   "leave_one_talk_out_range": [
+    0.04497446546216821,
+    0.3030153588332709
+   ],
+   "talk_permutation_p_holm": 1.0
+  },
+  "autoterm_taurus_vs_merged10k_taurus:mt_bleu": {
+   "diff": 0.16526112237664847,
+   "stratified_talk_bootstrap_ci95": [
+    -0.16418648245094863,
+    0.6849994435940004
+   ],
+   "talk_permutation_p": 0.513671875,
+   "per_domain_diff": {
+    "acl": -0.5731581723748818,
+    "medicine": 0.3159196741390815
+   },
+   "leave_one_talk_out_range": [
+    0.05315175709081643,
+    0.3236814881890808
+   ],
+   "talk_permutation_p_holm": 1.0
+  },
+  "autoterm_taurus_vs_merged2k_taurus:term_acc": {
+   "diff": -0.39081582804104187,
+   "stratified_talk_bootstrap_ci95": [
+    -1.2899262899262993,
+    0.3003293991666156
+   ],
+   "talk_permutation_p": 0.490234375,
+   "per_domain_diff": {
+    "acl": -0.9502923976608173,
+    "medicine": 0.7363770250368304
+   },
+   "leave_one_talk_out_range": [
+    -0.7563479200432255,
+    -0.21175224986765784
+   ],
+   "sensitivity_occurrence_mcnemar": {
+    "a_only": 34,
+    "b_only": 42,
+    "p": 0.42219110499231566
+   },
+   "talk_permutation_p_holm": 1.0
+  },
+  "autoterm_taurus_vs_merged2k_taurus:bleu": {
+   "diff": -0.030183198226382046,
+   "stratified_talk_bootstrap_ci95": [
+    -0.563779549374497,
+    0.6125769741681353
+   ],
+   "talk_permutation_p": 0.939453125,
+   "per_domain_diff": {
+    "acl": 0.0059512769018255085,
+    "medicine": -0.0026623883523129166
+   },
+   "leave_one_talk_out_range": [
+    -0.2265373515918654,
+    0.2277949423381287
+   ],
+   "talk_permutation_p_holm": 1.0
+  },
+  "autoterm_taurus_vs_merged2k_taurus:mt_bleu": {
+   "diff": -0.06115724891900243,
+   "stratified_talk_bootstrap_ci95": [
+    -0.44023968279300474,
+    0.6028138153092746
+   ],
+   "talk_permutation_p": 0.787109375,
+   "per_domain_diff": {
+    "acl": 0.06429271110701507,
+    "medicine": -0.031079186365388978
+   },
+   "leave_one_talk_out_range": [
+    -0.21445950554761595,
+    0.20180351326707324
+   ],
+   "talk_permutation_p_holm": 1.0
+  },
+  "merged2k_taurus_vs_merged10k_taurus:term_acc": {
+   "diff": -0.43966780654615434,
+   "stratified_talk_bootstrap_ci95": [
+    -1.3380047239569,
+    0.5250875145857634
+   ],
+   "talk_permutation_p": 0.46875,
+   "per_domain_diff": {
+    "acl": -0.21929824561404132,
+    "medicine": -0.8836524300441937
+   },
+   "leave_one_talk_out_range": [
+    -0.6507592190889397,
+    -0.10804970286331184
+   ],
+   "sensitivity_occurrence_mcnemar": {
+    "a_only": 32,
+    "b_only": 41,
+    "p": 0.34918183817058834
+   },
+   "talk_permutation_p_holm": 1.0
+  },
+  "merged2k_taurus_vs_merged10k_taurus:bleu": {
+   "diff": 0.21413766643819088,
+   "stratified_talk_bootstrap_ci95": [
+    -0.12442003512358024,
+    0.5111401125143694
+   ],
+   "talk_permutation_p": 0.341796875,
+   "per_domain_diff": {
+    "acl": -0.4522777673981224,
+    "medicine": 0.2874173195666927
+   },
+   "leave_one_talk_out_range": [
+    0.07522041649514222,
+    0.32178895557810705
+   ],
+   "talk_permutation_p_holm": 1.0
+  },
+  "merged2k_taurus_vs_merged10k_taurus:mt_bleu": {
+   "diff": 0.2264183712956509,
+   "stratified_talk_bootstrap_ci95": [
+    -0.06766158886278432,
+    0.4226732869314824
+   ],
+   "talk_permutation_p": 0.328125,
+   "per_domain_diff": {
+    "acl": -0.6374508834818968,
+    "medicine": 0.3469988605044705
+   },
+   "leave_one_talk_out_range": [
+    0.07669625073437203,
+    0.31644160420788126
+   ],
+   "talk_permutation_p_holm": 1.0
+  }
+ }
+}

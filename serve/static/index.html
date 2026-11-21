@@ -1393,7 +1393,7 @@
                 activeGlossaryPreset: topic.active_glossary_preset || topic.activeGlossaryPreset || adaptiveInfo.activeGlossaryPreset,
                 activeTerms: Number((extra && extra.active_terms) || adaptiveInfo.activeTerms || 0),
                 switchCount: Number(topic.switch_count != null ? topic.switch_count : adaptiveInfo.switchCount) || 0,
-                router: adaptiveInfo.router,
+                router: topic.router || adaptiveInfo.router,
                 updatedAt: Date.now()
             };
             if (!adaptiveInfo.activeTerms) {
@@ -1770,11 +1770,12 @@
         // Latest non-empty retrieval references rendered as the evidence panel.
         function updateEvidencePanel(meta) {
             if (!meta) return;
-            if (meta.topic) {
-                applyAdaptiveTopic(meta.topic, meta);
-            }
+            // The topic is applied last: it names the slice the working set leads with.
             if (meta.topic_router) {
                 applyTopicRouter(meta.topic_router, meta);
+            }
+            if (meta.topic) {
+                applyAdaptiveTopic(meta.topic, meta);
             }
             if (termMemoryStatus && meta.retrieve_s != null) {
                 const ms = (Number(meta.retrieve_s) * 1000).toFixed(1);

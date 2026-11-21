@@ -1,0 +1,355 @@
+{
+ "hardware": "Taurus, three RTX A6000 48GB in Slurm hold job 48285: vllm serve TP2 on two, retriever and router models on the third",
+ "client": "eval/streaming_sst/concurrency_full_pipeline.py, 180 s of real lecture audio per session, one 1.92 s chunk every 1.92 s, first 3 chunks excluded",
+ "code_revision": "239f398df098de7d40190d7d25748b18f0479970",
+ "configs": {
+  "lm": {
+   "name": "language-model router",
+   "levels": [
+    {
+     "sessions": 1,
+     "chunks_per_session": 93,
+     "coverage_min": 1.0,
+     "e2e_latency_s": {
+      "p50": 0.48230829334352165,
+      "p95": 0.9148739845142698,
+      "p99": 1.0466274272277951
+     },
+     "worst_session_p95_s": 0.9148739845142698,
+     "share_over_chunk_length": 0.0,
+     "first_text_after_audio_start_s": {
+      "median": 2.261016845004633,
+      "max": 2.261016845004633
+     },
+     "drain_after_last_chunk_s": {
+      "median": 0.44802772300317883,
+      "max": 0.44802772300317883
+     },
+     "retrieve_s": {
+      "p50": 0.0556065,
+      "p95": 0.18303899999999998
+     },
+     "generation_s": {
+      "p50": 0.3072275,
+      "p95": 0.6884529499999998
+     },
+     "events_with_selected_slices": 1.0,
+     "mean_selected_slices": 4.0,
+     "router_switches": 0,
+     "events_with_references": 0.7701149425287356,
+     "gpu_memory_mib_max": [
+      40958,
+      40958,
+      10394
+     ]
+    },
+    {
+     "sessions": 8,
+     "chunks_per_session": 93,
+     "coverage_min": 1.0,
+     "e2e_latency_s": {
+      "p50": 0.6658643080154434,
+      "p95": 1.2945933918701484,
+      "p99": 1.5915964022674596
+     },
+     "worst_session_p95_s": 1.4404677760205231,
+     "share_over_chunk_length": 0.005555555555555556,
+     "first_text_after_audio_start_s": {
+      "median": 2.255731857032515,
+      "max": 2.4481345729436725
+     },
+     "drain_after_last_chunk_s": {
+      "median": 0.7042218500282615,
+      "max": 0.9287467941176146
+     },
+     "retrieve_s": {
+      "p50": 0.09096,
+      "p95": 0.3062926499999998
+     },
+     "generation_s": {
+      "p50": 0.3421375,
+      "p95": 0.83394535
+     },
+     "events_with_selected_slices": 0.9985228951255539,
+     "mean_selected_slices": 3.9940915805022157,
+     "router_switches": 8,
+     "events_with_references": 0.654357459379616,
+     "gpu_memory_mib_max": [
+      41004,
+      41004,
+      11012
+     ]
+    },
+    {
+     "sessions": 16,
+     "chunks_per_session": 93,
+     "coverage_min": 1.0,
+     "e2e_latency_s": {
+      "p50": 3.381824804469943,
+      "p95": 5.4772708687116385,
+      "p99": 6.158307112662584
+     },
+     "worst_session_p95_s": 6.4810860476107335,
+     "share_over_chunk_length": 0.8027777777777778,
+     "first_text_after_audio_start_s": {
+      "median": 2.364555120584555,
+      "max": 2.545254274038598
+     },
+     "drain_after_last_chunk_s": {
+      "median": 2.881715337978676,
+      "max": 3.875773788196966
+     },
+     "retrieve_s": {
+      "p50": 1.107357,
+      "p95": 1.290037
+     },
+     "generation_s": {
+      "p50": 0.772229,
+      "p95": 1.9589173999999996
+     },
+     "events_with_selected_slices": 0.997822931785196,
+     "mean_selected_slices": 3.991291727140784,
+     "router_switches": 19,
+     "events_with_references": 0.7365747460087083,
+     "gpu_memory_mib_max": [
+      42768,
+      42768,
+      13636
+     ]
+    }
+   ]
+  },
+  "routed": {
+   "name": "similarity router",
+   "levels": [
+    {
+     "sessions": 1,
+     "chunks_per_session": 93,
+     "coverage_min": 1.0,
+     "e2e_latency_s": {
+      "p50": 0.4786890334216878,
+      "p95": 0.9194130810443311,
+      "p99": 1.3443738679983652
+     },
+     "worst_session_p95_s": 0.9194130810443311,
+     "share_over_chunk_length": 0.0,
+     "first_text_after_audio_start_s": {
+      "median": 2.2911849468946457,
+      "max": 2.2911849468946457
+     },
+     "drain_after_last_chunk_s": {
+      "median": 0.38878692709840834,
+      "max": 0.38878692709840834
+     },
+     "retrieve_s": {
+      "p50": 0.06636900000000001,
+      "p95": 0.08456564999999999
+     },
+     "generation_s": {
+      "p50": 0.31194350000000004,
+      "p95": 0.7538438499999999
+     },
+     "events_with_selected_slices": 1.0,
+     "mean_selected_slices": 4.0,
+     "router_switches": 0,
+     "events_with_references": 0.7931034482758621,
+     "gpu_memory_mib_max": [
+      40846,
+      40846,
+      5008
+     ]
+    },
+    {
+     "sessions": 8,
+     "chunks_per_session": 93,
+     "coverage_min": 1.0,
+     "e2e_latency_s": {
+      "p50": 0.5803027474321425,
+      "p95": 1.152981589292176,
+      "p99": 1.538136100622358
+     },
+     "worst_session_p95_s": 1.4042712423135522,
+     "share_over_chunk_length": 0.004166666666666667,
+     "first_text_after_audio_start_s": {
+      "median": 2.3080154539784417,
+      "max": 2.450216267025098
+     },
+     "drain_after_last_chunk_s": {
+      "median": 0.5804698505671695,
+      "max": 1.1507326329592615
+     },
+     "retrieve_s": {
+      "p50": 0.06471750000000001,
+      "p95": 0.096287
+     },
+     "generation_s": {
+      "p50": 0.3503595,
+      "p95": 0.8358860499999998
+     },
+     "events_with_selected_slices": 1.0,
+     "mean_selected_slices": 3.995581737849779,
+     "router_switches": 3,
+     "events_with_references": 0.6480117820324006,
+     "gpu_memory_mib_max": [
+      40890,
+      40890,
+      5022
+     ]
+    },
+    {
+     "sessions": 16,
+     "chunks_per_session": 93,
+     "coverage_min": 1.0,
+     "e2e_latency_s": {
+      "p50": 0.8147565994877368,
+      "p95": 1.463338651158846,
+      "p99": 1.859988704693969
+     },
+     "worst_session_p95_s": 1.9016863103141075,
+     "share_over_chunk_length": 0.006944444444444444,
+     "first_text_after_audio_start_s": {
+      "median": 2.3253257444594055,
+      "max": 2.8298914642073214
+     },
+     "drain_after_last_chunk_s": {
+      "median": 0.5412212420487776,
+      "max": 1.2079529829788953
+     },
+     "retrieve_s": {
+      "p50": 0.086331,
+      "p95": 0.1208443999999999
+     },
+     "generation_s": {
+      "p50": 0.4176515,
+      "p95": 0.9635797999999999
+     },
+     "events_with_selected_slices": 1.0,
+     "mean_selected_slices": 3.9933530280649925,
+     "router_switches": 8,
+     "events_with_references": 0.6358936484490398,
+     "gpu_memory_mib_max": [
+      41046,
+      41046,
+      5046
+     ]
+    }
+   ]
+  },
+  "fixed": {
+   "name": "Known-domain-1k fixed slice",
+   "levels": [
+    {
+     "sessions": 1,
+     "chunks_per_session": 93,
+     "coverage_min": 1.0,
+     "e2e_latency_s": {
+      "p50": 0.48777744139079005,
+      "p95": 0.8221915559843183,
+      "p99": 1.0565418186062012
+     },
+     "worst_session_p95_s": 0.8221915559843183,
+     "share_over_chunk_length": 0.0,
+     "first_text_after_audio_start_s": {
+      "median": 2.259952984051779,
+      "max": 2.259952984051779
+     },
+     "drain_after_last_chunk_s": {
+      "median": 0.3138301109429449,
+      "max": 0.3138301109429449
+     },
+     "retrieve_s": {
+      "p50": 0.060522,
+      "p95": 0.07533454999999999
+     },
+     "generation_s": {
+      "p50": 0.3277675,
+      "p95": 0.66318925
+     },
+     "events_with_selected_slices": 0.0,
+     "mean_selected_slices": 0.0,
+     "router_switches": 0,
+     "events_with_references": 0.7415730337078652,
+     "gpu_memory_mib_max": [
+      40846,
+      40846,
+      2698
+     ]
+    },
+    {
+     "sessions": 8,
+     "chunks_per_session": 93,
+     "coverage_min": 1.0,
+     "e2e_latency_s": {
+      "p50": 0.5444241143995896,
+      "p95": 1.0667839579982676,
+      "p99": 1.4316167734819436
+     },
+     "worst_session_p95_s": 1.2814425662509166,
+     "share_over_chunk_length": 0.002777777777777778,
+     "first_text_after_audio_start_s": {
+      "median": 2.2921168899629265,
+      "max": 2.432982554892078
+     },
+     "drain_after_last_chunk_s": {
+      "median": 0.34283803356811404,
+      "max": 0.8333556400611997
+     },
+     "retrieve_s": {
+      "p50": 0.0613145,
+      "p95": 0.07547859999999999
+     },
+     "generation_s": {
+      "p50": 0.3164205,
+      "p95": 0.7895621499999996
+     },
+     "events_with_selected_slices": 0.0,
+     "mean_selected_slices": 0.0,
+     "router_switches": 0,
+     "events_with_references": 0.5575221238938053,
+     "gpu_memory_mib_max": [
+      40890,
+      40890,
+      2712
+     ]
+    },
+    {
+     "sessions": 16,
+     "chunks_per_session": 93,
+     "coverage_min": 1.0,
+     "e2e_latency_s": {
+      "p50": 0.7341123903170228,
+      "p95": 1.3882551660644822,
+      "p99": 1.743334953470621
+     },
+     "worst_session_p95_s": 1.9559147500433023,
+     "share_over_chunk_length": 0.006944444444444444,
+     "first_text_after_audio_start_s": {
+      "median": 2.318897945457138,
+      "max": 2.5439443639479578
+     },
+     "drain_after_last_chunk_s": {
+      "median": 0.5101742905098945,
+      "max": 0.8637944511137903
+     },
+     "retrieve_s": {
+      "p50": 0.066021,
+      "p95": 0.08367799999999997
+     },
+     "generation_s": {
+      "p50": 0.3984115,
+      "p95": 0.9294620999999998
+     },
+     "events_with_selected_slices": 0.0,
+     "mean_selected_slices": 0.0,
+     "router_switches": 0,
+     "events_with_references": 0.5320895522388059,
+     "gpu_memory_mib_max": [
+      41222,
+      41222,
+      2720
+     ]
+    }
+   ]
+  }
+ }
+}

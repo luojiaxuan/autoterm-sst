@@ -1,0 +1,643 @@
+{
+ "catalog": "/mnt/data1/jiaxuanluo/rasst_autoterm_10domain/catalog_10domain_100k_deepcat_20260710",
+ "items": 89218,
+ "fit_items": 88768,
+ "excluded_sources": [
+  "acl_tagged_gt",
+  "medicine_hard_llm_judge_manual"
+ ],
+ "occurrences": 2047,
+ "budgets": [
+  2000,
+  5000,
+  10000,
+  20000,
+  40000
+ ],
+ "partitions": {
+  "taxonomy_prototype": {
+   "slices": 10,
+   "size_min": 10000,
+   "size_median": 10000.0,
+   "size_max": 10000,
+   "slices_for_90pct": {
+    "nlp": {
+     "slices": 1,
+     "terms": 10000
+    },
+    "medicine": {
+     "slices": 1,
+     "terms": 10000
+    }
+   },
+   "B=2000": {
+    "cover": 0.0,
+    "cover_nlp": 0.0,
+    "cover_medicine": 0.0,
+    "oracle_cover": 0.0,
+    "mean_active_slices": 0.0
+   },
+   "B=5000": {
+    "cover": 0.0,
+    "cover_nlp": 0.0,
+    "cover_medicine": 0.0,
+    "oracle_cover": 0.0,
+    "mean_active_slices": 0.0
+   },
+   "B=10000": {
+    "cover": 0.7826,
+    "cover_nlp": 0.7844,
+    "cover_medicine": 0.7791,
+    "oracle_cover": 1.0,
+    "mean_active_slices": 1.0
+   },
+   "B=20000": {
+    "cover": 0.8686,
+    "cover_nlp": 0.867,
+    "cover_medicine": 0.8719,
+    "oracle_cover": 1.0,
+    "mean_active_slices": 2.0
+   },
+   "B=40000": {
+    "cover": 0.9248,
+    "cover_nlp": 0.9342,
+    "cover_medicine": 0.9057,
+    "oracle_cover": 1.0,
+    "mean_active_slices": 4.0
+   },
+   "catalog_ceiling": 1.0
+  },
+  "taxonomy_centroid": {
+   "slices": 10,
+   "size_min": 10000,
+   "size_median": 10000.0,
+   "size_max": 10000,
+   "slices_for_90pct": {
+    "nlp": {
+     "slices": 1,
+     "terms": 10000
+    },
+    "medicine": {
+     "slices": 1,
+     "terms": 10000
+    }
+   },
+   "B=2000": {
+    "cover": 0.0,
+    "cover_nlp": 0.0,
+    "cover_medicine": 0.0,
+    "oracle_cover": 0.0,
+    "mean_active_slices": 0.0
+   },
+   "B=5000": {
+    "cover": 0.0,
+    "cover_nlp": 0.0,
+    "cover_medicine": 0.0,
+    "oracle_cover": 0.0,
+    "mean_active_slices": 0.0
+   },
+   "B=10000": {
+    "cover": 0.7894,
+    "cover_nlp": 0.7171,
+    "cover_medicine": 0.9352,
+    "oracle_cover": 1.0,
+    "mean_active_slices": 1.0
+   },
+   "B=20000": {
+    "cover": 0.9106,
+    "cover_nlp": 0.8896,
+    "cover_medicine": 0.9529,
+    "oracle_cover": 1.0,
+    "mean_active_slices": 2.0
+   },
+   "B=40000": {
+    "cover": 0.9673,
+    "cover_nlp": 0.9671,
+    "cover_medicine": 0.9676,
+    "oracle_cover": 1.0,
+    "mean_active_slices": 4.0
+   },
+   "catalog_ceiling": 1.0
+  },
+  "kmeans_10": {
+   "slices": 10,
+   "size_min": 3415,
+   "size_median": 8343.5,
+   "size_max": 16345,
+   "slices_for_90pct": {
+    "nlp": {
+     "slices": 2,
+     "terms": 24730
+    },
+    "medicine": {
+     "slices": 4,
+     "terms": 37150
+    }
+   },
+   "B=2000": {
+    "cover": 0.0,
+    "cover_nlp": 0.0,
+    "cover_medicine": 0.0,
+    "oracle_cover": 0.0,
+    "mean_active_slices": 0.0
+   },
+   "B=5000": {
+    "cover": 0.0362,
+    "cover_nlp": 0.0,
+    "cover_medicine": 0.109,
+    "oracle_cover": 0.0362,
+    "mean_active_slices": 1.0
+   },
+   "B=10000": {
+    "cover": 0.256,
+    "cover_nlp": 0.2946,
+    "cover_medicine": 0.1782,
+    "oracle_cover": 0.3644,
+    "mean_active_slices": 1.38
+   },
+   "B=20000": {
+    "cover": 0.4001,
+    "cover_nlp": 0.3757,
+    "cover_medicine": 0.4492,
+    "oracle_cover": 0.554,
+    "mean_active_slices": 2.52
+   },
+   "B=40000": {
+    "cover": 0.5056,
+    "cover_nlp": 0.4554,
+    "cover_medicine": 0.6068,
+    "oracle_cover": 0.977,
+    "mean_active_slices": 4.95
+   },
+   "catalog_ceiling": 1.0
+  },
+  "random_10": {
+   "slices": 10,
+   "size_min": 3415,
+   "size_median": 8343.5,
+   "size_max": 16345,
+   "slices_for_90pct": {
+    "nlp": {
+     "slices": 8,
+     "terms": 79358
+    },
+    "medicine": {
+     "slices": 8,
+     "terms": 75595
+    }
+   },
+   "B=2000": {
+    "cover": 0.0,
+    "cover_nlp": 0.0,
+    "cover_medicine": 0.0,
+    "oracle_cover": 0.0,
+    "mean_active_slices": 0.0
+   },
+   "B=5000": {
+    "cover": 0.0537,
+    "cover_nlp": 0.0585,
+    "cover_medicine": 0.0442,
+    "oracle_cover": 0.0537,
+    "mean_active_slices": 1.0
+   },
+   "B=10000": {
+    "cover": 0.1011,
+    "cover_nlp": 0.1082,
+    "cover_medicine": 0.0869,
+    "oracle_cover": 0.1808,
+    "mean_active_slices": 1.34
+   },
+   "B=20000": {
+    "cover": 0.2096,
+    "cover_nlp": 0.2361,
+    "cover_medicine": 0.1561,
+    "oracle_cover": 0.2667,
+    "mean_active_slices": 2.55
+   },
+   "B=40000": {
+    "cover": 0.4157,
+    "cover_nlp": 0.462,
+    "cover_medicine": 0.3225,
+    "oracle_cover": 0.5242,
+    "mean_active_slices": 4.68
+   },
+   "catalog_ceiling": 1.0
+  },
+  "kmeans_25": {
+   "slices": 25,
+   "size_min": 1466,
+   "size_median": 3298.0,
+   "size_max": 6500,
+   "slices_for_90pct": {
+    "nlp": {
+     "slices": 2,
+     "terms": 11649
+    },
+    "medicine": {
+     "slices": 5,
+     "terms": 21283
+    }
+   },
+   "B=2000": {
+    "cover": 0.0,
+    "cover_nlp": 0.0,
+    "cover_medicine": 0.0,
+    "oracle_cover": 0.0,
+    "mean_active_slices": 1.0
+   },
+   "B=5000": {
+    "cover": 0.0484,
+    "cover_nlp": 0.0037,
+    "cover_medicine": 0.1384,
+    "oracle_cover": 0.0777,
+    "mean_active_slices": 1.11
+   },
+   "B=10000": {
+    "cover": 0.2203,
+    "cover_nlp": 0.1308,
+    "cover_medicine": 0.4006,
+    "oracle_cover": 0.6996,
+    "mean_active_slices": 2.22
+   },
+   "B=20000": {
+    "cover": 0.3122,
+    "cover_nlp": 0.1813,
+    "cover_medicine": 0.5758,
+    "oracle_cover": 0.9306,
+    "mean_active_slices": 4.71
+   },
+   "B=40000": {
+    "cover": 0.5247,
+    "cover_nlp": 0.4539,
+    "cover_medicine": 0.6672,
+    "oracle_cover": 0.9985,
+    "mean_active_slices": 9.49
+   },
+   "catalog_ceiling": 1.0
+  },
+  "random_25": {
+   "slices": 25,
+   "size_min": 1466,
+   "size_median": 3298.0,
+   "size_max": 6500,
+   "slices_for_90pct": {
+    "nlp": {
+     "slices": 17,
+     "terms": 67776
+    },
+    "medicine": {
+     "slices": 15,
+     "terms": 62666
+    }
+   },
+   "B=2000": {
+    "cover": 0.0098,
+    "cover_nlp": 0.0044,
+    "cover_medicine": 0.0206,
+    "oracle_cover": 0.0225,
+    "mean_active_slices": 1.0
+   },
+   "B=5000": {
+    "cover": 0.0532,
+    "cover_nlp": 0.0556,
+    "cover_medicine": 0.0486,
+    "oracle_cover": 0.1441,
+    "mean_active_slices": 1.9
+   },
+   "B=10000": {
+    "cover": 0.1021,
+    "cover_nlp": 0.1075,
+    "cover_medicine": 0.0913,
+    "oracle_cover": 0.2355,
+    "mean_active_slices": 3.44
+   },
+   "B=20000": {
+    "cover": 0.2149,
+    "cover_nlp": 0.2215,
+    "cover_medicine": 0.2018,
+    "oracle_cover": 0.4089,
+    "mean_active_slices": 6.44
+   },
+   "B=40000": {
+    "cover": 0.4538,
+    "cover_nlp": 0.4554,
+    "cover_medicine": 0.4507,
+    "oracle_cover": 0.6546,
+    "mean_active_slices": 11.81
+   },
+   "catalog_ceiling": 1.0
+  },
+  "kmeans_50": {
+   "slices": 50,
+   "size_min": 357,
+   "size_median": 1679.5,
+   "size_max": 3807,
+   "slices_for_90pct": {
+    "nlp": {
+     "slices": 4,
+     "terms": 11943
+    },
+    "medicine": {
+     "slices": 9,
+     "terms": 21826
+    }
+   },
+   "B=2000": {
+    "cover": 0.0322,
+    "cover_nlp": 0.0007,
+    "cover_medicine": 0.0957,
+    "oracle_cover": 0.0552,
+    "mean_active_slices": 1.35
+   },
+   "B=5000": {
+    "cover": 0.105,
+    "cover_nlp": 0.0621,
+    "cover_medicine": 0.1915,
+    "oracle_cover": 0.5183,
+    "mean_active_slices": 2.83
+   },
+   "B=10000": {
+    "cover": 0.2452,
+    "cover_nlp": 0.1418,
+    "cover_medicine": 0.4536,
+    "oracle_cover": 0.7601,
+    "mean_active_slices": 5.1
+   },
+   "B=20000": {
+    "cover": 0.3771,
+    "cover_nlp": 0.2712,
+    "cover_medicine": 0.5906,
+    "oracle_cover": 0.9629,
+    "mean_active_slices": 9.7
+   },
+   "B=40000": {
+    "cover": 0.5677,
+    "cover_nlp": 0.4817,
+    "cover_medicine": 0.7408,
+    "oracle_cover": 1.0,
+    "mean_active_slices": 20.02
+   },
+   "catalog_ceiling": 1.0
+  },
+  "random_50": {
+   "slices": 50,
+   "size_min": 357,
+   "size_median": 1679.5,
+   "size_max": 3807,
+   "slices_for_90pct": {
+    "nlp": {
+     "slices": 28,
+     "terms": 55113
+    },
+    "medicine": {
+     "slices": 29,
+     "terms": 56676
+    }
+   },
+   "B=2000": {
+    "cover": 0.0215,
+    "cover_nlp": 0.0234,
+    "cover_medicine": 0.0177,
+    "oracle_cover": 0.1231,
+    "mean_active_slices": 1.53
+   },
+   "B=5000": {
+    "cover": 0.0625,
+    "cover_nlp": 0.0651,
+    "cover_medicine": 0.0574,
+    "oracle_cover": 0.2511,
+    "mean_active_slices": 3.08
+   },
+   "B=10000": {
+    "cover": 0.1275,
+    "cover_nlp": 0.1316,
+    "cover_medicine": 0.1193,
+    "oracle_cover": 0.3346,
+    "mean_active_slices": 5.74
+   },
+   "B=20000": {
+    "cover": 0.2653,
+    "cover_nlp": 0.2719,
+    "cover_medicine": 0.2518,
+    "oracle_cover": 0.4885,
+    "mean_active_slices": 10.81
+   },
+   "B=40000": {
+    "cover": 0.4934,
+    "cover_nlp": 0.5015,
+    "cover_medicine": 0.4772,
+    "oracle_cover": 0.7572,
+    "mean_active_slices": 21.59
+   },
+   "catalog_ceiling": 1.0
+  },
+  "kmeans_100": {
+   "slices": 100,
+   "size_min": 208,
+   "size_median": 855.0,
+   "size_max": 1816,
+   "slices_for_90pct": {
+    "nlp": {
+     "slices": 8,
+     "terms": 10674
+    },
+    "medicine": {
+     "slices": 12,
+     "terms": 15132
+    }
+   },
+   "B=2000": {
+    "cover": 0.1324,
+    "cover_nlp": 0.1703,
+    "cover_medicine": 0.056,
+    "oracle_cover": 0.2736,
+    "mean_active_slices": 2.16
+   },
+   "B=5000": {
+    "cover": 0.2872,
+    "cover_nlp": 0.299,
+    "cover_medicine": 0.2636,
+    "oracle_cover": 0.5804,
+    "mean_active_slices": 5.21
+   },
+   "B=10000": {
+    "cover": 0.4084,
+    "cover_nlp": 0.3808,
+    "cover_medicine": 0.4639,
+    "oracle_cover": 0.8276,
+    "mean_active_slices": 10.26
+   },
+   "B=20000": {
+    "cover": 0.5457,
+    "cover_nlp": 0.5175,
+    "cover_medicine": 0.6024,
+    "oracle_cover": 0.9883,
+    "mean_active_slices": 19.89
+   },
+   "B=40000": {
+    "cover": 0.7318,
+    "cover_nlp": 0.7208,
+    "cover_medicine": 0.7541,
+    "oracle_cover": 1.0,
+    "mean_active_slices": 41.0
+   },
+   "catalog_ceiling": 1.0
+  },
+  "random_100": {
+   "slices": 100,
+   "size_min": 208,
+   "size_median": 855.0,
+   "size_max": 1816,
+   "slices_for_90pct": {
+    "nlp": {
+     "slices": 44,
+     "terms": 45640
+    },
+    "medicine": {
+     "slices": 42,
+     "terms": 44702
+    }
+   },
+   "B=2000": {
+    "cover": 0.0303,
+    "cover_nlp": 0.0322,
+    "cover_medicine": 0.0265,
+    "oracle_cover": 0.1309,
+    "mean_active_slices": 3.97
+   },
+   "B=5000": {
+    "cover": 0.0669,
+    "cover_nlp": 0.068,
+    "cover_medicine": 0.0648,
+    "oracle_cover": 0.2555,
+    "mean_active_slices": 8.15
+   },
+   "B=10000": {
+    "cover": 0.1226,
+    "cover_nlp": 0.1148,
+    "cover_medicine": 0.1384,
+    "oracle_cover": 0.3913,
+    "mean_active_slices": 14.39
+   },
+   "B=20000": {
+    "cover": 0.2565,
+    "cover_nlp": 0.2273,
+    "cover_medicine": 0.3152,
+    "oracle_cover": 0.6082,
+    "mean_active_slices": 25.63
+   },
+   "B=40000": {
+    "cover": 0.4714,
+    "cover_nlp": 0.4364,
+    "cover_medicine": 0.542,
+    "oracle_cover": 0.8559,
+    "mean_active_slices": 46.84
+   },
+   "catalog_ceiling": 1.0
+  },
+  "kmeans_200": {
+   "slices": 200,
+   "size_min": 49,
+   "size_median": 419.5,
+   "size_max": 1132,
+   "slices_for_90pct": {
+    "nlp": {
+     "slices": 11,
+     "terms": 8230
+    },
+    "medicine": {
+     "slices": 15,
+     "terms": 8996
+    }
+   },
+   "B=2000": {
+    "cover": 0.1715,
+    "cover_nlp": 0.1791,
+    "cover_medicine": 0.1561,
+    "oracle_cover": 0.3937,
+    "mean_active_slices": 4.26
+   },
+   "B=5000": {
+    "cover": 0.4021,
+    "cover_nlp": 0.394,
+    "cover_medicine": 0.4183,
+    "oracle_cover": 0.7645,
+    "mean_active_slices": 9.86
+   },
+   "B=10000": {
+    "cover": 0.5813,
+    "cover_nlp": 0.5819,
+    "cover_medicine": 0.5803,
+    "oracle_cover": 0.9502,
+    "mean_active_slices": 19.31
+   },
+   "B=20000": {
+    "cover": 0.7,
+    "cover_nlp": 0.7149,
+    "cover_medicine": 0.6701,
+    "oracle_cover": 1.0,
+    "mean_active_slices": 38.71
+   },
+   "B=40000": {
+    "cover": 0.8149,
+    "cover_nlp": 0.8311,
+    "cover_medicine": 0.782,
+    "oracle_cover": 1.0,
+    "mean_active_slices": 79.18
+   },
+   "catalog_ceiling": 1.0
+  },
+  "random_200": {
+   "slices": 200,
+   "size_min": 49,
+   "size_median": 419.5,
+   "size_max": 1132,
+   "slices_for_90pct": {
+    "nlp": {
+     "slices": 65,
+     "terms": 34170
+    },
+    "medicine": {
+     "slices": 58,
+     "terms": 30695
+    }
+   },
+   "B=2000": {
+    "cover": 0.0288,
+    "cover_nlp": 0.0329,
+    "cover_medicine": 0.0206,
+    "oracle_cover": 0.2301,
+    "mean_active_slices": 5.64
+   },
+   "B=5000": {
+    "cover": 0.0684,
+    "cover_nlp": 0.0724,
+    "cover_medicine": 0.0604,
+    "oracle_cover": 0.3727,
+    "mean_active_slices": 12.52
+   },
+   "B=10000": {
+    "cover": 0.1314,
+    "cover_nlp": 0.1469,
+    "cover_medicine": 0.1001,
+    "oracle_cover": 0.5388,
+    "mean_active_slices": 23.53
+   },
+   "B=20000": {
+    "cover": 0.2423,
+    "cover_nlp": 0.2778,
+    "cover_medicine": 0.1708,
+    "oracle_cover": 0.7435,
+    "mean_active_slices": 44.38
+   },
+   "B=40000": {
+    "cover": 0.4665,
+    "cover_nlp": 0.5234,
+    "cover_medicine": 0.352,
+    "oracle_cover": 0.935,
+    "mean_active_slices": 84.8
+   },
+   "catalog_ceiling": 1.0
+  }
+ }
+}

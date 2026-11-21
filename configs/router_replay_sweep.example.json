@@ -1,0 +1,34 @@
+{
+  "configs": [
+    {
+      "name": "fast_ema050_margin005_streak1",
+      "router_text_mode": "scores_only",
+      "router_config": {
+        "audio_ema_alpha": 0.5,
+        "min_margin": 0.05,
+        "min_current_margin": 0.05,
+        "min_consistent_windows_generated_target": 1
+      }
+    },
+    {
+      "name": "balanced_ema070_margin010_streak2",
+      "router_text_mode": "scores_only",
+      "router_config": {
+        "audio_ema_alpha": 0.7,
+        "min_margin": 0.1,
+        "min_current_margin": 0.1,
+        "min_consistent_windows_generated_target": 2
+      }
+    },
+    {
+      "name": "stable_ema085_margin015_streak3",
+      "router_text_mode": "scores_only",
+      "router_config": {
+        "audio_ema_alpha": 0.85,
+        "min_margin": 0.15,
+        "min_current_margin": 0.1,
+        "min_consistent_windows_generated_target": 3
+      }
+    }
+  ]
+}

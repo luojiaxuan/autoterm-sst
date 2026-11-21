@@ -74,7 +74,7 @@ class MixedDomainSwitchEvalTests(unittest.TestCase):
         self.assertTrue(payload["summary"]["regression_pass"])
         self.assertEqual(payload["summary"]["domain_transition_count"], expected_transitions)
 
-    def test_generated_target_without_probe_is_diagnostic_not_deployable_pass(self) -> None:
+    def test_generated_target_context_can_route_without_speech_probe(self) -> None:
         acl, medicine = _blocks()
         payload = evaluate_playlist(
             build_schedule(acl[:1], medicine[:1], schedule="alternating"),
@@ -83,10 +83,10 @@ class MixedDomainSwitchEvalTests(unittest.TestCase):
             probe_mode="none",
         )
 
-        self.assertFalse(payload["summary"]["regression_pass"])
-        self.assertEqual(payload["summary"]["switch_count"], 0)
+        self.assertTrue(payload["summary"]["regression_pass"])
+        self.assertEqual(payload["summary"]["switch_count"], 1)
 
-    def test_inverted_probe_diagnostic_fails(self) -> None:
+    def test_strong_context_is_not_overridden_by_inverted_probe(self) -> None:
         acl, medicine = _blocks()
         payload = evaluate_playlist(
             build_schedule(acl[:1], medicine[:1], schedule="alternating"),
@@ -95,8 +95,8 @@ class MixedDomainSwitchEvalTests(unittest.TestCase):
             probe_mode="inverted",
         )
 
-        self.assertFalse(payload["summary"]["regression_pass"])
-        self.assertLess(payload["summary"]["steady_state_accuracy"], 1.0)
+        self.assertTrue(payload["summary"]["regression_pass"])
+        self.assertEqual(payload["summary"]["steady_state_accuracy"], 1.0)
 
     def test_acl_reader_preserves_meta_alignment_with_blank_text_lines(self) -> None:
         with TemporaryDirectory() as tmp:

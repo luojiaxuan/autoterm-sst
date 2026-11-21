@@ -625,7 +625,7 @@ guard（虽然真实语音 probe 单独太噪，见 §6 controls）。产物
 occurrence，只要输出出现 1 次就 k/k 全命中。修正为 **count clipping**：
 每组 (block, term) 的命中 = min(gold 次数, 输出中不重叠出现次数)，
 匹配语义（CJK 子串 / de casefold+词干 / identity retention）与原
-classify_output_hit 完全镜像；分母不变。`bb4a603`，单测 5/5。
+classify_output_hit 完全镜像；分母不变。`1c1240f`，单测 5/5。
 
 重评结果（旧→修正）：
 
@@ -643,7 +643,7 @@ classify_output_hit 完全镜像；分母不变。`bb4a603`，单测 5/5。
 
 ## 2026-07-10: MFA 时间对齐 occurrence-level term_acc（论文主指标）
 
-用户提供 MFA 对齐数据（5 ACL + 5 ESO TextGrid，commit 966c8b6）。新增
+用户提供 MFA 对齐数据（5 ACL + 5 ESO TextGrid，commit 6e71b1f）。新增
 `score_time_aligned_terms.py`：每个 gold occurrence 锚到 source 秒
 （ACL 走 words tier + **段偏移映射**——playlist 拼接去掉了段间静音，须把
 TextGrid 原始时间经 segments.meta 的 offset/seg_duration 映射到播放秒；
@@ -704,5 +704,5 @@ p95 从 N=8 到 N=32 保持 ~820ms(continuous batching 签名:延迟平坦、吞
 1.37→5.47 seg/s),**2.3× 余量**。N=1 的 38s 是首请求引擎 warmup 冷启动,非稳态。
 
 **结论:32 路实时可行且已实测**(引擎 + 端到端两条独立证据)。论文 §6 恢复为
-verified claim。代码 `5a0f94d` 已进 main;live demo 可通过 env 切到 vllm_serve
+verified claim。代码 `c72766b` 已进 main;live demo 可通过 env 切到 vllm_serve
 架构(需 vllm serve TP=2 + RAG GPU)。

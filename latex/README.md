@@ -1,10 +1,10 @@
 # AutoTerm-SST 论文（NAACL 2027 System Demonstrations）
 
-投稿截止 2026-12-04 AoE；正文 6 页，附录不超过 2 页，伦理声明与参考文献不限。`acl_latex.tex` 是入口，各节在 `sections/`；`bash latex/make_arxiv.sh <out.tar.gz>` 生成去掉注释、带 `.bbl` 的 arXiv 源码包并验证页数。arXiv:2610.26865 的替换版本用 bad0f45 的源码包于 2026-11-21 PT 提交（submit/8405958），只替换这一次。
+投稿截止 2026-12-04 AoE；正文 6 页，附录不超过 2 页，伦理声明与参考文献不限。`acl_latex.tex` 是入口，各节在 `sections/`；`bash latex/make_arxiv.sh <out.tar.gz>` 生成去掉注释、带 `.bbl` 的 arXiv 源码包并验证页数。arXiv:2610.26865 的替换版本用 6eafdf8 的源码包于 2026-11-21 PT 提交（submit/8405958），只替换这一次。
 
 ## 数字从哪来
 
-正文和表格不区分 run，统一以 AutoTerm-SST（语言模型路由）为对照。各 run 播放同一音频顺序、切块边界相同（timing signature `7c0be6da…` 一致），跨 run 的比较按讲座逐一配对。下表的路径都在实验分支 `explore/llm-router`（`28c03b4` 起）。
+正文和表格不区分 run，统一以 AutoTerm-SST（语言模型路由）为对照。各 run 播放同一音频顺序、切块边界相同（timing signature `7c0be6da…` 一致），跨 run 的比较按讲座逐一配对。下表的路径都在实验分支 `explore/llm-router`（`95aea9e` 起）。
 
 | 论文位置 | 来源 run | 结果文件 |
 | --- | --- | --- |

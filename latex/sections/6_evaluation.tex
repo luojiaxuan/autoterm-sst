@@ -82,9 +82,9 @@ Similarity routing & 78.8 & 23.9 & 68.1 s & 19 \\
 \bottomrule
 \end{tabular}
 \caption{Routing on the three RealSI orders, 30 talks in all. Coverage and
-top-1 are percentages of chunks, to top is the median delay until a talk's
-slice first ranks first, and never top counts talks where that never
-happens.}
+top-1 are the percentages of chunks whose correct slice is in the working set
+and ranks first; to top is the median delay until a talk's slice first ranks
+first, and never top counts talks where that never happens.}
 \label{tab:realsi}
 \end{table}
 
@@ -98,9 +98,8 @@ retrieval. Known-domain-1k searches only the 1,000-entry slice matching the
 current talk's domain and therefore requires the domain label of every talk.
 AutoTerm-SST routes over ten 1,000-entry slices spanning NLP, medicine, and
 eight topics drawn from Wikipedia and Wikidata, with at most four active at
-once. Similarity routing keeps these slices and budgets but swaps in the
-similarity router of Appendix~\ref{app:config}, which ranks slices by embedding
-similarity and switches only after fixed confirmation rules. Merged-2k pools the NLP and medicine slices, which requires knowing both
+once. Similarity routing keeps these slices and budgets but uses the
+embedding-similarity router of Appendix~\ref{app:config}. Merged-2k pools the NLP and medicine slices, which requires knowing both
 domains, and Merged-10k pools all ten slices, 9,880 entries after removing
 exact duplicates. Merged-1M adds entries from other topics to the same NLP and
 medicine glossaries, and Merged-100k is its first 100,000 entries. Merged
@@ -127,9 +126,7 @@ MT-BLEU, repeats this scoring with every evaluated target term masked in both
 hypothesis and reference. Prompt
 precision is the share of injected term pairs that match a gold term in the
 audio they were retrieved from. On RealSI, coverage is the share of chunks
-whose correct slice is in the working set, top-1 is the share whose correct
-slice ranks first, and time to top is the median delay from a talk's start
-until its slice first ranks first.
+whose correct slice is in the working set.
 
 \paragraph{Statistics.}
 An exact permutation test swaps the outputs of two configurations talk by talk
@@ -146,8 +143,8 @@ AutoTerm-SST performs on par with a known-domain reference without receiving
 any user input. In run 3, AutoTerm-SST minus Known-domain-1k is
 $+0.2^{+0.8}_{-1.0}$ TERM\_ACC points at $p=0.82$ and $-0.05^{+0.44}_{-0.55}$
 BLEU at $p=0.85$. Similarity routing also ties the reference in runs 1 and 2,
-as Table~\ref{tab:stats} reports. All of them lie well above retrieval-free
-InfiniSST, scored with its own per-corpus scorers in Table~\ref{tab:quality}.
+as Table~\ref{tab:stats} reports. All lie well above retrieval-free InfiniSST
+in Table~\ref{tab:quality}.
 
 \paragraph{Effect of catalog scale.}
 Merged glossaries keep pace with a routed working set up to 10k entries, yet
@@ -177,10 +174,11 @@ in the working set for about 98\% of chunks, which is why their accuracies
 match. Appendix~\ref{app:router} replays both routers on faster switches and
 on 24 close-domain slices.
 
-\paragraph{Latency.}
-The full pipeline keeps pace with live speech. We stream real lectures in real
-time to three A6000 GPUs, two serving the translation model and one the
-retriever and router. The first translation appears 2.3 seconds after audio
-starts, and with one session each chunk's text arrives 0.48 seconds after the
-chunk is sent at the median and 0.91 seconds at the 95th percentile, as fast as
-Known-domain-1k at 0.49 and 0.82 seconds.
+\paragraph{Processing speed.}
+Retrieval and routing take a small share of the processing time. With one
+session on three A6000 GPUs, AutoTerm-SST spends 0.094 seconds per 1.92-second chunk
+on speech encoding, routing, and retrieval and 0.333 seconds on generation, so
+it processes audio at 0.22 of its duration, as Known-domain-1k does. RASST
+measured its retriever alone at 0.042 seconds per chunk on the same
+GPUs~\citep{luo2026rasst}. The first translation appears 2.3 seconds after
+audio starts.

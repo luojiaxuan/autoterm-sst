@@ -1,6 +1,21 @@
 \section{Adaptive terminology memory}
 \label{sec:adaptive-memory}
 
+\begin{figure*}[t]
+  \centering
+  \begin{minipage}{.97\textwidth}
+    \centering
+    \includegraphics[height=.376\linewidth]{ui_evidence_panel.png}\hfill
+    \includegraphics[height=.376\linewidth]{ui_phone_acl.png}
+    \caption{The English-to-Chinese interface replaying one session of the ACL-ESO
+    stream. Left: an oncology lecture 19 minutes in, with the medicine slice leading
+    the posterior. Right: the installable phone app during the first ACL talk,
+    6 minutes in, with the NLP slice leading. Probabilities come from a replay of the
+    recorded translations, and highlights mark retrieved terms.}
+    \label{fig:ui}
+  \end{minipage}
+\end{figure*}
+
 Separating an offline catalog from a small working set lets AutoTerm-SST
 cover broad domains while keeping per-chunk search bounded. Each topic slice holds
 about 1,000 terms with translations, a prebuilt MaxSim index of source terms, and a

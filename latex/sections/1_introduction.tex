@@ -7,6 +7,18 @@ Speech-capable large language models, or LLMs, now translate long-form audio dir
 concepts, and named entities remain hard to recover from acoustics alone. Glossary retrieval helps by matching speech to bilingual term pairs
 and prompting the LLM with top matches before decoding.
 
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.86\textwidth]{autoterm_architecture.pdf}
+\caption{AutoTerm-SST during a live topic transition from NLP to medicine.
+The adaptive terminology memory, in orange, scores topic slices against recent translations on the
+dashed arrow. It activates up to four slices with at most 4,000 terms. The MaxSim
+retriever builds each chunk's term map $G_t$ from this working set alone. The LLM
+translates speech features $h_t$ with $G_t$. The ellipsis marks
+additional offline topic slices.}
+\label{fig:architecture}
+\end{figure*}
+
 Existing retrieval-augmented SST systems need manual session setup or lose
 accuracy as terminology catalogs grow. Retrieval-Augmented Simultaneous
 Speech Translation, or RASST \citep{luo2026rasst}, improves terminology on

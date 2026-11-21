@@ -169,10 +169,9 @@ We test it in open-loop replays on the ACL-ESO stream with per-chunk updates, us
 the saved translations described in Appendix~\ref{app:router}. Raw letter
 probabilities rank the correct topic slice in the top four for 90.5\% of chunks,
 and the filtered posterior reaches 98.7\%. Coverage stays between 98.4\% and
-98.9\% as $\rho$ ranges from $10^{-5}$ to $10^{-1}$. Raw similarity reaches
-85.0\% coverage with per-chunk updates. At the live update rate, the similarity
-router uses its confirmation rule and pins the confirmed slice, reaching 97.0\%
-coverage.
+98.9\% as $\rho$ ranges from $10^{-5}$ to $10^{-1}$. Raw similarity covers
+85.0\% of chunks with per-chunk updates. At the live rate, confirmation and
+pinning give the similarity router 97.0\% coverage.
 
 \paragraph{Processing speed.}
 AutoTerm-SST processes audio about 4.5 times as fast as real time and matches

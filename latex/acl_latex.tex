@@ -38,6 +38,7 @@
 \usepackage{booktabs}
 \usepackage{tabularx}
 \usepackage{fvextra}
+\usepackage{float}
 \usepackage{multirow}
 \usepackage{xcolor}
 \usepackage{url}
@@ -76,9 +77,10 @@
 \input{sections/6_evaluation}
 \input{sections/7_limitations_conclusion}
 
-% Acknowledgments are omitted in the submission version to respect the 6-page
-% limit; restore for camera-ready (which allows one extra page).
-% \section*{Acknowledgments}
+\section*{Acknowledgments}
+The authors used Claude, GPT, and Gemini for coding, data processing, editing,
+and other tasks. They reviewed all outputs and take full responsibility.
+% Additional thanks for the camera-ready version:
 % We thank the open-source communities behind PyTorch, vLLM, FastAPI, and Qwen
 % for their foundational contributions. We also thank the University of
 % California, Santa Barbara for computational resources used in the live GPU
@@ -86,6 +88,7 @@
 
 \bibliography{custom}
 
+\clearpage
 \input{sections/8_appendix}
 
 \end{document}

@@ -106,10 +106,12 @@ maintains both leads across the required consecutive updates.}
 
 \section{Router prompt and prototypes}
 
+Figure~\ref{fig:router-prompt} shows the router prompt.
 Table~\ref{tab:router-prototypes} lists the hand-written prototypes for the
 ACL-ESO runs, and the RealSI streams use the generated prototypes described in
 Appendix~\ref{app:router}.
 
+\begin{figure}[t]
 \begin{Verbatim}[fontsize=\small,fontfamily=\rmdefault,frame=single,breaklines=true,breaksymbolleft={}]
 A live speech translator is translating a talk from English into {language}. Below is its most recent {language} output, followed by terminology glossaries, one per topic. Which glossary best matches the topic of the talk at this point?
 
@@ -121,6 +123,9 @@ Glossaries:
 
 Answer with the letter of the best glossary only.
 \end{Verbatim}
+\caption{Prompt for the language-model router.}
+\label{fig:router-prompt}
+\end{figure}
 
 \begin{table}[!t]
 \centering
@@ -187,7 +192,7 @@ chunk late when audio arrives faster than real time. We replay the settings in
 Table~\ref{tab:router-diag} with each update one chunk late.
 Section~\ref{sec:adaptive-memory} reports the coverage change.
 
-\begin{table}[!ht]
+\begin{table}[H]
 \centering
 \small
 \begin{tabular}{lrrrr}

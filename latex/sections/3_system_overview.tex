@@ -10,21 +10,8 @@ Without a source transcript from RASST, the retriever matches speech directly
 to glossary source terms by maximum similarity, or MaxSim, between overlapping
 speech windows and pre-encoded term vectors. Terms scoring above 0.78 become
 candidates. The retriever adds up to ten bilingual term pairs to $G_t$.
-AutoTerm-SST changes only the entries searched. Its router limits lookup to
-a working set of up to four topic slices and reads each new translation as
-context for later chunks.
-
-\begin{figure*}[t]
-\centering
-\includegraphics[width=0.86\textwidth]{autoterm_architecture.pdf}
-\caption{AutoTerm-SST during a live topic transition from NLP to medicine.
-The adaptive terminology memory, in orange, scores topic slices against recent translations on the
-dashed arrow. It activates up to four slices with at most 4,000 terms. The MaxSim
-retriever builds each chunk's term map $G_t$ from this working set alone. The LLM
-translates speech features $h_t$ with $G_t$. The ellipsis marks
-additional offline topic slices.}
-\label{fig:architecture}
-\end{figure*}
+AutoTerm-SST changes only retrieval scope. Its router uses each translation
+to select up to four topic slices for later searches.
 
 Keeping adaptation outside the translation model makes the system pluggable.
 One streaming protocol supports a retrieval-free translator, fixed-glossary

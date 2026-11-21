@@ -1,0 +1,15 @@
+{
+ "model": "Qwen/Qwen3-4B-Instruct-2507",
+ "holdouts": {
+  "nlp": {
+   "fallback_when_topic_missing": 0.0383,
+   "fallback_when_topic_present": 0.0138,
+   "correct_slice_top1_when_present": 0.7882
+  },
+  "medicine": {
+   "fallback_when_topic_missing": 0.0,
+   "fallback_when_topic_present": 0.0,
+   "correct_slice_top1_when_present": 0.9394
+  }
+ }
+}

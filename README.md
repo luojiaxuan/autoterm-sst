@@ -1,16 +1,20 @@
 # AutoTerm-SST
 
-**Zero session-time setup for terminology-aware streaming speech translation —
+**Zero session-time setup for terminology-aware streaming speech translation,
 as a thin, pluggable framework.**
 
 AutoTerm-SST is an interactive simultaneous speech-translation (SST) system for
 term-dense vertical domains (academic, medical, legal, financial). It streams
 speech in, runs a swappable translation **agent**, and streams translated text
-back — with an **adaptive terminology memory** (AutoTerm) that retrieves up to
-10 prompt glossary references per chunk from an automatically routed,
-budgeted multi-slice working set, so the model gets specialized vocabulary right
-without a per-session glossary upload or domain choice. Domain resources are
-prebuilt and registered by the deployment operator.
+back. Its **adaptive terminology memory** picks the glossary on the fly: a small
+language model (Qwen3-4B-Instruct-2507) reads the last four translated chunks
+and scores every topic slice of an offline catalog by the probability of its
+option letter, a sticky hidden Markov filter turns these scores into a
+posterior over topics, and term retrieval searches only the most probable
+slices, at most four and 4,000 terms. Up to 10 retrieved term pairs enter the
+prompt of each chunk, so the model gets specialized vocabulary right without a
+per-session glossary upload or domain choice. Topic slices are prebuilt and
+registered by the deployment operator.
 
 The codebase is a **thin middle layer** (transport / session / routing) plus
 **swappable agents**. The framework knows nothing about models, prompting,
@@ -22,9 +26,13 @@ of that internally.
 - 📄 Paper: *AutoTerm-SST: Adaptive Terminology Memory with Zero Session-Time
   Setup for Streaming Speech Translation*, arXiv preprint
   [arXiv:2610.26865](https://arxiv.org/abs/2610.26865) ([PDF](https://arxiv.org/pdf/2610.26865)).
-- 📊 Evaluation source of truth: [ten-talk StreamLAAL audit](https://github.com/luojiaxuan/autoterm-sst/blob/explore/multidomain-routing/docs/autoterm_1m_budget_search_20260711.md)
-  and [`docs/system_scaling.md`](docs/system_scaling.md).
-- 🎬 Screencast video: [docs/demo_screencast.mp4](https://github.com/luojiaxuan/autoterm-sst/blob/main/docs/demo_screencast.mp4) (2.5 min).
+- 📊 Evaluation source of truth: [`docs/llm_router_20261120/README.md`](docs/llm_router_20261120/README.md)
+  for the language-model router (closed-loop results, replays, processing
+  speed), [`docs/realsi_20261120/README.md`](docs/realsi_20261120/README.md) for
+  the ten-domain RealSI routing test, and
+  [`docs/autoterm_1m_budget_search_20260711.md`](docs/autoterm_1m_budget_search_20260711.md)
+  for the large merged-glossary baselines.
+- 🎬 Screencast video: [docs/demo_screencast.mp4](https://github.com/luojiaxuan/autoterm-sst/blob/main/docs/demo_screencast.mp4) (2.5 min, recorded with the July 2026 interface).
 - 🌐 Hosted live demo: <https://luojiaxuan.github.io/autoterm-sst/> (stable
   entry page; the GPU-backed demo is currently offline, so use the screencast or
   mock mode below).
@@ -35,16 +43,18 @@ of that internally.
 
 ## Highlights
 
-- **Zero session-time setup.** `auto_working` mode starts from a
-  domain-specific glossary slice and a training-free hybrid router switches
-  slices from streaming evidence (generated-translation topic windows,
-  speech-window domain probes, speech-centroid similarity, retrieved-term
-  metadata) — no ASR or source transcripts in the production path.
+- **Zero session-time setup.** A training-free language-model router reads the
+  translation's own recent output, and a sticky topic filter with one free
+  parameter, the switch rate, keeps the most probable slices searchable. No ASR
+  or source transcript is needed. Routing runs in a background worker that
+  scores all sessions in one batch, so no chunk waits for it. The earlier
+  embedding-similarity router with confirmation rules remains available as a
+  baseline.
 - **Thin framework, pluggable agents.** The core only does WebSocket/REST
   transport, session lifecycle, and `agent_type` routing. Agents implement a
   small `Agent` contract.
 - **Retrieval is optional and agent-internal.** Terminology retrieval (MaxSim
-  RAG over glossary indexes) lives *inside* the agent as a plugin — enable it,
+  RAG over glossary indexes) lives *inside* the agent as a plugin: enable it,
   swap it, or turn it off without touching the framework.
 - **Live evidence panel.** The JSON WebSocket protocol exposes retrieved terms,
   active glossary state, router decisions/confidence, and retrieval/generation
@@ -139,7 +149,7 @@ retrieval (no torch/vLLM/GPU), so you can exercise the full
 `/init` → `/wss` → translate → `/delete_session` flow, the web UI, and the JSON
 evidence protocol.
 
-### 2. Live GPU mode — RASST (Qwen3-Omni)
+### 2. Live GPU mode: RASST (Qwen3-Omni)
 
 The real RASST agent loads a ~30B Qwen3-Omni checkpoint with **in-process vLLM
 tensor parallelism** (2 GPUs by default) plus the MaxSim retriever on a third
@@ -154,6 +164,27 @@ curl -s http://127.0.0.1:8011/health | python -m json.tool
 
 See the comments in that script and [Configuration](#configuration) for every
 knob (GPU selection, ports, memory fractions, retrieval devices).
+
+### 3. Paper configuration: language-model router
+
+`scripts/start_autoterm_demo.sh` serves the configuration evaluated in the
+NAACL 2027 demo paper, with the web UI on the same port: ten 1,000-term topic
+slices, the Qwen3-4B router with the sticky filter (switch rate 1e-3), at most
+four active slices within 4,000 terms, a four-chunk router context, routing
+updates every 5 seconds, and at most 10 term pairs per prompt.
+
+```bash
+MODEL=<RASST speech LLM> RETRIEVER=<rasst-hn1024.pt> \
+RETRIEVER_CODE=<RASST retriever code> MANIFEST=<topic-slice manifest> \
+PORT=8000 bash scripts/start_autoterm_demo.sh
+```
+
+The script runs `eval/streaming_sst/serve_glossary_capacity_sweep.py` with the
+same router and retrieval flags as the paper's runs; its header lists the
+optional overrides (GPUs, router model, prototypes, slice ids). The slices,
+their manifest, and the evaluation audio are listed with their Hugging Face
+revisions in the Source of Truth table of
+[`docs/llm_router_20261120/README.md`](docs/llm_router_20261120/README.md).
 
 ---
 
@@ -248,12 +279,12 @@ Additional router hysteresis defaults live in
 | `GET`  | `/queue_status/{session_id}` | admission/queue info |
 
 By default output events are **plain text** over the WS (errors as `ERROR: ...`,
-end-of-file as `PROCESSING_COMPLETE: ...`) — unchanged for existing clients.
+end-of-file as `PROCESSING_COMPLETE: ...`), unchanged for existing clients.
 
 Add **`?event_format=json`** to the WS URL for the **structured protocol**:
 each message is `{"type", "text", "meta"}` where `type` is
 `partial` / `final` / `status` / `error`, and `meta` carries the agent's
-evidence — retrieved terms (`references`), per-tick retrieval latency
+evidence: retrieved terms (`references`), per-tick retrieval latency
 (`retrieve_s`), generation latency (`elapsed_s`), segment index, routing-only
 domain-probe scores (`domain_probe_scores`), and adaptive router evidence
 (`topic`, `topic_router`). The web UI renders this as the live **Retrieved
@@ -323,7 +354,14 @@ Harnesses live in `eval/streaming_sst/`; result summaries live in `docs/`.
 | `score_terms.py` | terminology accuracy + regular/masked-term BLEU vs references |
 | `scripts/smoke_p0_protocol.py` | client-side protocol/concurrency smoke test |
 
-Key reports: [`docs/adaptive_working_glossary_eval.md`](docs/adaptive_working_glossary_eval.md),
+The demo paper's numbers come from the scripts in `eval/streaming_sst/evidence/`
+(paired significance, term-free BLEU, routing coverage and delay, open-loop
+router replays, single-session processing speed); their outputs and the run
+provenance are in [`docs/llm_router_20261120/`](docs/llm_router_20261120/),
+[`docs/realsi_20261120/`](docs/realsi_20261120/), and
+[`docs/evidence_20261024/`](docs/evidence_20261024/).
+
+Earlier reports: [`docs/adaptive_working_glossary_eval.md`](docs/adaptive_working_glossary_eval.md),
 [`docs/auto_glossary_mixed_switch_20260707.md`](docs/auto_glossary_mixed_switch_20260707.md),
 [`docs/open_term_memory_eval.md`](docs/open_term_memory_eval.md),
 [`docs/ai_glossary_sweep.md`](docs/ai_glossary_sweep.md).
@@ -365,7 +403,7 @@ reviewer-facing live demo.
 - **GPU (live mode only):** NVIDIA A6000-class. The 30B Qwen3-Omni checkpoint
   needs ≥ 2 GPUs (tensor parallel); RAG uses an additional small allocation.
   Mock mode needs no GPU.
-- **Python:** two environments are used in practice —
+- **Python:** two environments are used in practice:
   a vLLM env for the real RASST run (`vllm>=0.13`, `transformers>=4.57`,
   `torch` cu12x, `qwen_omni_utils`, `fastapi`, `uvicorn`, `soundfile`, `numpy`)
   and a lighter env for mock mode / the InfiniSST scheduler agent.

@@ -17,7 +17,7 @@ from __future__ import annotations
 import math
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Any, Deque, Dict, Iterable, List, Literal, Optional, Sequence
+from typing import Any, Deque, Dict, Iterable, List, Literal, Mapping, Optional, Sequence
 
 from framework.agents.term_memory.domain_taxonomy import (
     DOMAIN_KEYWORDS,
@@ -103,6 +103,7 @@ class RouterConfig:
     consistency_bonus: float = 0.05
     ambiguity_penalty: float = 0.10
     text_topic_weight: float = 0.60
+    context_similarity_weight: float = 0.60
     domain_probe_weight: float = 0.25
     speech_centroid_weight: float = 0.10
     metadata_prior_weight: float = 0.05
@@ -117,6 +118,11 @@ class RouterConfig:
     generated_target_probe_min_top_score: float = 0.25
     generated_target_probe_min_raw_margin: float = 0.01
     generated_target_probe_min_positive_domains: int = 1
+    slice_selection_mode: str = "hard_top1"
+    term_budget: int = 100_000
+    max_active_slices: int = 0
+    unknown_slice_term_count: int = 10_000
+    pin_active_slice: bool = True
 
 
 @dataclass
@@ -180,6 +186,42 @@ class RouterDecision:
         }
 
 
+@dataclass(frozen=True)
+class BudgetSliceSelection:
+    slices: Sequence[DomainSlice] = field(default_factory=tuple)
+    scores: Dict[str, float] = field(default_factory=dict)
+    term_counts: Dict[str, int] = field(default_factory=dict)
+    term_budget: int = 0
+    pinned_preset_id: str = ""
+
+    @property
+    def preset_ids(self) -> List[str]:
+        return [item.preset_id for item in self.slices]
+
+    @property
+    def total_terms(self) -> int:
+        return sum(int(self.term_counts.get(item.preset_id, 0)) for item in self.slices)
+
+    def to_meta(self) -> Dict[str, Any]:
+        return {
+            "mode": "budgeted_top_slices",
+            "term_budget": int(self.term_budget),
+            "selected_term_count": int(self.total_terms),
+            "selected_slice_count": len(self.slices),
+            "selected_slice_presets": self.preset_ids,
+            "pinned_active_preset": self.pinned_preset_id or None,
+            "selected_slices": [
+                {
+                    "preset_id": item.preset_id,
+                    "domain_id": item.domain_id,
+                    "score": round(float(self.scores.get(item.preset_id, 0.0)), 4),
+                    "term_count": int(self.term_counts.get(item.preset_id, 0)),
+                }
+                for item in self.slices
+            ],
+        }
+
+
 # Compatibility shape used by older tests and the legacy keyword router.
 @dataclass
 class TopicDecision:
@@ -212,6 +254,100 @@ class AudioNativeActiveGlossaryRouter:
         self.domain_slices: List[DomainSlice] = [item for item in domain_slices if item.enabled]
         self.by_preset = {item.preset_id: item for item in self.domain_slices}
         self.by_domain = {item.domain_id: item for item in self.domain_slices}
+
+    def budgeted_slice_selection_enabled(self) -> bool:
+        mode = str(self.config.slice_selection_mode or "hard_top1").strip().lower()
+        return mode in {"budgeted", "budgeted_top_slices", "top_slices"}
+
+    def select_budgeted_slices(
+        self,
+        similarity_scores: Mapping[str, float],
+        *,
+        term_budget: Optional[int] = None,
+        active_preset_id: str = "",
+    ) -> BudgetSliceSelection:
+        budget = max(
+            0,
+            int(self.config.term_budget if term_budget is None else term_budget),
+        )
+        if not self.budgeted_slice_selection_enabled() or budget <= 0:
+            return BudgetSliceSelection(term_budget=budget)
+
+        scored: List[tuple[DomainSlice, float]] = []
+        for item in self.domain_slices:
+            raw_score = similarity_scores.get(item.preset_id)
+            if raw_score is None:
+                raw_score = similarity_scores.get(item.domain_id)
+            try:
+                score = float(raw_score)
+            except (TypeError, ValueError):
+                continue
+            if math.isfinite(score):
+                scored.append((item, score))
+        scored.sort(
+            key=lambda row: (
+                -float(row[1]),
+                -int(row[0].priority),
+                row[0].preset_id,
+            )
+        )
+
+        unknown_terms = max(1, int(self.config.unknown_slice_term_count))
+        max_slices = max(0, int(self.config.max_active_slices))
+        selected: List[DomainSlice] = []
+        scores: Dict[str, float] = {}
+        term_counts: Dict[str, int] = {}
+        used_terms = 0
+        pinned_preset_id = ""
+
+        requested_active_preset = str(active_preset_id or "").strip()
+        pinned = (
+            self.by_preset.get(requested_active_preset)
+            if self.config.pin_active_slice and requested_active_preset
+            else None
+        )
+        if pinned is not None and (not max_slices or max_slices >= 1):
+            pinned_terms = (
+                int(pinned.term_count)
+                if int(pinned.term_count) > 0
+                else unknown_terms
+            )
+            if pinned_terms <= budget:
+                raw_score = similarity_scores.get(pinned.preset_id)
+                if raw_score is None:
+                    raw_score = similarity_scores.get(pinned.domain_id)
+                try:
+                    pinned_score = float(raw_score)
+                except (TypeError, ValueError):
+                    pinned_score = 0.0
+                if not math.isfinite(pinned_score):
+                    pinned_score = 0.0
+                selected.append(pinned)
+                scores[pinned.preset_id] = pinned_score
+                term_counts[pinned.preset_id] = pinned_terms
+                used_terms = pinned_terms
+                pinned_preset_id = pinned.preset_id
+
+        for item, score in scored:
+            if max_slices and len(selected) >= max_slices:
+                break
+            if item.preset_id == pinned_preset_id:
+                continue
+            item_terms = int(item.term_count) if int(item.term_count) > 0 else unknown_terms
+            if used_terms + item_terms > budget:
+                continue
+            selected.append(item)
+            scores[item.preset_id] = float(score)
+            term_counts[item.preset_id] = item_terms
+            used_terms += item_terms
+
+        return BudgetSliceSelection(
+            slices=tuple(selected),
+            scores=scores,
+            term_counts=term_counts,
+            term_budget=budget,
+            pinned_preset_id=pinned_preset_id,
+        )
 
     def observe(
         self,
@@ -486,6 +622,7 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
         router_text: str = "",
         router_text_source: Literal["manifest_source", "streaming_asr", "generated_target", "none"] = "none",
         domain_probe_scores: Optional[Dict[str, Any]] = None,
+        context_similarity_scores: Optional[Dict[str, float]] = None,
     ) -> RouterDecision:
         session_state.recent_references = _bounded_deque(
             session_state.recent_references,
@@ -513,6 +650,7 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             router_text=router_text,
             router_text_source=router_text_source,
             domain_probe_scores=domain_probe_scores or {},
+            context_similarity_scores=context_similarity_scores or {},
         )
         top = top_scores[0] if top_scores else None
         second = top_scores[1] if len(top_scores) > 1 else None
@@ -534,8 +672,19 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
         has_text = bool((router_text or "").strip() and text_source != "none")
         text_raw_for_guard, _ = topic_keyword_scores(router_text)
         has_text_topic_signal = bool(has_text and any(float(value) > 0.0 for value in text_raw_for_guard.values()))
+        has_context_similarity = any(
+            math.isfinite(float(value)) and float(value) > 0.0
+            for value in (context_similarity_scores or {}).values()
+        )
         has_probe = any(_probe_value(value) > 0.0 for value in (domain_probe_scores or {}).values())
-        has_signal = bool(has_text or has_probe or query_vec or session_state.ema_query_embedding or session_state.recent_references)
+        has_signal = bool(
+            has_text
+            or has_context_similarity
+            or has_probe
+            or query_vec
+            or session_state.ema_query_embedding
+            or session_state.recent_references
+        )
         audio_probe_guard = self._audio_probe_guard(
             domain_probe_scores or {},
             target_domain=target_domain,
@@ -553,6 +702,7 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             "router_text_source": text_source,
             "has_router_text": has_text,
             "has_text_topic_signal": has_text_topic_signal,
+            "has_context_similarity": has_context_similarity,
             "has_domain_probe": has_probe,
             "has_query_embedding": bool(query_vec or session_state.ema_query_embedding),
             "recent_reference_count": len(session_state.recent_references),
@@ -566,7 +716,6 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             "audio_probe_guard": audio_probe_guard,
             "generated_target_probe_guard": generated_target_probe_guard,
         }
-
         unsupported_current = bool(
             current_preset
             and current_preset not in self.by_preset
@@ -594,11 +743,22 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             guard_reason = "general_or_common"
         elif not self._slice_available(target_preset):
             guard_reason = "target_unavailable"
-        elif is_generated_target and not has_text_topic_signal and not generated_target_probe_guard.get("ok", False):
+        elif (
+            is_generated_target
+            and not has_text_topic_signal
+            and not has_context_similarity
+            and not generated_target_probe_guard.get("ok", False)
+        ):
             guard_reason = "generated_target_probe_evidence_insufficient"
-        elif has_text and not has_text_topic_signal and not has_probe:
+        elif has_text and not has_text_topic_signal and not has_context_similarity and not has_probe:
             guard_reason = "topic_text_or_probe_required"
-        elif has_probe and has_text and not has_text_topic_signal and not audio_probe_guard.get("ok", False):
+        elif (
+            has_probe
+            and has_text
+            and not has_text_topic_signal
+            and not has_context_similarity
+            and not audio_probe_guard.get("ok", False)
+        ):
             guard_reason = "probe_only_evidence_insufficient"
         elif not has_text and not has_probe:
             guard_reason = "audio_probe_required"
@@ -649,6 +809,14 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             or guard_reason.startswith("consistent_windows<")
         ):
             session_state.last_decision_s = float(now_s)
+        if self.budgeted_slice_selection_enabled():
+            confirmed_preset = (
+                target_preset if action in {"switch", "fallback"} else current_preset
+            )
+            evidence["slice_selection"] = self.select_budgeted_slices(
+                context_similarity_scores or {},
+                active_preset_id=confirmed_preset,
+            ).to_meta()
         decision = RouterDecision(
             action=action,
             target_preset_id=target_preset,
@@ -764,15 +932,20 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
         router_text: str,
         router_text_source: str,
         domain_probe_scores: Dict[str, Any],
+        context_similarity_scores: Dict[str, float],
     ) -> List[DomainScore]:
         text_raw, text_hits = topic_keyword_scores(router_text)
         text_by_domain = _normalize_nonnegative_score_map({key: value for key, value in text_raw.items()})
         probe_by_domain = _normalize_nonnegative_score_map(
             {key: _probe_value(value) for key, value in domain_probe_scores.items()}
         )
+        context_by_domain = _normalize_nonnegative_score_map(
+            {key: value for key, value in context_similarity_scores.items()}
+        )
         has_text = bool((router_text or "").strip() and str(router_text_source or "none") != "none")
         has_text_topic_signal = any(float(value) > 0.0 for value in text_by_domain.values())
         has_probe = any(float(value) > 0.0 for value in probe_by_domain.values())
+        has_context_similarity = any(float(value) > 0.0 for value in context_by_domain.values())
 
         ema = session_state.ema_query_embedding
         embedding_raw: Dict[str, Optional[float]] = {}
@@ -788,6 +961,7 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
         has_reference = any(float(value) > 0.0 for value in reference_by_preset.values())
         active_weight_sum = (
             (float(self.config.text_topic_weight) if has_text_topic_signal else 0.0)
+            + (float(self.config.context_similarity_weight) if has_context_similarity else 0.0)
             + (float(self.config.domain_probe_weight) if has_probe else 0.0)
             + (float(self.config.speech_centroid_weight) if has_embedding else 0.0)
             + (float(self.config.metadata_prior_weight) if has_reference else 0.0)
@@ -800,11 +974,14 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             probe_score = float(
                 probe_by_domain.get(item.domain_id, probe_by_domain.get(item.preset_id, 0.0))
             )
+            context_score = float(context_by_domain.get(item.domain_id, 0.0))
             speech_score = float(embedding_by_preset.get(item.preset_id, 0.0))
             metadata_prior = float(reference_by_preset.get(item.preset_id, 0.0))
             weighted = 0.0
             if has_text_topic_signal:
                 weighted += float(self.config.text_topic_weight) * text_score
+            if has_context_similarity:
+                weighted += float(self.config.context_similarity_weight) * context_score
             if has_probe:
                 weighted += float(self.config.domain_probe_weight) * probe_score
             if has_embedding:
@@ -831,6 +1008,7 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
             probe_score = float(
                 probe_by_domain.get(item.domain_id, probe_by_domain.get(item.preset_id, 0.0))
             )
+            context_score = float(context_by_domain.get(item.domain_id, 0.0))
             speech_score = float(embedding_by_preset.get(item.preset_id, 0.0))
             metadata_prior = float(reference_by_preset.get(item.preset_id, 0.0))
             raw_final = float(raw_final_by_preset.get(item.preset_id, 0.0))
@@ -847,6 +1025,7 @@ class HybridWindowTopicRouter(AudioNativeActiveGlossaryRouter):
                         "router_text_source": router_text_source or "none",
                         "has_text_topic_signal": has_text_topic_signal,
                         "text_topic_score": round(text_score, 4),
+                        "context_similarity_score": round(context_score, 4),
                         "domain_probe_score": round(probe_score, 4),
                         "speech_centroid_score": round(speech_score, 4),
                         "metadata_prior": round(metadata_prior, 4),

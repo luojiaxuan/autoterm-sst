@@ -1,0 +1,53 @@
+{
+ "matched": 2047,
+ "occurrences": 2047,
+ "cos": {
+  "raw@4": {
+   "all": 0.5159,
+   "nlp": 0.4313,
+   "medicine": 0.6863
+  }
+ },
+ "llm": {
+  "raw@4": {
+   "all": 0.7386,
+   "nlp": 0.8063,
+   "medicine": 0.6024
+  },
+  "hmm_rho=1e-05@4": {
+   "all": 0.8388,
+   "nlp": 0.9028,
+   "medicine": 0.7099
+  },
+  "hmm_rho=0.001@4": {
+   "all": 0.8363,
+   "nlp": 0.9057,
+   "medicine": 0.6966
+  },
+  "hmm_rho=0.1@4": {
+   "all": 0.8241,
+   "nlp": 0.9042,
+   "medicine": 0.6627
+  }
+ },
+ "oracle_per_talk@4": {
+  "all": 0.9731,
+  "nlp": 0.9773,
+  "medicine": 0.9647
+ },
+ "gold_occurrences_by_slice": {
+  "nlp:0 Natural Language Processing": 760,
+  "nlp:4 Data & Information Management": 250,
+  "nlp:1 Artificial Intelligence & Machine Learning": 219,
+  "medicine:3 Medical Procedures and Treatments": 211,
+  "medicine:0 Pharmacology and Medications": 211,
+  "medicine:1 Diseases and Disorders": 141,
+  "nlp:6 Computational Theory & Algorithms": 108,
+  "medicine:7 Clinical and Diagnostic Tools": 58,
+  "medicine:5 Genetics and Molecular Biology": 47,
+  "nlp:5 Human-Computer Interaction": 16,
+  "nlp:2 Computer Systems & Architecture": 12,
+  "medicine:4 Anatomy and Physiology": 11,
+  "nlp:7 Emerging Technologies & Applications": 3
+ }
+}

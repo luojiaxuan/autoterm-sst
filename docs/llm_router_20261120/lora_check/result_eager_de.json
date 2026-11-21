@@ -1,0 +1,210 @@
+{
+ "lang": "de",
+ "prompts": 40,
+ "identical_greedy_outputs": 31,
+ "mean_abs_logprob_diff": 0.12609491678248538,
+ "max_abs_logprob_diff": 6.639284133911133,
+ "tokens": 3218,
+ "outputs": [
+  {
+   "source": "Hi, this is Elena and I'm going to be presenting our work, Detecting Unassimilated Borrowings in Spanish: An Annotated Corpus and Approaches to Modeling.",
+   "merged": "Hallo, ich bin Elena und werde unsere Arbeit vorstellen: Die Erkennung nicht assimilierter Lehnw\u00f6rter im Spanischen: Ein annotiertes Korpus und Ans\u00e4tze zur Modellierung.",
+   "served": "Hallo, ich bin Elena und werde unsere Arbeit vorstellen: Die Erkennung unassimilierter Lehnw\u00f6rter im Spanischen: Ein annotiertes Korpus und Ans\u00e4tze zur Modellierung."
+  },
+  {
+   "source": "So we're going to be covering what lexical borrowing is, the task that we proposed, the dataset that we have released and some models that we explored.",
+   "merged": "Also werden wir uns mit dem Thema lexikalischer Entlehnung besch\u00e4ftigen, der von uns vorgeschlagenen Aufgabe, dem ver\u00f6ffentlichten Datensatz und einigen von uns untersuchten Modellen.",
+   "served": "Also werden wir uns mit dem Thema lexikalischer Entlehnung besch\u00e4ftigen, der von uns vorgeschlagenen Aufgabe, dem von uns ver\u00f6ffentlichten Datensatz und einigen von uns untersuchten Modellen."
+  },
+  {
+   "source": "But to begin with, what is lexical borrowing and why it matters as an NLP task?",
+   "merged": "Aber zun\u00e4chst einmal, was ist lexikalische Entlehnung und warum ist sie als NLP-Aufgabe wichtig?",
+   "served": "Aber zun\u00e4chst einmal, was ist lexikalische Entlehnung und warum ist sie als NLP-Aufgabe wichtig?"
+  },
+  {
+   "source": "Well, lexical borrowing is basically the incorporation of words from one language into another language.",
+   "merged": "Nun, lexikalische Entlehnung ist im Grunde die Aufnahme von W\u00f6rtern aus einer Sprache in eine andere Sprache.",
+   "served": "Nun, lexikalische Entlehnung ist im Grunde die Aufnahme von W\u00f6rtern aus einer Sprache in eine andere Sprache."
+  },
+  {
+   "source": "For instance, in Spanish we use words that come from English.",
+   "merged": "Zum Beispiel verwenden wir im Spanischen W\u00f6rter, die aus dem Englischen stammen.",
+   "served": "Zum Beispiel verwenden wir im Spanischen W\u00f6rter, die aus dem Englischen stammen."
+  },
+  {
+   "source": "And here you have a few examples, words such as podcast, app, and online crowdfunding, all these are English words that we sometimes use in Spanish.",
+   "merged": "Und hier haben Sie einige Beispiele, W\u00f6rter wie Podcast, App und Online-Crowdfunding, all diese sind englische W\u00f6rter, die wir manchmal auf Spanisch verwenden.",
+   "served": "Und hier haben Sie einige Beispiele, W\u00f6rter wie Podcast, App und Online-Crowdfunding, all diese sind englische W\u00f6rter, die wir manchmal auf Spanisch verwenden."
+  },
+  {
+   "source": "Lexical borrowing is a type of linguistic borrowing um which is basically reproducing in one language patterns of other languages.",
+   "merged": "Lexikale Entlehnung ist eine Art der sprachlichen Entlehnung, bei der in einer Sprache im Wesentlichen Muster anderer Sprachen nachgebildet werden.",
+   "served": "Lexikale Entlehnung ist eine Art der sprachlichen Entlehnung, bei der in einer Sprache im Wesentlichen Muster anderer Sprachen nachgebildet werden."
+  },
+  {
+   "source": "And borrowing and code switching have sometimes been compared and described as a continuum, code switching being ah the thing that bilinguals do where they mix two languages at the same time.",
+   "merged": "Und Entlehnung und Code-Switching wurden manchmal als Kontinuum verglichen, wobei Code-Switching das ist, was Zweisprachige tun, wenn sie gleichzeitig zwei Sprachen mischen.",
+   "served": "Und Entlehnung und Code-Switching wurden manchmal als Kontinuum verglichen, wobei Code-Switching das ist, was Zweisprachige tun, wenn sie gleichzeitig zwei Sprachen mischen."
+  },
+  {
+   "source": "There are however some differences between lexical borrowing and code-switching.",
+   "merged": "Es gibt jedoch einige Unterschiede zwischen lexikalischer Entlehnung und Code-Switching.",
+   "served": "Es gibt jedoch einige Unterschiede zwischen lexikalischer Entlehnung und Code-Switching."
+  },
+  {
+   "source": "We're going to be focusing on lexical borrowing.",
+   "merged": "Wir werden uns auf lexikalische Entlehnung konzentrieren.",
+   "served": "Wir werden uns auf lexikalische Entlehnung konzentrieren."
+  },
+  {
+   "source": "Code switching is something that is done by bilinguals and by definition the code switches are not integrated into any of the languages in use, whereas lexical borrowing is something that is also done by monolinguals.",
+   "merged": "Code-switching wird von Zweisprachigen ausgef\u00fchrt und ist per Definition nicht in eine der verwendeten Sprachen integriert, w\u00e4hrend Lexikalaufnahme auch von Einlingualen vorgenommen wird.",
+   "served": "Code-switching wird von Zweisprachigen durchgef\u00fchrt und ist per Definition nicht in eine der verwendeten Sprachen integriert, w\u00e4hrend Lexikale Entlehnung auch von Einlingualen vorgenommen wird."
+  },
+  {
+   "source": "The borrowings will comply with the grammar of the recipient language.",
+   "merged": "Die Lehnw\u00f6rter werden der Grammatik der Zielsprache entsprechen.",
+   "served": "Die Lehnw\u00f6rter werden der Grammatik der Zielsprache entsprechen."
+  },
+  {
+   "source": "And borrowings can eventually be integrated into the recipient language.",
+   "merged": "Und Lehnw\u00f6rter k\u00f6nnen schlie\u00dflich in die Empfangssprache integriert werden.",
+   "served": "Und Lehnw\u00f6rter k\u00f6nnen schlie\u00dflich in die Empf\u00e4nger Sprache integriert werden."
+  },
+  {
+   "source": "So why is borrowing an interesting phenomenon?",
+   "merged": "Warum ist Entlehnung ein interessantes Ph\u00e4nomen?",
+   "served": "Warum ist Entlehnung ein interessantes Ph\u00e4nomen?"
+  },
+  {
+   "source": "Well, from the point of view of linguistics, borrowing is a manifestation of of how languages change and how they interact.",
+   "merged": "Nun, aus sprachwissenschaftlicher Sicht ist Entlehnung ein Ausdruck daf\u00fcr, wie Sprachen sich ver\u00e4ndern und miteinander interagieren.",
+   "served": "Nun, aus linguistischer Sicht ist Entlehnung ein Ausdruck daf\u00fcr, wie Sprachen sich ver\u00e4ndern und miteinander interagieren."
+  },
+  {
+   "source": "And also lexical borrowings are a source of new words.",
+   "merged": "Und auch lexikalische Entlehnungen sind eine Quelle neuer W\u00f6rter.",
+   "served": "Und auch lexikalische Entlehnungen sind eine Quelle neuer W\u00f6rter."
+  },
+  {
+   "source": "Here you have some examples of lexical borrowings that have been incorporated into the Spanish language as new words.",
+   "merged": "Hier sind einige Beispiele f\u00fcr lexikalische Entlehnungen, die in die spanische Sprache als neue W\u00f6rter aufgenommen wurden.",
+   "served": "Hier sind einige Beispiele f\u00fcr lexikalische Entlehnungen, die in die spanische Sprache als neue W\u00f6rter aufgenommen wurden."
+  },
+  {
+   "source": "In terms of NLP ah borrowings are a common source of out-of-vocabulary words.",
+   "merged": "In Bezug auf NLP sind ah-Lehnw\u00f6rter eine h\u00e4ufige Quelle f\u00fcr W\u00f6rter au\u00dferhalb des Vokabulars.",
+   "served": "In Bezug auf NLP sind Entlehnungen eine h\u00e4ufige Quelle f\u00fcr W\u00f6rter au\u00dferhalb des Vokabulars."
+  },
+  {
+   "source": "And in fact, automatically detecting lexical borrowings ah has proven to be useful for NLP downstream tasks such as parsing, text-to-speech synthesis or machine translation.",
+   "merged": "Und tats\u00e4chlich hat sich die automatische Erkennung lexikalischer Entlehnungen als n\u00fctzlich f\u00fcr nachgeschaltete NLP-Aufgaben wie Parsing, Text-zu-Sprache-Synthese oder maschinelle \u00dcbersetzung erwiesen.",
+   "served": "Und tats\u00e4chlich hat sich die automatische Erkennung lexikalischer Entlehnungen als n\u00fctzlich f\u00fcr nachgeschaltete NLP-Aufgaben wie Parsing, Text-zu-Sprache-Synthese oder maschinelle \u00dcbersetzung erwiesen."
+  },
+  {
+   "source": "There has been a growing interest in the influence of English on other languages ah particularly ah related to English lexical borrowings, borrowings which sometimes have been called Anglicisms.",
+   "merged": "Es besteht ein wachsendes Interesse an dem Einfluss des Englischen auf andere Sprachen, insbesondere im Zusammenhang mit englischen Lehnw\u00f6rtern, die manchmal als Anglicismen bezeichnet werden.",
+   "served": "Es besteht ein wachsendes Interesse an dem Einfluss des Englischen auf andere Sprachen, insbesondere im Zusammenhang mit englischen Lehnw\u00f6rtern, die manchmal als Anglicismen bezeichnet werden."
+  },
+  {
+   "source": "And here, you have some examples of ah work on automatic detection of borrowings in ah some of these languages.",
+   "merged": "Und hier haben Sie einige Beispiele f\u00fcr die automatische Erkennung von Lehnw\u00f6rtern in einigen dieser Sprachen.",
+   "served": "Und hier haben Sie einige Beispiele f\u00fcr die automatische Erkennung von Lehnw\u00f6rtern in einigen dieser Sprachen."
+  },
+  {
+   "source": "So the task that we propose is to detect unassimilated lexical borrowings in Spanish newswire.",
+   "merged": "Die Aufgabe, die wir vorschlagen, besteht darin, nicht assimilierte Lehnw\u00f6rter im Spanischen Nachrichtenmaterial zu erkennen.",
+   "served": "Die Aufgabe, die wir vorschlagen, besteht darin, nicht assimilierte Lehnw\u00f6rter im spanischen Nachrichtenmaterial zu erkennen."
+  },
+  {
+   "source": "Which means that we are interested in extracting ah words borrowed from other languages that are being used in Spanish newspapers but that have not been integrated or assimilated into the recipient language.",
+   "merged": "Das bedeutet, dass wir uns daf\u00fcr interessieren, W\u00f6rter zu extrahieren, die aus anderen Sprachen entlehnt wurden und in spanischen Zeitungen verwendet werden, aber noch nicht in die Zielsprache integriert oder assimiliert wurden.",
+   "served": "Das bedeutet, dass wir uns daf\u00fcr interessieren, W\u00f6rter zu extrahieren, die aus anderen Sprachen entlehnt wurden und in spanischen Zeitungen verwendet werden, aber noch nicht in die Zielsprache integriert oder assimiliert wurden."
+  },
+  {
+   "source": "This is a sentence in Spanish: Las prendas bestsellers se estampan con motivos florales, animal print o retales tipo patchwork.",
+   "merged": "Die Bestseller-St\u00fccke werden mit floralen Motiven, Animal-Print oder Patchwork-Elementen bedruckt.",
+   "served": "Die Bestseller-St\u00fccke werden mit floralen Motiven, Animal-Print oder Patchwork-Elementen bedruckt."
+  },
+  {
+   "source": "Um, and as you can see, there are three spans of texts which are actually English words like bestseller, animal print and patchwork.",
+   "merged": "Und wie Sie sehen k\u00f6nnen, gibt es drei Textabschnitte, die tats\u00e4chlich englische W\u00f6rter wie Bestseller, Animal Print und Patchwork sind.",
+   "served": "Und wie Sie sehen k\u00f6nnen, gibt es drei Textabschnitte, die tats\u00e4chlich englische W\u00f6rter wie Bestseller, Animal Print und Patchwork sind."
+  },
+  {
+   "source": "These are the type of spans that we are interested in extracting and detecting.",
+   "merged": "Dies sind die Art von Spannen, die wir extrahieren und erkennen m\u00f6chten.",
+   "served": "Dies sind die Art von Spannen, die wir extrahieren und erkennen m\u00f6chten."
+  },
+  {
+   "source": "There has been previous word on Anglicism detection ah which consists consisted of a CRF model for Anglicism detection on Spanish Newswire.",
+   "merged": "Es gab bereits fr\u00fchere Arbeiten zur Erkennung von Anglicismen, die aus einem CRF-Modell zur Erkennung von Anglicismen in spanischen Nachrichtenbest\u00e4nden bestanden.",
+   "served": "Es gab bereits fr\u00fchere Arbeiten zur Erkennung von Anglicismen, die aus einem CRF-Modell zur Erkennung von Anglicismen in spanischen Nachrichtenbest\u00e4nden bestanden."
+  },
+  {
+   "source": "This model achieved an F1 score of eighty six.",
+   "merged": "Dieses Modell erzielte einen F1-Score von achtundachtzig.",
+   "served": "Dieses Modell erzielte einen F1-Score von achtundachtzig."
+  },
+  {
+   "source": "But there were some limitations both um in the dataset and the modeling approach.",
+   "merged": "Aber es gab einige Einschr\u00e4nkungen sowohl im Datensatz als auch im Modellierungsansatz.",
+   "served": "Aber es gab einige Einschr\u00e4nkungen sowohl im Datensatz als auch im Modellierungsansatz."
+  },
+  {
+   "source": "So the dataset focused exclusively on one source of news, consisted only of headlines.",
+   "merged": "Daher konzentrierte sich der Datensatz ausschlie\u00dflich auf eine Nachrichtenquelle und bestand nur aus \u00dcberschriften.",
+   "served": "Daher konzentrierte sich der Datensatz ausschlie\u00dflich auf eine Nachrichtenquelle und bestand nur aus \u00dcberschriften."
+  },
+  {
+   "source": "And also there was an overlap in the borrowings that appear in the training set and the test set.",
+   "merged": "Und es gab auch eine \u00dcberschneidung bei den Leihen, die sowohl im Trainings- als auch im Testdatensatz vorkamen.",
+   "served": "Und es gab auch eine \u00dcberschneidung bei den Leihen, die sowohl im Trainings- als auch im Testdatensatz vorkamen."
+  },
+  {
+   "source": "This prevented the assessment of whether the modeling approach could actually generalize to previously unseen borrowings.",
+   "merged": "Dies verhinderte die Beurteilung, ob der Modellierungsansatz tats\u00e4chlich auf bisher unbekannte Entlehnungen verallgemeinert werden konnte.",
+   "served": "Dies verhinderte die Beurteilung, ob der Modellierungsansatz tats\u00e4chlich auf bisher unbekannte Entlehnungen verallgemeinert werden konnte."
+  },
+  {
+   "source": "So what we aim is to tackle some of these limitations in the task.",
+   "merged": "Was wir also anstreben, ist, einige dieser Einschr\u00e4nkungen bei der Aufgabe anzugehen.",
+   "served": "Was wir also anstreben, ist, einige dieser Einschr\u00e4nkungen bei der Aufgabe anzugehen."
+  },
+  {
+   "source": "So to begin we, to begin with, we created a new dataset.",
+   "merged": "Also haben wir zun\u00e4chst ein neues Datensatz erstellt.",
+   "served": "Also haben wir zun\u00e4chst ein neues Datensatz erstellt."
+  },
+  {
+   "source": "Ah the aim at a new dataset that was annotated with lexical borrowings and the aim was to create a test set that was as difficult as possible.",
+   "merged": "Ah, das Ziel war, ein neues Datensatz zu erstellen, der mit lexikalischen Entlehnungen annotiert war, und das Ziel war es, einen Testdatensatz zu erstellen, der so schwierig wie m\u00f6glich war.",
+   "served": "Ah, das Ziel war, ein neues Datensatz zu erstellen, der mit lexikalischen Entlehnungen annotiert war, und das Ziel war es, einen Testdatensatz zu erstellen, der so schwierig wie m\u00f6glich war."
+  },
+  {
+   "source": "So there would be minimal overlap in words and topics between the training set and test set.",
+   "merged": "Daher g\u00e4be es nur eine geringe \u00dcberschneidung von W\u00f6rtern und Themen zwischen dem Trainings- und dem Testdatensatz.",
+   "served": "Daher g\u00e4be es nur eine geringe \u00dcberschneidung von W\u00f6rtern und Themen zwischen dem Trainings- und dem Testdatensatz."
+  },
+  {
+   "source": "And as a result, well, the test set comes from sources and dates that we're not seeing in the training set.",
+   "merged": "Und deshalb stammen die Testdaten aus Quellen und Zeitr\u00e4umen, die im Trainingsdatensatz nicht vorkommen.",
+   "served": "Und deshalb stammen die Testdaten aus Quellen und Zeitr\u00e4umen, die im Trainingsdatensatz nicht vorkommen."
+  },
+  {
+   "source": "Here you can see that there's no overlap in the in the time.",
+   "merged": "Hier sehen Sie, dass es keine \u00dcberschneidung in der Zeit gibt.",
+   "served": "Hier sehen Sie, dass es keine \u00dcberschneidung in der Zeit gibt."
+  },
+  {
+   "source": "It's also, the test set is also very borrowing-dense.",
+   "merged": "Es ist auch so, dass der Testdatensatz ebenfalls sehr dicht mit Entlehnungen ist.",
+   "served": "Es ist auch so, dass der Testdatensatz sehr dicht mit Entlehnungen ist."
+  },
+  {
+   "source": "Just to give you some numbers, if the training set contains six borrowings per each thousand tokens, the test set contained twenty borrowings per each thousand tokens.",
+   "merged": "Nur um Ihnen einige Zahlen zu nennen: Wenn der Trainingsdatensatz sechs Entlehnungen pro tausend Tokens enth\u00e4lt, enthielt der Testdatensatz zwanzig Entlehnungen pro tausend Tokens.",
+   "served": "Nur um Ihnen einige Zahlen zu nennen: Wenn der Trainingsdatensatz sechs Lehnw\u00f6rter pro tausend Token enth\u00e4lt, enthielt der Testdatensatz zwanzig Lehnw\u00f6rter pro tausend Token."
+  }
+ ]
+}

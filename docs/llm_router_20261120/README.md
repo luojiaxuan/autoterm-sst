@@ -136,6 +136,8 @@ RASST 论文的 De、Ja 运行（`release_profiles_taurusdata2_20260528T000922Z/
 
 读法：单会话三者相同，首个译文都在 2.3 秒左右；8 路时 LLM 路由的 p95 多 0.14 秒，仍跟得上实时；16 路时 LLM 路由跟不上。原因是每次路由更新在触发它的那一块的检索步骤里同步跑两次 4B 前向（正序、倒序各一次），并发一多，几乎每个 batch 都要等它，检索步骤中位数从 0.09 秒涨到 1.1 秒。
 
+论文表 3 用单会话一档的均值（前 3 块不计，90 块）：`eval/streaming_sst/evidence/latency_means.py` 读 Taurus `runs/latency_20261120/{lm,routed,fixed}.json`，结果在 `latency/single_session_means.json`。每块检索（含语音编码与路由）均值 LLM 路由 0.094 秒、相似度路由 0.064、Known-domain-1k 0.059；生成 0.333、0.343、0.359；实时率 0.22、0.21、0.22。`summary.json` 里的是中位数与 p95。
+
 ## Source of Truth
 
 | 产物 | 位置 | revision | 内容与来源 |

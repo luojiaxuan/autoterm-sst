@@ -10,13 +10,14 @@ MAX_SEQS="$3"
 GPU_UTIL="$4"
 PROTOTYPES="${5:-}"
 
-ROOT=/mnt/data2/jiaxuanluo/autoterm_taurus_20261024
+ROOT=${ROOT:-/mnt/data2/jiaxuanluo/autoterm_taurus_20261024}
 CODE="${ROOT}/code"
-IO_ROOT=/home/jiaxuanluo/autoterm_taurus_20261024_io
+IO_ROOT=${IO_ROOT:-/home/jiaxuanluo/autoterm_taurus_20261024_io}
 PYTHON_BIN=/home/jiaxuanluo/miniconda3/envs/spaCyEnv/bin/python
-MODEL=/mnt/data2/jiaxuanluo/RASST_release_runs/models/speech_llm_zh_cap16_denoise_budget_ttag_r32a32_ep1_taurus4_hf
-RETRIEVER=/mnt/data1/jiaxuanluo/rasst_eval/autoterm_capacity_100topics_20260710/models/rasst-hn1024.pt
-MANIFEST="${ROOT}/slices/manifest_taurus_1k.json"
+MODEL=${MODEL:-/mnt/data2/jiaxuanluo/RASST_release_runs/models/speech_llm_zh_cap16_denoise_budget_ttag_r32a32_ep1_taurus4_hf}
+RETRIEVER=${RETRIEVER:-/mnt/data1/jiaxuanluo/rasst_eval/autoterm_capacity_100topics_20260710/models/rasst-hn1024.pt}
+MANIFEST=${MANIFEST:-${ROOT}/slices/manifest_taurus_1k.json}
+RETRIEVER_CODE=${RETRIEVER_CODE:-/mnt/data2/jiaxuanluo/RASST/code/rasst/retriever}
 SLICES=nlp_core_1k,medicine_core_1k,education_core_1k,finance_core_1k,legal_core_1k,environment_core_1k,entertainment_core_1k,science_core_1k,sports_core_1k,art_core_1k
 
 case "${MODE}" in
@@ -93,7 +94,7 @@ exec "${PYTHON_BIN}" -u eval/streaming_sst/serve_glossary_capacity_sweep.py \
   --nccl-p2p-disable 1 \
   --nccl-ib-disable 1 \
   --torch-nccl-enable-monitoring 0 \
-  --extra-python-path /mnt/data2/jiaxuanluo/RASST/code/rasst/retriever \
+  --extra-python-path "${RETRIEVER_CODE}" \
   --scheduler-batch-size "${MAX_SEQS}" \
   --max-inflight-batches 2 \
   --max-new-tokens 40 \

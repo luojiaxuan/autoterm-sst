@@ -29,6 +29,33 @@ from framework.agents.term_memory.topic_router import (
 
 
 class AutoWorkingFixedTop10Tests(unittest.TestCase):
+    def test_empty_translation_status_acknowledges_the_stream_cursor(self) -> None:
+        events = []
+        agent = OmniAgent()
+        agent._emit = events.append
+        session = SimpleNamespace(session_id="empty-output", segment_idx=7)
+
+        with patch.object(
+            agent,
+            "_event_meta",
+            return_value={"start_sample": 10, "cursor_samples": 20},
+        ):
+            agent._emit_cursor_status(
+                session,
+                text="EMPTY_TRANSLATION",
+                start_sample=10,
+                cursor_samples=20,
+                retrieve_s=0.1,
+                references=[],
+            )
+
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].type, "status")
+        self.assertEqual(events[0].text, "EMPTY_TRANSLATION")
+        self.assertEqual(events[0].meta["start_sample"], 10)
+        self.assertEqual(events[0].meta["cursor_samples"], 20)
+        self.assertEqual(events[0].meta["cursor_status_reason"], "empty_translation")
+
     def test_autoterm_yaml_hysteresis_defaults_reach_omni_config(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             config = OmniConfig.from_env(get_template("qwen3_omni"))
@@ -40,6 +67,11 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertEqual(config.auto_glossary_base_preset, "none")
         self.assertEqual(config.auto_glossary_default_preset, "nlp_core_10k")
         self.assertEqual(config.router_mode, "hybrid_window_topic")
+        self.assertTrue(config.router_context_similarity_enabled)
+        self.assertEqual(config.router_context_similarity_model, "BAAI/bge-m3")
+        self.assertEqual(config.router_context_similarity_device, "cpu")
+        self.assertEqual(config.router_context_similarity_weight, 0.60)
+        self.assertEqual(len(config.auto_glossary_presets.split(",")), 10)
         self.assertEqual(config.router_domain_probe_top_k, 5)
         self.assertEqual(config.router_min_consistent_windows_with_text, 2)
         self.assertEqual(config.router_min_consistent_windows_generated_target, 2)
@@ -53,6 +85,11 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertTrue(config.router_generated_target_enabled)
         self.assertEqual(config.router_generated_target_window_chunks, 12)
         self.assertEqual(config.router_generated_target_min_chars, 6)
+        self.assertEqual(config.router_slice_selection_mode, "hard_top1")
+        self.assertEqual(config.router_term_budget, 100_000)
+        self.assertEqual(config.router_max_active_slices, 0)
+        self.assertEqual(config.router_unknown_slice_term_count, 10_000)
+        self.assertTrue(config.router_pin_active_slice)
         self.assertEqual(config.auto_glossary_switch_cooldown_sec, 30.0)
         self.assertEqual(config.auto_glossary_candidate_stale_sec, 120.0)
         self.assertEqual(config.autoterm_topk_per_slice, 10)
@@ -183,7 +220,7 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
             auto_glossary_enabled=True,
             router_text_window="",
             router_text_source="none",
-            history=["这是一个语言模型。", "患者接受临床治疗。"],
+            router_generated_target_history=["这是一个语言模型。"],
         )
 
         agent._after_translation_tick(session, text="患者接受临床治疗。", references=[])
@@ -200,7 +237,7 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
             auto_glossary_enabled=True,
             router_text_window="",
             router_text_source="none",
-            history=[],
+            router_generated_target_history=[],
         )
 
         agent._after_translation_tick(session, text="患者接受临床治疗。", references=[])
@@ -214,13 +251,36 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
             auto_glossary_enabled=True,
             router_text_window="external source text",
             router_text_source="manifest_source",
-            history=["患者接受临床治疗。"],
+            router_generated_target_history=["患者接受临床治疗。"],
         )
 
         agent._after_translation_tick(session, text="患者接受临床治疗。", references=[])
 
         self.assertEqual(session.router_text_source, "manifest_source")
         self.assertEqual(session.router_text_window, "external source text")
+
+    def test_generated_target_router_history_is_independent_of_decoder_cache(self) -> None:
+        agent = OmniAgent()
+        agent.config.router_generated_target_enabled = True
+        agent.config.router_generated_target_window_chunks = 3
+        agent.config.router_generated_target_min_chars = 1
+        session = SimpleNamespace(
+            auto_glossary_enabled=True,
+            router_text_window="",
+            router_text_source="none",
+            router_generated_target_history=[],
+            history=["decoder-only context"],
+        )
+
+        for text in ("oldest", "middle", "newest", "current"):
+            agent._after_translation_tick(session, text=text, references=[])
+
+        self.assertEqual(
+            session.router_generated_target_history,
+            ["middle", "newest", "current"],
+        )
+        self.assertEqual(session.router_text_window, "middle\nnewest\ncurrent")
+        self.assertNotIn("decoder-only context", session.router_text_window)
 
     def test_generated_target_text_is_used_by_next_router_tick_only(self) -> None:
         agent = OmniAgent()
@@ -386,6 +446,29 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
         self.assertFalse(session.last_domain_probe_cached)
         self.assertTrue(all(item["role"] == "domain_probe" for item in session.last_domain_probe_slices))
 
+    def test_zero_weight_disables_domain_probe_work(self) -> None:
+        agent = OmniAgent()
+        agent.config.router_domain_probe_weight = 0.0
+        agent.retrieval = MockRetrieval(target_lang="zh", top_k=10)
+        session = SimpleNamespace(
+            last_domain_probe_raw_scores={"stale": object()},
+            last_domain_probe_scores={"stale": {}},
+            last_domain_probe_slices=[{"preset_id": "stale"}],
+            last_domain_probe_s=1.0,
+            last_domain_probe_at_s=1.0,
+            last_domain_probe_cached=True,
+        )
+
+        scores = asyncio.run(agent._probe_domain_scores(session, end_sample=16000))
+
+        self.assertEqual(scores, {})
+        self.assertEqual(session.last_domain_probe_raw_scores, {})
+        self.assertEqual(session.last_domain_probe_scores, {})
+        self.assertEqual(session.last_domain_probe_slices, [])
+        self.assertIsNone(session.last_domain_probe_s)
+        self.assertEqual(session.last_domain_probe_at_s, 0.0)
+        self.assertFalse(session.last_domain_probe_cached)
+
     def test_domain_probe_reuses_cached_scores_inside_update_gate(self) -> None:
         agent = OmniAgent()
         agent.config.mock = True
@@ -467,6 +550,53 @@ class AutoWorkingFixedTop10Tests(unittest.TestCase):
 
         self.assertEqual(agent._domain_probe_refresh_sec(no_text), 1.92)
         self.assertEqual(agent._domain_probe_refresh_sec(with_text), 30.0)
+
+    def test_context_scores_refresh_in_the_background_and_are_reused(self) -> None:
+        class FakeContextSimilarity:
+            enabled = True
+
+            def __init__(self) -> None:
+                self.calls = []
+
+            async def score_batch(self, texts, *, allowed_domains):  # noqa: ANN001, ANN202
+                self.calls.append((list(texts), list(allowed_domains)))
+                return [{"nlp": 0.2, "medicine": 0.9} for _ in texts]
+
+        agent = OmniAgent()
+        agent.config.auto_glossary_update_sec = 30.0
+        scorer = FakeContextSimilarity()
+        agent.context_similarity = scorer
+        session = SimpleNamespace(
+            session_id="s1",
+            auto_glossary_enabled=True,
+            router_text_window="患者接受临床治疗。",
+            router_text_source="generated_target",
+            latency_multiplier=2,
+            language_pair=agent.config.language_pair,
+            segment_idx=3,
+            router_posterior={},
+            router_posterior_segment=-1,
+            last_context_similarity_scores={},
+            last_context_similarity_s=None,
+            last_context_similarity_at_s=0.0,
+            last_context_similarity_text="",
+            last_context_similarity_cached=False,
+        )
+        agent.sessions["s1"] = session
+
+        # A chunk never waits for scoring: it reads the cached scores and wakes the router worker.
+        before = asyncio.run(agent._context_similarity_scores_batch([session]))
+        self.assertEqual(before, [{}])
+        self.assertEqual(scorer.calls, [])
+        self.assertTrue(agent._router_wakeup.is_set())
+
+        asyncio.run(agent._refresh_context_scores())
+        asyncio.run(agent._refresh_context_scores())
+        after = asyncio.run(agent._context_similarity_scores_batch([session]))
+
+        self.assertEqual(after, [{"nlp": 0.2, "medicine": 0.9}])
+        self.assertEqual(len(scorer.calls), 1)
+        self.assertTrue(session.last_context_similarity_cached)
 
     def test_cached_probe_scores_can_confirm_audio_only_switch(self) -> None:
         router = HybridWindowTopicRouter(

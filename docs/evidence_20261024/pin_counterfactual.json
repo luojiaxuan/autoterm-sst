@@ -1,0 +1,26 @@
+{
+ "run": "/mnt/data1/jiaxuanluo/autoterm_streamlaal_20260711/runs/autoterm.json",
+ "window_chunks": 4,
+ "windows": 8775,
+ "device": "cpu",
+ "gold_in_working_set": {
+  "no_pin_raw_top4": 0.8496,
+  "pin_replay": 0.97,
+  "live_run": 0.9693
+ },
+ "confirmed_slice_correct": 0.885,
+ "confirmed_slice_outside_raw_top4": 0.1526,
+ "correct_confirmed_slice_kept_only_by_pin": {
+  "windows": 1068,
+  "share_of_all_windows": 0.1217,
+  "share_of_windows_with_correct_confirmed_slice": 0.1375,
+  "episodes": 350,
+  "episode_length_windows": {
+   "median": 2.0,
+   "max": 31,
+   "share_of_episodes_1_or_2_windows": 0.6
+  },
+  "share_within_60s_after_talk_boundary": 0.0019
+ },
+ "windows_within_60s_after_talk_boundary_share": 0.032
+}

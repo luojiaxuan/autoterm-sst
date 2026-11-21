@@ -1,0 +1,52 @@
+{
+ "art": [
+  "Art, architecture, media, literature, music, and heritage terms.",
+  "Arts and culture covers painting, sculpture, architecture, museums, historic sites, film, television, literature, music, and design.",
+  "艺术与文化涵盖绘画、雕塑、建筑、博物馆、古迹、电影、电视、文学、音乐和设计。"
+ ],
+ "education": [
+  "Universities, schools, colleges, academic disciplines, and education terms.",
+  "Education and academic institutions: universities, schools, colleges, vocational institutes, international education, higher education, educational sciences, language learning, academic disciplines.",
+  "教育与学术机构：大学、学校、学院、职业技术学院、国际教育、高等教育、学习科学、语言学习、学科。"
+ ],
+ "entertainment": [
+  "Film, television, music, video game, and pop culture terms.",
+  "Entertainment and media covers films, television series, video games, music genres, songs and albums, musicians, actors, awards, broadcasters, and anime.",
+  "娱乐与媒体涵盖电影、电视剧、电子游戏、音乐类型、歌曲和专辑、音乐人、演员、奖项、广播电视机构和动画。"
+ ],
+ "environment": [
+  "Ecology, biodiversity, geography, pollution, climate, and conservation terms.",
+  "Environmental studies covers environmental law, environmental chemistry, climate change, ozone depletion, invasive species, plastic pollution, municipal solid waste, water supply and sanitation, energy conservation, biogeography.",
+  "环境研究涵盖环境法学、环境化学、气候变化、臭氧层空洞、入侵物种、塑料污染、都市固体废物、供水与污水处理、节约能源和生物地理学。"
+ ],
+ "finance": [
+  "Finance, banking, accounting, marketing, retail, and economics terms.",
+  "The field is finance, banking, accounting, and commerce: financial services, central banks, currencies, accounting, payment cards and digital wallets, investment funds, securities exchanges, insurance, marketing, and supply chains.",
+  "该领域是金融、银行、会计和商业：金融服务、中央银行、货币、会计、支付卡和电子钱包、投资基金、证券交易所、保险、营销和供应链。"
+ ],
+ "legal": [
+  "Government, law, politics, economics, and international relations terms.",
+  "The field is politics, law, and political economy, covering governments, parliaments, courts, elections, treaties, international organizations, wars, human rights, finance, and corporations.",
+  "该领域是政治、法律和政治经济学，涵盖政府、议会、法院、选举、条约、国际组织、战争、人权、金融和公司。"
+ ],
+ "medicine": [
+  "Disease, drug, pathogen, anatomy, procedure, and diagnostic terms.",
+  "Biomedical and medical terminology covers diseases, pharmaceuticals, ATC drug codes, infectious pathogens, viruses, bacteria, anatomy, surgical procedures, diagnostic tests, and immunology.",
+  "生物医学和医学术语涵盖疾病、药物、ATC药物编码、传染性病原体、病毒、细菌、解剖学、外科手术、诊断检查和免疫学。"
+ ],
+ "nlp": [
+  "NLP, corpora, machine translation, chatbots, and OCR terms.",
+  "The field is computational linguistics and natural language processing: corpora, machine translation, language models, chatbots, information retrieval, optical character recognition, text summarization, named-entity recognition, finite automata.",
+  "该领域是计算语言学和自然语言处理：语料库、机器翻译、语言模型、聊天机器人、信息检索、光学字符识别、文本摘要、命名实体识别、有限自动机。"
+ ],
+ "science": [
+  "Taxonomy, ecology, humanities, social science, and engineering terms.",
+  "Academic disciplines and biological taxonomy covers species and families, ecology, botany, zoology, linguistics, anthropology, political science, economics, engineering, and medicine.",
+  "学科与生物分类涵盖物种和科、生态学、植物学、动物学、语言学、人类学、政治学、经济学、工程学和医学。"
+ ],
+ "sports": [
+  "Athletes, teams, leagues, tournaments, venues, and rules terms.",
+  "This field is sports: association football, baseball, basketball, tennis, Olympic Games, leagues, tournaments, teams, athletes, venues.",
+  "该领域是体育：足球、棒球、篮球、网球、奥林匹克运动会、联赛、锦标赛、球队、运动员、场馆。"
+ ]
+}

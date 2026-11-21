@@ -1,0 +1,24 @@
+{
+ "lang": "ja",
+ "windows": 8940,
+ "talks": {
+  "acl": 5,
+  "medicine": 5
+ },
+ "cosine": {
+  "top1_acc": 0.6919,
+  "top1_changes": 1985,
+  "cover@1": 0.6919,
+  "set_changes@1": 1985,
+  "cover@4": 0.8486,
+  "set_changes@4": 5763
+ },
+ "llm": {
+  "top1_acc": 0.7895,
+  "top1_changes": 1008,
+  "cover@1": 0.7895,
+  "set_changes@1": 1008,
+  "cover@4": 0.8816,
+  "set_changes@4": 4796
+ }
+}

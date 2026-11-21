@@ -107,6 +107,7 @@ def medicine_reference_segments(
     block_duration_s: float,
     *,
     medicine_input_dir: str,
+    target_lang: str = "zh",
 ) -> list[ReferenceSegment]:
     try:
         import yaml
@@ -119,7 +120,7 @@ def medicine_reference_segments(
     source_lines = (root / f"medicine.source_text.en__medicine_{medicine_id}.txt").read_text(
         encoding="utf-8"
     ).splitlines()
-    reference_lines = (root / f"medicine.ref.zh__medicine_{medicine_id}.txt").read_text(
+    reference_lines = (root / f"medicine.ref.{target_lang}__medicine_{medicine_id}.txt").read_text(
         encoding="utf-8"
     ).splitlines()
     if not (len(audio_rows) == len(source_lines) == len(reference_lines)):
@@ -150,6 +151,7 @@ def group_reference_segments(
     *,
     block_duration_s: float,
     target_window_s: float,
+    reference_separator: str = "",
 ) -> list[dict[str, Any]]:
     if not segments:
         return []
@@ -179,7 +181,9 @@ def group_reference_segments(
                 "local_start_s": start_s,
                 "local_end_s": max(start_s, end_s),
                 "source": " ".join(item.source for item in group if item.source),
-                "reference": "".join(item.reference for item in group if item.reference),
+                "reference": reference_separator.join(
+                    item.reference for item in group if item.reference
+                ),
                 "reference_segment_count": len(group),
             }
         )
@@ -245,6 +249,7 @@ def prepare_windows(
     acl_reference_text: str,
     medicine_input_dir: str,
     target_window_s: float,
+    target_lang: str = "zh",
 ) -> list[dict[str, Any]]:
     auto_signature = payload_signature(auto_payload)
     merged_signature = payload_signature(merged_payload)
@@ -275,6 +280,7 @@ def prepare_windows(
                 block,
                 block_duration_s,
                 medicine_input_dir=medicine_input_dir,
+                target_lang=target_lang,
             )
         else:
             raise ValueError(f"unsupported corpus: {block.get('corpus')}")
@@ -283,6 +289,7 @@ def prepare_windows(
             reference_segments,
             block_duration_s=block_duration_s,
             target_window_s=target_window_s,
+            reference_separator=" " if target_lang == "de" else "",
         )
         for window_index, window in enumerate(grouped, start=1):
             auto_hypothesis, auto_event_count = hypothesis_for_window(
@@ -440,9 +447,14 @@ def score_windows(
     bootstrap_samples: int,
     bootstrap_seed: int,
     max_combined_tokens: int,
+    auto_label: str = "AutoTerm",
+    merged_label: str = "merged glossary",
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if xcomet_code_dir:
         sys.path.insert(0, str(Path(xcomet_code_dir).expanduser()))
+    # note (luojiaxuan): xCOMET does not use HF hub kernels, and newer serving
+    # images can ship an incompatible optional ``kernels`` package.
+    sys.modules.setdefault("kernels", None)
     from sacrebleu.metrics import CHRF
     from xcomet.deberta_encoder import XCOMETLite
 
@@ -569,6 +581,7 @@ def score_windows(
     return scored_rows, {
         "model": model_name,
         "model_revision": model_revision or None,
+        "system_labels": {"auto": auto_label, "merged": merged_label},
         "mode": "reference_based_source_hypothesis_reference",
         "segments": len(scored_rows),
         "xcomet_eligible_segments": len(eligible_indices),
@@ -582,8 +595,14 @@ def score_windows(
 
 
 def markdown_summary(summary: dict[str, Any]) -> str:
+    labels = summary.get("system_labels") or {
+        "auto": "AutoTerm",
+        "merged": "merged glossary",
+    }
+    auto_label = str(labels["auto"])
+    merged_label = str(labels["merged"])
     lines = [
-        "# AutoTerm vs merged glossary: aligned-window quality",
+        f"# {auto_label} vs {merged_label}: aligned-window quality",
         "",
         f"- Model: `{summary['model']}`",
         f"- Mode: `{summary['mode']}`",
@@ -591,7 +610,7 @@ def markdown_summary(summary: dict[str, Any]) -> str:
         f"({summary['xcomet_eligible_segments']} xCOMET-eligible; "
         f"{summary['xcomet_excluded_overlength']} overlength excluded)",
         "",
-        "| metric | AutoTerm | merged | delta | talk-bootstrap 95% CI | talk sign-flip p |",
+        f"| metric | {auto_label} | {merged_label} | delta | talk-bootstrap 95% CI | talk sign-flip p |",
         "|---|---:|---:|---:|---:|---:|",
     ]
     for label, key in (("xCOMET-lite", "xcomet_lite"), ("chrF2", "chrf_pp")):
@@ -609,7 +628,7 @@ def markdown_summary(summary: dict[str, Any]) -> str:
             [
                 f"### {label}",
                 "",
-                "| domain | AutoTerm | merged | delta | windows |",
+                f"| domain | {auto_label} | {merged_label} | delta | windows |",
                 "|---|---:|---:|---:|---:|",
             ]
         )
@@ -631,6 +650,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--acl-source-text", default=DEFAULT_ACL_SOURCE_TEXT)
     parser.add_argument("--acl-reference-text", default=DEFAULT_ACL_REFERENCE_TEXT)
     parser.add_argument("--medicine-input-dir", default=DEFAULT_MEDICINE_INPUT_DIR)
+    parser.add_argument("--target-lang", choices=("zh", "ja", "de"), default="zh")
     parser.add_argument("--window-sec", type=float, default=30.0)
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--model-name", default="myyycroft/XCOMET-lite")
@@ -642,6 +662,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--bootstrap-samples", type=int, default=10000)
     parser.add_argument("--bootstrap-seed", type=int, default=20260710)
     parser.add_argument("--max-combined-tokens", type=int, default=480)
+    parser.add_argument("--auto-label", default="AutoTerm")
+    parser.add_argument("--merged-label", default="merged glossary")
     parser.add_argument("--out-scored-jsonl", default="")
     parser.add_argument("--out-summary-json", default="")
     parser.add_argument("--out-md", default="")
@@ -662,6 +684,7 @@ def main() -> None:
             acl_reference_text=args.acl_reference_text,
             medicine_input_dir=args.medicine_input_dir,
             target_window_s=args.window_sec,
+            target_lang=args.target_lang,
         )
         if not rows:
             raise SystemExit("no aligned windows were prepared")
@@ -685,6 +708,8 @@ def main() -> None:
         bootstrap_samples=args.bootstrap_samples,
         bootstrap_seed=args.bootstrap_seed,
         max_combined_tokens=args.max_combined_tokens,
+        auto_label=args.auto_label,
+        merged_label=args.merged_label,
     )
     write_jsonl(args.out_scored_jsonl, scored_rows)
     write_json(args.out_summary_json, summary)

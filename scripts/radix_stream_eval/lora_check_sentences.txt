@@ -1,0 +1,40 @@
+Hi, this is Elena and I'm going to be presenting our work, Detecting Unassimilated Borrowings in Spanish: An Annotated Corpus and Approaches to Modeling.
+So we're going to be covering what lexical borrowing is, the task that we proposed, the dataset that we have released and some models that we explored.
+But to begin with, what is lexical borrowing and why it matters as an NLP task?
+Well, lexical borrowing is basically the incorporation of words from one language into another language.
+For instance, in Spanish we use words that come from English.
+And here you have a few examples, words such as podcast, app, and online crowdfunding, all these are English words that we sometimes use in Spanish.
+Lexical borrowing is a type of linguistic borrowing um which is basically reproducing in one language patterns of other languages.
+And borrowing and code switching have sometimes been compared and described as a continuum, code switching being ah the thing that bilinguals do where they mix two languages at the same time.
+There are however some differences between lexical borrowing and code-switching.
+We're going to be focusing on lexical borrowing.
+Code switching is something that is done by bilinguals and by definition the code switches are not integrated into any of the languages in use, whereas lexical borrowing is something that is also done by monolinguals.
+The borrowings will comply with the grammar of the recipient language.
+And borrowings can eventually be integrated into the recipient language.
+So why is borrowing an interesting phenomenon?
+Well, from the point of view of linguistics, borrowing is a manifestation of of how languages change and how they interact.
+And also lexical borrowings are a source of new words.
+Here you have some examples of lexical borrowings that have been incorporated into the Spanish language as new words.
+In terms of NLP ah borrowings are a common source of out-of-vocabulary words.
+And in fact, automatically detecting lexical borrowings ah has proven to be useful for NLP downstream tasks such as parsing, text-to-speech synthesis or machine translation.
+There has been a growing interest in the influence of English on other languages ah particularly ah related to English lexical borrowings, borrowings which sometimes have been called Anglicisms.
+And here, you have some examples of ah work on automatic detection of borrowings in ah some of these languages.
+So the task that we propose is to detect unassimilated lexical borrowings in Spanish newswire.
+Which means that we are interested in extracting ah words borrowed from other languages that are being used in Spanish newspapers but that have not been integrated or assimilated into the recipient language.
+This is a sentence in Spanish: Las prendas bestsellers se estampan con motivos florales, animal print o retales tipo patchwork.
+Um, and as you can see, there are three spans of texts which are actually English words like bestseller, animal print and patchwork.
+These are the type of spans that we are interested in extracting and detecting.
+There has been previous word on Anglicism detection ah which consists consisted of a CRF model for Anglicism detection on Spanish Newswire.
+This model achieved an F1 score of eighty six.
+But there were some limitations both um in the dataset and the modeling approach.
+So the dataset focused exclusively on one source of news, consisted only of headlines.
+And also there was an overlap in the borrowings that appear in the training set and the test set.
+This prevented the assessment of whether the modeling approach could actually generalize to previously unseen borrowings.
+So what we aim is to tackle some of these limitations in the task.
+So to begin we, to begin with, we created a new dataset.
+Ah the aim at a new dataset that was annotated with lexical borrowings and the aim was to create a test set that was as difficult as possible.
+So there would be minimal overlap in words and topics between the training set and test set.
+And as a result, well, the test set comes from sources and dates that we're not seeing in the training set.
+Here you can see that there's no overlap in the in the time.
+It's also, the test set is also very borrowing-dense.
+Just to give you some numbers, if the training set contains six borrowings per each thousand tokens, the test set contained twenty borrowings per each thousand tokens.

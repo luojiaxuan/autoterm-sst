@@ -1,0 +1,117 @@
+{
+ "model": "Qwen/Qwen3-4B-Instruct-2507",
+ "k": 8,
+ "seed": 20261120,
+ "domains": {
+  "nlp": {
+   "subfields": [
+    {
+     "name": "Natural Language Processing",
+     "description_en": "Focuses on how computers understand, generate, and process human language; includes terms like natural language generation, semantic compression, topic map, linguistic frameworks, and computational humor.",
+     "description_zh": "聚焦计算机理解、生成和处理人类语言，包含自然语言生成、语义压缩、主题图、语言框架和计算幽默等术语。"
+    },
+    {
+     "name": "Artificial Intelligence & Machine Learning",
+     "description_en": "Covers AI systems, models, and learning techniques such as generative AI, LLM-as-a-Judge, neural modeling, and inductive programming.",
+     "description_zh": "涵盖人工智能系统、模型和学习技术，如生成式AI、LLM作为裁判、神经建模和归纳编程。"
+    },
+    {
+     "name": "Computer Systems & Architecture",
+     "description_en": "Deals with hardware, operating systems, and system design, including processors, memory, buses, and virtualization technologies like interruptible OS and capability-based OS.",
+     "description_zh": "涉及硬件、操作系统和系统设计，如处理器、内存、总线和基于能力的操作系统等技术。"
+    },
+    {
+     "name": "Security & Privacy",
+     "description_en": "Addresses cybersecurity threats, data protection, and privacy mechanisms such as cyber-kinetic attacks, differential privacy, and encryption disputes.",
+     "description_zh": "涉及网络安全威胁、数据保护和隐私机制，如网络攻击、差分隐私和加密争议。"
+    },
+    {
+     "name": "Data & Information Management",
+     "description_en": "Focuses on data structures, retrieval, storage, and analysis, including databases, information extraction, data redundancy, and data preprocessing.",
+     "description_zh": "聚焦数据结构、检索、存储和分析，包括数据库、信息提取、数据冗余和数据预处理。"
+    },
+    {
+     "name": "Human-Computer Interaction",
+     "description_en": "Explores how humans interact with technology, including interfaces, user modeling, accessibility, and ecological interface design.",
+     "description_zh": "探讨人类与技术的交互方式，包括界面、用户建模、可访问性和生态界面设计。"
+    },
+    {
+     "name": "Computational Theory & Algorithms",
+     "description_en": "Involves formal models, complexity, and algorithmic concepts such as finite-state machines, entropy, context-free grammars, and computational heuristics.",
+     "description_zh": "涉及形式模型、复杂性和算法概念，如有限状态机、熵、上下文无关文法和计算启发式。"
+    },
+    {
+     "name": "Emerging Technologies & Applications",
+     "description_en": "Encompasses cutting-edge applications and experimental fields like Xenobots, AI-driven design, augmented reality, and distributed ledger technology.",
+     "description_zh": "涵盖前沿应用和实验性领域，如Xenobots、AI驱动的设计、增强现实和分布式账本技术。"
+    }
+   ],
+   "sizes": [
+    5026,
+    883,
+    949,
+    432,
+    1125,
+    327,
+    890,
+    368
+   ],
+   "taxonomy_sample_size": 400
+  },
+  "medicine": {
+   "subfields": [
+    {
+     "name": "Pharmacology and Medications",
+     "description_en": "Drug classifications, therapeutic uses, and pharmacological mechanisms such as antivirals, antihypertensives, and analgesics; includes ATC codes, drug names, and drug actions.",
+     "description_zh": "药物分类、治疗用途和药理机制，如抗病毒药、降压药和止痛药；包含ATC代码、药物名称和药效信息。"
+    },
+    {
+     "name": "Diseases and Disorders",
+     "description_en": "Medical conditions including infections, neurological disorders, cancers, and systemic diseases such as syphilis, bipolar disorder, and sarcoidosis.",
+     "description_zh": "包括感染、神经系统疾病、癌症和系统性疾病，如梅毒、双相情感障碍和结节病等疾病。"
+    },
+    {
+     "name": "Microbiology and Pathogens",
+     "description_en": "Microorganisms and viruses such as bacteria, viruses, and fungi, including specific species and viral families like Streptomyces, Zika virus, and Nidovirales.",
+     "description_zh": "微生物和病毒，如细菌、病毒和真菌，包括特定物种和病毒家族，如链霉菌、寨卡病毒和 nidovirales。"
+    },
+    {
+     "name": "Medical Procedures and Treatments",
+     "description_en": "Clinical interventions such as surgery, biopsies, injections, and therapies including endometrial biopsy, joint injection, and plasma exchange.",
+     "description_zh": "临床干预措施，如手术、活检、注射和治疗，包括子宫内膜活检、关节注射和血浆置换。"
+    },
+    {
+     "name": "Anatomy and Physiology",
+     "description_en": "Body systems and structures such as the endocrine, nervous, and digestive systems, including organs, tissues, and developmental processes.",
+     "description_zh": "人体系统和结构，如内分泌、神经系统和消化系统，包括器官、组织和发育过程。"
+    },
+    {
+     "name": "Genetics and Molecular Biology",
+     "description_en": "Genetic mechanisms, gene expression, mutations, and molecular functions such as gene clusters, protein domains, and epigenetic regulation.",
+     "description_zh": "遗传机制、基因表达、突变和分子功能，如基因簇、蛋白质结构域和表观遗传调控。"
+    },
+    {
+     "name": "Medical Education and Institutions",
+     "description_en": "Medical schools, research centers, journals, and academic figures involved in medical training and research, such as Stanford, Geisel, and the WHO AWaRe book.",
+     "description_zh": "医学院、研究机构、期刊和学术人物，如斯坦福大学、盖塞尔医学院和WHO AWaRe抗生素指南。"
+    },
+    {
+     "name": "Clinical and Diagnostic Tools",
+     "description_en": "Diagnostic methods, laboratory tests, and clinical assessments such as urinalysis, tinnitus retraining, and protein function prediction.",
+     "description_zh": "诊断方法、实验室检测和临床评估，如尿液分析、耳鸣再训练和蛋白质功能预测。"
+    }
+   ],
+   "sizes": [
+    3102,
+    1639,
+    1812,
+    619,
+    434,
+    878,
+    1089,
+    427
+   ],
+   "taxonomy_sample_size": 400
+  }
+ }
+}

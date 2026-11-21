@@ -2,7 +2,8 @@
 # Chunk latency of the language-model router, the similarity router and Known-domain-1k, measured one
 # configuration at a time on three A6000 GPUs of the Taurus hold job: vllm serve on two GPUs, the retriever
 # and the router models on the third. concurrency_full_pipeline.py streams real lectures in real time
-# (one 1.92 s chunk every 1.92 s) at 1, 8 and 16 concurrent sessions and records, per chunk, the time from
+# (one 1.92 s chunk every 1.92 s; $LEVELS sessions of $SESSION_SEC seconds, 1, 8 and 16 sessions of 180 s by
+# default) and records, per chunk, the time from
 # sending its audio to receiving its translation. A configuration whose output exists is skipped.
 set -euo pipefail
 JOB=48285
@@ -10,6 +11,9 @@ ROOT=/mnt/data2/jiaxuanluo/autoterm_taurus_20261024
 IO_ROOT=/home/jiaxuanluo/autoterm_taurus_20261024_io
 PYTHON_BIN=/home/jiaxuanluo/miniconda3/envs/spaCyEnv/bin/python
 OUT="${OUT:-${IO_ROOT}/runs/latency_20261120}"
+LEVELS=${LEVELS:-1,8,16}
+SESSION_SEC=${SESSION_SEC:-180}
+WARMUP_SEC=${WARMUP_SEC:-$SESSION_SEC}
 mkdir -p "${OUT}"
 cd "${ROOT}/code"
 git rev-parse HEAD > "${OUT}/code_revision.txt"
@@ -40,7 +44,7 @@ PY
     eval/streaming_sst/concurrency_full_pipeline.py --base-url "http://127.0.0.1:${port}" --preset "${preset}" \
     --audio-glob '/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/acl6060/*.wav' \
     --audio-glob '/mnt/data2/jiaxuanluo/RASST/data/main_result/audio/medicine/sample_*_v2/*.wav' \
-    --levels 1,8,16 --seconds-per-session 180 --gpus "${granted}" \
+    --levels "${LEVELS}" --seconds-per-session "${SESSION_SEC}" --warmup-seconds "${WARMUP_SEC}" --gpus "${granted}" \
     --out-json "${OUT}/${mode}.json" > "${OUT}/client_${mode}.log" 2>&1
   tmux kill-session -t =lat-server
   for _ in $(seq 1 60); do

@@ -6,12 +6,10 @@ changing its models, as Figure~\ref{fig:architecture} shows. RASST translates
 audio in 1.92-second chunks with a speech encoder, a cross-modal term
 retriever, and the Qwen3-Omni LLM: the speech encoder turns chunk $t$ into features $h_t$,
 the retriever builds a term map $G_t$, and the LLM translates $h_t$ with $G_t$
-in its prompt. Because there is no transcript, the retriever matches speech
-directly against glossary source terms by maximum similarity, or MaxSim. Each
-source term is pre-encoded as a vector $z_i$, the speech of chunk $t$ is
-encoded into vectors $q_v$ over overlapping windows $v\in\mathcal V_t$, and the
-term score is $r_i=\max_{v\in\mathcal V_t}q_v^\top z_i$. Terms scoring above
-0.78 become candidates, and at most ten source--target pairs enter $G_t$.
+in its prompt. Because the model produces no source transcript, the retriever matches speech
+directly against glossary source terms by maximum similarity, or MaxSim,
+between pre-encoded term vectors and overlapping speech windows. Terms scoring
+above 0.78 become candidates, and at most ten source--target pairs enter $G_t$.
 AutoTerm-SST changes only which entries this lookup sees: its router restricts
 it to a working set of up to four topic slices, and each new translation joins
 the router's context for later chunks.

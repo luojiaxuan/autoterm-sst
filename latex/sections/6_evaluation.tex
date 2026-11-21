@@ -9,11 +9,11 @@ domains.
 \begin{figure*}[t]
   \centering
   \includegraphics[width=0.9\textwidth]{routing_states_realsi.pdf}
-  \caption{Routing on the first RealSI stream order, ten talks with one domain
+  \caption{Routing on the first of three RealSI orders, ten talks with one domain
   each, drawn at equal width. Each router's row marks per chunk whether the
   talk's slice ranks first in the working set, ranks lower, or is absent. The
-  language-model router ranks a new talk's slice first within 21 seconds in nine
-  of the ten talks; the similarity router ranks it first in three talks at all.}
+  language-model router of AutoTerm-SST ranks a new talk's slice first within 21
+  seconds in nine of the ten talks; the similarity router ranks it first in three talks at all.}
   \label{fig:routing}
 \end{figure*}
 
@@ -21,8 +21,8 @@ domains.
 
 \paragraph{Data.}
 Two English-to-Chinese benchmarks test translation quality and ten-domain
-routing. For quality, we build one continuous 4.7-hour stream by alternating
-five English ACL 60/60 dev talks with human-annotated
+routing. For quality, we build the ACL-ESO stream, one continuous 4.7-hour stream that
+alternates five English ACL 60/60 dev talks with human-annotated
 terminology~\citep{salesky-etal-2023-evaluating}, the NLP part, and five
 long-form oncology lectures from the European School of Oncology, or ESO, test
 set~\citep{iranzosanchez2025eso}, the medicine part. Following
@@ -31,9 +31,9 @@ references and manually verified ESO terminology. Because the NLP and
 medicine slices contain the benchmark glossaries, the stream tests whether
 routing keeps the gold terms searchable. To test routing
 across ten domains, we also chain the ten English-to-Chinese talks of
-RealSI~\citep{cheng2024clasi} into 45-minute streams in three random orders.
-Each talk lasts 3.4 to 5.2 minutes and carries a human domain label that maps
-to one of our ten slices, which gives the correct slice of every chunk.
+RealSI~\citep{cheng2024clasi} into 45-minute streams in three random orders, 30 talk instances in all.
+Each talk lasts 3.4 to 5.2 minutes and carries a human domain label that maps to one of the ten catalog slices, which gives the correct slice of every
+chunk.
 
 \begin{table*}[t]
 \centering
@@ -56,12 +56,11 @@ Merged-1M & None & 1M & 87.1 & 78.9 & 84.4$^\dagger$ & 42.79$^\dagger$ & 39.95$^
 InfiniSST & None & 0 & 76.6 & 46.3 & 61.4 & 41.84 & 38.32 & 0.0 & 0.00 \\
 \bottomrule
 \end{tabular}
-\caption{Results on the ten-talk stream. Input is what the user supplies before
-the session, and Active the most entries searched per chunk; Similarity routing
-swaps in the router of Appendix~\ref{app:config}. TERM\_ACC and prompt
+\caption{Results on the ACL-ESO stream. Input is what the user supplies before
+the session, and Active the most entries searched per chunk. TERM\_ACC and prompt
 precision are percentages, MT-BLEU masks glossary terms, and Pairs counts
 injected pairs per chunk. $\dagger$: $p<0.05$ against AutoTerm-SST. InfiniSST
-uses no glossary; its All, BLEU, and MT-BLEU average the corpora.}
+uses no glossary; its All, BLEU, and MT-BLEU are unweighted means of the two corpora.}
 \label{tab:quality}
 \end{table*}
 
@@ -77,9 +76,9 @@ AutoTerm-SST & 89.7 & 67.0 & 15.6 s & 1 \\
 Similarity routing & 78.8 & 23.9 & 68.1 s & 19 \\
 \bottomrule
 \end{tabular}
-\caption{Routing on 30 RealSI talks: percentages of chunks whose correct slice
-is in the working set and ranks first, the median delay until it first ranks
-first among talks where it does, and talks where it never does.}
+\caption{Routing on 30 RealSI talk instances: percentages of chunks whose
+correct slice is in the working set and ranks first, median delay to its first
+rank over talks that reach it, and talks that never do.}
 \label{tab:realsi}
 \end{table}
 
@@ -93,17 +92,20 @@ retrieval. Known-domain-1k searches only the 1,000-entry slice matching the
 current talk's domain and therefore requires the domain label of every talk.
 AutoTerm-SST routes over ten 1,000-entry slices spanning NLP, medicine, and
 eight topics drawn from Wikipedia and Wikidata, with at most four active at
-once. Similarity routing keeps these slices and budgets but uses the
-embedding-similarity router of Appendix~\ref{app:config}. Merged-2k pools the NLP and medicine slices, which requires knowing both
+once. Similarity routing keeps these slices and budgets but ranks them by BGE-M3
+embedding similarity, and its top slice changes only after a rival leads by
+fixed margins in three consecutive updates outside a 30-second cooldown, as
+Appendix~\ref{app:config} details. Merged-2k pools the NLP and medicine slices, which requires knowing both
 domains, and Merged-10k pools all ten slices, 9,880 entries after removing
 exact duplicates. Merged-1M adds entries from other topics to the same NLP and
-medicine glossaries, and Merged-100k is its first 100,000 entries. Merged
+medicine glossaries, and Merged-100k keeps its first 100,000 entries. Merged
 glossaries keep conflicting translations of a source term.
 
 \paragraph{Metrics.}
-Following RASST, terminology accuracy, or TERM\_ACC, is the share of 2,047 time-aligned
-term occurrences, 1,368 NLP and 679 medicine, whose reference translation
-appears in the aligned hypothesis. For translation quality,
+Following RASST, terminology accuracy, or TERM\_ACC, is the share of
+time-aligned term occurrences whose reference translation appears in the
+aligned hypothesis; the ACL-ESO stream has 2,047 such
+occurrences, 1,368 NLP and 679 medicine. For translation quality,
 mWERSegmenter~\citep{matusov-etal-2005-evaluating} first resegments each talk
 to the reference boundaries of the StreamLAAL
 protocol~\citep{papi2024streamatt}, and we then compute corpus
@@ -139,29 +141,25 @@ points at $p\ge0.34$, with matching BLEU. Merged-100k matches AutoTerm-SST in
 TERM\_ACC but trails it by $1.38^{+0.53}_{-0.70}$ BLEU at $p=0.010$. Merged-1M
 trails by $3.3^{+1.5}_{-1.9}$ TERM\_ACC points at $p=0.031$ and by
 $2.31^{+0.63}_{-0.82}$ BLEU at $p=0.002$, and its TERM\_ACC loss concentrates
-on medicine, a 7.4-point gap. Merged-1M also fills the fixed prompt with
-irrelevant pairs, nine times as many per chunk as AutoTerm-SST at one tenth of
-its prompt precision. The damage reaches sentences without terms: on the 935
-sentences whose references contain no glossary term, AutoTerm-SST leads it by
-1.85 BLEU at $p=0.047$.
+on medicine, a 7.4-point gap. Merged-1M also floods the fixed prompt: it injects nine times as many pairs per
+chunk as AutoTerm-SST at one tenth of its prompt precision. The loss reaches
+the 935 sentences whose references contain no glossary term, where
+AutoTerm-SST leads Merged-1M by 1.85 BLEU at $p=0.047$.
 
 \paragraph{Routing across ten domains.}
-The language-model router follows topic changes that the confirmation rules
-miss. On RealSI, it keeps the correct slice in the working set for 89.7\% of
+The language-model router follows topic changes that the similarity router's
+confirmation rule misses. On RealSI, it keeps the correct slice in the working set for 89.7\% of
 chunks against 78.8\% for similarity routing, as Table~\ref{tab:realsi}
-shows, and ranks a new talk's slice first after a median of 15.6 seconds. The
-similarity router switches only after three consecutive leads and a 30-second
-cooldown, so in 19 of the 30 talks its top slice never becomes the correct
-one, as Figure~\ref{fig:routing} shows for the first order. On the two-domain
-ten-talk stream, both routers keep the correct slice searchable in about 98\%
+shows, and ranks a new talk's slice first after a median of 15.6 seconds. Because that rule delays every switch, the similarity router's top slice never
+becomes the correct one in 19 of the 30 talks, as Figure~\ref{fig:routing} shows for the first order. On the two-domain ACL-ESO stream, both routers keep the correct slice searchable in about 98\%
 of chunks, so their accuracies match. Appendix~\ref{app:router} adds faster
 switches and 24 close-domain slices.
 
 \paragraph{Processing speed.}
 With routing, AutoTerm-SST still processes audio about 4.5 times faster than
 real time. Its real-time factor matches that of Known-domain-1k in
-Table~\ref{tab:speed}, and RASST measured its retriever alone at 0.042
-seconds per chunk on the same GPUs. The first translation
+Table~\ref{tab:speed}. RASST measured its retriever alone at 0.042 seconds per
+chunk on the same GPUs. The first translation
 appears 2.3 seconds after audio starts.
 
 \begin{table}[t]
@@ -176,8 +174,8 @@ Similarity routing & 0.064 & 0.343 & 0.21 \\
 AutoTerm-SST & 0.094 & 0.333 & 0.22 \\
 \bottomrule
 \end{tabular}
-\caption{Seconds of compute per 1.92-second chunk, one session on an ACL talk,
-three A6000 GPUs. Retrieval includes speech encoding and routing; the
+\caption{Mean seconds of compute per 1.92-second chunk, one session on an ACL
+talk, three A6000 GPUs. Retrieval includes speech encoding and routing; the
 real-time factor, RTF, is the total over the chunk length.}
 \label{tab:speed}
 \end{table}

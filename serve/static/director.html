@@ -30,7 +30,7 @@
 
   // Shot staging: scroll the page title off-screen so the settings card sits at
   // the top, then pin the translation panel BELOW the adaptive-status chips so
-  // Auto Topic / Confidence / Active Glossary stay visible for the whole take.
+  // the topic posterior stays visible for the whole take.
   const stage = () => {
     try {
       const doc = D(), win = W();
@@ -85,20 +85,15 @@
         play: pt(doc.getElementById('playBtn')),
         lang: pt(doc.getElementById('languagePair')),
         lat: pt(doc.getElementById('latencyMultiplier')),
-        term: pt(doc.getElementById('modeAutoBtn')),
-        topic: pt(doc.getElementById('adaptiveTopic')),
-        gloss: pt(doc.getElementById('adaptiveGlossary'))
+        posterior: pt(doc.getElementById('adaptivePosterior'))
       };
-      // Screen-space rect spanning the Auto Topic .. Active Glossary chips, for
-      // the post-production callout box at the switch moment.
-      const a = doc.getElementById('adaptiveTopic')?.closest('.adaptive-cell');
-      const b = doc.getElementById('adaptiveGlossary')?.closest('.adaptive-cell');
-      if (a && b) {
-        const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
-        const x0 = Math.min(ra.left, rb.left), y0 = Math.min(ra.top, rb.top);
-        const x1 = Math.max(ra.right, rb.right), y1 = Math.max(ra.bottom, rb.bottom);
-        box = [Math.round(window.screenX + x0), Math.round(window.screenY + chromeH + y0),
-               Math.round(x1 - x0), Math.round(y1 - y0)];
+      // Screen-space rect of the topic-posterior cell, for the post-production
+      // callout box at the switch moment.
+      const cell = doc.getElementById('adaptivePosterior')?.closest('.adaptive-cell');
+      if (cell) {
+        const r = cell.getBoundingClientRect();
+        box = [Math.round(window.screenX + r.left), Math.round(window.screenY + chromeH + r.top),
+               Math.round(r.width), Math.round(r.height)];
       }
     } catch (e) {}
     const st = {
@@ -109,10 +104,7 @@
       geo: [window.screenX, window.screenY, window.outerWidth, window.outerHeight, window.innerWidth, window.innerHeight].join(','),
       rs: m ? m.readyState : -1,
       t: m ? +m.currentTime.toFixed(1) : -1,
-      topic: txt('adaptiveTopic').slice(0, 16),
-      conf: txt('adaptiveConfidence').slice(0, 6),
-      gl: txt('adaptiveGlossary').slice(0, 24),
-      sw: txt('adaptiveSwitches').slice(0, 4),
+      posterior: txt('adaptivePosterior').slice(0, 60),
       status: txt('statusText').slice(0, 40)
     };
     document.title = 'DIR|' + JSON.stringify(st);

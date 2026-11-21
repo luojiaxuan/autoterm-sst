@@ -90,9 +90,9 @@
             padding: 20px;
             margin-bottom: 30px;
             display: grid;
-            grid-template-columns: 1fr 1fr 1.8fr auto;
-            gap: 18px;
-            align-items: start;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.75fr) minmax(0, 0.75fr) auto;
+            gap: 14px 12px;
+            align-items: end;
         }
 
         .controls-section .adaptive-status { grid-column: 1 / -1; }
@@ -283,11 +283,14 @@
             justify-content: flex-end;
         }
 
-        .adaptive-status {
-            display: grid;
-            grid-template-columns: repeat(7, minmax(0, 1fr));
-            gap: 8px;
-            margin-top: 12px;
+        .adaptive-status { display: grid; }
+
+        .inline-cell {
+            box-sizing: border-box;
+            min-height: 48px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
 
         .adaptive-cell {
@@ -305,6 +308,57 @@
             line-height: 1.1;
             margin-bottom: 4px;
         }
+
+
+        .posterior-list {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-width: 0;
+        }
+
+        .posterior-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex: 0 1 calc(25% - 11px);
+            min-width: 0;
+            color: rgba(255, 255, 255, 0.55);
+            font-size: 0.82rem;
+        }
+
+        .posterior-item b {
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .posterior-item i {
+            display: block;
+            flex: 1 1 auto;
+            min-width: 20px;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+        }
+
+        .posterior-item u {
+            display: block;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.4);
+            transition: width 0.4s ease;
+        }
+
+        .posterior-item em {
+            font-style: normal;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .posterior-item.top { color: rgba(255, 255, 255, 0.95); }
+        .posterior-waiting { color: rgba(255, 255, 255, 0.45); font-size: 0.82rem; }
+        .posterior-item.top u { background: #00d2ff; }
 
         .adaptive-cell strong {
             display: block;
@@ -397,6 +451,8 @@
             align-items: center;
             gap: 10px;
         }
+
+        .input-item.sample-item { align-items: flex-start; }
 
         .input-item.youtube-section {
             flex-direction: row;
@@ -945,6 +1001,7 @@
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
 
+
             .glossary-header {
                 align-items: flex-start;
                 flex-direction: column;
@@ -1097,22 +1154,17 @@
                     </select>
                 </div>
 
-                <div class="control-group">
-                    <label>Terminology <span id="glossaryMeta" class="glossary-meta-inline"></span></label>
-                    <div class="term-row">
-                        <div class="mode-toggle" id="termModeToggle">
-                            <button type="button" class="mode-pill active" data-mode="auto" id="modeAutoBtn">Auto&nbsp;<small>no session setup</small></button>
-                            <button type="button" class="mode-pill" data-mode="fixed" id="modeFixedBtn">Fixed</button>
-                        </div>
-                        <div class="fixed-controls" id="fixedPresetGroup" style="display: none;">
-                            <select id="glossaryPreset" disabled>
-                                <option value="none" selected>No glossary (baseline)</option>
-                            </select>
-                            <button id="buildGlossary" class="btn btn-compact" type="button" disabled>Apply</button>
-                        </div>
-                    </div>
-                    <p class="mode-hint" id="modeHint">Routed automatically from the speech.</p>
+                <!-- Terminology is always routed automatically; the preset controls stay hidden for the session API. -->
+                <div hidden>
+                    <span id="glossaryMeta"></span>
+                    <select id="glossaryPreset" disabled>
+                        <option value="none" selected>No glossary (baseline)</option>
+                    </select>
+                    <button id="buildGlossary" type="button" disabled>Apply</button>
                 </div>
+
+                <div class="adaptive-cell inline-cell"><span>Active Terms</span><strong id="adaptiveTerms">0</strong></div>
+                <div class="adaptive-cell inline-cell"><span>Router</span><strong id="adaptiveRouter">Similarity rules</strong></div>
 
                 <div class="control-group buttons-group">
                     <label>&nbsp;</label>
@@ -1120,13 +1172,7 @@
                 </div>
 
                 <div id="adaptiveStatus" class="adaptive-status">
-                    <div class="adaptive-cell"><span>Mode</span><strong id="adaptiveMode">Automatic</strong></div>
-                    <div class="adaptive-cell"><span>Auto Topic</span><strong id="adaptiveTopic">General</strong></div>
-                    <div class="adaptive-cell"><span>Confidence</span><strong id="adaptiveConfidence">0.00</strong></div>
-                    <div class="adaptive-cell"><span>Active Glossary</span><strong id="adaptiveGlossary">none</strong></div>
-                    <div class="adaptive-cell"><span>Active Terms</span><strong id="adaptiveTerms">0</strong></div>
-                    <div class="adaptive-cell"><span>Switch Count</span><strong id="adaptiveSwitches">0</strong></div>
-                    <div class="adaptive-cell"><span>Router</span><strong id="adaptiveRouter">hybrid_window_topic</strong></div>
+                    <div class="adaptive-cell posterior-cell"><span id="adaptivePosteriorLabel">Topic posterior</span><div id="adaptivePosterior" class="posterior-list"></div></div>
                 </div>
             </div>
 
@@ -1294,11 +1340,9 @@
         const glossaryMeta = document.getElementById('glossaryMeta');
         const buildGlossary = document.getElementById('buildGlossary');
         const adaptiveMode = document.getElementById('adaptiveMode');
-        const adaptiveTopic = document.getElementById('adaptiveTopic');
-        const adaptiveConfidence = document.getElementById('adaptiveConfidence');
-        const adaptiveGlossary = document.getElementById('adaptiveGlossary');
+        const adaptivePosterior = document.getElementById('adaptivePosterior');
+        const adaptivePosteriorLabel = document.getElementById('adaptivePosteriorLabel');
         const adaptiveTerms = document.getElementById('adaptiveTerms');
-        const adaptiveSwitches = document.getElementById('adaptiveSwitches');
         const adaptiveRouter = document.getElementById('adaptiveRouter');
         const loadModel = document.getElementById('loadModel');
         const updateLatency = document.getElementById('updateLatency');
@@ -1354,6 +1398,7 @@
             activeTerms: 0,
             switchCount: 0,
             router: 'hybrid_window_topic',
+            topSlices: [],
             updatedAt: 0
         };
 
@@ -1373,16 +1418,63 @@
             return 'Manual Preset';
         }
 
+        function displayRouter(name) {
+            const labels = { language_model: 'Language model', hybrid_window_topic: 'Similarity rules' };
+            const text = String(name || 'hybrid_window_topic');
+            return labels[text] || text;
+        }
+
+        function displayDomain(name) {
+            const text = String(name || 'general').replace(/_core_.*$/, '').replace(/_/g, ' ');
+            if (text.toLowerCase() === 'nlp') return 'NLP';
+            return text.charAt(0).toUpperCase() + text.slice(1);
+        }
+
+        // The working-set slices in posterior order, each with its posterior probability.
+        // Routers that report no posterior show the current topic and its confidence.
+        function renderPosterior() {
+            if (!adaptivePosterior) return;
+            if (adaptivePosteriorLabel) {
+                const hasPosterior = adaptiveInfo.topSlices.length || !adaptiveInfo.confidence;
+                adaptivePosteriorLabel.textContent = hasPosterior ? 'Topic posterior' : 'Topic · confidence';
+            }
+            const waiting = !adaptiveInfo.topSlices.length && !adaptiveInfo.confidence
+                && (adaptiveInfo.activeDomain || 'general') === 'general';
+            if (waiting) {
+                adaptivePosterior.innerHTML = '<span class="posterior-waiting">Waiting for speech</span>';
+                return;
+            }
+            const rows = adaptiveInfo.topSlices.length ? adaptiveInfo.topSlices.slice(0, 4) : [{
+                domain: adaptiveInfo.activeDomain,
+                preset: adaptiveInfo.activeGlossaryPreset,
+                probability: adaptiveInfo.confidence
+            }];
+            adaptivePosterior.innerHTML = '';
+            rows.forEach((row, index) => {
+                const probability = Math.max(0, Math.min(1, Number(row.probability) || 0));
+                const item = document.createElement('div');
+                item.className = 'posterior-item' + (index === 0 ? ' top' : '');
+                item.title = row.preset || '';
+                const name = document.createElement('b');
+                name.textContent = displayDomain(row.domain || row.preset);
+                const bar = document.createElement('i');
+                const fill = document.createElement('u');
+                fill.style.width = (probability * 100).toFixed(1) + '%';
+                bar.appendChild(fill);
+                const value = document.createElement('em');
+                value.textContent = probability.toFixed(2);
+                item.append(name, bar, value);
+                adaptivePosterior.appendChild(item);
+            });
+        }
+
         function refreshAdaptiveStatus() {
             const selectedPreset = selectedTermPreset();
             if (adaptiveMode) adaptiveMode.textContent = displayPresetMode(selectedPreset);
-            if (adaptiveTopic) adaptiveTopic.textContent = adaptiveInfo.activeDomain || 'general';
-            if (adaptiveConfidence) adaptiveConfidence.textContent = Number(adaptiveInfo.confidence || 0).toFixed(2);
-            if (adaptiveGlossary) adaptiveGlossary.textContent = adaptiveInfo.activeGlossaryPreset || selectedPreset || 'none';
+            renderPosterior();
             const terms = adaptiveInfo.activeTerms || confirmedGlossary.presetTerms || termsFromPreset(adaptiveInfo.activeGlossaryPreset);
             if (adaptiveTerms) adaptiveTerms.textContent = Number(terms || 0).toLocaleString();
-            if (adaptiveSwitches) adaptiveSwitches.textContent = String(adaptiveInfo.switchCount || 0);
-            if (adaptiveRouter) adaptiveRouter.textContent = adaptiveInfo.router || 'hybrid_window_topic';
+            if (adaptiveRouter) adaptiveRouter.textContent = displayRouter(adaptiveInfo.router);
         }
 
         function applyAdaptiveTopic(topic, extra) {
@@ -1394,6 +1486,7 @@
                 activeTerms: Number((extra && extra.active_terms) || adaptiveInfo.activeTerms || 0),
                 switchCount: Number(topic.switch_count != null ? topic.switch_count : adaptiveInfo.switchCount) || 0,
                 router: topic.router || adaptiveInfo.router,
+                topSlices: Array.isArray(topic.top_slices) ? topic.top_slices : [],
                 updatedAt: Date.now()
             };
             if (!adaptiveInfo.activeTerms) {
@@ -1410,7 +1503,8 @@
                 activeGlossaryPreset: routerMeta.to_preset || routerMeta.target_preset_id || adaptiveInfo.activeGlossaryPreset,
                 activeTerms: Number((extra && extra.active_terms) || adaptiveInfo.activeTerms || 0),
                 switchCount: adaptiveInfo.switchCount,
-                router: routerMeta.action ? `${routerMeta.action}: ${routerMeta.reason || ''}` : (routerMeta.reason || 'hybrid_window_topic'),
+                router: 'hybrid_window_topic',
+                topSlices: adaptiveInfo.topSlices,
                 updatedAt: Date.now()
             };
             if (!adaptiveInfo.activeTerms) {
@@ -1853,7 +1947,8 @@
                         active_domain: tm.sessions[sessionId].active_domain,
                         confidence: tm.sessions[sessionId].confidence,
                         active_glossary_preset: tm.sessions[sessionId].active_glossary_preset,
-                        switch_count: tm.sessions[sessionId].switch_count
+                        switch_count: tm.sessions[sessionId].switch_count,
+                        top_slices: tm.sessions[sessionId].top_slices
                     }, { active_terms: tm.active_terms });
                 } else if (tm && tm.active_terms) {
                     adaptiveInfo.activeTerms = Number(tm.active_terms) || adaptiveInfo.activeTerms;

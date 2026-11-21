@@ -1,0 +1,32 @@
+{
+ "term_free_sentences": 935,
+ "sentences": 1905,
+ "by_domain": {
+  "acl": 47,
+  "medicine": 888
+ },
+ "lm_hmm_vs_merged100k": {
+  "bleu_diff": 1.345262086690326,
+  "stratified_talk_bootstrap_ci95": [
+   0.6436890998819536,
+   1.8301331518949713
+  ],
+  "talk_permutation_p": 0.0234375,
+  "per_domain_diff": {
+   "acl": 1.2482319728448843,
+   "medicine": 1.3531499070911224
+  }
+ },
+ "lm_hmm_vs_merged1m": {
+  "bleu_diff": 1.849405815938681,
+  "stratified_talk_bootstrap_ci95": [
+   0.5163444008853872,
+   3.0106398457359242
+  ],
+  "talk_permutation_p": 0.046875,
+  "per_domain_diff": {
+   "acl": 1.6094890485341082,
+   "medicine": 1.8822663418887373
+  }
+ }
+}

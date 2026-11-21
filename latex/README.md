@@ -1,6 +1,6 @@
 # AutoTerm-SST 论文（NAACL 2027 System Demonstrations）
 
-投稿截止 2026-12-04 AoE；正文 6 页，附录不超过 2 页，伦理声明与参考文献不限。`acl_latex.tex` 是入口，各节在 `sections/`。
+投稿截止 2026-12-04 AoE；正文 6 页，附录不超过 2 页，伦理声明与参考文献不限。`acl_latex.tex` 是入口，各节在 `sections/`；`bash latex/make_arxiv.sh <out.tar.gz>` 生成去掉注释、带 `.bbl` 的 arXiv 源码包并验证页数。
 
 ## 数字从哪来
 
@@ -16,7 +16,7 @@
 | 表 2 与图 3：RealSI 路由 | 2026-11-20，hyper01 两张 H200，三种顺序 | `docs/realsi_20261120/results/routing_coverage.json`；图由 `eval/streaming_sst/render_routing_states_svg.py` 生成 |
 | 表 3：处理速度 | 2026-11-20，Taurus 三张 A6000，单会话一场 ACL 讲座 | `docs/llm_router_20261120/latency/summary.json` 的 1 路一档 |
 | 附录路由诊断与回放表 | run 1 存下的译文，离线回放 | `docs/llm_router_20261120/README.md` 各节与同目录 JSON |
-| 图 2：界面截图 | 回放 run 3 的输出 | 本分支的 `scripts/render_ui_replay.py` |
+| 图 2：界面截图 | 回放 run 3 第 600 到 639 块的输出；状态行的后验由 `router_posterior_replay.py` 在 aries 一张 A6000 上按线上节奏在录下的译文上重放，前 660 块里首位 slice 与线上一致 87%，图中 40 块全部一致 | 实验仓库 `feat/status-row-top-slices`（[PR #2](https://github.com/luojiaxuan/autoterm-sst/pull/2)）的 `scripts/render_ui_replay.py`；后验在 `docs/llm_router_20261120/ui_posterior_replay.json` |
 
 ## 没进论文的
 

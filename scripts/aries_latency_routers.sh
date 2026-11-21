@@ -3,12 +3,16 @@
 # GPUs of aries, borrowed outside Slurm. Code, models and slices come from the Taurus NFS mounts through the
 # directory $BASE, whose entries link to them under neutral names. Each configuration is served alone with
 # vllm serve on the first two GPUs and the retriever and router models on the third, and
-# concurrency_full_pipeline.py streams real lectures in real time at 1, 8 and 16 sessions, as in
-# taurus_latency_routers.sh. A configuration whose output exists is skipped.
+# concurrency_full_pipeline.py streams real lectures in real time ($LEVELS sessions, $SESSION_SEC seconds each,
+# 1, 8 and 16 sessions of 180 s by default, as in taurus_latency_routers.sh). A configuration whose output
+# exists is skipped.
 set -euo pipefail
 BASE=${BASE:-/mnt/data6/jiaxuanluo/sglang-omni-lat}
 GPUS=${GPUS:-0,1,2}
 OUT=${OUT:?set OUT to the output directory}
+LEVELS=${LEVELS:-1,8,16}
+SESSION_SEC=${SESSION_SEC:-180}
+WARMUP_SEC=${WARMUP_SEC:-$SESSION_SEC}
 PYTHON_BIN=/home/jiaxuanluo/miniconda3/envs/spaCyEnv/bin/python
 export ROOT="$BASE" IO_ROOT="$BASE/io" MODEL="$BASE/model" RETRIEVER="$BASE/retriever.pt"
 export MANIFEST="$BASE/manifest.json" RETRIEVER_CODE="$BASE/retriever_code"
@@ -41,7 +45,7 @@ PY
   CUDA_VISIBLE_DEVICES= "$PYTHON_BIN" -u eval/streaming_sst/concurrency_full_pipeline.py \
     --base-url "http://127.0.0.1:$port" --preset "$preset" \
     --audio-glob "$BASE/audio_acl/*.wav" --audio-glob "$BASE/audio_med/sample_*_v2/*.wav" \
-    --levels 1,8,16 --seconds-per-session 180 --gpus "$GPUS" \
+    --levels "$LEVELS" --seconds-per-session "$SESSION_SEC" --warmup-seconds "$WARMUP_SEC" --gpus "$GPUS" \
     --out-json "$OUT/$mode.json" > "$OUT/client_$mode.log" 2>&1
   kill -- "-$pid" 2>/dev/null || true
   for _ in $(seq 1 60); do

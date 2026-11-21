@@ -31,10 +31,12 @@ import websockets
 SAMPLE_RATE = 16000
 
 
-def read_wav(path: str) -> np.ndarray:
+def read_excerpt(path: str, offset: int, length: int) -> np.ndarray:
+    """Reads `length` samples from `offset`, moved back so the excerpt ends within the file."""
     with wave.open(path) as handle:
         assert handle.getframerate() == SAMPLE_RATE and handle.getnchannels() == 1, path
-        raw = handle.readframes(handle.getnframes())
+        handle.setpos(max(0, min(offset, handle.getnframes() - length)))
+        raw = handle.readframes(length)
     return np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
 
 
@@ -193,6 +195,8 @@ def main() -> None:
     ap.add_argument("--seconds-per-session", type=float, default=180.0)
     ap.add_argument("--chunk-samples", type=int, default=30720)
     ap.add_argument("--warmup-chunks", type=int, default=3)
+    ap.add_argument("--warmup-seconds", type=float, default=None,
+                    help="audio length of the discarded warmup session (default: --seconds-per-session)")
     ap.add_argument("--idle-timeout-sec", type=float, default=60.0)
     ap.add_argument("--gpus", required=True, help="physical GPU ids for memory sampling, e.g. 4,5")
     ap.add_argument("--out-json", type=Path, required=True)
@@ -201,19 +205,15 @@ def main() -> None:
 
     files = sorted({f for pattern in args.audio_glob for f in glob.glob(pattern)})
     length = int(args.seconds_per_session * SAMPLE_RATE)
-    excerpts = []
-    for k in range(32):
-        pcm = read_wav(files[k % len(files)])
-        offset = (k // len(files)) * length
-        if offset + length > len(pcm):
-            offset = max(0, len(pcm) - length)
-        excerpts.append(pcm[offset:offset + length])
+    levels = [int(x) for x in args.levels.split(",")]
+    excerpts = [read_excerpt(files[k % len(files)], (k // len(files)) * length, length) for k in range(max(levels))]
     result = {"audio_files": files, "seconds_per_session": args.seconds_per_session, "levels": []}
     # note (luojiaxuan): one discarded single-session pass absorbs first-request warmup.
-    warmup = asyncio.run(run_level(args, excerpts, 1))
+    warmup_length = int((args.warmup_seconds or args.seconds_per_session) * SAMPLE_RATE)
+    warmup = asyncio.run(run_level(args, [excerpts[0][:warmup_length]], 1))
     result["warmup"] = {k: v for k, v in warmup.items() if k != "raw_sessions"}
     print(json.dumps({"warmup": result["warmup"]}), flush=True)
-    for n in [int(x) for x in args.levels.split(",")]:
+    for n in levels:
         row = asyncio.run(run_level(args, excerpts, n))
         summary = {k: v for k, v in row.items() if k != "raw_sessions"}
         print(json.dumps(summary), flush=True)

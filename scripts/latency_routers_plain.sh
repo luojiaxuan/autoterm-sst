@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Chunk latency of the language-model router, the similarity router and Known-domain-1k on three idle A6000
-# GPUs of aries, borrowed outside Slurm. Code, models and slices come from the Taurus NFS mounts through the
-# directory $BASE, whose entries link to them under neutral names. Each configuration is served alone with
-# vllm serve on the first two GPUs and the retriever and router models on the third, and
+# Chunk latency of the language-model router, the similarity router and Known-domain-1k as plain processes on
+# three given GPUs ($GPUS): borrowed idle cards, or the cards of a Slurm allocation. Code, models and slices are
+# read through the directory $BASE, whose entries link to them under neutral names. Each configuration is
+# served alone with vllm serve on the first two GPUs and the retriever and router models on the third, and
 # concurrency_full_pipeline.py streams real lectures in real time ($LEVELS sessions, $SESSION_SEC seconds each,
 # 1, 8 and 16 sessions of 180 s by default, as in taurus_latency_routers.sh). A configuration whose output
 # exists is skipped.

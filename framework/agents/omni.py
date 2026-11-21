@@ -1143,6 +1143,7 @@ class OmniAgent(Agent):
             logger.exception("context-similarity scoring failed; using cached router evidence")
             return
         elapsed = time.perf_counter() - started
+        print("RASST_ROUTER_METRIC " + json.dumps({"sessions": len(due), "score_s": round(elapsed, 4)}), flush=True)
         for (session, text), segment, row in zip(due, segments, scores):
             if self.sessions.get(session.session_id) is not session:
                 continue

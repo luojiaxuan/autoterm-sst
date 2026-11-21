@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1800" height="760" viewBox="0 0 1800 760" role="img" aria-labelledby="title desc">
   <title id="title">AutoTerm-SST architecture illustrated with an NLP-to-medicine stream</title>
-  <desc id="desc">A RASST-style example-driven architecture. Earlier speech about SRL and a later medical segment retrieve terms from a budgeted multi-slice working set selected from a larger glossary catalog using sliding-window context similarity.</desc>
+  <desc id="desc">A RASST-style example-driven architecture. Earlier speech about SRL and a later medical segment retrieve terms from a budgeted multi-slice working set selected from a larger glossary catalog by a language-model router that reads the latest translated chunks.</desc>
   <defs>
     <marker id="arrow-ink" markerWidth="4.5" markerHeight="3.5" refX="4.2" refY="1.75" orient="auto" markerUnits="strokeWidth">
       <path d="M0,0 L4.5,1.75 L0,3.5 Z" fill="#222222"/>
@@ -185,4 +185,8 @@
   </g>
 
   <path d="M1145 389 H1118" class="control-line"/>
+
+  <!-- Each new translation feeds the router's context for later chunks. -->
+  <path d="M1230 73 H1760 V421 H1674" class="feedback-line"/>
+  <text x="1495" y="62" class="small" text-anchor="middle" fill="#B85120">last w = 4 translated chunks → router</text>
 </svg>

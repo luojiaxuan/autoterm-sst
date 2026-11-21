@@ -18,8 +18,8 @@ the router's context for later chunks.
 \centering
 \includegraphics[width=0.86\textwidth]{autoterm_architecture.pdf}
 \caption{AutoTerm-SST during a live topic transition from NLP to medicine.
-The adaptive terminology memory, in orange, scores slices against recent
-translations and activates up to four slices with at most 4,000 terms; the
+The adaptive terminology memory, in orange, scores slices against the recent
+translations on the dashed arrow and activates up to four slices with at most 4,000 terms; the
 MaxSim retriever builds each chunk's term map $G_t$ only from this working set,
 and the LLM translates speech features $h_t$ with $G_t$. The ellipsis marks
 further offline slices.}

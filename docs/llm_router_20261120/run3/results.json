@@ -1,0 +1,56 @@
+{
+ "stream": "ten-talk, 5 ACL 60/60 dev + 5 ESO oncology, alternating, 8,776 chunks",
+ "hardware": "hyper01, two H200, tensor parallel 2",
+ "systems": {
+  "lm_hmm": {
+   "term_acc_nlp": 88.38,
+   "term_acc_medicine": 86.3,
+   "term_acc_all": 87.69,
+   "bleu": 45.1,
+   "mt_bleu": 42.27,
+   "prompt_precision": 35.69,
+   "pairs_per_chunk": 0.944,
+   "run_json_sha256": "b6250bc36ff11e6983141e53a558063fd17f89cae3ec399cf713ae6648066f0d"
+  },
+  "cosine": {
+   "term_acc_nlp": 88.38,
+   "term_acc_medicine": 86.01,
+   "term_acc_all": 87.59,
+   "bleu": 45.39,
+   "mt_bleu": 42.62,
+   "prompt_precision": 35.69,
+   "pairs_per_chunk": 0.937,
+   "run_json_sha256": "1946f99099e596b418468be8c1b3f7fc57493629c5a197059dd2a6a4981f9c0a"
+  },
+  "known": {
+   "term_acc_nlp": 88.3,
+   "term_acc_medicine": 85.86,
+   "term_acc_all": 87.49,
+   "bleu": 45.15,
+   "mt_bleu": 42.41,
+   "prompt_precision": 48.68,
+   "pairs_per_chunk": 0.692,
+   "run_json_sha256": "ed3ff64b76845a436242044250f3179c96bdf9d7d203ecf3a1c4c99230404a2b"
+  },
+  "merged2k": {
+   "term_acc_nlp": 88.82,
+   "term_acc_medicine": 86.01,
+   "term_acc_all": 87.88,
+   "bleu": 45.31,
+   "mt_bleu": 42.48,
+   "prompt_precision": 39.08,
+   "pairs_per_chunk": 0.864,
+   "run_json_sha256": "d84a753ab0331e8693bd60ce2dbc2c58f947ccebd8db2971fe39940f61792d24"
+  },
+  "merged10k": {
+   "term_acc_nlp": 88.6,
+   "term_acc_medicine": 87.04,
+   "term_acc_all": 88.08,
+   "bleu": 45.11,
+   "mt_bleu": 42.33,
+   "prompt_precision": 27.07,
+   "pairs_per_chunk": 1.263,
+   "run_json_sha256": "ede874e7d86520b7adc1c8053e8b8919583c7b06cf34f0238d046caa598eb5f6"
+  }
+ }
+}

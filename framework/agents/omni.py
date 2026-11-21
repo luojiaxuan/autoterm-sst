@@ -49,8 +49,10 @@ from framework.agents.glossary import (
 from framework.agents.plugins.backends import ModelTemplate, Sampling, build_backend, get_template
 from framework.agents.plugins.prompt import PromptBuilder
 from framework.agents.plugins.retrieval import (
+    IndexRetrievalSpec,
     MaxSimRetrievalPlugin,
     MockRetrieval,
+    MultiIndexRetrievalResult,
     NullRetrieval,
     RetrievalPlugin,
     RetrievalResult,
@@ -59,16 +61,20 @@ from framework.agents.term_memory.active_glossary import (
     ActiveGlossaryManager,
     glossary_topic_meta,
 )
+from framework.agents.term_memory.context_similarity import DomainDescriptionSimilarity
+from framework.agents.term_memory.language_model_router import LanguageModelSliceScorer, filter_step
 from framework.agents.term_memory.domain_taxonomy import (
     AUTO_WORKING_PRESET,
+    DOMAIN_ROUTER_PROTOTYPES,
+    DOMAIN_TO_PRESET,
     GENERAL_DOMAIN,
     configured_working_presets,
     domain_for_preset,
 )
+from framework.agents.term_memory.manifest import TermMemoryManifest
 from framework.agents.term_memory.slice_registry import (
     PROMPT_K,
     RetrievalSlice,
-    domain_for_slice_preset,
     rank_references as rank_autoterm_references,
     slice_id_for_preset,
     slice_role_for_preset,
@@ -91,6 +97,7 @@ logger = logging.getLogger(__name__)
 TARGET_SAMPLE_RATE = 16000
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 EMPTY_GLOSSARY_PRESETS = {"", "none", "no_glossary"}
+DEFAULT_AUTO_GLOSSARY_PRESETS = ",".join(DOMAIN_TO_PRESET.values())
 
 
 def _env_str(key: str, default: str) -> str:
@@ -277,11 +284,15 @@ class OmniConfig:
     rag_text_lora_r: int = 128
     rag_score_threshold: float = 0.78
     rag_timeline_lookback_sec: float = 1.92
+    rag_index_cache_max_entries: int = 16
+    rag_startup_glossary_preset: str = RAG_STARTUP_GLOSSARY_PRESET
+    retrieval_candidate_budget: int = 0
+    reference_ranking_policy: str = "autoterm_rerank"
 
     auto_glossary_enabled: bool = True
     auto_glossary_base_preset: str = "none"
     auto_glossary_default_preset: str = "nlp_core_10k"
-    auto_glossary_presets: str = "nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k"
+    auto_glossary_presets: str = DEFAULT_AUTO_GLOSSARY_PRESETS
     auto_glossary_update_sec: float = 45.0
     auto_glossary_warmup_sec: float = 30.0
     auto_glossary_min_conf: float = 0.60
@@ -292,16 +303,27 @@ class OmniConfig:
     auto_glossary_candidate_stale_sec: float = 120.0
     auto_glossary_fallback_preset: str = "none"
     auto_glossary_preload: bool = True
-    auto_glossary_preload_presets: str = "nlp_core_10k,medicine_core_10k"
+    auto_glossary_preload_presets: str = DEFAULT_AUTO_GLOSSARY_PRESETS
     router_mode: str = "hybrid_window_topic"
     router_legacy_keywords: bool = False
     router_embed_weight: float = 0.65
     router_ref_weight: float = 0.35
     router_ema_alpha: float = 0.80
-    router_text_topic_weight: float = 0.60
-    router_domain_probe_weight: float = 0.25
-    router_speech_centroid_weight: float = 0.10
-    router_metadata_prior_weight: float = 0.05
+    router_context_similarity_enabled: bool = True
+    router_context_similarity_model: str = "BAAI/bge-m3"
+    router_context_similarity_device: str = "cpu"
+    router_context_similarity_batch_size: int = 32
+    router_context_similarity_weight: float = 0.60
+    router_context_similarity_prototypes_path: str = ""
+    # "embedding" scores slices by BGE-M3 cosine similarity, "language_model" by letter probability.
+    router_context_scorer: str = "embedding"
+    router_context_language_model: str = "Qwen/Qwen3-4B-Instruct-2507"
+    # Per-chunk topic switch probability of the sticky HMM filter; 0 uses the window scores directly.
+    router_context_switch_rate: float = 0.0
+    router_text_topic_weight: float = 0.25
+    router_domain_probe_weight: float = 0.10
+    router_speech_centroid_weight: float = 0.03
+    router_metadata_prior_weight: float = 0.02
     router_domain_probe_top_k: int = 5
     router_min_consistent_windows_with_text: int = 2
     router_min_consistent_windows_generated_target: int = 3
@@ -315,6 +337,11 @@ class OmniConfig:
     router_generated_target_enabled: bool = True
     router_generated_target_window_chunks: int = 3
     router_generated_target_min_chars: int = 6
+    router_slice_selection_mode: str = "hard_top1"
+    router_term_budget: int = 100_000
+    router_max_active_slices: int = 0
+    router_unknown_slice_term_count: int = 10_000
+    router_pin_active_slice: bool = True
     prompt_top_k: int = PROMPT_K
     ui_top_k: int = PROMPT_K
     autoterm_topk_per_slice: int = PROMPT_K
@@ -337,7 +364,7 @@ class OmniConfig:
         initial_preset_default = _autoterm_initial_preset(autoterm_config, "nlp_core_10k")
         working_presets_default = _autoterm_working_presets(
             autoterm_config,
-            "nlp_core_10k,medicine_core_10k,finance_core_10k,legal_core_10k",
+            DEFAULT_AUTO_GLOSSARY_PRESETS,
         )
         rescue_preset_default = _autoterm_rescue_preset(autoterm_config, "open_wiki_100k")
         mock = _env_bool("RASST_DEMO_MOCK", False)
@@ -386,6 +413,10 @@ class OmniConfig:
             rag_text_lora_r=_env_int("RASST_RAG_TEXT_LORA_R", 128),
             rag_score_threshold=_env_float("RASST_RAG_SCORE_THRESHOLD", 0.78),
             rag_timeline_lookback_sec=_env_float("RASST_RAG_LOOKBACK_SEC", 1.92),
+            retrieval_candidate_budget=_safe_int(
+                retrieval_config.get("candidate_budget"),
+                0,
+            ),
             auto_glossary_enabled=_env_bool("RASST_AUTO_GLOSSARY_ENABLED", True),
             auto_glossary_base_preset=base_preset_default,
             auto_glossary_default_preset=_env_str("RASST_AUTO_GLOSSARY_DEFAULT", initial_preset_default),
@@ -427,10 +458,28 @@ class OmniConfig:
             router_embed_weight=_env_float("RASST_ROUTER_EMBED_WEIGHT", 0.65),
             router_ref_weight=_env_float("RASST_ROUTER_REF_WEIGHT", 0.35),
             router_ema_alpha=_env_float("RASST_ROUTER_EMA_ALPHA", 0.80),
-            router_text_topic_weight=_safe_float(routing_config.get("text_topic_weight"), 0.60),
-            router_domain_probe_weight=_safe_float(routing_config.get("domain_probe_weight"), 0.25),
-            router_speech_centroid_weight=_safe_float(routing_config.get("speech_centroid_weight"), 0.10),
-            router_metadata_prior_weight=_safe_float(routing_config.get("metadata_prior_weight"), 0.05),
+            router_context_similarity_enabled=_meta_bool(
+                routing_config.get("enable_context_similarity"),
+                True,
+            ),
+            router_context_similarity_model=str(
+                routing_config.get("context_similarity_model") or "BAAI/bge-m3"
+            ),
+            router_context_similarity_device=str(
+                routing_config.get("context_similarity_device") or "cpu"
+            ),
+            router_context_similarity_batch_size=_safe_int(
+                routing_config.get("context_similarity_batch_size"),
+                32,
+            ),
+            router_context_similarity_weight=_safe_float(
+                routing_config.get("context_similarity_weight"),
+                0.60,
+            ),
+            router_text_topic_weight=_safe_float(routing_config.get("text_topic_weight"), 0.25),
+            router_domain_probe_weight=_safe_float(routing_config.get("domain_probe_weight"), 0.10),
+            router_speech_centroid_weight=_safe_float(routing_config.get("speech_centroid_weight"), 0.03),
+            router_metadata_prior_weight=_safe_float(routing_config.get("metadata_prior_weight"), 0.02),
             router_domain_probe_top_k=_safe_int(routing_config.get("domain_probe_top_k"), 5),
             router_min_consistent_windows_with_text=_safe_int(
                 routing_config.get("min_consistent_windows_with_text"),
@@ -453,6 +502,19 @@ class OmniConfig:
             router_generated_target_enabled=_meta_bool(routing_config.get("enable_generated_target_text"), True),
             router_generated_target_window_chunks=_safe_int(routing_config.get("generated_target_window_chunks"), 3),
             router_generated_target_min_chars=_safe_int(routing_config.get("generated_target_min_chars"), 6),
+            router_slice_selection_mode=str(
+                routing_config.get("slice_selection_mode") or "hard_top1"
+            ),
+            router_term_budget=_safe_int(routing_config.get("term_budget"), 100_000),
+            router_max_active_slices=_safe_int(routing_config.get("max_active_slices"), 0),
+            router_unknown_slice_term_count=_safe_int(
+                routing_config.get("unknown_slice_term_count"),
+                10_000,
+            ),
+            router_pin_active_slice=_meta_bool(
+                routing_config.get("pin_active_slice"),
+                True,
+            ),
             prompt_top_k=_env_int("RASST_PROMPT_TOP_K", prompt_k_default),
             ui_top_k=_env_int("RASST_UI_TOP_K", prompt_k_default),
             autoterm_topk_per_slice=retrieval_topk_default,
@@ -505,6 +567,7 @@ class OmniSession:
     created_s: float = field(default_factory=time.perf_counter)
     topic_history: List[Dict[str, Any]] = field(default_factory=list)
     glossary_switch_count: int = 0
+    top_slice_changes: int = 0
     topic_update_task: Optional[asyncio.Task] = None
     recent_references: Deque[Dict[str, Any]] = field(default_factory=lambda: deque(maxlen=64))
     last_topic_reason: str = ""
@@ -513,18 +576,31 @@ class OmniSession:
     last_query_embedding: Any = None
     router_text_window: str = ""
     router_text_source: str = "none"
+    router_generated_target_history: List[str] = field(default_factory=list)
     active_slice_presets: List[str] = field(default_factory=list)
     active_slice_terms: Dict[str, int] = field(default_factory=dict)
     last_retrieval_plan: List[Dict[str, Any]] = field(default_factory=list)
     last_rescue_triggered: bool = False
     last_candidate_pool_count: int = 0
     last_prompt_reference_count: int = 0
+    last_retrieval_candidate_requested: int = 0
+    last_retrieval_candidate_returned: int = 0
+    last_retrieval_index_queries: int = 0
+    last_retrieval_scored_inventory_terms: int = 0
+    last_retrieval_top_k_by_slice: Dict[str, int] = field(default_factory=dict)
     last_domain_probe_raw_scores: Dict[str, DomainProbeScore] = field(default_factory=dict)
     last_domain_probe_scores: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     last_domain_probe_slices: List[Dict[str, Any]] = field(default_factory=list)
     last_domain_probe_s: Optional[float] = None
     last_domain_probe_at_s: float = 0.0
     last_domain_probe_cached: bool = False
+    last_context_similarity_scores: Dict[str, float] = field(default_factory=dict)
+    last_context_similarity_s: Optional[float] = None
+    last_context_similarity_at_s: float = 0.0
+    last_context_similarity_text: str = ""
+    last_context_similarity_cached: bool = False
+    router_posterior: Dict[str, float] = field(default_factory=dict)
+    router_posterior_segment: int = -1
     active_retrieval_slices: List[RetrievalSlice] = field(default_factory=list)
     pending_since_s: Optional[float] = None
     latency_multiplier: int = 2
@@ -533,7 +609,14 @@ class OmniSession:
 class OmniAgent(Agent):
     """Omni-model streaming SST agent (RASST / Qwen3-Omni / MiniCPM-o)."""
 
-    def __init__(self, name: str = "RASST", model_id: str = "qwen3_omni") -> None:
+    def __init__(
+        self,
+        name: str = "RASST",
+        model_id: str = "qwen3_omni",
+        *,
+        config: Optional[OmniConfig] = None,
+        manifest: Optional[TermMemoryManifest] = None,
+    ) -> None:
         self.name = name
         self.model_id = model_id
         self.template = get_template(model_id)
@@ -548,7 +631,8 @@ class OmniAgent(Agent):
                 backend_kind=backend_override,
                 **({"served_model_name": served} if served else {}),
             )
-        self.config = OmniConfig.from_env(self.template)
+        self.config = config if config is not None else OmniConfig.from_env(self.template)
+        self._manifest = manifest
         self.prompt = PromptBuilder(
             system_prompt_style=self.config.system_prompt_style,
             term_map_format=self.config.term_map_format,
@@ -559,11 +643,14 @@ class OmniAgent(Agent):
         self._emit: Optional[EmitFn] = None
         self.backend = None
         self.retrieval: RetrievalPlugin = NullRetrieval()
+        self.context_similarity: Optional[DomainDescriptionSimilarity] = None
         self.sessions: Dict[str, OmniSession] = {}
         self.pending: Deque[str] = deque()
         self.pending_set: Set[str] = set()
 
         self._scheduler_task: Optional[asyncio.Task] = None
+        self._router_task: Optional[asyncio.Task] = None
+        self._router_wakeup = asyncio.Event()
         self._batch_gate: Optional[asyncio.Semaphore] = None
         self._retriever_lock: Optional[asyncio.Lock] = None
         self.batch_seq = 0
@@ -586,7 +673,11 @@ class OmniAgent(Agent):
     def _catalog(self, language_pair: str) -> GlossaryCatalog:
         catalog = self._catalogs.get(language_pair)
         if catalog is None:
-            catalog = GlossaryCatalog(language_pair, self.config.max_imported_glossary_terms)
+            catalog = GlossaryCatalog(
+                language_pair,
+                self.config.max_imported_glossary_terms,
+                manifest=self._manifest,
+            )
             self._catalogs[language_pair] = catalog
         return catalog
 
@@ -609,6 +700,7 @@ class OmniAgent(Agent):
             ema_alpha=self.config.router_ema_alpha,
             fallback_preset_id=self.config.auto_glossary_fallback_preset,
             text_topic_weight=self.config.router_text_topic_weight,
+            context_similarity_weight=self.config.router_context_similarity_weight,
             domain_probe_weight=self.config.router_domain_probe_weight,
             speech_centroid_weight=self.config.router_speech_centroid_weight,
             metadata_prior_weight=self.config.router_metadata_prior_weight,
@@ -621,6 +713,11 @@ class OmniAgent(Agent):
             generated_target_probe_min_top_score=self.config.router_generated_target_probe_min_top_score,
             generated_target_probe_min_raw_margin=self.config.router_generated_target_probe_min_raw_margin,
             generated_target_probe_min_positive_domains=self.config.router_generated_target_probe_min_positive_domains,
+            slice_selection_mode=self.config.router_slice_selection_mode,
+            term_budget=self.config.router_term_budget,
+            max_active_slices=self.config.router_max_active_slices,
+            unknown_slice_term_count=self.config.router_unknown_slice_term_count,
+            pin_active_slice=self.config.router_pin_active_slice,
         )
         router_cls = (
             HybridWindowTopicRouter
@@ -639,7 +736,7 @@ class OmniAgent(Agent):
         slices: List[DomainSlice] = []
         for preset_id in allowed:
             meta = catalog.manifest.meta_for_preset(preset_id) if catalog.manifest else {}
-            domain_id = str(meta.get("domain_id") or meta.get("domain") or domain_for_preset(preset_id)).strip()
+            domain_id = self._domain_id_for_preset(catalog, preset_id)
             if domain_id == "general":
                 domain_id = GENERAL_DOMAIN
             if (
@@ -682,6 +779,40 @@ class OmniAgent(Agent):
                 )
             )
         return slices
+
+    def _domain_id_for_preset(self, catalog: GlossaryCatalog, preset_id: str) -> str:
+        meta = catalog.manifest.meta_for_preset(preset_id) if catalog.manifest else {}
+        return str(
+            meta.get("domain_id")
+            or meta.get("domain")
+            or domain_for_preset(preset_id)
+            or GENERAL_DOMAIN
+        ).strip()
+
+    def _context_similarity_prototypes_for(
+        self,
+        catalog: GlossaryCatalog,
+    ) -> Dict[str, Tuple[str, ...]]:
+        if self.config.router_context_similarity_prototypes_path:
+            texts = json.loads(
+                Path(self.config.router_context_similarity_prototypes_path).read_text(encoding="utf-8")
+            )
+            return {item.domain_id: tuple(texts[item.domain_id]) for item in self._domain_slices_for(catalog)}
+        prototypes: Dict[str, List[str]] = {}
+        for item in self._domain_slices_for(catalog):
+            description = str(item.description or "").strip()
+            texts = []
+            if description:
+                texts.append(description)
+            texts.extend(DOMAIN_ROUTER_PROTOTYPES.get(item.domain_id, ()))
+            if not texts:
+                texts = [item.domain_id.replace("_", " ").replace("-", " ")]
+            domain_texts = prototypes.setdefault(item.domain_id, [])
+            for text in texts:
+                normalized = str(text).strip()
+                if normalized and normalized not in domain_texts:
+                    domain_texts.append(normalized)
+        return {domain: tuple(texts) for domain, texts in prototypes.items() if texts}
 
     def _load_centroid(self, centroid_path: Any) -> Any:
         path = str(centroid_path or "").strip()
@@ -733,6 +864,9 @@ class OmniAgent(Agent):
         }
 
     def _schedule_auto_preloads(self) -> None:
+        # note (luojiaxuan): Budgeted routing warms only the slices it selects.
+        if self._budgeted_slice_routing_enabled():
+            return
         catalog = self._catalog(self.config.language_pair)
         for preset in configured_working_presets(self.config.auto_glossary_preload_presets):
             try:
@@ -798,7 +932,7 @@ class OmniAgent(Agent):
             preset_id=active_preset,
             slice_id=slice_id_for_preset(active_preset),
             role=resolved_role,
-            domain=domain_for_slice_preset(active_preset),
+            domain=self._domain_id_for_preset(catalog, active_preset),
             index_path=index_path,
             term_count=int(selection.preset_terms or 0),
             weight=slice_weight_for_role(resolved_role),
@@ -827,7 +961,10 @@ class OmniAgent(Agent):
             presets.append((active_preset, "domain"))
         else:
             for preset in configured_working_presets(self.config.auto_glossary_presets):
-                domain = domain_for_preset(preset)
+                domain = self._domain_id_for_preset(
+                    self._catalog(session.language_pair),
+                    preset,
+                )
                 if not preset or preset == "none" or domain in {GENERAL_DOMAIN, "common", "general"}:
                     continue
                 presets.append((preset, "domain_probe"))
@@ -854,8 +991,9 @@ class OmniAgent(Agent):
             return []
         slices: List[RetrievalSlice] = []
         seen: Set[str] = set()
+        catalog = self._catalog(session.language_pair)
         for preset in configured_working_presets(self.config.auto_glossary_presets):
-            domain = domain_for_preset(preset)
+            domain = self._domain_id_for_preset(catalog, preset)
             if not preset or preset == "none" or domain in {GENERAL_DOMAIN, "common", "general"}:
                 continue
             plan = self._slice_for_preset(session, preset, role="domain_probe")
@@ -895,6 +1033,13 @@ class OmniAgent(Agent):
         session.last_domain_probe_at_s = 0.0
         session.last_domain_probe_cached = False
 
+    def _clear_context_similarity_meta(self, session: "OmniSession") -> None:
+        session.last_context_similarity_scores = {}
+        session.last_context_similarity_s = None
+        session.last_context_similarity_at_s = 0.0
+        session.last_context_similarity_text = ""
+        session.last_context_similarity_cached = False
+
     def _cached_domain_probe_scores(
         self,
         session: "OmniSession",
@@ -925,6 +1070,103 @@ class OmniAgent(Agent):
         latency_multiplier = max(1, min(4, latency_multiplier))
         return max(0.1, float(self.config.base_segment_sec) * latency_multiplier)
 
+    def _due_context_sessions(
+        self,
+        sessions: Sequence["OmniSession"],
+        now: float,
+    ) -> List[Tuple["OmniSession", str]]:
+        """Sessions whose router text changed and whose last refresh is older than the update interval."""
+        due: List[Tuple[OmniSession, str]] = []
+        for session in sessions:
+            text = str(session.router_text_window or "").strip()
+            source = str(session.router_text_source or "none")
+            if not session.auto_glossary_enabled or not text or source == "none":
+                continue
+            refresh_sec = self._domain_probe_refresh_sec(session)
+            cache_fresh = bool(
+                session.last_context_similarity_scores
+                and (
+                    text == session.last_context_similarity_text
+                    or now - float(session.last_context_similarity_at_s) < refresh_sec
+                )
+            )
+            if not cache_fresh:
+                due.append((session, text))
+        return due
+
+    async def _context_similarity_scores_batch(
+        self,
+        batch: Sequence["OmniSession"],
+    ) -> List[Dict[str, float]]:
+        # Routing never blocks a chunk: it reads the latest scores, and the router worker refreshes
+        # due sessions in the background.
+        scorer = self.context_similarity
+        if scorer is not None and scorer.enabled and self._due_context_sessions(batch, time.perf_counter()):
+            self._router_wakeup.set()
+        for session in batch:
+            session.last_context_similarity_cached = True
+        return [dict(session.last_context_similarity_scores) for session in batch]
+
+    async def _router_loop(self) -> None:
+        while True:
+            await self._router_wakeup.wait()
+            self._router_wakeup.clear()
+            await self._refresh_context_scores()
+
+    async def _refresh_context_scores(self) -> None:
+        """Scores every due session in one batch and folds the result into its posterior."""
+        scorer = self.context_similarity
+        if scorer is None or not scorer.enabled:
+            return
+        now = time.perf_counter()
+        due = self._due_context_sessions(list(self.sessions.values()), now)
+        if not due:
+            return
+        allowed_domains = list(getattr(scorer, "prototypes", {}) or {})
+        if not allowed_domains:
+            language_pair = str(
+                getattr(due[0][0], "language_pair", self.config.language_pair)
+                or self.config.language_pair
+            )
+            allowed_domains = [
+                item.domain_id
+                for item in self._domain_slices_for(self._catalog(language_pair))
+            ]
+        segments = [session.segment_idx for session, _ in due]
+        started = time.perf_counter()
+        try:
+            scores = await scorer.score_batch(
+                [text for _, text in due],
+                allowed_domains=allowed_domains,
+            )
+        except Exception:  # noqa: BLE001 - context evidence is optional
+            logger.exception("context-similarity scoring failed; using cached router evidence")
+            return
+        elapsed = time.perf_counter() - started
+        print("RASST_ROUTER_METRIC " + json.dumps({"sessions": len(due), "score_s": round(elapsed, 4)}), flush=True)
+        for (session, text), segment, row in zip(due, segments, scores):
+            if self.sessions.get(session.session_id) is not session:
+                continue
+            if self.config.router_context_switch_rate > 0.0 and row:
+                window = max(1, int(self.config.router_generated_target_window_chunks))
+                fresh = segment - session.router_posterior_segment
+                if session.router_posterior_segment < 0:
+                    fresh = window
+                # Consecutive contexts share chunks; each chunk's evidence is counted once.
+                row = filter_step(
+                    session.router_posterior,
+                    row,
+                    switch_rate=float(self.config.router_context_switch_rate),
+                    evidence_weight=min(1.0, max(0, fresh) / window),
+                )
+                session.router_posterior = dict(row)
+                session.router_posterior_segment = segment
+            session.last_context_similarity_scores = dict(row)
+            session.last_context_similarity_s = elapsed
+            session.last_context_similarity_at_s = now
+            session.last_context_similarity_text = text
+            session.last_context_similarity_cached = False
+
     async def _probe_domain_scores(
         self,
         session: "OmniSession",
@@ -932,6 +1174,9 @@ class OmniAgent(Agent):
         end_sample: int,
         query_embedding: Any = None,
     ) -> Dict[str, DomainProbeScore]:
+        if float(self.config.router_domain_probe_weight) <= 0.0:
+            self._clear_domain_probe_meta(session)
+            return {}
         mode = (self.config.router_mode or "embedding_refs").strip().lower()
         if mode != "hybrid_window_topic" or not self.retrieval.enabled:
             self._clear_domain_probe_meta(session)
@@ -942,8 +1187,16 @@ class OmniAgent(Agent):
             return {}
         state = session.router_state
 
+        probe_slices = self._domain_probe_slices(session)
+        if self._budgeted_slice_routing_enabled():
+            # note (luojiaxuan): Keep probe indexes inside the active term budget.
+            probe_slices = [
+                plan
+                for plan in self._active_retrieval_slices(session)
+                if plan.domain not in {GENERAL_DOMAIN, "common", "general"}
+            ]
         candidates: List[RetrievalSlice] = []
-        for plan in self._domain_probe_slices(session):
+        for plan in probe_slices:
             if self.retrieval.is_index_ready(plan.index_path):
                 candidates.append(plan)
             else:
@@ -995,15 +1248,134 @@ class OmniAgent(Agent):
         return self._slice_for_preset(session, self.config.autoterm_rescue_preset, role="rescue")
 
     def _record_active_slices(self, session: "OmniSession", slices: Sequence[RetrievalSlice]) -> None:
+        first = slices[0].preset_id if slices else ""
+        if session.active_slice_presets and first != session.active_slice_presets[0]:
+            session.top_slice_changes += 1
         session.active_retrieval_slices = list(slices)
         session.active_slice_presets = [item.preset_id for item in slices]
         session.active_slice_terms = {item.preset_id: int(item.term_count or 0) for item in slices}
         session.last_retrieval_plan = [item.to_meta() for item in slices]
 
+    def _budgeted_slice_routing_enabled(self) -> bool:
+        mode = str(self.config.router_slice_selection_mode or "hard_top1").strip().lower()
+        return mode in {"budgeted", "budgeted_top_slices", "top_slices"}
+
+    def _activate_budgeted_retrieval_slices(
+        self,
+        session: "OmniSession",
+        decision: RouterDecision,
+    ) -> bool:
+        if not self._budgeted_slice_routing_enabled():
+            return False
+        selection = decision.evidence.get("slice_selection")
+        if not isinstance(selection, dict):
+            return False
+        selected_presets = [
+            str(preset).strip()
+            for preset in selection.get("selected_slice_presets", [])
+            if str(preset).strip()
+        ]
+        if not selected_presets:
+            return False
+
+        budget = max(0, int(self.config.router_term_budget))
+        unknown_terms = max(1, int(self.config.router_unknown_slice_term_count))
+        planned: List[RetrievalSlice] = []
+        used_terms = 0
+        base_preset = str(self.config.auto_glossary_base_preset or "").strip()
+        ordered_presets: List[Tuple[str, str]] = []
+        if base_preset and base_preset != "none":
+            ordered_presets.append((base_preset, "base"))
+        ordered_presets.extend((preset, "domain") for preset in selected_presets)
+
+        seen: Set[str] = set()
+        for preset, role in ordered_presets:
+            plan = self._slice_for_preset(session, preset, role=role)
+            if plan is None or plan.preset_id in seen:
+                continue
+            item_terms = int(plan.term_count) if int(plan.term_count) > 0 else unknown_terms
+            if used_terms + item_terms > budget:
+                continue
+            planned.append(plan)
+            seen.add(plan.preset_id)
+            used_terms += item_terms
+        if not planned:
+            return False
+
+        self._record_active_slices(session, planned)
+        for item in planned:
+            self._schedule_index_preload(item.index_path)
+        selection["activated_slice_presets"] = [item.preset_id for item in planned]
+        selection["activated_slice_count"] = len(planned)
+        selection["activated_term_count"] = used_terms
+        return True
+
     def _retrieval_top_k_for(self, session: "OmniSession") -> int:
         if session.auto_glossary_enabled:
             return max(int(self.config.autoterm_topk_per_slice), int(self.config.prompt_top_k), int(self.config.ui_top_k))
         return max(int(self.config.rag_top_k), int(self.config.prompt_top_k), int(self.config.ui_top_k))
+
+    def _retrieval_top_ks_for(
+        self,
+        session: "OmniSession",
+        slices: Sequence[RetrievalSlice],
+    ) -> List[int]:
+        if not slices:
+            return []
+        candidate_budget = max(0, int(self.config.retrieval_candidate_budget))
+        if candidate_budget <= 0:
+            return [self._retrieval_top_k_for(session) for _ in slices]
+        per_slice, remainder = divmod(candidate_budget, len(slices))
+        return [
+            per_slice + (1 if index < remainder else 0)
+            for index in range(len(slices))
+        ]
+
+    def _remaining_retrieval_candidate_budget(self, session: "OmniSession") -> int:
+        candidate_budget = max(0, int(self.config.retrieval_candidate_budget))
+        if candidate_budget <= 0:
+            return self._retrieval_top_k_for(session)
+        return max(
+            0,
+            candidate_budget - int(session.last_retrieval_candidate_requested),
+        )
+
+    def _reset_retrieval_candidate_metrics(self, session: "OmniSession") -> None:
+        session.last_retrieval_candidate_requested = 0
+        session.last_retrieval_candidate_returned = 0
+        session.last_retrieval_index_queries = 0
+        session.last_retrieval_scored_inventory_terms = 0
+        session.last_retrieval_top_k_by_slice = {}
+
+    def _record_retrieval_query(
+        self,
+        session: "OmniSession",
+        plan: RetrievalSlice,
+        top_k: int,
+    ) -> None:
+        requested = max(0, int(top_k))
+        if requested <= 0:
+            return
+        session.last_retrieval_candidate_requested += requested
+        session.last_retrieval_index_queries += 1
+        session.last_retrieval_scored_inventory_terms += max(0, int(plan.term_count))
+        key = str(plan.preset_id or plan.slice_id)
+        session.last_retrieval_top_k_by_slice[key] = (
+            int(session.last_retrieval_top_k_by_slice.get(key, 0)) + requested
+        )
+
+    def _retrieval_candidate_cost_meta(self, session: "OmniSession") -> Dict[str, Any]:
+        candidate_budget = max(0, int(self.config.retrieval_candidate_budget))
+        return {
+            "allocation_mode": "shared_total" if candidate_budget > 0 else "legacy_per_slice",
+            "configured_budget": candidate_budget,
+            "requested_top_k": int(session.last_retrieval_candidate_requested),
+            "returned_before_rerank": int(session.last_retrieval_candidate_returned),
+            "pool_after_rerank": int(session.last_candidate_pool_count),
+            "index_queries": int(session.last_retrieval_index_queries),
+            "scored_inventory_terms": int(session.last_retrieval_scored_inventory_terms),
+            "top_k_by_slice": dict(session.last_retrieval_top_k_by_slice),
+        }
 
     def _retrieval_score_threshold_for(self, session: "OmniSession") -> Optional[float]:
         if session.auto_glossary_enabled:
@@ -1053,7 +1425,9 @@ class OmniAgent(Agent):
         if self.config.rag_enabled:
             try:
                 catalog = self._catalog(self.config.language_pair)
-                startup_index = catalog.index_path_for_preset(RAG_STARTUP_GLOSSARY_PRESET)
+                startup_index = catalog.index_path_for_preset(
+                    self.config.rag_startup_glossary_preset
+                )
                 self.retrieval = MaxSimRetrievalPlugin(
                     model_path=self.config.rag_model_path,
                     index_path=startup_index,
@@ -1063,6 +1437,7 @@ class OmniAgent(Agent):
                     text_lora_rank=self.config.rag_text_lora_r,
                     target_lang=catalog.lang_code,
                     score_threshold=self.config.rag_score_threshold,
+                    max_cached_indexes=self.config.rag_index_cache_max_entries,
                 )
                 await self.retrieval.start()
             except Exception:  # noqa: BLE001 - retrieval is optional; degrade gracefully
@@ -1080,9 +1455,40 @@ class OmniAgent(Agent):
         else:
             self.retrieval = NullRetrieval()
 
+        if (
+            self.config.auto_glossary_enabled
+            and self.config.router_context_similarity_enabled
+            and not self.config.mock
+        ):
+            try:
+                prototypes = self._context_similarity_prototypes_for(
+                    self._catalog(self.config.language_pair)
+                )
+                if self.config.router_context_scorer == "language_model":
+                    self.context_similarity = LanguageModelSliceScorer(
+                        model_id=self.config.router_context_language_model,
+                        device=self.config.router_context_similarity_device,
+                        batch_size=self.config.router_context_similarity_batch_size,
+                        prototypes=prototypes,
+                        target_language=str(LANGUAGE_PAIRS[self.config.language_pair]["target_lang"]),
+                    )
+                else:
+                    self.context_similarity = DomainDescriptionSimilarity(
+                        model_id=self.config.router_context_similarity_model,
+                        device=self.config.router_context_similarity_device,
+                        batch_size=self.config.router_context_similarity_batch_size,
+                        prototypes=prototypes,
+                    )
+                await self.context_similarity.start()
+            except Exception:  # noqa: BLE001 - router falls back to other evidence
+                logger.exception("context-similarity router failed to load; continuing without it")
+                self.context_similarity = None
+
         if self.config.auto_glossary_enabled and self.retrieval.enabled:
             self._schedule_auto_preloads()
 
+        if self.context_similarity is not None:
+            self._router_task = asyncio.create_task(self._router_loop())
         self._scheduler_task = asyncio.create_task(self._scheduler_loop())
         logger.info(
             "OmniAgent %r started (model=%s mock=%s rag=%s)",
@@ -1093,9 +1499,10 @@ class OmniAgent(Agent):
         )
 
     async def shutdown(self) -> None:
-        if self._scheduler_task:
-            self._scheduler_task.cancel()
-            await asyncio.gather(self._scheduler_task, return_exceptions=True)
+        for task in (self._scheduler_task, self._router_task):
+            if task:
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
         if self.backend is not None:
             try:
                 await self.backend.stop()
@@ -1112,6 +1519,11 @@ class OmniAgent(Agent):
             await self.retrieval.stop()
         except Exception:  # noqa: BLE001
             logger.exception("retrieval stop failed")
+        if self.context_similarity is not None:
+            try:
+                await self.context_similarity.stop()
+            except Exception:  # noqa: BLE001
+                logger.exception("context-similarity router shutdown failed")
         for path in self.tmp_dir.glob("*.wav"):
             try:
                 path.unlink()
@@ -1201,6 +1613,10 @@ class OmniAgent(Agent):
             "active_slices": list(session.active_slice_presets),
             "active_slice_terms": dict(session.active_slice_terms),
             "fixed_prompt_k": int(self.config.prompt_top_k),
+            "retrieval_candidate_budget": max(
+                0,
+                int(self.config.retrieval_candidate_budget),
+            ),
             "topic": self._topic_meta(session),
         }
         return SessionInfo(admitted=True, queued=False, queue_position=0, meta=meta)
@@ -1312,13 +1728,16 @@ class OmniAgent(Agent):
         session.topic_history.clear()
         session.topic_confidence = 0.0
         session.glossary_switch_count = 0
+        session.top_slice_changes = 0
         session.last_topic_update_s = time.perf_counter()
         session.last_topic_reason = "reset"
         session.last_router_decision = None
         session.last_query_embedding = None
         session.router_text_window = ""
         session.router_text_source = "none"
+        session.router_generated_target_history.clear()
         self._clear_domain_probe_meta(session)
+        self._clear_context_similarity_meta(session)
         if session.auto_glossary_enabled:
             try:
                 selection = self.active_glossary.initial_selection(
@@ -1399,6 +1818,7 @@ class OmniAgent(Agent):
             session.imported_glossary = selection.manual_refs
             session.last_router_decision = None
             session.last_query_embedding = None
+            self._clear_context_similarity_meta(session)
             session.router_state = RouterSessionState(
                 active_preset_id=session.active_glossary_preset,
                 active_domain_id=session.active_domain,
@@ -1553,6 +1973,23 @@ class OmniAgent(Agent):
             "references_avg": round(sum(len(item) for item in refs_by_session) / len(refs_by_session), 4)
             if refs_by_session
             else 0.0,
+            "retrieval_candidates_requested_avg": round(
+                sum(session.last_retrieval_candidate_requested for session in batch) / len(batch),
+                4,
+            ),
+            "retrieval_candidates_returned_avg": round(
+                sum(session.last_retrieval_candidate_returned for session in batch) / len(batch),
+                4,
+            ),
+            "retrieval_index_queries_avg": round(
+                sum(session.last_retrieval_index_queries for session in batch) / len(batch),
+                4,
+            ),
+            "retrieval_scored_inventory_terms_avg": round(
+                sum(session.last_retrieval_scored_inventory_terms for session in batch)
+                / len(batch),
+                4,
+            ),
             "generation_ok": sum(1 for item in results if item.get("ok")),
             "request_elapsed_avg_s": round(sum(request_elapsed_values) / len(request_elapsed_values), 4)
             if request_elapsed_values
@@ -1581,15 +2018,21 @@ class OmniAgent(Agent):
         for idx, session in enumerate(batch):
             session.last_rescue_triggered = False
             session.last_candidate_pool_count = 0
+            self._reset_retrieval_candidate_metrics(session)
             slices = self._active_retrieval_slices(session)
             self._record_active_slices(session, slices)
-            for plan in slices:
-                if session.auto_glossary_enabled and not self.retrieval.is_index_ready(plan.index_path):
-                    self._schedule_index_preload(plan.index_path)
+            top_ks = self._retrieval_top_ks_for(session, slices)
+            for plan, top_k in zip(slices, top_ks):
+                if top_k <= 0:
                     continue
+                if session.auto_glossary_enabled and not self.retrieval.is_index_ready(plan.index_path):
+                    await self.retrieval.preload_index(plan.index_path)
+                    if not self.retrieval.is_index_ready(plan.index_path):
+                        continue
+                self._record_retrieval_query(session, plan, top_k)
                 key = (
                     plan.index_path,
-                    self._retrieval_top_k_for(session),
+                    top_k,
                     self._retrieval_score_threshold_for(session),
                 )
                 grouped.setdefault(key, []).append((idx, session, plan))
@@ -1606,27 +2049,31 @@ class OmniAgent(Agent):
 
             rescue_grouped: Dict[Tuple[str, int, Optional[float]], List[Tuple[int, OmniSession, RetrievalSlice]]] = {}
             for idx, session in enumerate(batch):
-                if session.auto_glossary_enabled:
-                    ranked = rank_autoterm_references(outputs[idx], active_domain=session.active_domain)
-                else:
-                    ranked = self._rank_references(outputs[idx])
+                session.last_retrieval_candidate_returned = len(outputs[idx])
+                ranked = self._rank_references_for_session(session, outputs[idx])
                 outputs[idx] = ranked
                 if not self._should_rescue_retrieval(session, ranked):
                     continue
                 rescue = self._rescue_retrieval_slice(session)
                 if rescue is None or rescue.preset_id in set(session.active_slice_presets):
                     continue
-                if session.auto_glossary_enabled and not self.retrieval.is_index_ready(rescue.index_path):
-                    self._schedule_index_preload(rescue.index_path)
+                rescue_top_k = self._remaining_retrieval_candidate_budget(session)
+                if rescue_top_k <= 0:
                     continue
+                if session.auto_glossary_enabled and not self.retrieval.is_index_ready(rescue.index_path):
+                    await self.retrieval.preload_index(rescue.index_path)
+                    if not self.retrieval.is_index_ready(rescue.index_path):
+                        continue
                 session.last_rescue_triggered = True
                 session.last_retrieval_plan.append(rescue.to_meta())
+                self._record_retrieval_query(session, rescue, rescue_top_k)
                 key = (
                     rescue.index_path,
-                    self._retrieval_top_k_for(session),
+                    rescue_top_k,
                     self._retrieval_score_threshold_for(session),
                 )
                 rescue_grouped.setdefault(key, []).append((idx, session, rescue))
+            pre_rescue_counts = [len(items) for items in outputs]
             await self._retrieve_slice_groups(
                 rescue_grouped,
                 end_by_session,
@@ -1634,12 +2081,15 @@ class OmniAgent(Agent):
                 query_embeddings,
                 query_window_embeddings,
             )
+            for idx, session in enumerate(batch):
+                session.last_retrieval_candidate_returned += max(
+                    0,
+                    len(outputs[idx]) - pre_rescue_counts[idx],
+                )
 
+        context_scores_by_session = await self._context_similarity_scores_batch(batch)
         for idx, session in enumerate(batch):
-            if session.auto_glossary_enabled:
-                outputs[idx] = rank_autoterm_references(outputs[idx], active_domain=session.active_domain)
-            else:
-                outputs[idx] = self._rank_references(outputs[idx])
+            outputs[idx] = self._rank_references_for_session(session, outputs[idx])
             session.last_candidate_pool_count = len(outputs[idx])
             if session.auto_glossary_enabled:
                 observer_refs = self._prompt_references(session, outputs[idx])
@@ -1657,6 +2107,7 @@ class OmniAgent(Agent):
                     session,
                     RetrievalResult(references=observer_refs, query_embedding=query_embeddings[idx]),
                     domain_probe_scores=domain_probe_scores,
+                    context_similarity_scores=context_scores_by_session[idx],
                 )
             else:
                 session.last_query_embedding = query_embeddings[idx]
@@ -1670,9 +2121,32 @@ class OmniAgent(Agent):
         query_embeddings: List[Any],
         query_window_embeddings: List[Any],
     ) -> None:
+        if not grouped:
+            return
+        request_entries: Dict[int, Dict[str, Any]] = {}
         for (index_path, top_k, score_threshold), indexed_sessions in grouped.items():
-            await self.retrieval.activate_index(index_path)
-            requests = [
+            for original_idx, session, plan in indexed_sessions:
+                entry = request_entries.setdefault(
+                    original_idx,
+                    {"session": session, "specs": [], "plans": {}},
+                )
+                spec_key = f"slice-{len(entry['specs'])}"
+                entry["specs"].append(
+                    IndexRetrievalSpec(
+                        key=spec_key,
+                        index_path=index_path,
+                        top_k=top_k,
+                        score_threshold=score_threshold,
+                    )
+                )
+                entry["plans"][spec_key] = plan
+
+        ordered_entries = list(request_entries.items())
+        requests = []
+        specs_by_request = []
+        for _, entry in ordered_entries:
+            session = entry["session"]
+            requests.append(
                 {
                     "audio_buffer": session.audio[: end_by_session[session.session_id]],
                     "current_start_sec": float(session.last_llm_samples) / TARGET_SAMPLE_RATE,
@@ -1680,25 +2154,28 @@ class OmniAgent(Agent):
                     "lookback_sec": float(self.config.rag_timeline_lookback_sec),
                     "return_query_window_embeddings": bool(session.auto_glossary_enabled),
                 }
-                for _, session, _ in indexed_sessions
-            ]
-            group_results = await self.retrieval.retrieve_with_metadata(
-                requests,
-                top_k=top_k,
-                lookback_sec=self.config.rag_timeline_lookback_sec,
-                score_threshold=score_threshold,
             )
-            for (original_idx, session, plan), result in zip(indexed_sessions, group_results):
-                if not isinstance(result, RetrievalResult):
-                    result = RetrievalResult(references=list(result or []))
-                if query_embeddings[original_idx] is None and result.query_embedding is not None:
-                    query_embeddings[original_idx] = result.query_embedding
-                if (
-                    query_window_embeddings[original_idx] is None
-                    and result.query_window_embeddings is not None
-                ):
-                    query_window_embeddings[original_idx] = result.query_window_embeddings
-                for ref in result.references:
+            specs_by_request.append(entry["specs"])
+
+        group_results = await self.retrieval.retrieve_across_indexes_with_metadata(
+            requests,
+            index_specs_by_request=specs_by_request,
+            lookback_sec=self.config.rag_timeline_lookback_sec,
+        )
+        for (original_idx, entry), result in zip(ordered_entries, group_results):
+            if not isinstance(result, MultiIndexRetrievalResult):
+                raise TypeError("multi-index retrieval returned an invalid result")
+            session = entry["session"]
+            if query_embeddings[original_idx] is None and result.query_embedding is not None:
+                query_embeddings[original_idx] = result.query_embedding
+            if (
+                query_window_embeddings[original_idx] is None
+                and result.query_window_embeddings is not None
+            ):
+                query_window_embeddings[original_idx] = result.query_window_embeddings
+            for spec in entry["specs"]:
+                plan = entry["plans"][spec.key]
+                for ref in result.references_by_key.get(spec.key, []):
                     item = dict(ref)
                     item.setdefault("source_preset", plan.preset_id)
                     item["source_slice"] = plan.slice_id
@@ -1731,9 +2208,19 @@ class OmniAgent(Agent):
                 if source in {"", "rag", "wikidata", "glossary"}:
                     item["source"] = f"preset:{session.glossary_preset}"
             annotated.append(item)
-        if session.auto_glossary_enabled:
-            return rank_autoterm_references(annotated, active_domain=session.active_domain)
-        return self._rank_references(annotated)
+        return self._rank_references_for_session(session, annotated)
+
+    def _rank_references_for_session(
+        self,
+        session: OmniSession,
+        references: Sequence[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        policy = str(self.config.reference_ranking_policy or "autoterm_rerank")
+        if policy == "dense_pair" or not session.auto_glossary_enabled:
+            return self._rank_references(references)
+        if policy != "autoterm_rerank":
+            raise ValueError(f"unsupported reference ranking policy: {policy}")
+        return rank_autoterm_references(references, active_domain=session.active_domain)
 
     def _rank_references(self, references: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
         def _priority(ref: Dict[str, Any]) -> Tuple[int, float]:
@@ -1754,7 +2241,19 @@ class OmniAgent(Agent):
                 score = 0.0
             return pri, -score
 
-        return sorted((dict(ref) for ref in references or []), key=_priority)
+        ranked = sorted((dict(ref) for ref in references or []), key=_priority)
+        output: List[Dict[str, Any]] = []
+        seen_pairs: set[Tuple[str, str]] = set()
+        for ref in ranked:
+            key = (
+                str(ref.get("term") or "").strip().casefold(),
+                str(ref.get("translation") or "").strip().casefold(),
+            )
+            if not all(key) or key in seen_pairs:
+                continue
+            seen_pairs.add(key)
+            output.append(ref)
+        return output
 
     def _prompt_references(
         self,
@@ -1775,6 +2274,17 @@ class OmniAgent(Agent):
         return self._annotate_references(session, references)[: max(0, int(self.config.ui_top_k))]
 
     def _topic_meta(self, session: OmniSession) -> Dict[str, Any]:
+        if self.config.router_context_switch_rate > 0.0 and session.active_retrieval_slices:
+            # The language-model router's topic is its posterior argmax, the first slice of the working set.
+            top = session.active_retrieval_slices[0]
+            meta = glossary_topic_meta(
+                active_domain=top.domain,
+                confidence=float(session.router_posterior.get(top.domain, 0.0)),
+                active_glossary_preset=top.preset_id,
+                switch_count=session.top_slice_changes,
+                last_reason="posterior argmax",
+            )
+            return {**meta, "router": "language_model"}
         return glossary_topic_meta(
             active_domain=session.active_domain,
             confidence=session.topic_confidence,
@@ -1809,6 +2319,11 @@ class OmniAgent(Agent):
             "fixed_prompt_k": prompt_k,
             "prompt_candidate_shortfall": max(0, prompt_k - len(prompt_refs)),
             "candidate_pool_count": int(session.last_candidate_pool_count or len(references or [])),
+            "retrieval_candidate_budget": max(
+                0,
+                int(self.config.retrieval_candidate_budget),
+            ),
+            "retrieval_candidate_cost": self._retrieval_candidate_cost_meta(session),
             "active_slices": list(session.active_slice_presets),
             "active_slice_terms": dict(session.active_slice_terms),
             "retrieval_plan": list(session.last_retrieval_plan),
@@ -1821,6 +2336,16 @@ class OmniAgent(Agent):
             "domain_probe_cached": bool(session.last_domain_probe_cached),
             "domain_probe_scores": dict(session.last_domain_probe_scores),
             "domain_probe_slices": list(session.last_domain_probe_slices),
+            "context_similarity_scores": {
+                domain: round(float(score), 4)
+                for domain, score in session.last_context_similarity_scores.items()
+            },
+            "context_similarity_s": (
+                round(float(session.last_context_similarity_s), 6)
+                if session.last_context_similarity_s is not None
+                else None
+            ),
+            "context_similarity_cached": bool(session.last_context_similarity_cached),
             "router_text_source": session.router_text_source,
             "router_text_chars": len(session.router_text_window or ""),
             "topic": self._topic_meta(session),
@@ -1845,15 +2370,24 @@ class OmniAgent(Agent):
         if current_source not in {"none", "generated_target"}:
             return
         window = max(1, int(self.config.router_generated_target_window_chunks))
-        texts = [str(item).strip() for item in session.history[-window:] if str(item).strip()]
+        texts = [
+            str(item).strip()
+            for item in getattr(session, "router_generated_target_history", [])
+            if str(item).strip()
+        ]
         current_text = str(text or "").strip()
         if current_text and (not texts or texts[-1] != current_text):
-            texts = (texts + [current_text])[-window:]
+            texts.append(current_text)
+        texts = texts[-window:]
+        session.router_generated_target_history = texts
         router_text = "\n".join(texts).strip()
         if len(router_text) < max(1, int(self.config.router_generated_target_min_chars)):
             return
         session.router_text_window = router_text
         session.router_text_source = "generated_target"
+        # Score the new context while the next chunk is still being spoken.
+        if self.context_similarity is not None and self._due_context_sessions([session], time.perf_counter()):
+            self._router_wakeup.set()
 
     async def _observe_active_glossary(
         self,
@@ -1861,6 +2395,7 @@ class OmniAgent(Agent):
         result: RetrievalResult,
         *,
         domain_probe_scores: Optional[Dict[str, DomainProbeScore]] = None,
+        context_similarity_scores: Optional[Dict[str, float]] = None,
     ) -> None:
         if not session.auto_glossary_enabled:
             return
@@ -1892,6 +2427,7 @@ class OmniAgent(Agent):
                 router_text=session.router_text_window,
                 router_text_source=session.router_text_source,
                 domain_probe_scores=domain_probe_scores or {},
+                context_similarity_scores=context_similarity_scores or {},
             )
         else:
             decision = router.observe(
@@ -1900,6 +2436,7 @@ class OmniAgent(Agent):
                 annotated_refs,
                 now,
             )
+        self._activate_budgeted_retrieval_slices(session, decision)
         session.topic_confidence = decision.confidence
         session.last_topic_reason = decision.reason
         session.last_topic_update_s = now
@@ -1984,12 +2521,20 @@ class OmniAgent(Agent):
 
         old_preset = session.active_glossary_preset
         old_domain = session.active_domain
+        budgeted_slices = (
+            list(session.active_retrieval_slices)
+            if self._budgeted_slice_routing_enabled()
+            else []
+        )
         session.glossary_preset = selection.active_preset
         session.active_glossary_preset = selection.active_preset
         session.active_domain = selection.active_domain
         session.glossary_index_path = selection.index_path
-        session.active_retrieval_slices = []
-        active_slices = self._active_retrieval_slices(session)
+        if budgeted_slices:
+            active_slices = budgeted_slices
+        else:
+            session.active_retrieval_slices = []
+            active_slices = self._active_retrieval_slices(session)
         self._record_active_slices(session, active_slices)
         for item in active_slices:
             self._schedule_index_preload(item.index_path)
@@ -2118,6 +2663,14 @@ class OmniAgent(Agent):
         if chunk_rms < float(self.config.min_audio_rms):
             session.last_llm_samples = end_sample
             session.segment_idx += 1
+            self._emit_cursor_status(
+                session,
+                text="SILENCE_SKIPPED",
+                start_sample=start_sample,
+                cursor_samples=end_sample,
+                retrieve_s=retrieve_s,
+                references=references,
+            )
             return {"ok": True, "elapsed_s": 0.0, "skipped": "silence"}
 
         seg_no = session.segment_idx + 1
@@ -2182,6 +2735,15 @@ class OmniAgent(Agent):
                             references=references,
                         ),
                     )
+                )
+            else:
+                self._emit_cursor_status(
+                    session,
+                    text="EMPTY_TRANSLATION",
+                    start_sample=start_sample,
+                    cursor_samples=end_sample,
+                    retrieve_s=retrieve_s,
+                    references=references,
                 )
             return {"ok": True, "elapsed_s": elapsed}
         except Exception as exc:  # noqa: BLE001
@@ -2281,6 +2843,15 @@ class OmniAgent(Agent):
                         ),
                     )
                 )
+            elif ok:
+                self._emit_cursor_status(
+                    session,
+                    text="EMPTY_TRANSLATION",
+                    start_sample=start_sample,
+                    cursor_samples=end_sample,
+                    retrieve_s=retrieve_s,
+                    references=refs,
+                )
             elif not ok:
                 self._emit_event(
                     TranslationEvent(
@@ -2292,6 +2863,35 @@ class OmniAgent(Agent):
                 )
             results.append({"ok": ok, "elapsed_s": elapsed, "error": output.get("error")})
         return results
+
+    def _emit_cursor_status(
+        self,
+        session: OmniSession,
+        *,
+        text: str,
+        start_sample: int,
+        cursor_samples: int,
+        retrieve_s: Optional[float],
+        references: Sequence[Dict[str, Any]],
+    ) -> None:
+        meta = self._event_meta(
+            session,
+            segment_idx=session.segment_idx,
+            elapsed_s=0.0,
+            retrieve_s=retrieve_s,
+            cursor_samples=cursor_samples,
+            start_sample=start_sample,
+            references=references,
+        )
+        meta["cursor_status_reason"] = text.casefold()
+        self._emit_event(
+            TranslationEvent(
+                session_id=session.session_id,
+                type=EVENT_STATUS,
+                text=text,
+                meta=meta,
+            )
+        )
 
     def _trim_messages(self, session: OmniSession) -> None:
         max_cache = int(self.config.max_cache_chunks)
@@ -2347,6 +2947,13 @@ class OmniAgent(Agent):
                 "generated_target_probe_min_positive_domains": self.config.router_generated_target_probe_min_positive_domains,
                 "generated_target_enabled": self.config.router_generated_target_enabled,
                 "generated_target_window_chunks": self.config.router_generated_target_window_chunks,
+                "slice_selection_mode": self.config.router_slice_selection_mode,
+                "term_budget": self.config.router_term_budget,
+                "max_active_slices": self.config.router_max_active_slices,
+                "retrieval_candidate_budget": max(
+                    0,
+                    int(self.config.retrieval_candidate_budget),
+                ),
                 "prompt_top_k": self.config.prompt_top_k,
                 "ui_top_k": self.config.ui_top_k,
             },
@@ -2397,13 +3004,7 @@ class OmniAgent(Agent):
             "active_index_path": active_index,
             "active_terms": rag_health.get("active_terms"),
             "sessions": {
-                sid: {
-                    "active_domain": sess.active_domain,
-                    "confidence": round(sess.topic_confidence, 4),
-                    "active_glossary_preset": sess.active_glossary_preset,
-                    "switch_count": sess.glossary_switch_count,
-                    "router": sess.last_router_decision,
-                }
+                sid: {**self._topic_meta(sess), "router": sess.last_router_decision}
                 for sid, sess in list(self.sessions.items())[:16]
             },
         }
@@ -2426,10 +3027,24 @@ class OmniAgent(Agent):
     async def health(self) -> Dict[str, Any]:
         backend_health = await self.backend.health() if self.backend is not None else {"status": "starting"}
         rag_health = await self.retrieval.health()
+        context_health = (
+            await self.context_similarity.health()
+            if self.context_similarity is not None
+            else {"status": "disabled"}
+        )
         backend_ok = self.config.mock or backend_health.get("status") in {"healthy", "ready"}
         rag_ok = (not self.config.rag_enabled) or rag_health.get("status") in {"ready", "disabled"}
-        status = "healthy" if backend_ok and rag_ok else "starting"
-        if backend_health.get("status") == "error" or rag_health.get("status") == "error":
+        context_ok = (
+            not self.config.router_context_similarity_enabled
+            or self.config.mock
+            or context_health.get("status") in {"ready", "disabled"}
+        )
+        status = "healthy" if backend_ok and rag_ok and context_ok else "starting"
+        if (
+            backend_health.get("status") == "error"
+            or rag_health.get("status") == "error"
+            or context_health.get("status") == "error"
+        ):
             status = "error"
         return {
             "status": status,
@@ -2441,6 +3056,7 @@ class OmniAgent(Agent):
             "active_sessions": len(self.sessions),
             "mock_mode": self.config.mock,
             "rag": rag_health,
+            "context_similarity": context_health,
             "term_memory": self._term_memory_status(rag_health),
             "backend_health": backend_health,
             "scheduler_batch_size": self.config.scheduler_batch_size,

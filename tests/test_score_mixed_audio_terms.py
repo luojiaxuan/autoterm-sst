@@ -55,7 +55,7 @@ class MixedAudioTermScorerTests(unittest.TestCase):
 
         self.assertEqual(reference, "ACL参考一\nACL参考二\n医学参考\n")
 
-    def test_reports_occurrence_and_unique_type_accuracy(self) -> None:
+    def test_clips_occurrence_hits_to_distinct_output_mentions(self) -> None:
         payload = {
             "block_spans": [
                 {
@@ -80,13 +80,56 @@ class MixedAudioTermScorerTests(unittest.TestCase):
         metrics = score_occurrences(payload, gold)
         medicine = metrics["by_domain"]["medicine"]
 
-        self.assertEqual(metrics["hits"], 2)
+        self.assertEqual(metrics["hits"], 1)
         self.assertEqual(metrics["gold_occurrences"], 3)
+        self.assertEqual(metrics["term_acc"], 0.3333)
         self.assertEqual(metrics["unique_term_types"], 2)
         self.assertEqual(metrics["type_hits_any"], 1)
         self.assertEqual(metrics["type_acc_any"], 0.5)
+        self.assertEqual([row["hit"] for row in metrics["traces"]], [True, False, False])
+        self.assertEqual(metrics["traces"][0]["output_occurrences"], 1)
+        self.assertEqual(metrics["traces"][1]["output_occurrences"], 1)
         self.assertEqual(medicine["unique_term_types"], 2)
         self.assertEqual(medicine["type_hits_any"], 1)
+
+    def test_selected_medicine_reference_uses_audio_offsets(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            medicine = root / "medicine"
+            medicine.mkdir()
+            (medicine / "medicine.ref.zh__medicine_606.txt").write_text(
+                "before\ninside-a\ninside-b\nafter\n",
+                encoding="utf-8",
+            )
+            (medicine / "medicine.audio__medicine_606.yaml").write_text(
+                "- {offset: 0, duration: 10}\n"
+                "- {offset: 10, duration: 5}\n"
+                "- {offset: 15, duration: 5}\n"
+                "- {offset: 20, duration: 5}\n",
+                encoding="utf-8",
+            )
+            payload = {
+                "blocks": [
+                    {
+                        "item_id": "medicine_606__window_160000_320000",
+                        "original_item_id": "medicine_606",
+                        "corpus": "medicine",
+                        "source_offset_samples": 160000,
+                        "source_end_samples": 320000,
+                    }
+                ],
+                "block_spans": [{"block_index": 1, "sample_count": 160000}],
+            }
+            args = SimpleNamespace(
+                acl_root=str(root / "acl"),
+                acl_reference_text=str(root / "acl-ref.txt"),
+                medicine_oracle_dir=str(medicine),
+                target_lang="zh",
+            )
+
+            reference = build_reference_text(payload, args)
+
+        self.assertEqual(reference, "inside-a\ninside-b")
 
     def test_type_accuracy_is_block_local_for_repeated_terms(self) -> None:
         payload = {

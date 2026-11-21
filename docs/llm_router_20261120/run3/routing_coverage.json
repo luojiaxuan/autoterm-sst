@@ -1,0 +1,14 @@
+{
+ "lm_hmm": {
+  "chunks": 8776,
+  "cover": 97.99,
+  "top1": 81.49,
+  "top_changes": 231
+ },
+ "cosine": {
+  "chunks": 8776,
+  "cover": 98.7,
+  "top1": 95.84,
+  "top_changes": 15
+ }
+}

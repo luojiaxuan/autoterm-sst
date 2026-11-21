@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from framework.agents.term_memory.domain_taxonomy import DOMAIN_TO_PRESET, topic_keyword_scores
 from framework.agents.term_memory.topic_router import (
     DomainProbeScore,
     DomainSlice,
@@ -55,27 +56,20 @@ def _router_all_domains(**overrides):
     values.update(overrides)
     return HybridWindowTopicRouter(
         [
-            DomainSlice("nlp_core_10k", "nlp", index_path="mock://nlp"),
-            DomainSlice("medicine_core_10k", "medicine", index_path="mock://medicine"),
-            DomainSlice("finance_core_10k", "finance", index_path="mock://finance"),
-            DomainSlice("legal_core_10k", "legal", index_path="mock://legal"),
+            DomainSlice(preset, domain, index_path=f"mock://{domain}")
+            for domain, preset in DOMAIN_TO_PRESET.items()
         ],
         RouterConfig(**values),
     )
 
 
 def _probe_for(target: str) -> dict[str, DomainProbeScore]:
-    scores = {
-        "nlp": 0.35,
-        "medicine": 0.35,
-        "finance": 0.35,
-        "legal": 0.35,
-    }
+    scores = {domain: 0.35 for domain in DOMAIN_TO_PRESET}
     scores[target] = 0.90
     return {
         domain: DomainProbeScore(
             domain,
-            f"{domain}_core_10k",
+            DOMAIN_TO_PRESET[domain],
             top_score=score,
             mean_topk_score=score,
             top_terms=(domain,),
@@ -104,6 +98,25 @@ def _contested_probe(target: str, other: str, *, target_score: float, other_scor
 
 
 class HybridWindowTopicRouterTests(unittest.TestCase):
+    def test_realsi_domain_topic_examples_are_separable(self) -> None:
+        examples = {
+            "nlp": "负载均衡把请求分发到多个服务器和数据库副本。",
+            "medicine": "医疗保健系统让医生追踪患者健康状况和抗体检测。",
+            "education": "学校教师正在调整课堂课程和学生评估。",
+            "finance": "市场利率影响债券收益率、股票估值和投资组合。",
+            "legal": "法院审理刑事谋杀案件，辩护律师随后提出上诉。",
+            "environment": "洪水和飓风迫使沿海社区重建并调整防灾标准。",
+            "entertainment": "任天堂电子游戏的玩家讨论玩法和游戏主机。",
+            "science": "研究人员用显微镜观察海绵细胞、物种和进化。",
+            "sports": "球队在世界杯足球比赛中争夺冠军。",
+            "art": "博物馆展出文艺复兴画家的挂毯、绘画和浮雕。",
+        }
+        for expected, text in examples.items():
+            with self.subTest(domain=expected):
+                scores, _ = topic_keyword_scores(text)
+                actual = max(scores, key=scores.get)
+                self.assertEqual(actual, expected)
+
     def test_acl_window_topic_stays_on_nlp_without_medicine_false_switch(self) -> None:
         state = RouterSessionState("nlp_core_10k", "nlp", created_s=1.0)
         decision = _router().observe(
@@ -258,6 +271,50 @@ class HybridWindowTopicRouterTests(unittest.TestCase):
         self.assertEqual(decisions[1].action, "stay")
         self.assertEqual(decisions[2].action, "switch")
         self.assertEqual(decisions[2].target_domain_id, "medicine")
+
+    def test_generated_target_context_similarity_can_switch_without_keyword_hit(self) -> None:
+        router = _router()
+        state = RouterSessionState("nlp_core_10k", "nlp", created_s=1.0)
+        scores = {"nlp": 0.20, "medicine": 0.90}
+
+        decisions = [
+            router.observe(
+                state,
+                None,
+                [],
+                now_s=float(step),
+                router_text="这个部分继续讨论相关背景。",
+                router_text_source="generated_target",
+                context_similarity_scores=scores,
+            )
+            for step in (10, 11, 12)
+        ]
+
+        self.assertEqual(decisions[0].action, "stay")
+        self.assertEqual(decisions[1].action, "stay")
+        self.assertEqual(decisions[2].action, "switch")
+        self.assertEqual(decisions[2].target_domain_id, "medicine")
+
+    def test_ambiguous_context_similarity_does_not_switch(self) -> None:
+        router = _router()
+        state = RouterSessionState("nlp_core_10k", "nlp", created_s=1.0)
+        scores = {"nlp": 0.70, "medicine": 0.71}
+
+        decisions = [
+            router.observe(
+                state,
+                None,
+                [],
+                now_s=float(step),
+                router_text="这个部分继续讨论相关背景。",
+                router_text_source="generated_target",
+                context_similarity_scores=scores,
+            )
+            for step in (10, 11, 12, 13)
+        ]
+
+        self.assertTrue(all(decision.action == "stay" for decision in decisions))
+        self.assertTrue(all("margin<" in decision.reason for decision in decisions))
 
     def test_generated_target_generic_text_does_not_dilute_strong_probe(self) -> None:
         router = _router()

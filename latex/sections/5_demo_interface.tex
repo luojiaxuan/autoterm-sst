@@ -14,42 +14,47 @@ appear immediately. As context builds, the top status row lists active topic
 slices and their posterior probabilities. The evidence panel shows the pairs
 retrieved for each output. After a topic change, outgoing and incoming topic slices
 briefly share the working set. Figure~\ref{fig:ui} shows one session at two
-points. During the ACL talk, the NLP slice leads the posterior and the panel lists
-NLP pairs such as BERT model. During the oncology lecture, the medicine slice
-leads, and the translation renders high volume cancer centers with its retrieved
-target term.
+points. During the ACL talk, the phone app shows the NLP slice leading the
+posterior, and its evidence panel lists retrieved NLP pairs such as BERT model.
+During the oncology lecture, the medicine slice leads, and the translation
+renders high volume cancer centers with its retrieved target term.
 
 \begin{figure*}[t]
   \centering
-  \includegraphics[height=0.33\textwidth]{ui_evidence_panel.png}\hfill
-  \includegraphics[height=0.33\textwidth]{ui_narrow_acl.png}
-  \caption{English-to-Chinese interface replay of one ACL-ESO session. The left
-  panel shows an oncology lecture 19 minutes into the session, with the medicine
-  slice leading the posterior. The right panel shows the same session on a narrow
-  screen during the first ACL talk, at 6 minutes, with the NLP slice leading the
-  posterior. Probabilities come from a replay of the recorded translations, and
-  highlights mark retrieved terms.}
-  \label{fig:ui}
+  \begin{minipage}{.97\textwidth}
+    \centering
+    \includegraphics[height=.376\linewidth]{ui_evidence_panel.png}\hfill
+    \includegraphics[height=.376\linewidth]{ui_phone_acl.png}
+    \caption{The English-to-Chinese interface replaying one session of the ACL-ESO
+    stream. Left: an oncology lecture 19 minutes in, with the medicine slice leading
+    the posterior. Right: the installable phone app during the first ACL talk,
+    6 minutes in, with the NLP slice leading. Probabilities come from a replay of the
+    recorded translations, and highlights mark retrieved terms.}
+    \label{fig:ui}
+  \end{minipage}
 \end{figure*}
 
 \paragraph{Visible terminology evidence.}
 Highlighting and an evidence panel make terminology behavior transparent. As
 Figure~\ref{fig:ui} shows, the interface highlights retrieved terms in the
-translation and lists their source--target mappings. The status row shows the active
-topic slices, their posterior probabilities, and the active term count. The
+translation and lists the corresponding bilingual term pairs. The status row
+shows the active topic slices, their posterior probabilities, and the active term count. The
 evidence-panel header lists the active slices and retrieval latency. Viewers can tell
 whether retrieval missed a mistranslated term, drew it from an irrelevant slice, or
 supplied a term the decoder ignored.
 
 \paragraph{Extensibility.}
 Adding a topic requires one glossary file without a restart. Registration
-validates pairs, builds the index, and writes the manifest entry. An LLM can
-write the prototype from the glossary, as Appendix~\ref{app:router} evaluates.
+validates pairs, builds the index, and writes the manifest entry. Prototypes
+that GPT-5.5 writes from each glossary, with evaluation terms removed, keep
+top-four coverage within 0.8 points of the hand-written ones, as
+Appendix~\ref{app:router} reports.
 Sessions retain the catalog snapshot from the start of each session.
 
 \paragraph{Availability.}
 The \href{https://github.com/luojiaxuan/autoterm-sst}{GitHub repository}
 hosts the MIT-licensed implementation, a one-command launcher, and a screencast.
 The hosted entry page is \url{https://luojiaxuan.github.io/autoterm-sst/}.
+The same page installs as a phone app on iOS and Android.
 The live demo runs the RASST retriever alongside Qwen3-Omni, which it
 serves with continuous batching in vLLM.

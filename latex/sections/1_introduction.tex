@@ -4,7 +4,7 @@ Simultaneous speech translation, or SST, generates target-language text while
 a speaker is still talking, serving technical talks, lectures, and live media.
 Speech-capable large language models, or LLMs, now translate long-form audio directly
 \citep{xu2025qwen3omni,ouyang2025infinisst}. Rare method and dataset names, clinical
-concepts, and named entities remain hard to recover from acoustics alone. Glossary retrieval helps by matching speech to source--target term pairs
+concepts, and named entities remain hard to recover from acoustics alone. Glossary retrieval helps by matching speech to bilingual term pairs
 and prompting the LLM with top matches before decoding.
 
 Existing retrieval-augmented SST systems need manual session setup or lose
@@ -36,8 +36,8 @@ a working set inside a fixed term budget. Retrieval and decoding stay
 unchanged, so the per-chunk budget stays constant as the catalog grows. In
 summary, our contributions are threefold:
 \begin{itemize}
-\item Zero-setup terminology-aware SST built on RASST, paired with a live
-interface that displays the active slices and the retrieved term pairs beside
+\item Terminology-aware SST built on RASST, with a live interface that starts
+without session setup and shows active slices and retrieved term pairs beside
 every partial translation.
 \item Training-free language-model routing with a sticky topic filter whose
 only free parameter is the switch rate. The correct slice stays searchable

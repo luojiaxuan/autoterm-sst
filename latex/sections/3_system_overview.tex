@@ -9,7 +9,7 @@ builds a term map $G_t$, and the LLM translates $h_t$ with $G_t$ in its prompt.
 Without a source transcript from RASST, the retriever matches speech directly
 to glossary source terms by maximum similarity, or MaxSim, between overlapping
 speech windows and pre-encoded term vectors. Terms scoring above 0.78 become
-candidates. The retriever adds up to ten source--target pairs to $G_t$.
+candidates. The retriever adds up to ten bilingual term pairs to $G_t$.
 AutoTerm-SST changes only the entries searched. Its router limits lookup to
 a working set of up to four topic slices and reads each new translation as
 context for later chunks.

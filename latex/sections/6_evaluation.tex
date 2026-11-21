@@ -87,9 +87,7 @@ term occurrences with the reference translation in the aligned hypothesis.
 The ACL-ESO stream has 2,047 evaluated occurrences, with 1,368 in NLP and 679 in
 medicine. Prompt precision counts the share of injected pairs matching a gold
 term in their source audio. RealSI coverage counts the share of chunks with the
-correct slice in the working set. Translation quality uses corpus SacreBLEU and masked-term BLEU, detailed with
-the paired permutation tests in Appendix~\ref{app:stats}. Intervals are 95\%
-stratified talk-bootstrap bounds, written $a\pm h$ or $a^{+u}_{-l}$.
+correct slice in the working set. Translation quality uses corpus SacreBLEU and masked-term BLEU, detailed with paired permutation tests in Appendix~\ref{app:stats}. Intervals are 95\% talk-bootstrap bounds, written $a\pm h$ or $a^{+u}_{-l}$.
 
 \subsection{Results}
 
@@ -108,8 +106,9 @@ Merged-100k matches AutoTerm-SST in TERM\_ACC and trails by
 $1.38^{+0.53}_{-0.70}$ BLEU at $p=0.010$. Merged-1M trails by
 $3.3^{+1.5}_{-1.9}$ TERM\_ACC points at $p=0.031$ and $2.31^{+0.63}_{-0.82}$ BLEU at
 $p=0.002$. Its TERM\_ACC loss concentrates in medicine, a 7.4-point gap.
-Merged-1M injects nine times as many pairs per chunk at one tenth of AutoTerm-SST's prompt precision. AutoTerm-SST gains
-1.85 BLEU at $p=0.047$ over Merged-1M on 935 sentences with glossary-free references.
+Merged-1M injects pairs at nine times AutoTerm-SST's rate per chunk and at one
+tenth of its prompt precision. On the 935 sentences with glossary-free references,
+AutoTerm-SST's BLEU gain over Merged-1M is 1.85 points at $p=0.047$. All three gains hold when any single talk is left out.
 
 \begin{table*}[t]
 \centering
@@ -150,18 +149,19 @@ to first place when reached and count talks that miss it.}
 \end{table}
 
 \paragraph{Ten-domain routing.}
-The language-model router follows topic changes the similarity router misses
-under its confirmation rule. On RealSI, coverage is 89.7\% for the language-model
-router and 78.8\% for the similarity router in Table~\ref{tab:realsi}.
-The language-model router ranks a new talk's slice first after a median of
-15.6 seconds. The similarity router's confirmation rule delays each switch,
-and the correct slice fails to rank first in 19 of the 30 talk instances.
-Figure~\ref{fig:routing} shows the first order. On the two-domain ACL-ESO stream,
-both routers keep the correct slice searchable in about 98\% of chunks, so
-their accuracies match. With 24 close-domain slices, we measure coverage
-over gold term occurrences. The language-model router keeps the corresponding
-slice in the working set for 82.7\% of those occurrences. The similarity router
-covers 52.2\%, as Table~\ref{tab:router-diag} shows.
+The language-model router tracks topic changes faster than similarity routing
+with confirmation. RealSI coverage is 89.7\% against
+78.8\% in Table~\ref{tab:realsi}, and the gap holds in each stream order in
+Table~\ref{tab:realsi-orders}. The language-model router ranks a new talk's
+slice first in a median of 15.6 seconds. Similarity routing misses first place
+in 19 of 30 talk instances. Figure~\ref{fig:routing} shows the first order.
+On two-domain ACL-ESO, both routers match in accuracy and cover the correct
+slice in about 98\% of chunks. In Table~\ref{tab:router-diag}, the language-model router covers 82.7\% of gold
+term occurrences with 24 close-domain slices, against 52.2\%, keeps 100.0\% coverage
+when topics switch every 15 seconds, against 82.1\%, and leads on German and Japanese output.
+When NLP and medicine alternate every 15 to 300 seconds, median time to first
+place is 7.7 seconds with the language-model router and 27 to 46 seconds with
+the similarity router.
 
 \paragraph{Effect of the topic filter.}
 The filter turns noisy per-update scores into a stable ranking without thresholds.
@@ -170,9 +170,9 @@ the saved translations described in Appendix~\ref{app:router}. Raw letter
 probabilities rank the correct topic slice in the top four for 90.5\% of chunks,
 and the filtered posterior reaches 98.7\%. Coverage stays between 98.4\% and
 98.9\% as $\rho$ ranges from $10^{-5}$ to $10^{-1}$. Raw similarity reaches
-85.0\% coverage with per-chunk updates. With the confirmation rule enabled and
-the confirmed slice pinned, the similarity router keeps the correct topic slice in
-the working set for 97.0\% of chunks at the live update rate.
+85.0\% coverage with per-chunk updates. At the live update rate, the similarity
+router uses its confirmation rule and pins the confirmed slice, reaching 97.0\%
+coverage.
 
 \paragraph{Processing speed.}
 AutoTerm-SST processes audio about 4.5 times as fast as real time and matches

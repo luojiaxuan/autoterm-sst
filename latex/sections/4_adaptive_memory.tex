@@ -3,7 +3,7 @@
 
 Separating an offline catalog from a small working set lets AutoTerm-SST
 cover broad domains while keeping per-chunk search bounded. Each topic slice holds
-about 1,000 term--translation pairs, a prebuilt MaxSim index of source terms, and a
+about 1,000 terms with translations, a prebuilt MaxSim index of source terms, and a
 prototype. The prototype gives a short English topic summary with example terms and
 its Chinese translation. Different topic slices can assign different target
 translations to the same source term.
@@ -68,4 +68,5 @@ thus gains by fitting more relevant mappings within the same fixed budget.
 A background worker keeps routing off the decoding path. It scores changed session
 contexts in one batch. Each chunk retrieves from the working set at decode start.
 Finished updates apply from the next chunk. Likely slice indexes are preloaded in the
-background.
+background. In replays, applying every update one chunk late lowers coverage by
+at most 0.33 points.

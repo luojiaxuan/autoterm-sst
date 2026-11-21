@@ -156,13 +156,11 @@ or one language-model filter step. The similarity router reproduces 19 topic
 switches from the live run when given the original emission times.
 
 \paragraph{Short topic shifts.}
-The posterior follows topics alternating every 15 to 300 seconds. For each
-length in Table~\ref{tab:router-diag}, we interleave saved NLP and medicine
-translation segments into one 40-segment stream. At each length, at least
-half the segments start with the incoming slice in the language-model router's
-working set. The slice ranks first after a median of 7.7 seconds. On segments
-at least one minute long, similarity routing confirms the incoming slice
-after a median of 27 to 46 seconds.
+The posterior tracks topics alternating every 15 to 300 seconds. For each
+interval in Table~\ref{tab:router-diag}, one 40-segment stream alternates saved NLP
+and medicine translations. In each stream, at least half the segments start
+with the incoming slice active for the language-model router.
+Section~\ref{sec:evaluation} reports time to first place for both routers.
 
 \paragraph{Close domains.}
 Finer slices widen the routing gap. The same 4B model splits each of NLP
@@ -184,10 +182,10 @@ lower the language-model router's top-four coverage to 97.9\%. RealSI uses
 them because its NLP talk shares topics with the hand-written NLP prototype.
 Table~\ref{tab:realsi-orders} gives both routers' coverage and top-1 accuracy
 by stream order. Closed-loop runs in Section~\ref{sec:evaluation} scored
-updates before the next chunk. The deployed worker in
-Section~\ref{sec:adaptive-memory} can apply an update one chunk late when
-audio arrives faster than real time. For the replays in Table~\ref{tab:router-diag},
-the delay reduces coverage by up to 0.33 points.
+updates before the next chunk. The deployed worker can apply an update one
+chunk late when audio arrives faster than real time. We replay the settings in
+Table~\ref{tab:router-diag} with each update one chunk late.
+Section~\ref{sec:adaptive-memory} reports the coverage change.
 
 \begin{table}[!ht]
 \centering

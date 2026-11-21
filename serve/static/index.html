@@ -118,6 +118,8 @@
 
         .dimmed { opacity: 0.4; pointer-events: none; filter: grayscale(0.6); }
 
+        .sample-item[hidden], .sample-btn[hidden] { display: none; }
+
         .sample-item {
             display: flex;
             flex-direction: column;
@@ -4013,7 +4015,16 @@
             audioFile.click();
         });
 
-        // Bundled sample audio: no upload needed to try the demo.
+        // Sample audio: the repository bundles the ACL clip; a deployment may add
+        // the medicine clips to serve/static/samples/. Show only the samples it serves.
+        (async () => {
+            const buttons = [...document.querySelectorAll('.sample-btn')];
+            const served = await Promise.all(buttons.map(btn =>
+                fetch(`/static/samples/${btn.dataset.sample}`, { method: 'HEAD' })
+                    .then(resp => resp.ok, () => false)));
+            buttons.forEach((btn, i) => { btn.hidden = !served[i]; });
+            document.getElementById('sampleAudioItem').hidden = !served.some(Boolean);
+        })();
         document.querySelectorAll('.sample-btn').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const name = btn.dataset.sample;

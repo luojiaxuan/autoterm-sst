@@ -36,8 +36,8 @@ checkpoints/
 
 # Demo/runtime media and temporary files
 *.wav
-# bundled demo samples are an exception
-!serve/static/samples/*.wav
+# the bundled ACL sample is an exception; the medicine clips are not redistributed
+!serve/static/samples/acl_sample.wav
 *.mp3
 *.mp4
 *.webm

@@ -94,7 +94,7 @@ sources and all four run hashes are recorded under
 ### 3.1 Correction: the earlier "infeasible" read was a unit error
 
 An earlier analysis compared the internal A/B benchmark's **12.97 seg/s**
-(vLLM `serve`, N=32, no-RAG, `sglang_omni_vllm_gap_findings.md`) directly
+(vLLM `serve`, N=32, no-RAG) directly
 against a "16.67 chunks/s" real-time demand and concluded 32-way was
 infeasible. That mixed two units:
 

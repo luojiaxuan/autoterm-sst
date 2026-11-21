@@ -18,7 +18,7 @@ streaming speech translation, not as a generic InfiniSST archive.
 ## Canonical Paths
 
 - Repo root: `/mnt/taurus/home/jiaxuanluo/rasst-demo`
-- Demo paper PDF: `docs/autoterm_sst_emnlp2026_demo.pdf` (LaTeX sources in git history)
+- Demo paper sources: `latex/` on branch `paper/naacl2027-demo`
 - Main RASST reference: `/mnt/data2/jiaxuanluo/RASST`
 - User-expected RASST home path, if later symlinked or moved:
   `/mnt/taurus/home/jiaxuanluo/RASST`
@@ -99,7 +99,7 @@ Do not plan full 30B online GRPO unless the user explicitly changes the scope.
 
 ## Paper Framing
 
-The submitted paper PDF is at `docs/autoterm_sst_emnlp2026_demo.pdf`; its LaTeX sources were removed from the tree after submission and live in git history.
+The NAACL 2027 demo paper's LaTeX sources live under `latex/` on branch `paper/naacl2027-demo`.
 When revising it:
 
 - update the title away from pure high-throughput InfiniSST scheduling if the

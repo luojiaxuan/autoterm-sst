@@ -1,6 +1,6 @@
 # AutoTerm-SST 论文（NAACL 2027 System Demonstrations）
 
-投稿截止 2026-12-04 AoE；正文 6 页，附录不超过 2 页，伦理声明与参考文献不限。`acl_latex.tex` 是入口，各节在 `sections/`；`bash latex/make_arxiv.sh <out.tar.gz>` 生成去掉注释、带 `.bbl` 的 arXiv 源码包并验证页数。
+投稿截止 2026-12-04 AoE；正文 6 页，附录不超过 2 页，伦理声明与参考文献不限。`acl_latex.tex` 是入口，各节在 `sections/`；`bash latex/make_arxiv.sh <out.tar.gz>` 生成去掉注释、带 `.bbl` 的 arXiv 源码包并验证页数。arXiv:2610.26865 的替换版本用 bad0f45 的源码包于 2026-11-21 PT 提交（submit/8405958），只替换这一次。
 
 ## 数字从哪来
 

@@ -1703,13 +1703,18 @@
             body.ui2 .ui2-sample-row { flex-wrap: wrap; }
             body.ui2 .ui2-source-row { grid-template-columns: 1fr; }
             body.ui2 #translationPanel { height: 52vh !important; }
-            body.ui2 .ui2-translation-head { padding: 0 14px; height: 56px; }
-            body.ui2 #statusIndicator { max-width: 190px; }
+            body.ui2 .ui2-translation-head { flex-wrap: wrap; row-gap: 8px; height: auto; padding: 12px 14px; }
+            body.ui2 #statusIndicator { max-width: 260px; padding: 5px 10px; gap: 6px; font-size: 12px; }
             body.ui2 .ui2-transcript { padding: 12px 14px; }
             body.ui2 .ui2-transcript-text { font-size: 19px; line-height: 31px; }
-            body.ui2 .ui2-terms-columns, body.ui2 #evidenceList .evidence-row { grid-template-columns: 38% 34% 28%; padding: 0 14px; }
+            body.ui2 .ui2-terms-columns, body.ui2 #evidenceList .evidence-row { grid-template-columns: 37% 32% 31%; padding: 0 14px; }
+            body.ui2 #evidenceList .ev-source span { padding: 3px 6px; font-size: 11px; }
             body.ui2 .ui2-terms-columns span:nth-child(3), body.ui2 #evidenceList .ev-score { display: none; }
-            body.ui2 .ui2-terms-head { padding: 0 14px; }
+            body.ui2 .ui2-terms-head {
+                flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px;
+                height: auto; padding: 12px 14px;
+            }
+            body.ui2 .ui2-terms-meta { max-width: 100%; }
         }
     </style>
 </head>

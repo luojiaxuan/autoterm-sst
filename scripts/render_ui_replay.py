@@ -54,6 +54,13 @@ def topic_of(record):
     }
 
 
+def slice_terms(record):
+    # The page shows the working set as the sum of the active slices' term counts; the record keeps only the sum.
+    presets = record["selected_slice_presets"]
+    share, rest = divmod(record["selected_term_count"], max(1, len(presets)))
+    return {preset: share + (i < rest) for i, preset in enumerate(presets)}
+
+
 class ReplayAgent(OmniAgent):
     """Mock RASST agent whose partial outputs come from a recorded run."""
 
@@ -83,6 +90,7 @@ class ReplayAgent(OmniAgent):
                     prompt_reference_count=record["prompt_reference_count"],
                     active_slices=record["selected_slice_presets"],
                     active_terms=record["selected_term_count"],
+                    active_slice_terms=slice_terms(record),
                     topic=topic_of(record),
                     cursor_samples=record["cursor_samples"],
                     start_sample=record["start_sample"],
@@ -128,10 +136,8 @@ def serve(agent, port):
     raise RuntimeError("server did not start")
 
 
-STAGE_CSS = """
-.translation-panel{top:%dpx !important;bottom:auto !important;}
-#mediaContainer, .media-player, audio, video{visibility:hidden !important;}
-"""
+# The source card would show the bundled sample that drives the replay, which is not the recorded talk.
+STAGE_CSS = "#videoSection{display:none !important;}"
 
 
 async def capture(args, agent):
@@ -153,7 +159,8 @@ async def capture(args, agent):
             await cdp.send("Emulation.setEmulatedMedia",
                            {"features": [{"name": "display-mode", "value": "standalone"}]})
         await page.goto(f"http://127.0.0.1:{args.port}/", wait_until="networkidle")
-        await page.click(".sample-btn-primary")
+        await page.wait_for_selector(".sample-btn:not([hidden])", timeout=20000)
+        await page.click(".sample-btn:not([hidden])")
         await page.wait_for_function(
             "() => { const m = document.querySelector('#mediaContainer audio, #mediaContainer video, audio, video');"
             " return m && m.readyState >= 2 && m.duration > 0; }",
@@ -170,33 +177,39 @@ async def capture(args, agent):
         if args.extra_css:
             await page.add_style_tag(content=args.extra_css)
             await asyncio.sleep(0.5)
-        chips_bottom = await page.evaluate(
-            "() => { const lang = document.getElementById('languagePair');"
-            " const card = lang.closest('.control-group') || lang;"
-            " window.scrollTo(0, Math.max(0, card.getBoundingClientRect().top + window.scrollY - 16));"
-            " return Math.round(document.getElementById('adaptiveStatus').getBoundingClientRect().bottom); }"
-        )
-        await page.add_style_tag(content=STAGE_CSS % (chips_bottom + 10))
+        # A resized panel keeps its old scroll position, so the transcript is moved back to its newest line.
+        await page.evaluate("() => { const c = document.getElementById('translationContent'); c.scrollTop = c.scrollHeight; }")
+        await page.add_style_tag(content=STAGE_CSS)
         await page.evaluate(
             "() => document.querySelectorAll('.toast, .notification, .status-toast').forEach(e => e.remove())"
         )
         await asyncio.sleep(1.0)
-        box = await page.evaluate(
-            "() => { const p = document.querySelector('.translation-panel').getBoundingClientRect();"
-            " const c = document.getElementById('adaptiveStatus').getBoundingClientRect();"
-            " return {x0: Math.min(p.left, c.left), x1: Math.max(p.right, c.right), y1: p.bottom}; }"
-        )
-        margin = 16
-        x0 = max(0, box["x0"] - margin)
-        await page.screenshot(
-            path=args.out,
-            clip={
-                "x": x0,
-                "y": 0,
-                "width": min(args.width, box["x1"] + margin) - x0,
-                "height": min(args.height, box["y1"] + margin),
-            },
-        )
+        if args.standalone:
+            # The phone figure is one screen that starts at the live translation.
+            await page.evaluate(
+                "() => window.scrollTo(0, document.getElementById('translationPanel').getBoundingClientRect().top"
+                " + window.scrollY - 12)"
+            )
+            await asyncio.sleep(0.5)
+            await page.screenshot(path=args.out)
+        else:
+            # The desktop figure spans the live translation, the topic posterior and the retrieved terms.
+            box = await page.evaluate(
+                "() => { const w = document.querySelector('.ui2-workspace').getBoundingClientRect();"
+                " const t = document.getElementById('evidencePanel').getBoundingClientRect();"
+                " return {x0: w.left, x1: w.right, y0: w.top + window.scrollY, y1: t.bottom + window.scrollY}; }"
+            )
+            margin = 16
+            await page.screenshot(
+                path=args.out,
+                full_page=True,
+                clip={
+                    "x": box["x0"] - margin,
+                    "y": box["y0"] - margin,
+                    "width": box["x1"] - box["x0"] + 2 * margin,
+                    "height": box["y1"] - box["y0"] + 2 * margin,
+                },
+            )
         await browser.close()
 
 

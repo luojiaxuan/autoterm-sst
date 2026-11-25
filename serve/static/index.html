@@ -1204,30 +1204,30 @@
 
         /* ===== Demo page layout: one aligned grid, dark panels, a single teal accent ===== */
         body.ui2 {
-            --bg: #10151c;
-            --surface: #171e27;
-            --surface2: #1b2430;
-            --border: #2b3643;
-            --text: #edf2f6;
-            --muted: #9ba9b8;
-            --subtle: #788898;
-            --accent: #68d8c6;
-            --track: #293440;
-            --control-bg: #1d2631;
-            --control-border: #394653;
-            --input-bg: #131b24;
-            --on-accent: #102724;
-            --selected-border: #417b73;
-            --selected-bg: #203635;
-            --selected-text: #9ce6d9;
-            --highlight-text: #b9f4e8;
-            --highlight-bg: #28433f;
-            --row-border: #27323e;
-            --danger: #f08a8a;
+            --bg: #f5f7fb;
+            --surface: #ffffff;
+            --surface2: #f7f9fc;
+            --border: #e3e8f0;
+            --text: #0f172a;
+            --muted: #5b6474;
+            --subtle: #8a93a3;
+            --accent: #1769ff;
+            --track: #edf1f7;
+            --control-bg: #ffffff;
+            --control-border: #d6dce6;
+            --input-bg: #ffffff;
+            --on-accent: #ffffff;
+            --selected-border: #b9d0ff;
+            --selected-bg: #ebf2ff;
+            --selected-text: #1769ff;
+            --highlight-text: #135c2c;
+            --highlight-bg: #dcf3e1;
+            --row-border: #eef1f6;
+            --danger: #d92d20;
             --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Inter, "Helvetica Neue", Arial, "PingFang SC", "Noto Sans CJK SC", sans-serif;
             --font-zh: "PingFang SC", "Noto Sans CJK SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-            --radius-panel: 13px;
-            --radius-control: 8px;
+            --radius-panel: 16px;
+            --radius-control: 10px;
             --control-h: 44px;
             --gap: 16px;
             margin: 0;
@@ -1273,27 +1273,30 @@
         body.ui2 .ui2-brand-icon {
             display: grid; place-items: center;
             width: 52px; height: 52px;
-            border: 1px solid #325452; border-radius: var(--radius-panel);
-            background: #192c30; color: var(--accent);
+            border: 1px solid #0f172a; border-radius: var(--radius-panel);
+            background: #0f172a; color: #ffffff;
         }
         body.ui2 .ui2-header h1 {
             margin: 0 0 6px;
-            font-size: 31px; line-height: 1.12; font-weight: 700; letter-spacing: -1.1px;
-            color: var(--text);
+            font-size: 32px; line-height: 1.1; font-weight: 800; letter-spacing: -1px;
+            color: var(--accent);
             background: none; -webkit-text-fill-color: currentColor;
         }
         body.ui2 .ui2-tagline { color: var(--muted); font-size: 16px; letter-spacing: -.15px; }
         body.ui2 .ui2-architecture {
-            display: flex; align-items: center; gap: 9px;
-            color: var(--subtle); font-size: 13px;
+            display: flex; align-items: center; gap: 8px;
+            padding: 7px 14px; border-radius: 999px;
+            background: var(--selected-bg); color: var(--accent);
+            font-size: 14px; font-weight: 550;
         }
-        body.ui2 .ui2-architecture svg { color: var(--accent); opacity: .85; }
+        body.ui2 .ui2-architecture svg { color: var(--accent); }
 
         /* Panels and shared controls */
         body.ui2 .ui2-panel {
             border: 1px solid var(--border);
             border-radius: var(--radius-panel);
             background: var(--surface);
+            box-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 6px 20px rgba(16, 24, 40, .045);
             min-width: 0;
         }
         body.ui2 .ui2-label {
@@ -1314,7 +1317,7 @@
             appearance: none; -webkit-appearance: none;
             box-shadow: none;
         }
-        body.ui2 .ui2-select:focus, body.ui2 .ui2-url:focus-within { outline: 2px solid rgba(104, 216, 198, .35); outline-offset: 1px; }
+        body.ui2 .ui2-select:focus, body.ui2 .ui2-url:focus-within { outline: 2px solid rgba(23, 105, 255, .25); outline-offset: 1px; }
         body.ui2 .ui2-select option { background: var(--surface); color: var(--text); }
         body.ui2 .ui2-primary, body.ui2 .ui2-outline, body.ui2 .ui2-chip {
             height: var(--control-h);
@@ -1332,7 +1335,7 @@
             background: var(--accent);
             color: var(--on-accent);
         }
-        body.ui2 .ui2-primary:hover { background: #7fe1d1; }
+        body.ui2 .ui2-primary:hover { background: #0f5ce0; }
         body.ui2 .ui2-primary:disabled { opacity: .55; cursor: default; }
         body.ui2 .ui2-outline {
             width: 100%;
@@ -1341,10 +1344,10 @@
             color: var(--text);
             font-weight: 550;
         }
-        body.ui2 .ui2-outline svg { color: #a8b8c8; }
-        body.ui2 .ui2-outline:hover { border-color: #4b5a69; background: #222d39; }
+        body.ui2 .ui2-outline svg { color: #5b6474; }
+        body.ui2 .ui2-outline:hover { border-color: #b9c3d3; background: #f5f8ff; }
         body.ui2 #toggleMic.recording, body.ui2 #toggleMic.active {
-            border-color: var(--danger); color: var(--danger); background: rgba(240, 138, 138, .08);
+            border-color: var(--danger); color: var(--danger); background: rgba(217, 45, 32, .06);
         }
         body.ui2 #toggleMic.recording svg, body.ui2 #toggleMic.active svg { color: var(--danger); }
 
@@ -1386,11 +1389,11 @@
             padding: 0 13px;
             border: 1px solid var(--control-border);
             background: var(--control-bg);
-            color: #cad4df;
+            color: #344054;
             font-size: 14px; font-weight: 550;
         }
         body.ui2 .ui2-chip[hidden] { display: none; }
-        body.ui2 .ui2-chip:hover { border-color: #4b5a69; }
+        body.ui2 .ui2-chip:hover { border-color: #b9c3d3; }
         body.ui2 .ui2-chip.active {
             border-color: var(--selected-border);
             background: var(--selected-bg);
@@ -1398,7 +1401,7 @@
         }
         body.ui2 .ui2-chip.active::before {
             content: ""; width: 12px; height: 12px;
-            background: no-repeat center/12px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ce6d9' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 4 4L19 6'/%3E%3C/svg%3E");
+            background: no-repeat center/12px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231769ff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 4 4L19 6'/%3E%3C/svg%3E");
         }
         body.ui2 .ui2-chip.loading { opacity: .6; pointer-events: none; }
         body.ui2 .ui2-source-row {
@@ -1435,7 +1438,7 @@
             cursor: pointer; box-shadow: none; transform: none;
         }
         body.ui2 .ui2-play svg { margin-left: 2px; width: 17px; height: 17px; fill: currentColor; }
-        body.ui2 .ui2-play:hover { background: #7fe1d1; }
+        body.ui2 .ui2-play:hover { background: #0f5ce0; }
         body.ui2 .ui2-mic-status:empty { display: none; }
         body.ui2 .ui2-mic-status { margin: 0; color: var(--muted); font-size: 13px; }
 
@@ -1493,13 +1496,13 @@
             background: var(--subtle);
         }
         body.ui2 #statusIndicator .loading { display: none !important; }
-        body.ui2 #statusIndicator.processing, body.ui2 #statusIndicator.success {
-            border-color: #305a55; background: #1c3332; color: #a1e7d8;
+        body.ui2 #statusIndicator.processing {
+            border-color: #b9d0ff; background: #ebf2ff; color: #1769ff;
         }
-        body.ui2 #statusIndicator.processing::before, body.ui2 #statusIndicator.success::before {
-            background: var(--accent); box-shadow: 0 0 0 3px #315653;
-        }
-        body.ui2 #statusIndicator.error { border-color: #5a3434; background: #2d1d1f; color: var(--danger); }
+        body.ui2 #statusIndicator.processing::before { background: var(--accent); box-shadow: 0 0 0 3px #cfe0ff; }
+        body.ui2 #statusIndicator.success { border-color: #b4e0bd; background: #e9f7ec; color: #167a38; }
+        body.ui2 #statusIndicator.success::before { background: #22a447; }
+        body.ui2 #statusIndicator.error { border-color: #f5c2bd; background: #fef3f2; color: var(--danger); }
         body.ui2 #statusIndicator.error::before { background: var(--danger); }
 
         body.ui2 .ui2-reset {
@@ -1522,7 +1525,7 @@
         body.ui2 .ui2-transcript-text {
             font-family: var(--font-zh);
             font-size: 22px; line-height: 36px; letter-spacing: .02px;
-            color: #e7edf1;
+            color: #111827;
             white-space: pre-wrap;
             line-break: strict;
             max-height: none; min-height: 0;
@@ -1567,7 +1570,7 @@
             font-weight: 500; color: var(--muted);
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
-        body.ui2 #adaptivePosterior .posterior-item.top b { font-weight: 600; color: #e6eeef; }
+        body.ui2 #adaptivePosterior .posterior-item.top b { font-weight: 600; color: #0f172a; }
         body.ui2 #adaptivePosterior .posterior-item i {
             display: block; height: 7px;
             border-radius: 5px; background: var(--track); overflow: hidden;
@@ -1582,9 +1585,9 @@
         body.ui2 #adaptivePosterior .posterior-item em {
             font-style: normal; text-align: right;
             font-variant-numeric: tabular-nums; font-weight: 530;
-            color: #c6d1dc;
+            color: #475467;
         }
-        body.ui2 #adaptivePosterior .posterior-item.top em { color: #a6e9dc; }
+        body.ui2 #adaptivePosterior .posterior-item.top em { color: #1769ff; }
         body.ui2 #adaptivePosterior .posterior-waiting { color: var(--subtle); font-size: 14px; }
 
         body.ui2 .ui2-playback { padding: 14px 16px 16px; }
@@ -1599,7 +1602,7 @@
             margin: 0; padding: 0; border: 0;
             background: none; box-shadow: none; aspect-ratio: auto;
         }
-        body.ui2 .ui2-media-slot audio { display: block; width: 100% !important; height: 36px !important; color-scheme: dark; }
+        body.ui2 .ui2-media-slot audio { display: block; width: 100% !important; height: 36px !important; color-scheme: light; }
         body.ui2 .ui2-media-slot video {
             display: block; width: 100% !important; height: auto !important; max-height: 180px;
             border-radius: var(--radius-control); background: #000;
@@ -1640,16 +1643,18 @@
             height: 39px;
             margin: 0; border: 0; border-bottom: 1px solid var(--row-border); border-radius: 0;
             background: none;
-            font-size: 15px; font-weight: 500; color: #dce4ed;
+            font-size: 15px; font-weight: 500; color: #1f2937;
         }
         body.ui2 #evidenceList .evidence-row:last-child { border-bottom: 0; }
-        body.ui2 #evidenceList .evidence-row.used { background: rgba(104, 216, 198, .05); }
+        body.ui2 #evidenceList .evidence-row.used { background: rgba(23, 105, 255, .035); }
         body.ui2 #evidenceList .evidence-row > span {
             min-width: 0; padding-right: 16px;
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         body.ui2 #evidenceList .ev-arrow { display: none; }
-        body.ui2 #evidenceList .ev-tr { font-family: var(--font-zh); font-size: 16px; color: #aee7db; }
+        body.ui2 #evidenceList .ev-term { color: var(--text); font-weight: 500; }
+        body.ui2 #evidenceList .ev-score { color: #344054; font-weight: 500; }
+        body.ui2 #evidenceList .ev-tr { font-family: var(--font-zh); font-size: 16px; color: #167a38; }
         body.ui2 #evidenceList .ev-score {
             display: flex; align-items: center; gap: 11px;
             font-variant-numeric: tabular-nums;
@@ -1665,8 +1670,8 @@
         body.ui2 #evidenceList .ev-source span {
             display: inline-block; max-width: 100%;
             padding: 3px 8px;
-            border: 1px solid #344452; border-radius: 5px;
-            background: #24313d; color: #a7bbc8;
+            border: 1px solid #c9dbff; border-radius: 5px;
+            background: #ebf2ff; color: #1769ff;
             font-size: 12px; line-height: 15px;
             overflow: hidden; text-overflow: ellipsis; vertical-align: middle;
         }
@@ -2426,7 +2431,7 @@
         // mode; strip the markers for a clean translation display (the evidence
         // panel already shows which terms were retrieved/used).
         function stripTermTags(text) {
-            return String(text == null ? '' : text).replace(/<\/?t>/g, '');
+            return String(text == null ? '' : text).replace(/<\/?t>?/g, '');
         }
 
         function renderTranslationMessage(message) {
@@ -2442,7 +2447,8 @@
                     panelAutoExpanded = true;
                     toggleMinimize();
                 }
-                const joined = joinTranslationText(translationOutput.textContent, text);
+                // A tag can arrive split across two messages, so the joined text is cleaned again.
+                const joined = stripTermTags(joinTranslationText(translationOutput.textContent, text));
                 translationOutput.innerHTML = renderTranslationHTML(joined);
                 setTimeout(() => {
                     scrollTranslationToBottom();

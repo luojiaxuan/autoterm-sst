@@ -21,11 +21,12 @@ retrieved term pairs next to each partial translation.
 - **Paper:** *AutoTerm-SST: Adaptive Terminology Memory with Zero Session-Time
   Setup for Streaming Speech Translation*, arXiv preprint
   [arXiv:2610.26865](https://arxiv.org/abs/2610.26865) ([PDF](https://arxiv.org/pdf/2610.26865)).
-- **Hosted entry page:** <https://luojiaxuan.github.io/autoterm-sst/>.
+- **Live demo:** <https://luojiaxuan.github.io/autoterm-sst/> forwards to the
+  running GPU server. Pick the *Medicine then ACL* sample and press play.
 - **Phone app:** the web interface of a running server installs on iOS and
   Android (see [Phone app](#phone-app)).
 - **Screencast:** [`docs/demo_screencast.mp4`](https://github.com/luojiaxuan/autoterm-sst/blob/main/docs/demo_screencast.mp4)
-  (2.5 min, recorded with an earlier version of the interface).
+  (2 min 12 s, one session of the live demo on the *Medicine then ACL* sample).
 - **Mock mode:** one command runs the full web UI and wire protocol on a
   laptop with no GPU and no model download ([Quick start](#quick-start)).
 - **Paper configuration:** `scripts/start_autoterm_demo.sh` serves the

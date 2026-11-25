@@ -1201,47 +1201,561 @@
                 white-space: normal;
             }
         }
+
+        /* ===== Demo page layout: one aligned grid, dark panels, a single teal accent ===== */
+        body.ui2 {
+            --bg: #10151c;
+            --surface: #171e27;
+            --surface2: #1b2430;
+            --border: #2b3643;
+            --text: #edf2f6;
+            --muted: #9ba9b8;
+            --subtle: #788898;
+            --accent: #68d8c6;
+            --track: #293440;
+            --control-bg: #1d2631;
+            --control-border: #394653;
+            --input-bg: #131b24;
+            --on-accent: #102724;
+            --selected-border: #417b73;
+            --selected-bg: #203635;
+            --selected-text: #9ce6d9;
+            --highlight-text: #b9f4e8;
+            --highlight-bg: #28433f;
+            --row-border: #27323e;
+            --danger: #f08a8a;
+            --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Inter, "Helvetica Neue", Arial, "PingFang SC", "Noto Sans CJK SC", sans-serif;
+            --font-zh: "PingFang SC", "Noto Sans CJK SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            --radius-panel: 13px;
+            --radius-control: 8px;
+            --control-h: 44px;
+            --gap: 16px;
+            margin: 0;
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font-ui);
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+        body.ui2::before, body.ui2::after { display: none !important; }
+        body.ui2 .drag-area { display: none; }
+        body.ui2 button, body.ui2 input, body.ui2 select { font: inherit; }
+        body.ui2 svg { display: block; flex-shrink: 0; }
+
+        body.ui2 .ui2-page {
+            max-width: 1312px;
+            margin: 0 auto;
+            padding: 30px 24px 24px;
+            background: none;
+            box-shadow: none;
+            border: 0;
+        }
+        body.ui2 .ui2-main {
+            display: grid;
+            gap: var(--gap);
+            padding: 0;
+            margin: 0;
+            background: none;
+            border: 0;
+            box-shadow: none;
+            backdrop-filter: none;
+        }
+
+        /* Header */
+        body.ui2 .ui2-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 26px;
+        }
+        body.ui2 .ui2-brand { display: flex; align-items: center; gap: 16px; }
+        body.ui2 .ui2-brand-icon {
+            display: grid; place-items: center;
+            width: 52px; height: 52px;
+            border: 1px solid #325452; border-radius: var(--radius-panel);
+            background: #192c30; color: var(--accent);
+        }
+        body.ui2 .ui2-header h1 {
+            margin: 0 0 6px;
+            font-size: 31px; line-height: 1.12; font-weight: 700; letter-spacing: -1.1px;
+            color: var(--text);
+            background: none; -webkit-text-fill-color: currentColor;
+        }
+        body.ui2 .ui2-tagline { color: var(--muted); font-size: 16px; letter-spacing: -.15px; }
+        body.ui2 .ui2-architecture {
+            display: flex; align-items: center; gap: 9px;
+            color: var(--subtle); font-size: 13px;
+        }
+        body.ui2 .ui2-architecture svg { color: var(--accent); opacity: .85; }
+
+        /* Panels and shared controls */
+        body.ui2 .ui2-panel {
+            border: 1px solid var(--border);
+            border-radius: var(--radius-panel);
+            background: var(--surface);
+            min-width: 0;
+        }
+        body.ui2 .ui2-label {
+            display: block;
+            margin-bottom: 7px;
+            font-size: 13.5px; font-weight: 500; line-height: 18px;
+            color: var(--muted);
+        }
+        body.ui2 .ui2-select {
+            width: 100%;
+            height: var(--control-h);
+            padding: 0 38px 0 13px;
+            border: 1px solid var(--control-border);
+            border-radius: var(--radius-control);
+            background: var(--control-bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ba9b8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 13px center;
+            color: var(--text);
+            font-size: 15px; font-weight: 500;
+            appearance: none; -webkit-appearance: none;
+            box-shadow: none;
+        }
+        body.ui2 .ui2-select:focus, body.ui2 .ui2-url:focus-within { outline: 2px solid rgba(104, 216, 198, .35); outline-offset: 1px; }
+        body.ui2 .ui2-select option { background: var(--surface); color: var(--text); }
+        body.ui2 .ui2-primary, body.ui2 .ui2-outline, body.ui2 .ui2-chip {
+            height: var(--control-h);
+            display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+            padding: 0 15px;
+            border-radius: var(--radius-control);
+            font-size: 15px; font-weight: 600; white-space: nowrap;
+            cursor: pointer;
+            transition: background .15s, border-color .15s, color .15s;
+            box-shadow: none; transform: none;
+        }
+        body.ui2 .ui2-primary {
+            width: 100%;
+            border: 1px solid var(--accent);
+            background: var(--accent);
+            color: var(--on-accent);
+        }
+        body.ui2 .ui2-primary:hover { background: #7fe1d1; }
+        body.ui2 .ui2-primary:disabled { opacity: .55; cursor: default; }
+        body.ui2 .ui2-outline {
+            width: 100%;
+            border: 1px solid var(--control-border);
+            background: var(--control-bg);
+            color: var(--text);
+            font-weight: 550;
+        }
+        body.ui2 .ui2-outline svg { color: #a8b8c8; }
+        body.ui2 .ui2-outline:hover { border-color: #4b5a69; background: #222d39; }
+        body.ui2 #toggleMic.recording, body.ui2 #toggleMic.active {
+            border-color: var(--danger); color: var(--danger); background: rgba(240, 138, 138, .08);
+        }
+        body.ui2 #toggleMic.recording svg, body.ui2 #toggleMic.active svg { color: var(--danger); }
+
+        /* Session bar */
+        body.ui2 .ui2-session {
+            display: grid;
+            grid-template-columns: 285px 210px 150px minmax(0, 1fr) 180px;
+            gap: 24px;
+            align-items: end;
+            padding: 17px 21px 19px;
+        }
+        body.ui2 .ui2-stat {
+            height: 69px;
+            padding-left: 22px;
+            border-left: 1px solid var(--border);
+        }
+        body.ui2 .ui2-stat strong {
+            display: flex; align-items: center;
+            height: var(--control-h);
+            font-size: 21px; font-weight: 600; letter-spacing: -.5px;
+            font-variant-numeric: tabular-nums;
+            color: var(--text);
+        }
+        body.ui2 .ui2-stat.ui2-router strong { font-size: 17px; font-weight: 550; letter-spacing: -.15px; }
+        body.ui2 .ui2-actions { position: static; transform: none; }
+
+        /* Input bar */
+        body.ui2 .ui2-inputs {
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr);
+            gap: 22px;
+            align-items: end;
+            padding: 13px 21px 15px;
+        }
+        body.ui2 .ui2-samples { min-width: 330px; padding-right: 21px; border-right: 1px solid var(--border); }
+        body.ui2 .ui2-samples[hidden] { display: none; }
+        body.ui2 .ui2-sample-row { display: flex; gap: 8px; }
+        body.ui2 .ui2-chip {
+            padding: 0 13px;
+            border: 1px solid var(--control-border);
+            background: var(--control-bg);
+            color: #cad4df;
+            font-size: 14px; font-weight: 550;
+        }
+        body.ui2 .ui2-chip[hidden] { display: none; }
+        body.ui2 .ui2-chip:hover { border-color: #4b5a69; }
+        body.ui2 .ui2-chip.active {
+            border-color: var(--selected-border);
+            background: var(--selected-bg);
+            color: var(--selected-text);
+        }
+        body.ui2 .ui2-chip.active::before {
+            content: ""; width: 12px; height: 12px;
+            background: no-repeat center/12px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ce6d9' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 4 4L19 6'/%3E%3C/svg%3E");
+        }
+        body.ui2 .ui2-chip.loading { opacity: .6; pointer-events: none; }
+        body.ui2 .ui2-source-row {
+            display: grid;
+            grid-template-columns: 215px minmax(0, 1fr) 160px;
+            gap: 10px;
+            align-items: center;
+        }
+        body.ui2 .ui2-cell { min-width: 0; margin: 0; padding: 0; background: none; border: 0; }
+        body.ui2 .ui2-youtube { display: grid; grid-template-columns: minmax(0, 1fr) var(--control-h); gap: 10px; }
+        body.ui2 .ui2-url {
+            display: flex; align-items: center; gap: 10px;
+            height: var(--control-h);
+            padding: 0 13px;
+            border: 1px solid var(--control-border);
+            border-radius: var(--radius-control);
+            background: var(--input-bg);
+            color: var(--subtle);
+            min-width: 0;
+        }
+        body.ui2 .ui2-url input {
+            flex: 1; min-width: 0; height: 100%;
+            border: 0; outline: 0; padding: 0;
+            background: transparent; color: var(--text);
+            font-size: 15px;
+        }
+        body.ui2 .ui2-url input::placeholder { color: var(--subtle); }
+        body.ui2 .ui2-play {
+            width: var(--control-h); height: var(--control-h);
+            display: grid; place-items: center;
+            padding: 0; margin: 0;
+            border: 1px solid var(--accent); border-radius: 50%;
+            background: var(--accent); color: var(--on-accent);
+            cursor: pointer; box-shadow: none; transform: none;
+        }
+        body.ui2 .ui2-play svg { margin-left: 2px; width: 17px; height: 17px; fill: currentColor; }
+        body.ui2 .ui2-play:hover { background: #7fe1d1; }
+        body.ui2 .ui2-mic-status:empty { display: none; }
+        body.ui2 .ui2-mic-status { margin: 0; color: var(--muted); font-size: 13px; }
+
+        /* Workspace: translation on the left, topic posterior and source on the right */
+        body.ui2 .ui2-workspace {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 348px;
+            gap: var(--gap);
+            min-height: 0;
+        }
+        body.ui2 #translationPanel {
+            position: static !important;
+            display: flex !important;
+            flex-direction: column;
+            width: auto !important; height: 340px !important;
+            left: auto !important; top: auto !important; bottom: auto !important; right: auto !important;
+            transform: none !important;
+            margin: 0; padding: 0;
+            box-shadow: none; backdrop-filter: none;
+            overflow: hidden;
+            cursor: auto;
+        }
+        body.ui2 .ui2-translation-head {
+            height: 64px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: space-between; gap: 16px;
+            padding: 0 22px;
+            border-bottom: 1px solid var(--border);
+            cursor: auto; user-select: auto;
+        }
+        body.ui2 .ui2-section-name { display: flex; align-items: center; gap: 10px; min-width: 0; }
+        body.ui2 .ui2-section-name svg { color: var(--muted); }
+        body.ui2 .ui2-panel h2 {
+            margin: 0;
+            font-size: 19px; line-height: 24px; font-weight: 600; letter-spacing: -.35px;
+            color: var(--text);
+        }
+        body.ui2 .ui2-head-actions { display: flex; align-items: center; gap: 14px; min-width: 0; }
+        body.ui2 .ui2-hidden-control { display: none !important; }
+
+        body.ui2 #statusIndicator {
+            display: inline-flex; align-items: center; gap: 8px;
+            max-width: 430px;
+            padding: 7px 12px;
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            background: var(--surface2);
+            color: var(--muted);
+            font-size: 13px; font-weight: 560; line-height: 16px;
+            white-space: nowrap;
+        }
+        body.ui2 #statusIndicator #statusText { overflow: hidden; text-overflow: ellipsis; }
+        body.ui2 #statusIndicator::before {
+            content: ""; flex-shrink: 0;
+            width: 7px; height: 7px; border-radius: 50%;
+            background: var(--subtle);
+        }
+        body.ui2 #statusIndicator .loading { display: none !important; }
+        body.ui2 #statusIndicator.processing, body.ui2 #statusIndicator.success {
+            border-color: #305a55; background: #1c3332; color: #a1e7d8;
+        }
+        body.ui2 #statusIndicator.processing::before, body.ui2 #statusIndicator.success::before {
+            background: var(--accent); box-shadow: 0 0 0 3px #315653;
+        }
+        body.ui2 #statusIndicator.error { border-color: #5a3434; background: #2d1d1f; color: var(--danger); }
+        body.ui2 #statusIndicator.error::before { background: var(--danger); }
+
+        body.ui2 .ui2-reset {
+            display: inline-flex; align-items: center; gap: 7px;
+            padding: 8px 0 8px 13px;
+            border: 0; border-left: 1px solid var(--border);
+            background: transparent; color: var(--muted);
+            font-size: 13px; font-weight: 520;
+            cursor: pointer;
+        }
+        body.ui2 .ui2-reset:disabled { opacity: .45; cursor: default; }
+        body.ui2 .ui2-reset:not(:disabled):hover { color: var(--text); }
+
+        body.ui2 .ui2-transcript {
+            flex: 1; min-height: 0;
+            overflow-y: auto;
+            padding: 16px 24px 14px;
+            display: block !important;
+        }
+        body.ui2 .ui2-transcript-text {
+            font-family: var(--font-zh);
+            font-size: 22px; line-height: 36px; letter-spacing: .02px;
+            color: #e7edf1;
+            white-space: pre-wrap;
+            line-break: strict;
+            max-height: none; min-height: 0;
+            padding: 0; margin: 0;
+            border: 0; background: none; box-shadow: none;
+        }
+        body.ui2 .ui2-transcript-text:empty::before {
+            content: "Translations appear here as the talk plays.";
+            font-family: var(--font-ui);
+            font-size: 15px; color: var(--subtle);
+        }
+        body.ui2 #translationOutput mark.term-hit {
+            color: var(--highlight-text);
+            background: var(--highlight-bg);
+            border-radius: 4px;
+            padding: 1px 2px;
+            box-decoration-break: clone; -webkit-box-decoration-break: clone;
+        }
+
+        body.ui2 .ui2-sidebar {
+            display: grid;
+            grid-template-rows: minmax(0, 1fr) auto;
+            gap: var(--gap);
+            min-width: 0;
+        }
+        body.ui2 .ui2-topic {
+            display: block;
+            padding: 18px 19px 17px;
+            margin: 0;
+        }
+        body.ui2 .ui2-detail { margin: 5px 0 18px; color: var(--subtle); font-size: 13px; }
+        body.ui2 .ui2-topic-rows { display: grid; gap: 17px; }
+        body.ui2 #adaptivePosterior .posterior-item {
+            display: grid;
+            grid-template-columns: 112px minmax(0, 1fr) 38px;
+            align-items: center; gap: 10px;
+            margin: 0; padding: 0;
+            border: 0; background: none;
+            font-size: 14px; line-height: 17px; color: var(--muted);
+        }
+        body.ui2 #adaptivePosterior .posterior-item b {
+            font-weight: 500; color: var(--muted);
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        body.ui2 #adaptivePosterior .posterior-item.top b { font-weight: 600; color: #e6eeef; }
+        body.ui2 #adaptivePosterior .posterior-item i {
+            display: block; height: 7px;
+            border-radius: 5px; background: var(--track); overflow: hidden;
+        }
+        body.ui2 #adaptivePosterior .posterior-item u {
+            display: block; height: 100%;
+            border-radius: 5px; background: var(--accent); opacity: .72;
+            text-decoration: none;
+            transition: width .4s ease;
+        }
+        body.ui2 #adaptivePosterior .posterior-item.top u { opacity: 1; }
+        body.ui2 #adaptivePosterior .posterior-item em {
+            font-style: normal; text-align: right;
+            font-variant-numeric: tabular-nums; font-weight: 530;
+            color: #c6d1dc;
+        }
+        body.ui2 #adaptivePosterior .posterior-item.top em { color: #a6e9dc; }
+        body.ui2 #adaptivePosterior .posterior-waiting { color: var(--subtle); font-size: 14px; }
+
+        body.ui2 .ui2-playback { padding: 14px 16px 16px; }
+        body.ui2 .ui2-playback-label { color: var(--subtle); font-size: 12px; line-height: 15px; margin-bottom: 5px; }
+        body.ui2 .ui2-playback-title {
+            font-size: 14px; font-weight: 550; color: var(--text);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            margin-bottom: 10px;
+        }
+        body.ui2 .ui2-media-slot {
+            position: static; height: auto; min-height: 0;
+            margin: 0; padding: 0; border: 0;
+            background: none; box-shadow: none; aspect-ratio: auto;
+        }
+        body.ui2 .ui2-media-slot audio { display: block; width: 100% !important; height: 36px !important; color-scheme: dark; }
+        body.ui2 .ui2-media-slot video {
+            display: block; width: 100% !important; height: auto !important; max-height: 180px;
+            border-radius: var(--radius-control); background: #000;
+        }
+        body.ui2 .ui2-media-slot .video-placeholder {
+            display: flex; align-items: center;
+            height: 36px; padding: 0 12px;
+            border: 1px dashed var(--control-border); border-radius: var(--radius-control);
+            color: var(--subtle); font-size: 13px;
+            background: none;
+        }
+
+        /* Retrieved terms */
+        body.ui2 #evidencePanel { padding: 0; margin: 0; background: var(--surface); }
+        body.ui2 .ui2-terms-head {
+            height: 54px;
+            display: flex; align-items: center; justify-content: space-between; gap: 15px;
+            padding: 0 22px;
+        }
+        body.ui2 .ui2-terms-meta {
+            min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            color: var(--subtle); font-size: 13px; font-variant-numeric: tabular-nums;
+        }
+        body.ui2 .ui2-terms-columns, body.ui2 #evidenceList .evidence-row {
+            display: grid;
+            grid-template-columns: 37% 30% 13% 20%;
+            align-items: center;
+            padding: 0 22px;
+        }
+        body.ui2 .ui2-terms-columns {
+            height: 31px;
+            border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+            background: var(--surface2);
+            color: var(--muted); font-size: 13px; font-weight: 500;
+        }
+        body.ui2 .ui2-terms-list { max-height: 158px; overflow-y: auto; margin: 0; padding: 0; }
+        body.ui2 #evidenceList .evidence-row {
+            height: 39px;
+            margin: 0; border: 0; border-bottom: 1px solid var(--row-border); border-radius: 0;
+            background: none;
+            font-size: 15px; font-weight: 500; color: #dce4ed;
+        }
+        body.ui2 #evidenceList .evidence-row:last-child { border-bottom: 0; }
+        body.ui2 #evidenceList .evidence-row.used { background: rgba(104, 216, 198, .05); }
+        body.ui2 #evidenceList .evidence-row > span {
+            min-width: 0; padding-right: 16px;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        body.ui2 #evidenceList .ev-arrow { display: none; }
+        body.ui2 #evidenceList .ev-tr { font-family: var(--font-zh); font-size: 16px; color: #aee7db; }
+        body.ui2 #evidenceList .ev-score {
+            display: flex; align-items: center; gap: 11px;
+            font-variant-numeric: tabular-nums;
+        }
+        body.ui2 #evidenceList .ev-score-track {
+            width: 36px; height: 4px; border-radius: 3px; background: var(--track); overflow: hidden;
+        }
+        body.ui2 #evidenceList .ev-score-track i { display: block; height: 100%; background: var(--accent); opacity: .65; }
+        body.ui2 #evidenceList .ev-source,
+        body.ui2 #evidenceList .evidence-row.used .ev-source {
+            padding: 0; border: 0; border-radius: 0; background: none; color: inherit; font-size: inherit;
+        }
+        body.ui2 #evidenceList .ev-source span {
+            display: inline-block; max-width: 100%;
+            padding: 3px 8px;
+            border: 1px solid #344452; border-radius: 5px;
+            background: #24313d; color: #a7bbc8;
+            font-size: 12px; line-height: 15px;
+            overflow: hidden; text-overflow: ellipsis; vertical-align: middle;
+        }
+        body.ui2 #evidenceList .evidence-empty { padding: 11px 22px; color: var(--subtle); font-size: 14px; }
+
+        body.ui2 #backendBanner { border-radius: var(--radius-panel); }
+
+        /* Narrow screens and the installed phone app: one column */
+        @media (max-width: 1100px) {
+            body.ui2 .ui2-session { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            body.ui2 .ui2-stat { height: auto; padding-left: 0; border-left: 0; }
+            body.ui2 .ui2-actions { grid-column: 1 / -1; }
+            body.ui2 .ui2-inputs { grid-template-columns: 1fr; }
+            body.ui2 .ui2-samples { min-width: 0; padding-right: 0; border-right: 0; }
+            body.ui2 .ui2-workspace { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 640px) {
+            body.ui2 .ui2-page { padding: calc(16px + env(safe-area-inset-top)) 12px 16px; }
+            body.ui2 .ui2-header { margin-bottom: 16px; }
+            body.ui2 .ui2-architecture { display: none; }
+            body.ui2 .ui2-header h1 { font-size: 25px; }
+            body.ui2 .ui2-tagline { font-size: 14px; }
+            body.ui2 .ui2-session, body.ui2 .ui2-inputs { padding: 14px; gap: 14px; }
+            body.ui2 .ui2-session .ui2-field { grid-column: 1 / -1; }
+            body.ui2 .ui2-panel h2 { font-size: 17px; white-space: nowrap; }
+            body.ui2 .ui2-translation-head .ui2-section-name svg { display: none; }
+            body.ui2 .ui2-reset { font-size: 0; gap: 0; padding-left: 10px; }
+            body.ui2 .ui2-head-actions { gap: 10px; }
+            body.ui2 .ui2-sample-row { flex-wrap: wrap; }
+            body.ui2 .ui2-source-row { grid-template-columns: 1fr; }
+            body.ui2 #translationPanel { height: 52vh !important; }
+            body.ui2 .ui2-translation-head { padding: 0 14px; height: 56px; }
+            body.ui2 #statusIndicator { max-width: 190px; }
+            body.ui2 .ui2-transcript { padding: 12px 14px; }
+            body.ui2 .ui2-transcript-text { font-size: 19px; line-height: 31px; }
+            body.ui2 .ui2-terms-columns, body.ui2 #evidenceList .evidence-row { grid-template-columns: 38% 34% 28%; padding: 0 14px; }
+            body.ui2 .ui2-terms-columns span:nth-child(3), body.ui2 #evidenceList .ev-score { display: none; }
+            body.ui2 .ui2-terms-head { padding: 0 14px; }
+        }
     </style>
 </head>
-<body>
+<body class="ui2">
     <!-- 窗口拖拽区域 -->
     <div class="drag-area"></div>
-    
+
     <!-- Electron专用音频处理器 -->
     <script src="/static/electron-audio-fix.js"></script>
-    
-    <!-- Toast通知容器已移除 -->
-    
-    <div class="container">
-        <div class="header">
-            <h1>AutoTerm-SST</h1>
-            <p>Zero session-time terminology setup for streaming speech translation &middot; Speech LLM + MaxSim RAG</p>
-        </div>
 
-        <div class="main-panel">
-            <!-- Session Settings -->
-            <div class="controls-section">
+    <div class="container ui2-page">
+        <header class="ui2-header">
+            <div class="ui2-brand">
+                <div class="ui2-brand-icon" aria-hidden="true">
+                    <svg width="30" height="30" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 16h3l3-7 4 14 4-19 4 23 4-11h4"/></svg>
+                </div>
+                <div>
+                    <h1>AutoTerm-SST</h1>
+                    <div class="ui2-tagline">Streaming speech translation that finds its own terminology</div>
+                </div>
+            </div>
+            <div class="ui2-architecture">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M7.5 8.5l3 7m6-7-3 7M8.5 6h7"/></svg>
+                Speech LLM + MaxSim RAG
+            </div>
+        </header>
+
+        <div class="main-panel ui2-main">
+            <!-- Session settings -->
+            <section class="ui2-panel ui2-session">
                 <select id="agentType" style="display:none">
                     <option value="RASST" selected>RASST</option>
                     <option value="InfiniSST">InfiniSST Legacy</option>
                 </select>
 
-                <div class="control-group">
-                    <label>Language Pair</label>
-                    <select id="languagePair">
+                <div class="ui2-field">
+                    <label class="ui2-label" for="languagePair">Language pair</label>
+                    <select id="languagePair" class="ui2-select">
                         <option value="English -> Chinese">English → Chinese</option>
                         <option value="English -> Japanese">English → Japanese</option>
                         <option value="English -> German">English → German</option>
                     </select>
                 </div>
 
-                <div class="control-group">
-                    <label>Latency</label>
-                    <select id="latencyMultiplier">
+                <div class="ui2-field">
+                    <label class="ui2-label" for="latencyMultiplier">Latency</label>
+                    <select id="latencyMultiplier" class="ui2-select">
                         <option value="1">1x (Fastest)</option>
                         <option value="2" selected>2x (Default)</option>
-                        <option value="3">3x (More Accurate)</option>
-                        <option value="4">4x (Most Accurate)</option>
+                        <option value="3">3x (More accurate)</option>
+                        <option value="4">4x (Most accurate)</option>
                     </select>
                 </div>
 
@@ -1254,127 +1768,137 @@
                     <button id="buildGlossary" type="button" disabled>Apply</button>
                 </div>
 
-                <div class="adaptive-cell inline-cell"><span>Active Terms</span><strong id="adaptiveTerms">0</strong></div>
-                <div class="adaptive-cell inline-cell"><span>Router</span><strong id="adaptiveRouter">Similarity rules</strong></div>
-
-                <div class="control-group buttons-group">
-                    <label>&nbsp;</label>
-                    <button id="loadModel" class="btn">Update Session</button>
+                <div class="ui2-stat">
+                    <span class="ui2-label">Active terms</span>
+                    <strong id="adaptiveTerms">—</strong>
+                </div>
+                <div class="ui2-stat ui2-router">
+                    <span class="ui2-label">Router</span>
+                    <strong id="adaptiveRouter">—</strong>
                 </div>
 
-                <div id="adaptiveStatus" class="adaptive-status">
-                    <div class="adaptive-cell posterior-cell"><span id="adaptivePosteriorLabel">Topic posterior</span><div id="adaptivePosterior" class="posterior-list"></div></div>
+                <div class="buttons-group ui2-actions">
+                    <button id="loadModel" class="ui2-primary" type="button">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14-5L3 9m0-5v5h5m-4 4a8 8 0 0 0 14 5l3-3m0 5v-5h-5"/></svg>
+                        Update session
+                    </button>
                 </div>
-            </div>
+            </section>
 
-            <!-- Audio Input Section -->
-            <div class="input-section" id="audioInputSection">
-                <!-- Sample audio quick-start -->
-                <div class="input-item sample-item" id="sampleAudioItem">
-                    <span class="sample-label">Try a sample</span>
-                    <div class="sample-row">
-                        <button class="sample-btn sample-btn-primary" type="button" data-sample="acl_then_medicine.wav" data-title="ACL → Medicine (auto-switch)">ACL → Medicine</button>
-                        <button class="sample-btn" type="button" data-sample="acl_sample.wav" data-title="ACL talk (NLP)">ACL talk</button>
-                        <button class="sample-btn" type="button" data-sample="medicine_sample.wav" data-title="Medicine talk (oncology)">Medicine talk</button>
+            <!-- Audio input -->
+            <section class="ui2-panel ui2-inputs" id="audioInputSection">
+                <div class="ui2-samples" id="sampleAudioItem">
+                    <span class="ui2-label">Try a sample</span>
+                    <div class="ui2-sample-row">
+                        <button class="sample-btn ui2-chip" type="button" data-sample="acl_then_medicine.wav" data-title="ACL then Medicine">ACL then Medicine</button>
+                        <button class="sample-btn ui2-chip" type="button" data-sample="acl_sample.wav" data-title="ACL talk">ACL talk</button>
+                        <button class="sample-btn ui2-chip" type="button" data-sample="medicine_sample.wav" data-title="Medicine talk">Medicine talk</button>
                     </div>
                 </div>
 
-                <!-- Web Mode Buttons -->
-                <div class="input-item" id="webUploadItem">
-                    <button class="upload-btn" type="button" id="uploadBtn">
-                        <svg class="icon" viewBox="0 0 24 24">
-                            <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
-                        </svg>
-                        Upload Video/Audio
-                    </button>
-                    <input type="file" id="audioFile" class="file-input" accept="audio/*,video/*" />
-                </div>
-                
-                <div class="input-item youtube-section" id="webYoutubeItem">
-                    <input type="url" id="youtubeUrl" class="url-input" placeholder="https://www.youtube.com/watch?v=..." />
-                    <button id="playBtn" class="play-btn">
-                        <svg class="icon" viewBox="0 0 24 24">
-                            <path d="M8,5.14V19.14L19,12.14L8,5.14Z"/>
-                        </svg>
-                    </button>
-                </div>
-                
-                <!-- Electron Mode System Audio Capture Button -->
-                <div class="input-item" id="electronSystemAudioItem" style="display: none;">
-                    <button class="system-audio-btn" type="button" id="systemAudioBtn">
-                        <svg class="icon" viewBox="0 0 24 24">
-                            <path d="M3,9V15H7L12,20V4L7,9H3M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.71V20.77C18.01,19.86 21,16.28 21,12C21,7.72 18.01,4.14 14,3.23Z"/>
-                        </svg>
-                        Capture System Audio
-                    </button>
-                </div>
-                
+                <div class="ui2-media">
+                    <span class="ui2-label">Use your own media</span>
+                    <div class="ui2-source-row">
+                        <div id="webUploadItem" class="ui2-cell">
+                            <button class="ui2-outline" type="button" id="uploadBtn">
+                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V3m-5 5 5-5 5 5M4 15v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/></svg>
+                                Upload audio or video
+                            </button>
+                            <input type="file" id="audioFile" class="file-input" accept="audio/*,video/*" />
+                        </div>
 
-                
-                <div class="input-item">
-                    <button id="toggleMic" class="record-btn">
-                        <svg class="icon" viewBox="0 0 24 24">
-                            <path d="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z"/>
-                        </svg>
-                        Record Audio
-                    </button>
-                </div>
-            </div>
+                        <div id="webYoutubeItem" class="ui2-cell ui2-youtube">
+                            <label class="ui2-url">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M10 13a4 4 0 0 0 5.7.3l4.2-4.2a4 4 0 0 0-5.7-5.7L11.8 5.8m.2 5.2a4 4 0 0 0-5.7-.3l-4.2 4.2a4 4 0 0 0 5.7 5.7l2.4-2.4"/></svg>
+                                <input type="url" id="youtubeUrl" placeholder="Paste a YouTube URL" />
+                            </label>
+                            <button id="playBtn" class="ui2-play" type="button" aria-label="Play">
+                                <svg class="icon" width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5a1 1 0 0 1 1.5-.9l12 7.5a1 1 0 0 1 0 1.8l-12 7.5a1 1 0 0 1-1.5-.9z"/></svg>
+                            </button>
+                        </div>
 
-            <!-- Microphone Status -->
-            <div id="micStatus" class="mic-status"></div>
+                        <!-- Electron mode system audio capture -->
+                        <div id="electronSystemAudioItem" class="ui2-cell" style="display: none;">
+                            <button class="ui2-outline" type="button" id="systemAudioBtn">Capture system audio</button>
+                        </div>
+
+                        <div class="ui2-cell">
+                            <button id="toggleMic" class="ui2-outline" type="button">
+                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11v1a7 7 0 0 0 14 0v-1m-7 8v3m-3 0h6"/></svg>
+                                Record audio
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Microphone status -->
+            <div id="micStatus" class="mic-status ui2-mic-status"></div>
             <div class="volume-indicator hidden" id="volumeIndicator">
                 <div id="volumeLevel" class="volume-level"></div>
             </div>
 
-            <!-- Video/Audio Player (hidden in Electron mode) -->
-            <div class="video-section" id="videoSection">
-                <div class="video-container" id="mediaContainer">
-                    <div class="video-placeholder" id="videoPlaceholder">
-                        <p>Upload a video/audio file or enter a YouTube URL to begin</p>
+            <section class="ui2-workspace">
+                <!-- Live translation -->
+                <article id="translationPanel" class="ui2-panel ui2-translation">
+                    <div class="ui2-translation-head" id="panelHeader">
+                        <div class="ui2-section-name">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zM6 10h12M6 14h8"/></svg>
+                            <h2>Live translation</h2>
+                        </div>
+                        <div class="ui2-head-actions">
+                            <div id="statusIndicator" class="status-indicator ready">
+                                <div class="loading hidden" id="loadingSpinner"></div>
+                                <span id="statusText">Ready</span>
+                            </div>
+                            <button id="resetTranslation" class="ui2-reset" type="button" disabled>
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 2.6 6.4M3 4v8h8"/></svg>
+                                Reset
+                            </button>
+                            <button id="minimizeBtn" class="ui2-hidden-control" type="button" title="Minimize" tabindex="-1"></button>
+                            <button id="closeBtn" class="ui2-hidden-control" type="button" title="Close" tabindex="-1"></button>
+                        </div>
                     </div>
-                </div>
-            </div>
-        </div>
-    </div>
+                    <div class="ui2-transcript" id="translationContent" lang="zh-CN">
+                        <div id="translationOutput" class="ui2-transcript-text"></div>
+                    </div>
+                    <div class="ui2-hidden-control" id="resizeHandle"></div>
+                </article>
 
-    <!-- Floating Translation Panel -->
-    <div id="translationPanel" class="translation-panel">
-        <div class="translation-header" id="panelHeader">
-            <div class="header-left">
-                <h3>Ready to translate</h3>
-                <div id="statusIndicator" class="status-indicator ready">
-                    <div class="loading hidden" id="loadingSpinner"></div>
-                    <span id="statusText">Ready</span>
+                <aside class="ui2-sidebar">
+                    <section id="adaptiveStatus" class="ui2-panel ui2-topic">
+                        <h2 id="adaptivePosteriorLabel">Topic posterior</h2>
+                        <div class="ui2-detail">Inferred from the system's own translation</div>
+                        <div id="adaptivePosterior" class="ui2-topic-rows"></div>
+                    </section>
+
+                    <section class="ui2-panel ui2-playback" id="videoSection">
+                        <div class="ui2-playback-label">Source playback</div>
+                        <div class="ui2-playback-title" id="sourceTitle">No media loaded</div>
+                        <div class="ui2-media-slot" id="mediaContainer">
+                            <div class="video-placeholder" id="videoPlaceholder">Load a sample or your own media to begin</div>
+                        </div>
+                    </section>
+                </aside>
+            </section>
+
+            <!-- Retrieved terms -->
+            <section id="evidencePanel" class="ui2-panel ui2-terms">
+                <div class="ui2-terms-head">
+                    <div class="ui2-section-name">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14M12 7c-3-3-7-3-10-2v14c3-1 7-1 10 2 3-3 7-3 10-2V5c-3-1-7-1-10 2z"/></svg>
+                        <h2>Retrieved terms</h2>
+                    </div>
+                    <span id="termMemoryStatus" class="ui2-terms-meta">—</span>
                 </div>
-            </div>
-            <div class="panel-controls">
-                <button id="resetTranslation" class="panel-btn reset-btn" disabled>Reset</button>
-                <button id="minimizeBtn" class="panel-btn" title="Minimize">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M19,13H5V11H19V13Z"/>
-                    </svg>
-                </button>
-                <button id="closeBtn" class="panel-btn" title="Close">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/>
-                    </svg>
-                </button>
-            </div>
-        </div>
-        <div class="translation-content" id="translationContent">
-            <div id="translationOutput" class="translation-output"></div>
-            <div id="evidencePanel" class="evidence-panel">
-                <div class="evidence-header">
-                    <span>Retrieved Terms</span>
-                    <span id="termMemoryStatus" class="term-memory-status">memory: —</span>
+                <div class="ui2-terms-columns" aria-hidden="true">
+                    <span>Source term</span><span>Translation</span><span>Score</span><span>Slice</span>
                 </div>
-                <div id="evidenceList" class="evidence-list">
+                <div id="evidenceList" class="ui2-terms-list">
                     <div class="evidence-empty">No terms retrieved yet.</div>
                 </div>
-            </div>
+            </section>
         </div>
-        <div class="resize-handle" id="resizeHandle"></div>
     </div>
 
     <script>
@@ -1489,13 +2013,14 @@
             indexPath: '',
             confirmedAt: 0
         };
+        let workingSetTerms = 0;
         let adaptiveInfo = {
             activeDomain: 'general',
             confidence: 0,
             activeGlossaryPreset: 'none',
             activeTerms: 0,
             switchCount: 0,
-            router: 'hybrid_window_topic',
+            router: '',
             topSlices: [],
             updatedAt: 0
         };
@@ -1518,7 +2043,8 @@
 
         function displayRouter(name) {
             const labels = { language_model: 'Language model', hybrid_window_topic: 'Similarity rules' };
-            const text = String(name || 'hybrid_window_topic');
+            if (!name) return '—';
+            const text = String(name);
             return labels[text] || text;
         }
 
@@ -1570,8 +2096,8 @@
             const selectedPreset = selectedTermPreset();
             if (adaptiveMode) adaptiveMode.textContent = displayPresetMode(selectedPreset);
             renderPosterior();
-            const terms = adaptiveInfo.activeTerms || confirmedGlossary.presetTerms || termsFromPreset(adaptiveInfo.activeGlossaryPreset);
-            if (adaptiveTerms) adaptiveTerms.textContent = Number(terms || 0).toLocaleString();
+            // Only a running session has a working set; before that the stat stays empty.
+            if (adaptiveTerms) adaptiveTerms.textContent = workingSetTerms ? workingSetTerms.toLocaleString() : '—';
             if (adaptiveRouter) adaptiveRouter.textContent = displayRouter(adaptiveInfo.router);
         }
 
@@ -1751,9 +2277,8 @@
                         const option = document.createElement('option');
                         option.value = pair.id;
                         const unavailable = pair.available === false;
-                        option.textContent = unavailable
-                            ? `${pair.label || pair.id} (offline)`
-                            : (pair.label || pair.id);
+                        const label = String(pair.label || pair.id).replace('->', '→');
+                        option.textContent = unavailable ? `${label} (offline)` : label;
                         option.disabled = unavailable;
                         option.selected = pair.id === config.loaded_language_pair;
                         languagePair.appendChild(option);
@@ -1962,6 +2487,11 @@
         // Latest non-empty retrieval references rendered as the evidence panel.
         function updateEvidencePanel(meta) {
             if (!meta) return;
+            // The working set is the union of the active slices; /health reports only the default index.
+            if (meta.active_slice_terms && typeof meta.active_slice_terms === 'object') {
+                const total = Object.values(meta.active_slice_terms).reduce((sum, n) => sum + (Number(n) || 0), 0);
+                if (total > 0) workingSetTerms = total;
+            }
             // The topic is applied last: it names the slice the working set leads with.
             if (meta.topic_router) {
                 applyTopicRouter(meta.topic_router, meta);
@@ -1993,8 +2523,8 @@
                     `<span class="ev-term" title="${escapeHtml(term)}">${escapeHtml(term)}</span>` +
                     `<span class="ev-arrow">→</span>` +
                     `<span class="ev-tr" title="${escapeHtml(translation)}">${escapeHtml(translation)}</span>` +
-                    `<span class="ev-score">${escapeHtml(score)}</span>` +
-                    `<span class="ev-source">${escapeHtml(source)}</span>`;
+                    `<span class="ev-score">${escapeHtml(score)}<span class="ev-score-track"><i style="width:${Math.round(Math.max(0, Math.min(1, Number(score) || 0)) * 100)}%"></i></span></span>` +
+                    `<span class="ev-source"><span>${escapeHtml(String(source).replace(/^auto:/, ''))}</span></span>`;
                 evidenceList.appendChild(row);
             });
             // New candidates may match text that already streamed in.
@@ -2013,15 +2543,14 @@
             if (!termMemoryStatus) return;
             const parts = [];
             if (!termMemoryInfo || termMemoryInfo.enabled === false) {
-                parts.push('memory: off');
+                parts.push('Retrieval off');
             } else {
-                const terms = termMemoryInfo.active_terms;
-                parts.push('memory: ' + (termMemoryInfo.backend || 'rag') +
-                    (terms != null ? ` · ${Number(terms).toLocaleString()} terms` : ''));
-                if (termMemoryInfo.snapshot_id) parts.push(termMemoryInfo.snapshot_id);
+                const backend = String(termMemoryInfo.backend || 'rag');
+                parts.push(backend === 'maxsim' ? 'MaxSim' : backend);
+                if (workingSetTerms) parts.push(`${workingSetTerms.toLocaleString()} terms`);
             }
             const ms = termMemoryStatus.dataset.retrieveMs;
-            if (ms != null && ms !== '') parts.push(`retrieve ${ms}ms`);
+            if (ms != null && ms !== '') parts.push(`retrieval ${ms} ms`);
             termMemoryStatus.textContent = parts.join(' · ');
         }
 
@@ -3103,6 +3632,9 @@
             
             mediaContainer.appendChild(mediaElement);
             currentMediaElement = mediaElement;
+            const sourceTitle = document.getElementById('sourceTitle');
+            if (sourceTitle) sourceTitle.textContent = file.name;
+            document.querySelectorAll('.sample-btn.active').forEach(b => b.classList.remove('active'));
             
             // Add event listeners
             addMediaEventListeners(mediaElement);
@@ -4037,6 +4569,9 @@
                     const blob = await resp.blob();
                     const file = new File([blob], name, { type: 'audio/wav' });
                     createMediaElement(file);
+                    btn.classList.add('active');
+                    const sourceTitle = document.getElementById('sourceTitle');
+                    if (sourceTitle) sourceTitle.textContent = title;
                     translationInitialized = false;
                     updateStatus(`Sample loaded: ${title}. Press play to start translation.`, 'ready');
                     resetIdleTimer();

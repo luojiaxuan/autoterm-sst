@@ -1,0 +1,124 @@
+{
+ "lm_hmm_s1": {
+  "chunks": 1390,
+  "cover": 91.22,
+  "top1": 69.35,
+  "top_changes": 55,
+  "talk_delay_to_top_s": [
+   17.28,
+   20.153,
+   12.904,
+   20.843,
+   172.555,
+   0.704,
+   14.584,
+   11.175,
+   20.37,
+   7.951
+  ]
+ },
+ "lm_hmm_s2": {
+  "chunks": 1390,
+  "cover": 88.56,
+  "top1": 63.17,
+  "top_changes": 64,
+  "talk_delay_to_top_s": [
+   null,
+   10.549,
+   14.647,
+   18.927,
+   18.522,
+   15.636,
+   6.068,
+   19.026,
+   13.697,
+   12.798
+  ]
+ },
+ "lm_hmm_s3": {
+  "chunks": 1390,
+  "cover": 89.28,
+  "top1": 68.42,
+  "top_changes": 55,
+  "talk_delay_to_top_s": [
+   5.76,
+   125.822,
+   11.571,
+   14.444,
+   16.795,
+   18.974,
+   16.649,
+   10.921,
+   18.119,
+   103.03
+  ]
+ },
+ "cosine_s1": {
+  "chunks": 1390,
+  "cover": 78.63,
+  "top1": 21.29,
+  "top_changes": 5,
+  "talk_delay_to_top_s": [
+   null,
+   0.953,
+   57.064,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   25.231
+  ]
+ },
+ "cosine_s2": {
+  "chunks": 1390,
+  "cover": 79.21,
+  "top1": 26.91,
+  "top_changes": 5,
+  "talk_delay_to_top_s": [
+   null,
+   68.149,
+   162.487,
+   null,
+   null,
+   null,
+   98.228,
+   20.946,
+   null,
+   null
+  ]
+ },
+ "cosine_s3": {
+  "chunks": 1390,
+  "cover": 78.49,
+  "top1": 23.6,
+  "top_changes": 5,
+  "talk_delay_to_top_s": [
+   null,
+   null,
+   null,
+   null,
+   68.635,
+   null,
+   null,
+   89.641,
+   21.959,
+   260.47
+  ]
+ },
+ "lm_hmm": {
+  "talks": 30,
+  "never_top": 1,
+  "median_delay_to_top_s_among_reached": 15.636,
+  "cover": 89.69,
+  "top1": 66.98
+ },
+ "cosine": {
+  "talks": 30,
+  "never_top": 19,
+  "median_delay_to_top_s_among_reached": 68.149,
+  "cover": 78.78,
+  "top1": 23.93
+ }
+}

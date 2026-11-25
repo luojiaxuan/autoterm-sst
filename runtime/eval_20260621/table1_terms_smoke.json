@@ -1,0 +1,101 @@
+[
+  {
+    "preset": "none",
+    "gold": 9,
+    "term_recall": 0.444,
+    "false_copy": 0.0,
+    "recovered": [
+      "dataset->数据集",
+      "natural language processing->自然语言处理",
+      "borrowing->借用",
+      "model->模型"
+    ],
+    "chunks": 31,
+    "refs_total": 0,
+    "refs_per_chunk": 0.0,
+    "retrieval_precision": null,
+    "gold_retrieved": 0.0,
+    "bleu": 48.0174,
+    "masked_terms_bleu": 42.3422,
+    "delta_masked_minus_bleu": -5.6752,
+    "masked_terms_hyp_removed": 19,
+    "masked_terms_ref_removed": 25,
+    "masked_terms_types": 191
+  },
+  {
+    "preset": "open_wiki_100k",
+    "gold": 9,
+    "term_recall": 0.444,
+    "false_copy": 0.0,
+    "recovered": [
+      "dataset->数据集",
+      "natural language processing->自然语言处理",
+      "borrowing->借用",
+      "model->模型"
+    ],
+    "chunks": 31,
+    "refs_total": 154,
+    "refs_per_chunk": 4.97,
+    "retrieval_precision": 0.0,
+    "gold_retrieved": 0.0,
+    "bleu": 52.0155,
+    "masked_terms_bleu": 45.2947,
+    "delta_masked_minus_bleu": -6.7209,
+    "masked_terms_hyp_removed": 22,
+    "masked_terms_ref_removed": 25,
+    "masked_terms_types": 191
+  },
+  {
+    "preset": "auto_working",
+    "gold": 9,
+    "term_recall": 0.889,
+    "false_copy": 0.0,
+    "recovered": [
+      "lexical borrowing->词汇借用",
+      "linguistic borrowing->语言学借用",
+      "annotated corpus->注释语料库",
+      "corpus->语料库",
+      "dataset->数据集",
+      "natural language processing->自然语言处理",
+      "borrowing->借用",
+      "model->模型"
+    ],
+    "chunks": 31,
+    "refs_total": 71,
+    "refs_per_chunk": 2.29,
+    "retrieval_precision": 0.099,
+    "gold_retrieved": 0.444,
+    "bleu": 52.9904,
+    "masked_terms_bleu": 45.7958,
+    "delta_masked_minus_bleu": -7.1946,
+    "masked_terms_hyp_removed": 28,
+    "masked_terms_ref_removed": 25,
+    "masked_terms_types": 191
+  },
+  {
+    "preset": "acl_tagged_raw",
+    "gold": 9,
+    "term_recall": 0.778,
+    "false_copy": 0.0,
+    "recovered": [
+      "linguistic borrowing->语言学借用",
+      "annotated corpus->注释语料库",
+      "corpus->语料库",
+      "dataset->数据集",
+      "natural language processing->自然语言处理",
+      "borrowing->借用",
+      "model->模型"
+    ],
+    "chunks": 31,
+    "refs_total": 60,
+    "refs_per_chunk": 1.94,
+    "retrieval_precision": 0.117,
+    "gold_retrieved": 0.444,
+    "bleu": 56.64,
+    "masked_terms_bleu": 47.0719,
+    "delta_masked_minus_bleu": -9.5681,
+    "masked_terms_hyp_removed": 29,
+    "masked_terms_ref_removed": 25,
+    "masked_terms_types": 191
+  }
+]

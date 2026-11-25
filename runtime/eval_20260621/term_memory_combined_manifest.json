@@ -1,0 +1,133 @@
+{
+  "snapshot_id": "paper_auto_working_combined_20260621",
+  "source": "combined runtime manifest for adaptive glossary paper tables",
+  "created_at": "2026-06-21T00:00:00Z",
+  "root": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory",
+  "scales": {
+    "common_10k": {
+      "en-zh": {
+        "terms_path": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/glossaries/scale_aclgold_10000.json",
+        "indexes": {
+          "maxsim": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/indexes/scale_aclgold_10000/en-zh/maxsim.pt"
+        },
+        "num_terms": 10000
+      }
+    },
+    "nlp_core_10k": {
+      "en-zh": {
+        "terms_path": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/glossaries/wiki_nlp_ai_cs_zh.json",
+        "indexes": {
+          "maxsim": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/indexes/wiki_nlp_ai_cs/en-zh/maxsim.pt"
+        },
+        "num_terms": 10000
+      }
+    },
+    "medicine_core_10k": {
+      "en-zh": {
+        "terms_path": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/glossaries/wiki_medicine_zh.json",
+        "indexes": {
+          "maxsim": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/indexes/wiki_medicine/en-zh/maxsim.pt"
+        },
+        "num_terms": 23713
+      }
+    },
+    "open_wiki_academic": {
+      "en-zh": {
+        "terms_path": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/glossaries/wiki_academic_zh.json",
+        "indexes": {
+          "maxsim": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/indexes/wiki_academic/en-zh/maxsim.pt"
+        },
+        "num_terms": 18994
+      }
+    },
+    "open_wiki_100k": {
+      "en-zh": {
+        "terms_path": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/glossaries/wiki_general_zh_100k.json",
+        "indexes": {
+          "maxsim": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/indexes/wiki_general_100k/en-zh/maxsim.pt"
+        },
+        "num_terms": 100000
+      }
+    },
+    "open_wiki_1m": {
+      "en-zh": {
+        "terms_path": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/glossaries/wiki_general_zh_1m.json",
+        "indexes": {
+          "maxsim": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/indexes/wiki_general_1m/en-zh/maxsim.pt"
+        },
+        "num_terms": 1000000
+      }
+    },
+    "acl_tagged_gs10k": {
+      "en-zh": {
+        "terms_path": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/glossaries/acl_tagged_gs10k_zh.json",
+        "indexes": {
+          "maxsim": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/indexes/acl_tagged_gs10k/en-zh/maxsim.pt"
+        },
+        "num_terms": 10000
+      }
+    },
+    "acl_tagged_gs100k": {
+      "en-zh": {
+        "terms_path": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/glossaries/acl_tagged_gs100k_zh.json",
+        "indexes": {
+          "maxsim": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/indexes/acl_tagged_gs100k/en-zh/maxsim.pt"
+        },
+        "num_terms": 100000
+      }
+    },
+    "acl_tagged_gs1m": {
+      "en-zh": {
+        "terms_path": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/glossaries/acl_tagged_gs1m_zh.json",
+        "indexes": {
+          "maxsim": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/indexes/acl_tagged_gs1m/en-zh/maxsim.pt"
+        },
+        "num_terms": 1000000
+      }
+    }
+  },
+  "preset_meta": {
+    "common_10k": {
+      "label": "Common working glossary 10k",
+      "domain": "general",
+      "domain_id": "general",
+      "fallback_preset_id": "",
+      "term_count": 10000,
+      "maxsim_index_path": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/indexes/scale_aclgold_10000/en-zh/maxsim.pt",
+      "centroid_path": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/centroids/common_10k.pt",
+      "enabled_for_auto_router": true
+    },
+    "nlp_core_10k": {
+      "label": "NLP core working glossary 10k",
+      "domain": "nlp",
+      "domain_id": "nlp",
+      "fallback_preset_id": "common_10k",
+      "term_count": 10000,
+      "maxsim_index_path": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/indexes/wiki_nlp_ai_cs/en-zh/maxsim.pt",
+      "centroid_path": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/centroids/nlp_core_10k.pt",
+      "enabled_for_auto_router": true
+    },
+    "medicine_core_10k": {
+      "label": "Medicine working glossary",
+      "domain": "medicine",
+      "domain_id": "medicine",
+      "fallback_preset_id": "common_10k",
+      "term_count": 23713,
+      "maxsim_index_path": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/indexes/wiki_medicine/en-zh/maxsim.pt",
+      "centroid_path": "/mnt/taurus/data2/jiaxuanluo/rasst-demo/runtime/term_memory/centroids/medicine_core_10k.pt",
+      "enabled_for_auto_router": true
+    },
+    "open_wiki_academic": {
+      "label": "Open Wiki academic 19k",
+      "domain": "open"
+    },
+    "open_wiki_100k": {
+      "label": "Open Wiki general 100k",
+      "domain": "open"
+    },
+    "open_wiki_1m": {
+      "label": "Open Wiki general 1M",
+      "domain": "open"
+    }
+  }
+}

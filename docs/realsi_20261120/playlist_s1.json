@@ -1,0 +1,62 @@
+[
+ {
+  "item_id": "en2zh-07-ent",
+  "domain": "entertainment",
+  "corpus": "realsi",
+  "wav": "/data/inputs/realsi/wav/en2zh-07-ent.wav"
+ },
+ {
+  "item_id": "en2zh-09-sport",
+  "domain": "sports",
+  "corpus": "realsi",
+  "wav": "/data/inputs/realsi/wav/en2zh-09-sport.wav"
+ },
+ {
+  "item_id": "en2zh-10-art",
+  "domain": "art",
+  "corpus": "realsi",
+  "wav": "/data/inputs/realsi/wav/en2zh-10-art.wav"
+ },
+ {
+  "item_id": "en2zh-08-sci",
+  "domain": "science",
+  "corpus": "realsi",
+  "wav": "/data/inputs/realsi/wav/en2zh-08-sci.wav"
+ },
+ {
+  "item_id": "en2zh-06-env",
+  "domain": "environment",
+  "corpus": "realsi",
+  "wav": "/data/inputs/realsi/wav/en2zh-06-env.wav"
+ },
+ {
+  "item_id": "en2zh-04-fin",
+  "domain": "finance",
+  "corpus": "realsi",
+  "wav": "/data/inputs/realsi/wav/en2zh-04-fin.wav"
+ },
+ {
+  "item_id": "en2zh-01-tech",
+  "domain": "nlp",
+  "corpus": "realsi",
+  "wav": "/data/inputs/realsi/wav/en2zh-01-tech.wav"
+ },
+ {
+  "item_id": "en2zh-05-law",
+  "domain": "legal",
+  "corpus": "realsi",
+  "wav": "/data/inputs/realsi/wav/en2zh-05-law.wav"
+ },
+ {
+  "item_id": "en2zh-02-health",
+  "domain": "medicine",
+  "corpus": "realsi",
+  "wav": "/data/inputs/realsi/wav/en2zh-02-health.wav"
+ },
+ {
+  "item_id": "en2zh-03-edu",
+  "domain": "education",
+  "corpus": "realsi",
+  "wav": "/data/inputs/realsi/wav/en2zh-03-edu.wav"
+ }
+]

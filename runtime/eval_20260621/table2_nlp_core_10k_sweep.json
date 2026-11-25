@@ -1,0 +1,14 @@
+[
+  {
+    "preset": "nlp_core_10k",
+    "preset_terms": 10000,
+    "active_terms": 10000,
+    "chunks": 15,
+    "cold_retrieve_ms": 81.4,
+    "warm_retrieve_p50_ms": 78.5,
+    "warm_retrieve_p95_ms": 82.1,
+    "gen_p50_ms": 316.4,
+    "refs_per_chunk": 1.8,
+    "used_tag_count": 1
+  }
+]

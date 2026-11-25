@@ -1,0 +1,67 @@
+{
+ "model": "Qwen/Qwen3-4B-Instruct-2507",
+ "prototypes": "router_prototypes_generated_s0.json",
+ "w": 4,
+ "descriptions": {
+  "nlp": "NLP, corpora, machine translation, chatbots, and OCR terms. The field is computational linguistics and natural language processing: corpora, machine translation, language models, chatbots, information retrieval, optical character recognition, text summarization, named-entity recognition, finite automata.",
+  "medicine": "Disease, drug, pathogen, anatomy, procedure, and diagnostic terms. Biomedical and medical terminology covers diseases, pharmaceuticals, ATC drug codes, infectious pathogens, viruses, bacteria, anatomy, surgical procedures, diagnostic tests, and immunology.",
+  "education": "Universities, schools, colleges, academic disciplines, and education terms. Education and academic institutions: universities, schools, colleges, vocational institutes, international education, higher education, educational sciences, language learning, academic disciplines.",
+  "finance": "Finance, banking, accounting, marketing, retail, and economics terms. The field is finance, banking, accounting, and commerce: financial services, central banks, currencies, accounting, payment cards and digital wallets, investment funds, securities exchanges, insurance, marketing, and supply chains.",
+  "legal": "Government, law, politics, economics, and international relations terms. The field is politics, law, and political economy, covering governments, parliaments, courts, elections, treaties, international organizations, wars, human rights, finance, and corporations.",
+  "environment": "Ecology, biodiversity, geography, pollution, climate, and conservation terms. Environmental studies covers environmental law, environmental chemistry, climate change, ozone depletion, invasive species, plastic pollution, municipal solid waste, water supply and sanitation, energy conservation, biogeography.",
+  "entertainment": "Film, television, music, video game, and pop culture terms. Entertainment and media covers films, television series, video games, music genres, songs and albums, musicians, actors, awards, broadcasters, and anime.",
+  "science": "Taxonomy, ecology, humanities, social science, and engineering terms. Academic disciplines and biological taxonomy covers species and families, ecology, botany, zoology, linguistics, anthropology, political science, economics, engineering, and medicine.",
+  "sports": "Athletes, teams, leagues, tournaments, venues, and rules terms. This field is sports: association football, baseball, basketball, tennis, Olympic Games, leagues, tournaments, teams, athletes, venues.",
+  "art": "Art, architecture, media, literature, music, and heritage terms. Arts and culture covers painting, sculpture, architecture, museums, historic sites, film, television, literature, music, and design."
+ },
+ "raw": {
+  "top1_acc": 0.7765,
+  "top1_changes": 1257,
+  "cover@1": 0.7765,
+  "set_changes@1": 1257,
+  "cover@4": 0.898,
+  "set_changes@4": 4766
+ },
+ "filtered": {
+  "rho=1e-05": {
+   "top1_acc": 0.8416,
+   "top1_changes": 270,
+   "cover@1": 0.8416,
+   "set_changes@1": 270,
+   "cover@4": 0.9832,
+   "set_changes@4": 860
+  },
+  "rho=0.0001": {
+   "top1_acc": 0.8326,
+   "top1_changes": 306,
+   "cover@1": 0.8326,
+   "set_changes@1": 306,
+   "cover@4": 0.9811,
+   "set_changes@4": 866
+  },
+  "rho=0.001": {
+   "top1_acc": 0.8225,
+   "top1_changes": 388,
+   "cover@1": 0.8225,
+   "set_changes@1": 388,
+   "cover@4": 0.9793,
+   "set_changes@4": 878
+  },
+  "rho=0.01": {
+   "top1_acc": 0.8145,
+   "top1_changes": 482,
+   "cover@1": 0.8145,
+   "set_changes@1": 482,
+   "cover@4": 0.9745,
+   "set_changes@4": 902
+  },
+  "rho=0.1": {
+   "top1_acc": 0.8009,
+   "top1_changes": 589,
+   "cover@1": 0.8009,
+   "set_changes@1": 589,
+   "cover@4": 0.9654,
+   "set_changes@4": 938
+  }
+ }
+}

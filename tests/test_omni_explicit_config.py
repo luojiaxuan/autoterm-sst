@@ -1,0 +1,199 @@
+from __future__ import annotations
+
+import os
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
+
+from eval.streaming_sst.serve_glossary_capacity_sweep import build_agent, configure_vllm_runtime, parse_args
+from framework.agents.omni import OmniAgent, OmniConfig
+from framework.agents.term_memory.manifest import TermMemoryManifest
+
+
+def capacity_args(root: Path, **overrides):
+    """Server arguments with parser defaults for every option the test does not set."""
+    args = parse_args(["--port", "0", "--model-path", str(root / "model"), "--manifest", str(root / "manifest.json"),
+                       "--rag-model-path", str(root / "retriever.pt"), "--tmp-dir", str(root / "tmp")])
+    vars(args).update(overrides)
+    return args
+
+
+class OmniExplicitConfigTest(unittest.TestCase):
+    def test_capacity_server_configures_vllm_runtime_explicitly(self) -> None:
+        args = SimpleNamespace(
+            vllm_use_v1=1,
+            vllm_enable_v1_multiprocessing=1,
+            vllm_worker_multiproc_method="spawn",
+            vllm_moe_use_deep_gemm=0,
+            vllm_use_fused_moe_grouped_topk=0,
+            nccl_p2p_disable=1,
+            nccl_ib_disable=1,
+            torch_nccl_enable_monitoring=0,
+            vllm_compat_dir=Path("/tmp/vllm-compat"),
+            extra_python_path=[Path("/tmp/external-retriever")],
+        )
+        with patch.dict(os.environ, {}, clear=True), patch.object(sys, "path", list(sys.path)):
+            configure_vllm_runtime(args)
+            self.assertEqual(os.environ["VLLM_USE_V1"], "1")
+            self.assertEqual(os.environ["VLLM_ENABLE_V1_MULTIPROCESSING"], "1")
+            self.assertEqual(os.environ["VLLM_WORKER_MULTIPROC_METHOD"], "spawn")
+            self.assertEqual(os.environ["NCCL_P2P_DISABLE"], "1")
+            self.assertEqual(os.environ["NCCL_IB_DISABLE"], "1")
+            self.assertEqual(
+                os.environ["PYTHONPATH"],
+                os.pathsep.join(
+                    [
+                        "/tmp/vllm-compat",
+                        str(Path(__file__).resolve().parent.parent),
+                        "/tmp/external-retriever",
+                    ]
+                ),
+            )
+            self.assertEqual(sys.path[0], "/tmp/external-retriever")
+
+    def test_agent_uses_injected_config_and_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = TermMemoryManifest.from_dict(
+                {
+                    "snapshot_id": "explicit-test",
+                    "scales": {
+                        "capacity_10k": {
+                            "en-zh": {
+                                "terms_path": "terms.json",
+                                "indexes": {"maxsim": "maxsim.pt"},
+                                "num_terms": 10_000,
+                            }
+                        }
+                    },
+                },
+                base_dir=root,
+                path=str(root / "manifest.json"),
+            )
+            config = OmniConfig(
+                mock=True,
+                rag_enabled=False,
+                auto_glossary_enabled=False,
+                tmp_dir=str(root / "runtime"),
+            )
+
+            agent = OmniAgent(config=config, manifest=manifest)
+
+            self.assertIs(agent.config, config)
+            self.assertIs(agent._catalog("English -> Chinese").manifest, manifest)
+            self.assertEqual(agent._catalog("English -> Chinese").open_preset_ids(), ["capacity_10k"])
+
+    def test_capacity_agent_starts_rag_from_required_preset(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = TermMemoryManifest.from_dict(
+                {
+                    "snapshot_id": "capacity-startup",
+                    "scales": {
+                        "capacity_1m": {
+                            "en-zh": {
+                                "terms_path": "terms.json",
+                                "indexes": {"maxsim": "maxsim.pt"},
+                                "num_terms": 1_000_000,
+                            }
+                        }
+                    },
+                },
+                base_dir=root,
+                path=str(root / "manifest.json"),
+            )
+            args = capacity_args(
+                root,
+                rag_device="cuda:0",
+                vllm_tp_size=1,
+                gpu_memory_utilization=0.6,
+                max_num_seqs=8,
+                max_model_len=16384,
+                enable_prefix_caching=1,
+                vllm_enforce_eager=1,
+                vllm_limit_audio=16,
+                disable_custom_all_reduce=1,
+                scheduler_batch_size=8,
+                max_inflight_batches=2,
+                max_new_tokens=40,
+                term_map_format="tagged",
+                empty_term_map_policy="none_block",
+                rag_top_k=10,
+                rag_score_threshold=0.78,
+                vllm_serve_url="http://127.0.0.1:8210",
+            )
+
+            agent = build_agent(args, manifest, ["capacity_1m"])
+
+            self.assertEqual(agent.config.rag_startup_glossary_preset, "capacity_1m")
+            self.assertEqual(agent.config.vllm_serve_base_url, "http://127.0.0.1:8210")
+
+    def test_capacity_agent_can_enable_explicit_budgeted_autoterm(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = TermMemoryManifest.from_dict(
+                {
+                    "snapshot_id": "budgeted-autoterm",
+                    "scales": {
+                        name: {
+                            "description": f"{name} terminology",
+                            "en-zh": {
+                                "terms_path": f"{name}.json",
+                                "indexes": {"maxsim": f"{name}.pt"},
+                                "num_terms": 10_000,
+                            },
+                        }
+                        for name in ("nlp_core_10k", "medicine_core_10k")
+                    },
+                },
+                base_dir=root,
+                path=str(root / "manifest.json"),
+            )
+            args = capacity_args(
+                root,
+                rag_device="cuda:0",
+                vllm_tp_size=1,
+                gpu_memory_utilization=0.6,
+                max_num_seqs=8,
+                max_model_len=16384,
+                enable_prefix_caching=1,
+                vllm_enforce_eager=1,
+                vllm_limit_audio=16,
+                disable_custom_all_reduce=1,
+                scheduler_batch_size=8,
+                max_inflight_batches=2,
+                max_new_tokens=40,
+                term_map_format="tagged",
+                empty_term_map_policy="none_block",
+                rag_top_k=10,
+                rag_score_threshold=0.78,
+                retrieval_candidate_budget=100,
+                autoterm_policy="budgeted_top_slices",
+                autoterm_default_preset="nlp_core_10k",
+                autoterm_term_budget=20_000,
+                autoterm_max_active_slices=2,
+                autoterm_context_window_chunks=12,
+            )
+
+            agent = build_agent(
+                args,
+                manifest,
+                ["nlp_core_10k", "medicine_core_10k"],
+            )
+
+            self.assertTrue(agent.config.auto_glossary_enabled)
+            self.assertEqual(agent.config.router_slice_selection_mode, "budgeted_top_slices")
+            self.assertEqual(agent.config.router_term_budget, 20_000)
+            self.assertEqual(agent.config.router_max_active_slices, 2)
+            self.assertEqual(agent.config.retrieval_candidate_budget, 100)
+            self.assertEqual(
+                agent.config.auto_glossary_presets,
+                "nlp_core_10k,medicine_core_10k",
+            )
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DIR|boot</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;background:#0b1020;overflow:hidden}
+  #strip{display:none}
+  #strip button{flex:1;font:600 13px -apple-system,sans-serif;border:none;cursor:pointer;
+    background:#1b2438;color:#9fb3d9}
+  #strip button:disabled{opacity:.35}
+  #frame{position:fixed;top:0;left:0;width:100%;height:100%;border:none}
+</style>
+</head>
+<body>
+<div id="strip">
+  <button id="bLoad">1 LOAD SAMPLE</button>
+  <button id="bPlay">2 PLAY</button>
+  <button id="bReset">RESET</button>
+</div>
+<iframe id="frame" src="/"></iframe>
+<script>
+(() => {
+  const frame = document.getElementById('frame');
+  const D = () => frame.contentDocument;
+  const W = () => frame.contentWindow;
+  const media = () => D() && D().querySelector('#mediaContainer audio, #mediaContainer video, audio, video');
+  let phase = 'boot';
+  let staged = false;
+
+  // Shot staging: scroll the page title off-screen so the settings card sits at
+  // the top, then pin the translation panel BELOW the adaptive-status chips so
+  // the topic posterior stays visible for the whole take.
+  const stage = () => {
+    try {
+      const doc = D(), win = W();
+      const chips = doc.getElementById('adaptiveStatus');
+      const lang = doc.getElementById('languagePair');
+      if (!chips || !lang) return false;
+      const card = lang.closest('.control-group');
+      const cardTop = (card || lang).getBoundingClientRect().top + win.scrollY;
+      win.scrollTo(0, Math.max(0, Math.round(cardTop - 16)));
+      const chB = Math.round(chips.getBoundingClientRect().bottom);
+      const style = doc.createElement('style');
+      style.id = 'dirStage';
+      style.textContent = [
+        `.translation-panel{top:${chB + 10}px !important;bottom:14px !important;`,
+        'display:flex;flex-direction:column;}',
+        '.translation-content{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;}',
+        '.translation-output{flex:1 1 auto;max-height:none !important;min-height:70px;}',
+        '.evidence-panel{flex:0 0 auto;}',
+        '.evidence-list{max-height:92px !important;}'
+      ].join('');
+      const old = doc.getElementById('dirStage');
+      if (old) old.remove();
+      doc.head.appendChild(style);
+      win.scrollTo(0, Math.max(0, Math.round(cardTop - 16)));
+      return true;
+    } catch (e) { return false; }
+  };
+  frame.addEventListener('load', () => { staged = false; });
+  setInterval(() => { if (!staged) staged = stage(); }, 700);
+
+  const txt = id => {
+    try { return (D().getElementById(id) || {}).textContent?.trim() || ''; } catch (e) { return ''; }
+  };
+
+  // Telemetry via title: readable from AppleScript without any JS permission.
+  setInterval(() => {
+    const m = media();
+    const chromeH = window.outerHeight - window.innerHeight;
+    const sx = r => Math.round(window.screenX + r.x + r.width / 2);
+    const sy = r => Math.round(window.screenY + chromeH + r.y + r.height / 2);
+    const pt = el => {
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      if (!r.width && !r.height) return null;
+      return [sx(r), sy(r)];
+    };
+    let btns = null, box = null;
+    try {
+      const doc = D();
+      btns = {
+        load: pt(doc.querySelector('.sample-btn-primary')),
+        play: pt(doc.getElementById('playBtn')),
+        lang: pt(doc.getElementById('languagePair')),
+        lat: pt(doc.getElementById('latencyMultiplier')),
+        posterior: pt(doc.getElementById('adaptivePosterior'))
+      };
+      // Screen-space rect of the topic-posterior cell, for the post-production
+      // callout box at the switch moment.
+      const cell = doc.getElementById('adaptivePosterior')?.closest('.adaptive-cell');
+      if (cell) {
+        const r = cell.getBoundingClientRect();
+        box = [Math.round(window.screenX + r.left), Math.round(window.screenY + chromeH + r.top),
+               Math.round(r.width), Math.round(r.height)];
+      }
+    } catch (e) {}
+    const st = {
+      p: phase,
+      stg: staged ? 1 : 0,
+      btn: btns,
+      box: box,
+      geo: [window.screenX, window.screenY, window.outerWidth, window.outerHeight, window.innerWidth, window.innerHeight].join(','),
+      rs: m ? m.readyState : -1,
+      t: m ? +m.currentTime.toFixed(1) : -1,
+      posterior: txt('adaptivePosterior').slice(0, 60),
+      status: txt('statusText').slice(0, 40)
+    };
+    document.title = 'DIR|' + JSON.stringify(st);
+  }, 1000);
+
+  document.getElementById('bLoad').onclick = () => {
+    phase = 'loading';
+    D().querySelector('.sample-btn-primary').click();
+  };
+
+  document.getElementById('bPlay').onclick = async () => {
+    phase = 'waitbuf';
+    const m = media();
+    for (let i = 0; i < 120; i++) {
+      if (m && m.readyState >= 2 && m.duration > 0) break;
+      await new Promise(r => setTimeout(r, 500));
+    }
+    phase = 'playing';
+    try { await m.play(); } catch (e) { phase = 'playerr:' + (e && e.name); }
+  };
+
+  // Click-landing probe: driver clicks this corner hotspot to verify its
+  // synthetic clicks reach THIS page (screen-front check) before recording.
+  const pingHot = document.createElement('div');
+  pingHot.style.cssText = 'position:fixed;top:8px;right:6px;width:48px;height:28px;z-index:2147483647;opacity:0.001;cursor:default';
+  document.body.appendChild(pingHot);
+  pingHot.onclick = () => { phase = 'ping' + Date.now() % 100000; };
+
+  document.getElementById('bReset').onclick = () => { W().location.reload(); phase = 'reset'; };
+})();
+</script>
+</body>
+</html>

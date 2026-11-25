@@ -1,0 +1,130 @@
+{
+ "n_boot": 4000,
+ "seed": 20261024,
+ "talks": [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+  10
+ ],
+ "contrasts": {
+  "lm_hmm_vs_merged100k:term_acc": {
+   "diff": -0.09770395701025336,
+   "stratified_talk_bootstrap_ci95": [
+    -1.2706951913450246,
+    0.8174386920980936
+   ],
+   "talk_permutation_p": 0.96875,
+   "per_domain_diff": {
+    "acl": -1.0233918128654977,
+    "medicine": 1.7673048600883732
+   },
+   "leave_one_talk_out_range": [
+    -0.3278688524590194,
+    0.5747126436781542
+   ],
+   "sensitivity_occurrence_mcnemar": {
+    "a_only": 50,
+    "b_only": 52,
+    "p": 0.9211910492538722
+   },
+   "talk_permutation_p_holm": 0.96875
+  },
+  "lm_hmm_vs_merged100k:bleu": {
+   "diff": 1.381242824037919,
+   "stratified_talk_bootstrap_ci95": [
+    0.6823752457362235,
+    1.9054655031619625
+   ],
+   "talk_permutation_p": 0.009765625,
+   "per_domain_diff": {
+    "acl": 0.14867280684457285,
+    "medicine": 1.6040886775933885
+   },
+   "leave_one_talk_out_range": [
+    1.0875052772656346,
+    1.5890854367086078
+   ],
+   "talk_permutation_p_holm": 0.029296875
+  },
+  "lm_hmm_vs_merged100k:mt_bleu": {
+   "diff": 1.3472948185195435,
+   "stratified_talk_bootstrap_ci95": [
+    0.6431900280673405,
+    1.746898167520156
+   ],
+   "talk_permutation_p": 0.005859375,
+   "per_domain_diff": {
+    "acl": 0.322903865672167,
+    "medicine": 1.5253306503356185
+   },
+   "leave_one_talk_out_range": [
+    1.0021411193673089,
+    1.522013149248778
+   ],
+   "talk_permutation_p_holm": 0.0234375
+  },
+  "lm_hmm_vs_merged1m:term_acc": {
+   "diff": 3.2730825598436724,
+   "stratified_talk_bootstrap_ci95": [
+    1.3796323312484393,
+    4.785212749555567
+   ],
+   "talk_permutation_p": 0.03125,
+   "per_domain_diff": {
+    "acl": 1.2426900584795249,
+    "medicine": 7.363770250368191
+   },
+   "leave_one_talk_out_range": [
+    2.568306010928964,
+    4.310344827586192
+   ],
+   "sensitivity_occurrence_mcnemar": {
+    "a_only": 120,
+    "b_only": 53,
+    "p": 3.7812303722229655e-07
+   },
+   "talk_permutation_p_holm": 0.0625
+  },
+  "lm_hmm_vs_merged1m:bleu": {
+   "diff": 2.3112790403161014,
+   "stratified_talk_bootstrap_ci95": [
+    1.4873812787466796,
+    2.9403509919100994
+   ],
+   "talk_permutation_p": 0.001953125,
+   "per_domain_diff": {
+    "acl": 0.8152855391915566,
+    "medicine": 2.4156862061649917
+   },
+   "leave_one_talk_out_range": [
+    2.0433154915887286,
+    2.4860778659256653
+   ],
+   "talk_permutation_p_holm": 0.01171875
+  },
+  "lm_hmm_vs_merged1m:mt_bleu": {
+   "diff": 2.3242140755779204,
+   "stratified_talk_bootstrap_ci95": [
+    0.8678545732297442,
+    2.9600912125929852
+   ],
+   "talk_permutation_p": 0.001953125,
+   "per_domain_diff": {
+    "acl": 0.7836889144877119,
+    "medicine": 2.3571001748632625
+   },
+   "leave_one_talk_out_range": [
+    1.699484234083286,
+    2.5153449419547016
+   ],
+   "talk_permutation_p_holm": 0.01171875
+  }
+ }
+}

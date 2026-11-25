@@ -1,0 +1,114 @@
+{
+ "geography": {
+  "description": "Country, city, region, river, mountain, and place-name terms.",
+  "prototypes": [
+   "Geography, countries, cities, regions, rivers, mountains, islands, lakes, and borders.",
+   "地理、国家、城市、地区、河流、山脉、岛屿、湖泊和边界。"
+  ]
+ },
+ "history": {
+  "description": "Historical period, dynasty, empire, war, and event terms.",
+  "prototypes": [
+   "History, ancient civilizations, dynasties, empires, kings, revolutions, wars, and historical events.",
+   "历史、古代文明、朝代、帝国、国王、革命、战争和历史事件。"
+  ]
+ },
+ "politics": {
+  "description": "Government, election, party, parliament, and diplomacy terms.",
+  "prototypes": [
+   "Politics, government, elections, political parties, parliaments, ministers, diplomacy, and international relations.",
+   "政治、政府、选举、政党、议会、部长、外交和国际关系。"
+  ]
+ },
+ "military": {
+  "description": "Weapon, armed-force, battle, rank, and defense terms.",
+  "prototypes": [
+   "Military, armed forces, weapons, warships, military aircraft, battles, soldiers, ranks, and defense.",
+   "军事、武装力量、武器、军舰、军用飞机、战役、士兵、军衔和国防。"
+  ]
+ },
+ "religion": {
+  "description": "Religion, belief, scripture, clergy, and mythology terms.",
+  "prototypes": [
+   "Religion, churches, temples, saints, gods, scripture, clergy, rituals, and mythology.",
+   "宗教、教堂、寺庙、圣人、神祇、经文、神职人员、仪式和神话。"
+  ]
+ },
+ "literature": {
+  "description": "Book, author, poetry, novel, and publishing terms.",
+  "prototypes": [
+   "Literature, novels, poetry, authors, poets, books, plays, literary prizes, and publishing.",
+   "文学、小说、诗歌、作家、诗人、书籍、戏剧、文学奖和出版。"
+  ]
+ },
+ "social_science": {
+  "description": "Psychology, sociology, anthropology, and social-theory terms.",
+  "prototypes": [
+   "Social science, psychology, sociology, anthropology, human behavior, society, culture, and social theory.",
+   "社会科学、心理学、社会学、人类学、人类行为、社会、文化和社会理论。"
+  ]
+ },
+ "transportation": {
+  "description": "Rail, road, aviation, shipping, and vehicle terms.",
+  "prototypes": [
+   "Transportation, railways, stations, airports, airlines, roads, ships, cars, and public transit.",
+   "交通运输、铁路、车站、机场、航空公司、道路、船舶、汽车和公共交通。"
+  ]
+ },
+ "astronomy": {
+  "description": "Planet, star, galaxy, spacecraft, and space-mission terms.",
+  "prototypes": [
+   "Astronomy and space, planets, stars, galaxies, asteroids, telescopes, satellites, and space missions.",
+   "天文与航天、行星、恒星、星系、小行星、望远镜、卫星和航天任务。"
+  ]
+ },
+ "agriculture": {
+  "description": "Crop, farming, livestock, food, and cuisine terms.",
+  "prototypes": [
+   "Agriculture and food, crops, farming, livestock, plants, cooking, dishes, beverages, and cuisine.",
+   "农业与食品、农作物、耕作、牲畜、植物、烹饪、菜肴、饮料和美食。"
+  ]
+ },
+ "mathematics": {
+  "description": "Mathematical concept, theorem, structure, and statistics terms.",
+  "prototypes": [
+   "Mathematics, algebra, geometry, calculus, theorems, equations, numbers, and statistics.",
+   "数学、代数、几何、微积分、定理、方程、数和统计。"
+  ]
+ },
+ "computing": {
+  "description": "Computer hardware, networking, and telecommunications terms.",
+  "prototypes": [
+   "Computing, computer hardware, processors, semiconductors, networks, the internet, telecommunications, and programming languages.",
+   "计算机、计算机硬件、处理器、半导体、网络、互联网、电信和编程语言。"
+  ]
+ },
+ "linguistics": {
+  "description": "Language, dialect, writing-system, and grammar terms.",
+  "prototypes": [
+   "Linguistics, languages, dialects, writing systems, alphabets, grammar, phonetics, and etymology.",
+   "语言学、语言、方言、文字系统、字母、语法、语音学和词源。"
+  ]
+ },
+ "energy": {
+  "description": "Energy, power, engineering, and industrial terms.",
+  "prototypes": [
+   "Energy and engineering, electricity, power plants, oil and gas, engines, machines, manufacturing, and industry.",
+   "能源与工程、电力、发电厂、石油和天然气、发动机、机械、制造和工业。"
+  ]
+ },
+ "geology": {
+  "description": "Mineral, rock, volcano, earthquake, and earth-science terms.",
+  "prototypes": [
+   "Geology and earth science, minerals, rocks, volcanoes, earthquakes, fossils, oceans, and plate tectonics.",
+   "地质与地球科学、矿物、岩石、火山、地震、化石、海洋和板块构造。"
+  ]
+ },
+ "zoology": {
+  "description": "Animal, bird, insect, fish, and wildlife terms.",
+  "prototypes": [
+   "Zoology and wildlife, animals, mammals, birds, insects, fish, reptiles, and animal behavior.",
+   "动物学与野生动物、动物、哺乳动物、鸟类、昆虫、鱼类、爬行动物和动物行为。"
+  ]
+ }
+}

@@ -1,0 +1,30 @@
+{
+ "chunk_s": 1.92,
+ "warmup_chunks_dropped": 3,
+ "configs": {
+  "lm": {
+   "chunks": 90,
+   "retrieve_chunks": 90,
+   "generation_chunks": 90,
+   "retrieve_mean_s": 0.0935,
+   "generation_mean_s": 0.3331,
+   "rtf": 0.2222
+  },
+  "routed": {
+   "chunks": 90,
+   "retrieve_chunks": 90,
+   "generation_chunks": 90,
+   "retrieve_mean_s": 0.0638,
+   "generation_mean_s": 0.343,
+   "rtf": 0.2119
+  },
+  "fixed": {
+   "chunks": 90,
+   "retrieve_chunks": 90,
+   "generation_chunks": 90,
+   "retrieve_mean_s": 0.0591,
+   "generation_mean_s": 0.3593,
+   "rtf": 0.2179
+  }
+ }
+}

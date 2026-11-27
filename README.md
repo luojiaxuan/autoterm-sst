@@ -27,6 +27,7 @@ retrieved term pairs next to each partial translation.
   Android (see [Phone app](#phone-app)).
 - **Screencast:** [`docs/demo_screencast.mp4`](https://github.com/luojiaxuan/autoterm-sst/blob/main/docs/demo_screencast.mp4)
   (2 min 12 s, one session of the live demo on the *Medicine then ACL* sample).
+  Audio excerpt courtesy of the European School of Oncology (ESO).
 - **Mock mode:** one command runs the full web UI and wire protocol on a
   laptop with no GPU and no model download ([Quick start](#quick-start)).
 - **Paper configuration:** `scripts/start_autoterm_demo.sh` serves the
@@ -279,7 +280,9 @@ Their outputs and run provenance are in `docs/`:
 The test audio is not part of this repository. ACL 60/60 and RealSI are
 public; the oncology lectures come from the ESO test set, which the MLLP group
 distributes. `scripts/radix_stream_eval/download.py` names the five lectures and
-how to prepare them.
+how to prepare them. The screencast and the live demo's *Medicine then ACL*
+sample play 59 seconds of one ESO lecture with ESO's permission; audio excerpt
+courtesy of the European School of Oncology (ESO).
 
 ---
 

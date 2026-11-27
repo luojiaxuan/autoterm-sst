@@ -1597,6 +1597,7 @@
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
             margin-bottom: 10px;
         }
+        body.ui2 .ui2-playback-credit { color: var(--subtle); font-size: 12px; line-height: 16px; margin-top: 8px; }
         body.ui2 .ui2-media-slot {
             position: static; height: auto; min-height: 0;
             margin: 0; padding: 0; border: 0;
@@ -1800,7 +1801,7 @@
                 <div class="ui2-samples" id="sampleAudioItem">
                     <span class="ui2-label">Try a sample</span>
                     <div class="ui2-sample-row">
-                        <button class="sample-btn ui2-chip" type="button" data-sample="medicine_then_acl.wav" data-title="Medicine then ACL">Medicine then ACL</button>
+                        <button class="sample-btn ui2-chip" type="button" data-sample="medicine_then_acl.wav" data-title="Medicine then ACL" data-credit="Audio excerpt courtesy of the European School of Oncology (ESO)">Medicine then ACL</button>
                         <button class="sample-btn ui2-chip" type="button" data-sample="acl_sample.wav" data-title="ACL talk">ACL talk</button>
                         <button class="sample-btn ui2-chip" type="button" data-sample="medicine_sample.wav" data-title="Medicine talk">Medicine talk</button>
                     </div>
@@ -1888,6 +1889,7 @@
                         <div class="ui2-media-slot" id="mediaContainer">
                             <div class="video-placeholder" id="videoPlaceholder">Load a sample or your own media to begin</div>
                         </div>
+                        <div class="ui2-playback-credit" id="sourceCredit" hidden></div>
                     </section>
                 </aside>
             </section>
@@ -3618,6 +3620,13 @@
             resetIdleTimer();
         }
 
+        // Samples from third-party recordings carry the credit line their rights holder asked for.
+        function setSourceCredit(text) {
+            const credit = document.getElementById('sourceCredit');
+            credit.textContent = text;
+            credit.hidden = !text;
+        }
+
         // Create media element (audio or video)
         function createMediaElement(file) {
             // Remove existing media
@@ -3645,6 +3654,7 @@
             currentMediaElement = mediaElement;
             const sourceTitle = document.getElementById('sourceTitle');
             if (sourceTitle) sourceTitle.textContent = file.name;
+            setSourceCredit('');
             document.querySelectorAll('.sample-btn.active').forEach(b => b.classList.remove('active'));
             
             // Add event listeners
@@ -4583,6 +4593,7 @@
                     btn.classList.add('active');
                     const sourceTitle = document.getElementById('sourceTitle');
                     if (sourceTitle) sourceTitle.textContent = title;
+                    setSourceCredit(btn.dataset.credit || '');
                     translationInitialized = false;
                     updateStatus(`Sample loaded: ${title}. Press play to start translation.`, 'ready');
                     resetIdleTimer();
